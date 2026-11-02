@@ -42,7 +42,7 @@ where:
   stack is defined under that id, so that it works whatever the ids are. `validate-stack`, `generate-cleanup-script` and the other
   commands taking a stack id accept it too, and so do the scripts (`aws-create`, `aws-cluster`, `tofu-plan`, the kube estimator and so on), which, as their name has the cloud, also take the role alone, eg `aws-create tre`.
   Every defined stack is listed: with the bundled `stacks.yaml`, `aws-full`, `aws-keycloak`, `aws-polaris`, `aws-snowflake`,
-  `azure-full`, `azure-keycloak`, `azure-polaris`, `gcp-keycloak` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
+  `azure-full`, `azure-keycloak`, `azure-polaris`, `gcp-full`, `gcp-keycloak` and `gcp-polaris`, and, to delete every stack of a cloud, `<cloud>-all`, eg `aws-all`;
 - `<step>`, if given, is the step from which to resume a failed run (see
   [Resume a failed stack deployment](#resume-a-failed-stack-deployment-from-a-specific-step));
 - `--replace`, if given, lets `deploy` and `setup` delete the other stacks conflicting with the stack, see
@@ -159,6 +159,8 @@ stack of the cloud, and `delete` of any stack of the cloud deletes it too.  Like
 | `azure-full` | `OIDC_DOMAIN_NAME`, `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | none |
 | `azure-full`, with `AZURE_KEYCLOAK_EXTERNAL=true` | `AZURE_POLARIS_DOMAIN_NAME`, `AZURE_JUPYTER_DOMAIN_NAME`, `AZURE_EGRESS_IP` | `azure-keycloak` |
 | `gcp-keycloak` | `OIDC_DOMAIN_NAME` | `gcp-polaris` |
+| `gcp-full` | `OIDC_DOMAIN_NAME`, `GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME`, `GCP_EGRESS_IP` | none |
+| `gcp-full`, with `GCP_KEYCLOAK_EXTERNAL=true` | `GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME`, `GCP_EGRESS_IP` | `gcp-keycloak` |
 | `gcp-polaris` | `GCP_POLARIS_DOMAIN_NAME`, `GCP_EGRESS_IP` | `gcp-keycloak` |
 
 The Polaris stacks, `aws-polaris`, `azure-polaris` and `gcp-polaris`, deploy no KeyCloak of their own, but use the
@@ -172,7 +174,7 @@ Their `deploy` and `setup` check first that KeyCloak answers at `OIDC_DOMAIN_NAM
 The `aws-full` stack deploys its own KeyCloak, so it conflicts with both `aws-keycloak` and `aws-polaris`, unless
 `AWS_KEYCLOAK_EXTERNAL=true` is set in `afon-aws.properties` (it is `false` when empty): it then uses the KeyCloak
 `aws-keycloak` deploys, like `aws-polaris`, so it runs side by side with `aws-keycloak`, and its `deploy` and `setup` likewise check first that KeyCloak answers.
-Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.  The same holds on Azure with `AZURE_EGRESS_IP`: `azure-keycloak` always gets an address from Azure.  On GCP `gcp-polaris` pins its egress IP to `GCP_EGRESS_IP`, if set, and `gcp-keycloak` always gets addresses from Google.
+Only the Polaris stacks pin their egress IP to `AWS_EGRESS_IP`, if set: `aws-keycloak` always gets a fresh one.  The same holds on Azure with `AZURE_EGRESS_IP`: `azure-keycloak` always gets an address from Azure.  On GCP `gcp-polaris` and `gcp-full` pin their egress IP to `GCP_EGRESS_IP`, if set, and `gcp-keycloak` always gets addresses from Google.
 
 On Azure it is the same with `azure-keycloak` and `AZURE_KEYCLOAK_EXTERNAL=true` in `afon-azure.properties` (it is `false` when empty):
 `azure-full` then uses the KeyCloak `azure-keycloak` deploys, so it runs side by side with it, and its `deploy` and `setup` check first that KeyCloak answers.
@@ -543,6 +545,23 @@ whose DNS zone is in `AZURE_RESOURCE_GROUP`, like `AZURE_POLARIS_DOMAIN_NAME` an
 need the cluster's Advanced Container Networking Services, which the stack enables, and its monitoring keeps the logs in the container of the
 `azure` catalog, using `AZURE_CONNECTION_STRING`.
 
+### Setup GCP full stack
+
+```
+afon-cli.sh manage-stack setup gcp-full
+```
+Run `gcp-create gcp-full` first: it makes the Gitea bucket and disk, and the HMAC key (see [volumes that outlive the cluster](cluster.md#volumes-that-outlive-the-cluster)),
+and the stack fails to plan without the disk.  `gcp-full` has the same components as `azure-full`, including its own KeyCloak at `OIDC_DOMAIN_NAME`, whose DNS zone must be in
+`GCP_PROJECT_ID` like those of `GCP_POLARIS_DOMAIN_NAME` and `GCP_JUPYTER_DOMAIN_NAME`.  The step-by-step is in the [GCP TRE guide](guides/gcp/tre.md).
+
+**NOTE:** `gcp-full` is unlikely to fit the default nodes (`e2-medium`, one per zone).  Set larger ones in `afon-gcp.properties` first, eg
+`GCP_GKE_NODE_POOL=machineType:e2-standard-4,nodeCount:2`, and approximate the capacity with `ALLOC_CPU=<m of CPU> ALLOC_MEM=<Mi> afon-cli.sh kube-estimator gcp-full <nodes> <machine type>`, giving what a node has to give to pods, as the estimator only knows Azure sizes and the system pods it counts are those measured on AKS.
+
+**NOTE:** its network policies need the cluster's Dataplane V2 and FQDN network policies, which the stack enables (GKE has no `CiliumNetworkPolicy`, which AWS and Azure use), and limit what the notebooks and the Spark master and driver can
+connect to the domains of `whitelist.yaml`: one `FQDNNetworkPolicy` for each, and an ordinary `NetworkPolicy` for DNS, the Spark master and, for the driver, the ingress controller.
+Unlike on AWS and Azure the DNS lookups themselves are not filtered, so a name that is not whitelisted cannot be connected to but can be looked up (see [GCP network policies](guides/gcp/tre.md#network-policies)).
+On an existing cluster, enabling FQDN network policies needs `kubectl rollout restart ds -n kube-system anetd` to take effect.  Loki keeps the monitoring logs in the bucket of the `gcp` catalog, with `GOOGLE_APPLICATION_CREDENTIALS`.
+
 ### Setup Azure Polaris only
 
 ```shell
@@ -828,7 +847,7 @@ afon-cli.sh manage-stack run snowflake-reading-all
 ## Deployment checklist
 
 - [ ] **Domain names** purchased via your domain registrar, one per cloud (e.g. `polaris.yourdomain.com`)
-- [ ] **DNS zones** created in each target cloud (`dns-create-zones`) and delegated to (`dns-delegate` for a subdomain, else the nameservers at your domain registrar), see [DNS configuration](dns_config.md)
+- [ ] **DNS zones** created in each target cloud (`dns-create-zones`) and delegated to (`dns-delegate` for a subdomain, or for a domain registered with Route 53 with `--route53`, else the nameservers at your domain registrar), see [DNS configuration](dns_config.md)
 - [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
 - [ ] **External Polaris database** provisioned for Polaris metadata storage
 - [ ] **OIDC provider** configured OIDC provider for Jupyter access

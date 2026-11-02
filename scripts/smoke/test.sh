@@ -5,7 +5,7 @@
 # usage: scripts/smoke/test.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
 #                                      [--tests|-t <tests>] [--restrict-polaris]
 #                                      [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
-#   <cloud>   the cloud of the full stack to run the tests against, aws or azure (default: aws), ie <cloud>-full.  The
+#   <cloud>   the cloud of the full stack to run the tests against, aws, azure or gcp (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
 #   --cli     runs the afon commands with afon-cli.sh, rather than afon.sh: that of the cli distribution in
@@ -30,7 +30,7 @@
 #   --restrict-polaris
 #             restricts the Polaris ingress for the run, for the network smoke test to pass on a stack whose deploy
 #             did not, see below.  Changes the cluster, so it is opt-in: it records how the ingress is, ie its
-#             annotation, and on Azure the ingress controller's externalTrafficPolicy, in
+#             annotation, and on Azure and GCP the ingress controller's externalTrafficPolicy, in
 #             smoke/target/regression/polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt, then restores exactly that on exit,
 #             before any teardown, whatever the properties say.  The file is kept as a record of the run, with the
 #             outcome of the restore.  A run killed before it restored, eg with kill -9, leaves a file without an
@@ -59,11 +59,12 @@
 # cluster of the env, that of --env, if given, else that of the current config, with the afon command
 # '<cloud>-update-kube-config tre', ie the stack with the role tre, and left so.  The stacks are tested as deployed:
 # eg the network smoke test, which checks that Polaris cannot be reached from outside of the cluster, only passes if
-# the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS or AZURE_POLARIS_ALLOWED_CIDRS set.  The suite
+# the deploy restricted its ingress, ie with AWS_POLARIS_ALLOWED_CIDRS, AZURE_POLARIS_ALLOWED_CIDRS or GCP_POLARIS_ALLOWED_CIDRS set.  The suite
 # changes nothing in the cluster, unless given --restrict-polaris: it only checks, before the tests, that the ingress is
 # restricted, and if it is not, warns that the network smoke test is expected to fail, and prints the kubectl commands
 # that restrict it for the cloud: the configured CIDRs plus the cluster's own addresses, ie its egress IP on AWS, or its
-# outbound IP and pod CIDR on Azure, with the ingress controller keeping the callers' IPs.  The machine running the
+# outbound IP and pod CIDR on Azure, or its pod range, node subnet and pinned egress IP on GCP, with the ingress controller keeping the
+# callers' IPs on Azure and GCP.  The machine running the
 # tests must not be among the CIDRs, else the call to Polaris from outside of the cluster gets through.
 # The env vars of afon.sh and afon-cli.sh apply, eg AFON_HOME, AFON_ENV or AFON_LOGGING_CONSOLE.
 #
@@ -404,7 +405,7 @@ check_polaris_ingress() {
     present:?*)
       banner "The Polaris ingress is restricted to ${state#present:}"
       record "Polaris ingress restricted to ${state#present:}"
-      if [ "$CLOUD" = "azure" ]; then
+      if ingress_controller_in_cluster; then
         controller=$(controller_service "$context")
         policy=
         if [ -n "$controller" ]; then
@@ -432,6 +433,12 @@ check_polaris_ingress() {
   fi
   echo "or, with the same CIDRs: afon-cli.sh kube-polaris-whitelist $CLOUD set"
   echo "or run the suite with --restrict-polaris, which restricts the ingress for the run and restores it after to its exact state."
+}
+
+# Whether the ingress controller, nginx, runs in the cluster, as on Azure and GCP, rather than being the AWS ALB, outside of it: its
+# service must then keep the callers' IPs, with externalTrafficPolicy Local, for the restriction of the ingress to apply to them.
+ingress_controller_in_cluster() {
+  [ "$CLOUD" = "azure" ] || [ "$CLOUD" = "gcp" ]
 }
 
 # Prints the value of key $1 of the snapshot of the Polaris ingress.
@@ -465,7 +472,7 @@ record_snapshot_outcome() {
 }
 
 # Puts the Polaris ingress back as the snapshot of --restrict-polaris recorded it, ie the annotation set to its recorded
-# value, or removed if it was not set, and, on Azure, the controller's externalTrafficPolicy as it was, whatever the
+# value, or removed if it was not set, and, on Azure and GCP, the controller's externalTrafficPolicy as it was, whatever the
 # properties say.  Does nothing without a pending snapshot, ie one with no outcome.  If the annotation is no longer what the
 # suite set, someone changed it since, and it is left as it is.  The snapshot gets its outcome once the ingress is restored,
 # else is left pending for the next run to restore.  It runs on exit, so it only warns on failure, keeping the exit status of
@@ -540,7 +547,7 @@ restrict_polaris_ingress() {
     error "No Polaris ingress in kubectl context $context to restrict: not running the tests"
     exit 1
   fi
-  if [ "$CLOUD" = "azure" ]; then
+  if ingress_controller_in_cluster; then
     controller=$(controller_service "$context")
     if [ -z "$controller" ]; then
       error "No ingress controller service in kubectl context $context: not running the tests"
@@ -567,7 +574,7 @@ restrict_polaris_ingress() {
   } > "$SNAPSHOT_FILE"
   banner "Restricting the Polaris ingress of $context to $cidrs, to restore it as it is now ($state) on exit"
   record "Polaris ingress restricted for the run to $cidrs, to be restored to $state, as recorded in $SNAPSHOT_FILE"
-  if [ "$CLOUD" = "azure" ]; then
+  if ingress_controller_in_cluster; then
     if ! kubectl --context "$context" patch "$controller" -n ingress-nginx --type merge \
            -p '{"spec":{"externalTrafficPolicy":"Local"}}'; then
       error "Failed to set externalTrafficPolicy Local on the ingress controller: not running the tests"
@@ -723,9 +730,9 @@ if [ -z "$CLOUD_GIVEN" ] && [ -z "$LIST" ]; then
   echo "No cloud given, defaulting to $CLOUD"
 fi
 case "$CLOUD" in
-  aws|azure) ;;
+  aws|azure|gcp) ;;
   *)
-    error "Unsupported cloud: $CLOUD, which should be aws or azure, the clouds of a full stack"
+    error "Unsupported cloud: $CLOUD, which should be aws, azure or gcp, the clouds of a full stack"
     usage >&2; exit 1 ;;
 esac
 

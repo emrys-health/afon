@@ -97,6 +97,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureUpdateKubeConfigMain", "azure/update-kube-config.sh", "azure"),
 
         new ScriptEntry("gcp", "GcpAccountMain", "gcp/account.sh"),
+        new ScriptEntry("gcp", "GcpClusterMain", "gcp/cluster.sh", "gcp"),
         new ScriptEntry("gcp", "GcpCreateIcebergEndpointMain", "gcp/create_iceberg_endpoint.sh"),
         new ScriptEntry("gcp", "GcpCreateMain", "gcp/create.sh", "gcp"),
         new ScriptEntry("gcp", "GcpDestroyMain", "gcp/destroy.sh"),

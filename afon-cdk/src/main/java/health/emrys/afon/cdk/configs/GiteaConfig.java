@@ -44,7 +44,7 @@ import static health.emrys.afon.config.AfonProperty.*;
  * keep theirs apart.  The database, the bucket's path and the volume are all named after the same cluster name,
  * eg {@code full-emrys-cluster}, so that a cluster of the same name finds all three again.
  *
- * <p>The database {@code gitea_<cluster>} is created, if absent, by an init container of the Gitea pod; Gitea then
+ * <p>The database {@code gitea_<cloud>_<cluster>} is created, if absent, by an init container of the Gitea pod; Gitea then
  * creates and migrates its own schema.  The chart's bundled Postgres and Valkey are disabled: being a single replica,
  * Gitea keeps its sessions and cache in memory and its queues on its volume.
  *
@@ -59,8 +59,7 @@ import static health.emrys.afon.config.AfonProperty.*;
  *     <li>optionally {@code GITEA_STORAGE_SIZE}, the size of the repositories' volume, defaulting to {@code 10Gi}</li>
  *     <li>{@code GITEA_ADMIN_USERNAME}, {@code GITEA_ADMIN_PASSWORD}</li>
  *     <li>AWS: {@code AWS_GITEA_BUCKET}, {@code AWS_REGION}, {@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY}</li>
- *     <li>GCP: {@code GCP_GITEA_BUCKET}, {@code GCP_REGION}, {@code GCP_GITEA_HMAC_ACCESS_ID},
- *     {@code GCP_GITEA_HMAC_SECRET}</li>
+ *     <li>GCP: {@code GCP_GITEA_BUCKET}, {@code GCP_REGION}, {@code GCP_HMAC_ACCESS_ID}, {@code GCP_HMAC_SECRET}</li>
  *     <li>Azure: {@code AZURE_GITEA_BUCKET} (a container), {@code AZURE_CONNECTION_STRING}</li>
  * </ul>
  */
@@ -152,10 +151,12 @@ public class GiteaConfig {
     }
 
     /**
-     * The Postgres database Gitea keeps its metadata in, one per cluster, as Postgres identifiers allow.
+     * The Postgres database Gitea keeps its metadata in, one per cluster of a cloud, as Postgres identifiers allow, eg
+     * {@code gitea_gcp_full_emrys_cluster}.  It has the cloud in its name as the cluster name has none, so that the clusters of the same
+     * env on different clouds, which share the Postgres, do not share the repositories' records, each having its own volume with the files.
      */
     String databaseName() {
-        return "gitea_" + clusterName.replaceAll("[^A-Za-z0-9_]", "_");
+        return "gitea_" + cloud.toString().toLowerCase(Locale.ROOT) + "_" + clusterName.replaceAll("[^A-Za-z0-9_]", "_");
     }
 
     /**
@@ -268,8 +269,8 @@ public class GiteaConfig {
                 section.put("MINIO_BUCKET", bucket);
                 section.put("MINIO_BASE_PATH", basePath());
                 section.put("MINIO_USE_SSL", "true");
-                section.put("MINIO_ACCESS_KEY_ID", properties.getValue(GCP_GITEA_HMAC_ACCESS_ID));
-                section.put("MINIO_SECRET_ACCESS_KEY", properties.getValue(GCP_GITEA_HMAC_SECRET));
+                section.put("MINIO_ACCESS_KEY_ID", properties.getValue(GCP_HMAC_ACCESS_ID));
+                section.put("MINIO_SECRET_ACCESS_KEY", properties.getValue(GCP_HMAC_SECRET));
             }
             case AZURE -> {
                 Map<String, String> connection = parseConnectionString(properties.getValue(AZURE_CONNECTION_STRING));

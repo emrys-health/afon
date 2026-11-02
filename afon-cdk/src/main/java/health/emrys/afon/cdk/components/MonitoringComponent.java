@@ -170,7 +170,7 @@ public class MonitoringComponent implements StackComponent {
             .name("loki")
             .chart(vendoredChart(stack, "lokiChart", "loki-6.16.0.tgz"))
             .namespace(MONITORING_NAMESPACE)
-            .values(List.of(lokiValues(logStorage)))
+            .values(lokiValuesOf(logStorage))
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
@@ -199,6 +199,16 @@ public class MonitoringComponent implements StackComponent {
             .forceUpdate(true)
             .dependsOn(deps)
             .build();
+    }
+
+    /**
+     * @return the values of the Loki release: those of {@link #lokiValues(LogStorage)}, then the extra ones of the storage, if any,
+     * which Helm merges over them
+     */
+    static List<String> lokiValuesOf(LogStorage storage) {
+        return storage.extraValuesYaml().isBlank()
+               ? List.of(lokiValues(storage))
+               : List.of(lokiValues(storage), storage.extraValuesYaml());
     }
 
     /**

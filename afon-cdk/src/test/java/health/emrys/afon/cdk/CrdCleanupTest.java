@@ -33,6 +33,8 @@ class CrdCleanupTest {
     private static final String GRAFANA_AGENTS = "customresourcedefinition.apiextensions.k8s.io/grafanaagents.monitoring.grafana.com";
     private static final String CILIUM_POLICIES = "customresourcedefinition.apiextensions.k8s.io/ciliumnetworkpolicies.cilium.io";
     private static final String CILIUM_IDENTITIES = "customresourcedefinition.apiextensions.k8s.io/ciliumidentities.cilium.io";
+    private static final String CILIUM_NODES = "customresourcedefinition.apiextensions.k8s.io/ciliumnodes.cilium.io";
+    private static final String TRACING_POLICIES = "customresourcedefinition.apiextensions.k8s.io/tracingpolicies.cilium.io";
     private static final String SPARK = "customresourcedefinition.apiextensions.k8s.io/sparkapplications.spark.apache.org";
     private static final String EKS_MANAGED = "customresourcedefinition.apiextensions.k8s.io/policyendpoints.networking.k8s.aws";
     private static final String LBC = "customresourcedefinition.apiextensions.k8s.io/targetgroupbindings.elbv2.k8s.aws";
@@ -184,6 +186,27 @@ class CrdCleanupTest {
     }
 
     @Test
+    void leavesTheCiliumCrdsOfTheDataplaneAloneWhereItOwnsThemButRemovesTetragons() throws Exception {
+        crds(PROM, CILIUM_NODES, CILIUM_IDENTITIES, CILIUM_POLICIES, TRACING_POLICIES, SPARK);
+
+        Result result = runWithCommand(CrdCleanup.command(true), Map.of("CRD_CLEANUP_INTERVAL", "0"));
+
+        assertThat(result.exitCode()).isZero();
+        // GKE's networking breaks without the others: no new pod gets a network once they are gone
+        assertThat(remainingCrds()).containsExactly(CILIUM_NODES, CILIUM_IDENTITIES, CILIUM_POLICIES, SPARK);
+        assertThat(calls()).noneMatch(call -> call.contains("ciliumnodes") || call.contains("ciliumidentities"));
+    }
+
+    @Test
+    void commandForADataplaneThatOwnsCiliumTargetsNoCiliumGroup() {
+        String command = CrdCleanup.command(true);
+
+        assertThat(command).contains("[.](monitoring[.]coreos[.]com|monitoring[.]grafana[.]com)$"
+                                     + "|/(tracingpolicies[.]cilium[.]io|tracingpoliciesnamespaced[.]cilium[.]io)$");
+        assertThat(CrdCleanup.command(false)).isEqualTo(CrdCleanup.command());
+    }
+
+    @Test
     void removesFinalizersOfTheResourcesThatHang() throws Exception {
         crds(PROM, CILIUM_IDENTITIES);
         Files.writeString(stub.resolve("cr_prometheuses.monitoring.coreos.com"), "default/k8s\nmonitoring/other\n");
@@ -298,7 +321,11 @@ class CrdCleanupTest {
     }
 
     private Result run(Map<String, String> env) throws Exception {
-        ProcessBuilder builder = new ProcessBuilder("sh", "-c", CrdCleanup.command());
+        return runWithCommand(CrdCleanup.command(), env);
+    }
+
+    private Result runWithCommand(String command, Map<String, String> env) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder("sh", "-c", command);
         builder.environment().putAll(env);
         builder.environment().put("STUB", stub.toString());
         builder.environment().put("PATH", stub + File.pathSeparator + System.getenv("PATH"));

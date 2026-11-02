@@ -17,7 +17,7 @@ class CloudStackValidatorTest {
     void canListStacks() {
         assertThat(validator.stackNames()).containsExactly(
             "aws-full", "aws-keycloak", "aws-lab", "aws-polaris", "aws-snowflake",
-            "azure-full", "azure-keycloak", "azure-polaris", "gcp-keycloak", "gcp-polaris");
+            "azure-full", "azure-keycloak", "azure-polaris", "gcp-full", "gcp-keycloak", "gcp-polaris");
     }
 
     @Test
@@ -34,8 +34,7 @@ class CloudStackValidatorTest {
         assertThat(validator.resolve("aws-tre")).isEqualTo(new StackId(AWS, "full"));
         assertThat(validator.resolve("AZURE-CATALOG")).isEqualTo(new StackId(AZURE, "polaris"));
         assertThat(validator.resolve("gcp-identity")).isEqualTo(new StackId(GCP, "keycloak"));
-        // no stack of gcp has the role, as for an unknown stack
-        assertThat(validator.resolve("gcp-tre")).isNull();
+        assertThat(validator.resolve("gcp-tre")).isEqualTo(new StackId(GCP, "full"));
     }
 
     @Test
@@ -48,7 +47,7 @@ class CloudStackValidatorTest {
         assertThat(validator.resolve("unknown")).isNull();
         assertThat(validator.resolve("aws-unknown")).isNull();
         assertThat(validator.resolve("mars-polaris")).isNull();
-        assertThat(validator.resolve("gcp-full")).isNull();
+        assertThat(validator.resolve("gcp-lab")).isNull();
         // the stacks are not classes, so not named as such
         assertThat(validator.resolve("azure-polaris-stack")).isNull();
         assertThat(validator.resolve("AzurePolarisStack")).isNull();

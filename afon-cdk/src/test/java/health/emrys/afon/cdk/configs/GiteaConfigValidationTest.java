@@ -43,6 +43,13 @@ class GiteaConfigValidationTest {
     }
 
     @Test
+    void theDatabaseHasTheCloudInItsNameSoThatClustersOfTheSameEnvOnDifferentCloudsDoNotShareIt() {
+        assertThat(configOf(AfonCloud.GCP).databaseName()).isEqualTo("gitea_gcp_full_x_cluster");
+        assertThat(configOf(AfonCloud.AWS).databaseName()).isEqualTo("gitea_aws_full_x_cluster");
+        assertThat(configOf(AfonCloud.AZURE).databaseName()).isEqualTo("gitea_azure_full_x_cluster");
+    }
+
+    @Test
     void acceptsPasswordsOfTheMinimumLength() {
         GiteaConfig config = configOf(AfonCloud.AWS, user("mauro", "12345678"));
         assertThat(config.usersList()).startsWith("mauro,").contains("12345678");

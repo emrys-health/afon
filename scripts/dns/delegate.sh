@@ -8,7 +8,11 @@ usage(){
   echo ""
   echo "With --route53, the records are also written to the Route 53 hosted zone of the parent domain, ie the longest suffix of the domain"
   echo "name that is a public hosted zone of the current AWS account, replacing any existing NS record of the domain name, so that it is safe"
-  echo "to repeat.  A domain name with no such parent zone is left for you to delegate by hand."
+  echo "to repeat."
+  echo "A domain name with no such parent zone that is itself registered with Route 53 in the current AWS account has its registered"
+  echo "nameservers set to those of the zone instead, REPLACING the ones it has, which are shown first: its DNS is then served by the zone"
+  echo "of the cloud, so anything else in the domain's current zone stops resolving.  Nothing is changed if they are the same already."
+  echo "Any other domain name is left for you to delegate by hand."
 }
 
 CLOUD=""
@@ -53,12 +57,52 @@ parent_zone() {
   return 1
 }
 
-# Upserts the NS record of the domain name, with the name servers given, in the Route 53 zone of its parent domain
-write_route53_delegation() {
-  local domain="$1" nameservers="$2" parent parent_id parent_name values="" ns
-  if ! parent="$(parent_zone $domain)"; then
-    echo "    no Route 53 hosted zone for a parent domain of $domain, so add the records above to its parent zone, or at the registrar"
+# Sets the nameservers registered for the domain name with Route 53 Domains to those given, if it is registered in the current AWS
+# account and they differ, saying what it replaces.  Route 53 Domains is only served from us-east-1.  Returns 2 if the domain name is
+# not registered in this account (or its registration cannot be read), 1 if the update fails.
+write_route53_registration() {
+  local domain="$1" nameservers="$2" current wanted ns out args=()
+  if ! current="$(aws route53domains get-domain-detail --region us-east-1 --domain-name "$domain" \
+                    --query 'Nameservers[].Name' --output text 2>/dev/null)"; then
+    return 2
+  fi
+  current="$(dns_normalise "$current")"
+  wanted="$(dns_normalise "$nameservers")"
+  if [ "$current" = "$wanted" ]; then
+    echo "    $domain is already registered with those nameservers, nothing to change"
     return 0
+  fi
+  echo "    $domain is registered with Route 53 Domains: REPLACING its registered nameservers"
+  echo "      current: $(echo $current)"
+  echo "      new:     $(echo $wanted)"
+  for ns in $nameservers; do
+    args+=("Name=$ns")
+  done
+  if ! out="$(aws route53domains update-domain-nameservers --region us-east-1 --domain-name "$domain" --nameservers "${args[@]}" \
+                --query 'OperationId' --output text 2>&1)"; then
+    # the registration shows the old nameservers until the update is applied, so a repeat finds it still pending
+    if [[ "$out" == *DuplicateRequest* ]]; then
+      echo "    an update of the nameservers of $domain is already pending: wait for it to finish (Route 53 -> Domains -> Requests), then repeat"
+      return 0
+    fi
+    echo "$out"
+    return 1
+  fi
+  echo "    submitted: the registry takes a while to apply it (the operation is under Route 53 -> Domains -> Requests)"
+}
+
+# Upserts the NS record of the domain name, with the name servers given, in the Route 53 zone of its parent domain, or, if it has no
+# such parent and is registered with Route 53 in the current AWS account, sets its registered nameservers
+write_route53_delegation() {
+  local domain="$1" nameservers="$2" parent parent_id parent_name values="" ns status
+  if ! parent="$(parent_zone $domain)"; then
+    write_route53_registration $domain "$nameservers" && return 0 || status=$?
+    if [ $status -eq 2 ]; then
+      echo "    no Route 53 hosted zone for a parent domain of $domain, and it is not registered with Route 53 in this account (or its registration cannot be read), so add the records"
+      echo "    above to its parent zone, or set the nameservers at the registrar"
+      return 0
+    fi
+    return 1
   fi
   parent_id="${parent% *}"
   parent_name="${parent#* }"

@@ -27,7 +27,7 @@ public class CrdCleanupComponent implements StackComponent {
         cleanup = Resource.Builder
             .create(context.stack(), "cleanupCRDs")
             .dependsOn(context.platform().getDependables())
-            .provisioners(uponDestroyRun(CrdCleanup.provisionerCommand()))
+            .provisioners(uponDestroyRun(CrdCleanup.provisionerCommand(context.platform().dataplaneOwnsCiliumCrds())))
             .build();
     }
 

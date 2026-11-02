@@ -100,9 +100,6 @@ class StackNeedsTest {
 
     @Test
     void rejectsWhatIsNotAStackOfTheCloudInTheStacksFile() {
-        assertThatThrownBy(() -> StackNeeds.resolve(GCP, "tre", properties))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("No stack of gcp has the role 'tre' in the stacks of ");
         assertThatThrownBy(() -> StackNeeds.resolve(AWS, "azure-full", properties))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("Stack azure-full is not a stack of aws");
         assertThatThrownBy(() -> StackNeeds.resolve(AWS, "aws-nonesuch", properties))
@@ -149,7 +146,7 @@ class StackNeedsTest {
         assertThat(StackNeeds.serving(AWS, "Keycloak", properties).stream().map(Object::toString))
             .containsExactly("aws-keycloak");
         assertThat(StackNeeds.serving(GCP, "Keycloak", properties).stream().map(Object::toString))
-            .containsExactly("gcp-keycloak");
+            .containsExactly("gcp-full", "gcp-keycloak");
         assertThatThrownBy(() -> StackNeeds.serving(AWS, "Nonesuch", properties))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown component 'Nonesuch'");
     }

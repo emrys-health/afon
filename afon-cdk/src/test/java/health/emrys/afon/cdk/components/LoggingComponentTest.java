@@ -12,6 +12,9 @@ import static health.emrys.afon.config.AfonCloud.AZURE;
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.AWS_POLARIS_LOG_BUCKET;
 import static health.emrys.afon.config.AfonProperty.AZURE_POLARIS_LOG_BUCKET;
+import static health.emrys.afon.config.AfonProperty.GCP_HMAC_ACCESS_ID;
+import static health.emrys.afon.config.AfonProperty.GCP_HMAC_SECRET;
+import static health.emrys.afon.config.AfonProperty.GCP_POLARIS_LOG_BUCKET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,10 +47,28 @@ class LoggingComponentTest {
     }
 
     @Test
-    void cannotBeDeployedToACloudWithoutALogShipper() {
+    void shipsNothingOnGcpWhenTheLogBucketIsNotSet() {
+        properties.setValue(GCP_POLARIS_LOG_BUCKET, "");
+        assertThatCode(() -> new LoggingComponent().deploy(contextOf(new StackId(GCP, "x")))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void needsTheHmacKeyToShipToGcs() {
+        properties.setValue(GCP_POLARIS_LOG_BUCKET, "logs");
+        properties.setValue(GCP_HMAC_ACCESS_ID, "");
+        properties.setValue(GCP_HMAC_SECRET, "");
         assertThatThrownBy(() -> new LoggingComponent().deploy(contextOf(new StackId(GCP, "x"))))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Stack gcp-x cannot ship Polaris logs, not supported for cloud gcp");
+            .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void needsTheHmacKeyToBeAnAccessIdAndASecret() {
+        properties.setValue(GCP_POLARIS_LOG_BUCKET, "logs");
+        properties.setValue(GCP_HMAC_ACCESS_ID, "GOOG1Eaccess");
+        properties.setValue(GCP_HMAC_SECRET, "");
+        assertThatThrownBy(() -> new LoggingComponent().deploy(contextOf(new StackId(GCP, "x"))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("GCP_HMAC_SECRET");
     }
 
     @Test

@@ -96,6 +96,48 @@ for ID in "${CATALOG_IDS[@]}"; do
   fi
 done
 
+## Gitea and the logs of Polaris
+
+# What create.sh makes for the stacks with Git, none of which deleting a stack deletes: the repositories' disks of every stack of the
+# cluster name, named gitea-<stack type>-<CLUSTER_NAME>, Gitea's bucket and the one of Polaris' logs, and the HMAC key, which is to be deactivated to be deleted.
+DISK_ZONE="${GCP_REGION}-a"
+for DISK in $(gcloud compute disks list --project=$PROJECT_ID --zones=$DISK_ZONE --filter="name~^gitea-.*-${CLUSTER_NAME:-NO_CLUSTER_NAME}$" --format="value(name)" 2>/dev/null); do
+  echo "- Deleting disk $DISK"
+  gcloud compute disks delete "$DISK" --zone=$DISK_ZONE --project=$PROJECT_ID --quiet
+done
+
+for BUCKET in "${GCP_GITEA_BUCKET:-}" "${GCP_POLARIS_LOG_BUCKET:-}"; do
+  if [ -z "$BUCKET" ]; then
+    continue
+  fi
+  if gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1; then
+    echo "- Deleting bucket $BUCKET"
+    gcloud storage rm -r "gs://$BUCKET"
+  else
+    echo "- Bucket $BUCKET does not exist, skipping"
+  fi
+done
+
+# The access id of the HMAC key, read from the secret files, not from the environment: afon-source.sh does not load them, and sourcing
+# secret-gcp.properties would also run its GOOGLE_APPLICATION_CREDENTIALS, a JSON key on one line, through the shell.
+configured_hmac_access_id() {
+  local FILE
+  for FILE in "$AFON_HOME/config/secret.properties" "$AFON_HOME/config/secret-gcp.properties"; do
+    [ -f "$FILE" ] && grep -E '^[[:space:]]*GCP_HMAC_ACCESS_ID[[:space:]]*=' "$FILE"
+  done | tail -1 | cut -d= -f2- | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//'
+}
+
+HMAC_ACCESS_ID="$(configured_hmac_access_id)"
+if [ -n "$HMAC_ACCESS_ID" ]; then
+  if gcloud storage hmac describe "$HMAC_ACCESS_ID" --project=$PROJECT_ID >/dev/null 2>&1; then
+    echo "- Deleting HMAC key $HMAC_ACCESS_ID"
+    gcloud storage hmac update "$HMAC_ACCESS_ID" --deactivate --project=$PROJECT_ID
+    gcloud storage hmac delete "$HMAC_ACCESS_ID" --project=$PROJECT_ID
+  else
+    echo "- HMAC key $HMAC_ACCESS_ID does not exist, skipping"
+  fi
+fi
+
 if gcloud iam service-accounts describe $GCP_SERVICE_ACCOUNT >/dev/null 2>&1; then
   echo "- Deleting service account $GCP_SERVICE_ACCOUNT"
   gcloud iam service-accounts delete $GCP_SERVICE_ACCOUNT --quiet

@@ -11,6 +11,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.*;
 import static java.lang.String.format;
@@ -48,6 +54,8 @@ public class SparkConnectS3ReadSmokeMain {
     private static final String REGION = "eu-north-1";
     private static final String ENDPOINT = "s3." + REGION + ".amazonaws.com";
     private static final String PATH     = "s3a://s3.carriagereturn.nl/hello.txt";
+    /** How long the read may take before it counts as refused: a network may drop the packets rather than refuse the name. */
+    private static final long   READ_DEADLINE_SECONDS = 60;
     private final KubeClient client;
     private final String namespace;
 
@@ -70,17 +78,33 @@ public class SparkConnectS3ReadSmokeMain {
             .remote(remote)
             .getOrCreate();
 
-        logger.info("Reading {} via {}", PATH, remote);
+        logger.info("Reading {} via {}, which should be refused: waiting up to {}s for the read to fail, as a network that drops "
+                    + "the connections gives no answer, and treating no answer as refused", PATH, remote, READ_DEADLINE_SECONDS);
         Dataset<Row> lines = spark.read().options(anonymousS3Options()).text(PATH);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            lines.show(false);
-            String msg = format("Test failed. We should not have been allowed to read %s", PATH);
-            logger.error(msg);
-            throw new Exception(msg);
-        } catch (Exception e) {
-            logger.info("Could not read {} so test passes", PATH);
+            Future<?> shown = executor.submit(() -> lines.show(false));
+            try {
+                shown.get(READ_DEADLINE_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                // Not every network refuses by failing the lookup, as Cilium does: GKE resolves the name and drops the packets, so S3A
+                // retries each connection for tens of minutes.  A read that has not returned by the deadline has not been allowed.
+                spark.interruptAll();
+                logger.info("Could not read {} within {}s, as its connections are dropped, so test passes", PATH, READ_DEADLINE_SECONDS);
+                return lines;
+            } catch (ExecutionException e) {
+                logger.info("Could not read {} so test passes: {}", PATH, e.getCause() == null ? e : e.getCause().toString());
+                return lines;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted reading " + PATH, e);
+        } finally {
+            executor.shutdownNow();
         }
-        return lines;
+        String msg = format("Test failed. We should not have been allowed to read %s", PATH);
+        logger.error(msg);
+        throw new IllegalStateException(msg);
     }
 
     private static Map<String, String> anonymousS3Options() {

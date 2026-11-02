@@ -13,3 +13,15 @@ End-to-end procedure to set up the Azure env and deploy the stacks of a TRE and 
 | [data](./azure/data.md) | `azure-polaris` | The Data Provider side: a Polaris catalog on AKS, relying on the TRE's KeyCloak. Same layout as the TRE doc, with its own config, deploy, verify, whitelisting and teardown.                                                                                                                                |
 
 Start with [config](./azure/config.md), then follow the doc of the side you deploy.
+
+# GCP docs
+
+End-to-end procedure to set up the GCP env and deploy the stacks of a TRE and its data providers:
+
+| Doc                     | Stack | Contents |
+|-------------------------|-------|----------|
+| [config](./gcp/config.md) | any | The config and setup steps common to both sides: installing the Afon CLI and local tools, creating and filling the config, login, `gcp-create`, DNS zones, TLS certs in Secret Manager, checks and teardown. |
+| [tre](./gcp/tre.md)   | `gcp-full` | The TRE side: KeyCloak, Polaris, Spark, Trino, Jupyter, Gitea and monitoring on GKE. Step table, stack-specific config, deploy, verify, Data Provider whitelisting, teardown. |
+| [data](./gcp/data.md) | `gcp-polaris` | The Data Provider side: a Polaris catalog on GKE, relying on the TRE's KeyCloak. Same layout as the TRE doc. |
+
+Start with [config](./gcp/config.md), then follow the doc of the side you deploy.

@@ -44,6 +44,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
+import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.config.AfonCloud;
@@ -58,7 +59,6 @@ import software.constructs.IConstruct;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -155,24 +155,11 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     }
 
     /**
-     * Parses the {@code key1:value1,...,keyN:valueN} encoding used by {@link AfonProperty#AZURE_AKS_NODE_POOL}
-     * into a {@code Map} keyed on the camel-cased name of the node pool builder method, eg {@code nodeCount} or {@code vmSize}.
-     * If a key is missing, the value will fall back to its own default upon {@code Map#getOrDefault()}.
-     * The pairs may also be separated by {@code ;}, which the property used before, but which a shell reading the
-     * properties file takes as the end of a command, so it must be escaped there: {@code ,} is safe in both.
+     * Parses {@link AfonProperty#AZURE_AKS_NODE_POOL}, see {@link CdkUtils#parseNodePoolConfig(String)}, into a {@code Map}
+     * keyed on the camel-cased name of the node pool builder method, eg {@code nodeCount} or {@code vmSize}.
      */
     static Map<String, String> parseNodePoolConfig(String encoded) {
-        Map<String, String> config = new HashMap<>();
-        if (encoded == null || encoded.isBlank()) {
-            return config;
-        }
-        for (String entry : encoded.split("[,;]")) {
-            String[] keyValue = entry.split(":", 2);
-            if (keyValue.length == 2) {
-                config.put(keyValue[0].trim(), keyValue[1].trim());
-            }
-        }
-        return config;
+        return CdkUtils.parseNodePoolConfig(encoded);
     }
 
     /**

@@ -27,6 +27,25 @@ public class NetworkConfig {
     private static final String DOMAIN_POLICY_NAME = "allow-only-whitelisted-domains";
 
     /**
+     * What enforces the rules by domain name of the egress of the notebooks and of Spark.
+     */
+    public enum DomainPolicy {
+        /** Cilium's {@code CiliumNetworkPolicy} with {@code toFQDNs}, with the DNS lookups filtered too, as on AWS and Azure. */
+        CILIUM,
+        /**
+         * GKE Dataplane V2's {@code FQDNNetworkPolicy} (GKE has no CiliumNetworkPolicy), which allows the addresses that a name resolves to,
+         * and only that: it filters neither the lookups nor anything of the traffic but its address and port.  What goes to a pod of the
+         * cluster, which a name cannot express, is an ordinary {@link NetworkPolicy}.
+         */
+        GKE_FQDN
+    }
+
+    /** Selects the {@code FQDNNetworkPolicy} resources of a workload, to delete them together. */
+    static final String FQDN_POLICY_LABEL = "afon.emrys.health/network-policy";
+
+    static final String FQDN_POLICY_API_VERSION = "networking.gke.io/v1alpha1";
+
+    /**
      * The ports the whitelisted domains may be reached on.
      */
     private static final List<String> ALLOWED_PORTS = List.of("80", "443");
@@ -67,7 +86,7 @@ public class NetworkConfig {
      * {@code a.b.example.com}.</LI>
      * </UL>
      */
-    private record AllowedDomain(String matcher, String domain) {
+    record AllowedDomain(String matcher, String domain) {
 
         static AllowedDomain create(String domain) {
             if (domain.contains("*")) {
@@ -88,6 +107,11 @@ public class NetworkConfig {
             return Map.of(matcher, domain);
         }
 
+        /** As an entry of {@code matches} of an {@code FQDNNetworkPolicy}: {@code name} for the name, {@code pattern} for a wildcard. */
+        Map<String, String> asGkeMatch() {
+            return Map.of(matcher.equals("matchPattern") ? "pattern" : "name", domain);
+        }
+
         /**
          * How many dot-separated labels the name has, {@code a.b.com} being three.
          */
@@ -99,6 +123,7 @@ public class NetworkConfig {
     private final TerraformStack      tfStack;
     private final List<AllowedDomain> allowedDomains;
     private final Map<String, String> ingressPodLabels;
+    private final DomainPolicy        domainPolicy;
 
     /**
      * For debugging purposes only.
@@ -134,9 +159,18 @@ public class NetworkConfig {
      *                         allowed to reach them, as it reaches what they expose, eg Polaris, by its domain name
      */
     public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties, Map<String, String> ingressPodLabels) {
+        this(tfStack, properties, ingressPodLabels, DomainPolicy.CILIUM);
+    }
+
+    /**
+     * @param domainPolicy what enforces the rules by domain name, see {@link health.emrys.afon.cdk.CloudPlatform#domainPolicy()}
+     */
+    public NetworkConfig(TerraformStack tfStack, AfonPropertyProvider properties, Map<String, String> ingressPodLabels,
+                         DomainPolicy domainPolicy) {
         this.tfStack          = tfStack;
         allowedDomains        = getAllowedDomainsFrom(properties);
         this.ingressPodLabels = ingressPodLabels;
+        this.domainPolicy     = domainPolicy;
     }
 
     /**
@@ -159,22 +193,107 @@ public class NetworkConfig {
         // pixels travel back on a connection Guacamole itself opened; conntrack permits those
         // replies and the notebook never initiates to Guacamole. Listing it would only have granted
         // the notebook the ability to dial Guacamole, which nothing requires.
-        List<NetworkPolicySpecEgressTo> allowedNamespacePeers = List.of(
-            podEgressTo(JupyterHubConfig.HUB_LABELS));
+        boolean gke = domainPolicy == DomainPolicy.GKE_FQDN;
+        List<NetworkPolicySpecEgressTo> allowedNamespacePeers = new ArrayList<>(List.of(
+            podEgressTo(JupyterHubConfig.HUB_LABELS)));
+        if (gke) {
+            // The Spark master, which on Cilium its own policy allows (see connectionManifest), a name not being what a policy on GKE
+            // can express for a pod of the cluster
+            allowedNamespacePeers.add(podEgressTo(MASTER_LABELS));
+        }
         List<NetworkPolicySpecEgress> egress = List.of(
 //            createWebEgressPolicy(),
-            createDnsEgressPolicy(),
+            createDnsEgressPolicy(domainPolicy),
             NetworkPolicySpecEgress.builder()
                                    .to(allowedNamespacePeers)
                                    .build(),
             createSparkConnectorEgressPolicy(sparkConnectorName),
             createGiteaEgressPolicy());
         networkPolicyFor(USER_POD_LABELS, egress);
+
+        if (gke) {
+            // The notebooks have no domain to reach: the policy above is all they need.  Only the driver calls what the ingress
+            // exposes, ie Polaris, so only it may reach the ingress controller
+            lockdownSparkOnGke(dependsOn, MASTER_LABELS, "spark-master", Map.of());
+            lockdownSparkOnGke(dependsOn, DRIVER_LABELS, "spark-driver", ingressPodLabels);
+            return;
+        }
         lockdownJupyterPods(USER_POD_LABELS, dependsOn);
 
         // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
         lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
         lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")), ingressPodLabels);
+    }
+
+    /**
+     * The egress of a Spark pod on GKE, which has no CiliumNetworkPolicy: a {@link NetworkPolicy} for what it may reach in the cluster,
+     * DNS, the Spark master and, for the driver, the ingress controller, and {@code FQDNNetworkPolicy} resources for the domain names,
+     * which GKE adds to what the NetworkPolicy allows.
+     * <p>
+     * Unlike Cilium's, the DNS lookups are not filtered, as GKE cannot: a name that is not whitelisted cannot be connected to, but can
+     * be looked up, so data can still leave in the labels of a query.
+     */
+    private void lockdownSparkOnGke(List<ITerraformDependable> dependsOn,
+                                    Map<String, String> labels,
+                                    String pod,
+                                    Map<String, String> ingressPodLabels
+    ) {
+        List<NetworkPolicySpecEgress> egress = new ArrayList<>(List.of(
+            createDnsEgressPolicy(domainPolicy),
+            NetworkPolicySpecEgress.builder().to(List.of(podEgressTo(MASTER_LABELS))).build()));
+        if (!ingressPodLabels.isEmpty()) {
+            egress.add(ingressEgressPolicy(ingressPodLabels));
+        }
+        networkPolicyFor(pod + "EgressPolicy", "allow-only-" + pod + "-egress", labels, egress);
+
+        if (!allowedDomains.isEmpty()) {
+            Map<String, Object> manifest = fqdnPolicies(pod, labels, allowedDomains);
+            createWhitelistFor(dependsOn, manifest, pod + "-policy",
+                               "kubectl delete fqdnnetworkpolicy -l " + FQDN_POLICY_LABEL + "=" + pod + " -n default");
+        }
+    }
+
+    /**
+     * One {@code FQDNNetworkPolicy} for each domain, in a list that kubectl applies in one go.  GKE resolves at most 50 addresses for a
+     * policy, which the domains together, eg the buckets of S3 and the endpoints of a CDN, can pass; each on its own cannot.
+     * No ports, as the policy of Cilium has none: every port of the domain is reachable.
+     */
+    static Map<String, Object> fqdnPolicies(String pod, Map<String, String> labels, List<AllowedDomain> domains) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int i = 0; i < domains.size(); i++) {
+            items.add(Map.of(
+                "apiVersion", FQDN_POLICY_API_VERSION,
+                "kind", "FQDNNetworkPolicy",
+                "metadata", Map.of(
+                    "name", pod + "-fqdn-" + i,
+                    "namespace", "default",
+                    "labels", Map.of(FQDN_POLICY_LABEL, pod)),
+                "spec", Map.of(
+                    "podSelector", Map.of("matchLabels", labels),
+                    "egress", List.of(Map.of("matches", List.of(domains.get(i).asGkeMatch()))))));
+        }
+        return Map.of("apiVersion", "v1", "kind", "List", "items", items);
+    }
+
+    /**
+     * HTTPS to the pods of the ingress controller, given as the Cilium labels of {@link health.emrys.afon.cdk.CloudPlatform#ingressPodLabels()}:
+     * the namespace is the label {@code k8s:io.kubernetes.pod.namespace}, and the others have the prefix {@code k8s:}.
+     */
+    private static @NonNull NetworkPolicySpecEgress ingressEgressPolicy(Map<String, String> ciliumLabels) {
+        String              namespaceLabel = "k8s:io.kubernetes.pod.namespace";
+        Map<String, String> podLabels      = new java.util.TreeMap<>();
+        ciliumLabels.forEach((key, value) -> {
+            if (!key.equals(namespaceLabel)) {
+                podLabels.put(key.startsWith("k8s:") ? key.substring("k8s:".length()) : key, value);
+            }
+        });
+        return NetworkPolicySpecEgress
+            .builder()
+            .to(List.of(egressPolicyFor(
+                egressToNamespaceFor(Map.of("kubernetes.io/metadata.name", ciliumLabels.get(namespaceLabel))),
+                egressPodSelectorFor(podLabels))))
+            .ports(List.of(NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("443").build()))
+            .build();
     }
 
     private void lockdownSpark(List<ITerraformDependable> dependsOn,
@@ -187,7 +306,7 @@ public class NetworkConfig {
         whitelist.addAll(additional);
         whitelist.addAll(allowedDomains);
         Map<String, Object> manifest = sparkManifest(labels, pod, whitelist, ingressPodLabels);
-        createWhitelistFor(dependsOn, manifest, pod + "-policy");
+        createWhitelistFor(dependsOn, manifest, pod + "-policy", "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default");
     }
 
     /**
@@ -275,18 +394,19 @@ public class NetworkConfig {
                                      List<ITerraformDependable> dependsOn
     ) {
         Map<String, Object> manifest = connectionManifest(labels, List.of());
-        createWhitelistFor(dependsOn, manifest, "jupyterNetworkPolicy");
+        createWhitelistFor(dependsOn, manifest, "jupyterNetworkPolicy",
+                           "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default");
     }
 
     private void createWhitelistFor(List<ITerraformDependable> dependsOn,
                                     Map<String, Object> manifest,
-                                    String whiteListName
+                                    String whiteListName,
+                                    String deleteCommand
     ) {
         String manifestJson = toCanonicalJson(manifest);
         List<LocalExecProvisioner> provisioners = new ArrayList<>(
             uponCreateRun("echo '" + manifestJson + "' | kubectl apply -f -"));
-        provisioners.addAll(uponDestroyRun(
-            "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default"));
+        provisioners.addAll(uponDestroyRun(deleteCommand));
         Resource.Builder.create(tfStack, whiteListName)
                         .dependsOn(dependsOn)
                         // A provisioner runs on create only, so without a trigger an edit to
@@ -448,21 +568,34 @@ public class NetworkConfig {
             .build();
     }
 
-    private static @NonNull NetworkPolicySpecEgress createDnsEgressPolicy() {
+    /**
+     * Egress to the cluster's DNS on port 53.  On GKE the lookups are answered by the {@code node-local-dns} pod of the pod's own node
+     * (NodeLocal DNSCache, which Dataplane V2's FQDN network policies run with), which forwards to {@code kube-dns} only on a miss:
+     * the Service address of {@code kube-dns} is translated to it before the policy applies, so a policy that allows only
+     * {@code kube-dns} drops every lookup, and the pod can resolve no name, not even the hub's.
+     */
+    private static @NonNull NetworkPolicySpecEgress createDnsEgressPolicy(DomainPolicy domainPolicy) {
         List<NetworkPolicySpecEgressPorts> dnsPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("UDP").port("53").build(),
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("53").build());
-        NetworkPolicySpecEgressTo dnsNetworkPolicy
-            = egressPolicyFor(
-            egressToNamespaceFor(Map.of(
-                "kubernetes.io/metadata.name", "kube-system")),
-            egressPodSelectorFor(Map.of("k8s-app", "kube-dns")));
+        List<NetworkPolicySpecEgressTo> resolvers = new ArrayList<>();
+        resolvers.add(dnsResolverIn("kube-dns"));
+        if (domainPolicy == DomainPolicy.GKE_FQDN) {
+            resolvers.add(dnsResolverIn("node-local-dns"));
+        }
         NetworkPolicySpecEgress dnsEgress = NetworkPolicySpecEgress
             .builder()
-            .to(List.of(dnsNetworkPolicy))
+            .to(resolvers)
             .ports(dnsPorts)
             .build();
         return dnsEgress;
+    }
+
+    private static @NonNull NetworkPolicySpecEgressTo dnsResolverIn(String k8sApp) {
+        return egressPolicyFor(
+            egressToNamespaceFor(Map.of(
+                "kubernetes.io/metadata.name", "kube-system")),
+            egressPodSelectorFor(Map.of("k8s-app", k8sApp)));
     }
 
     private static @NonNull NetworkPolicySpecEgressTo egressPolicyFor(
@@ -477,6 +610,10 @@ public class NetworkConfig {
     }
 
     private void networkPolicyFor(Map<String, String> labels, List<NetworkPolicySpecEgress> egress) {
+        networkPolicyFor("secretAppEgressPolicy", "allow-only-specific-egress", labels, egress);
+    }
+
+    private void networkPolicyFor(String id, String name, Map<String, String> labels, List<NetworkPolicySpecEgress> egress) {
         NetworkPolicySpecPodSelector labelPods = NetworkPolicySpecPodSelector
             .builder()
             .matchLabels(labels)
@@ -487,16 +624,16 @@ public class NetworkConfig {
             .policyTypes(List.of("Egress"))
             .egress(egress)
             .build();
-        NetworkPolicy.Builder.create(tfStack, "secretAppEgressPolicy")
-                             .metadata(getMetadata())
+        NetworkPolicy.Builder.create(tfStack, id)
+                             .metadata(getMetadata(name))
                              .spec(spec)
                              .build();
     }
 
-    private static @NonNull NetworkPolicyMetadata getMetadata() {
+    private static @NonNull NetworkPolicyMetadata getMetadata(String name) {
         return NetworkPolicyMetadata
             .builder()
-            .name("allow-only-specific-egress")
+            .name(name)
             .namespace("default")
             .build();
     }

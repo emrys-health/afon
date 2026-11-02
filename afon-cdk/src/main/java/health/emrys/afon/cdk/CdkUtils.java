@@ -24,6 +24,26 @@ public class CdkUtils {
     private static final ObjectMapper CANONICAL_JSON = new ObjectMapper()
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
+    /**
+     * Parses the {@code key1:value1,...,keyN:valueN} encoding of a node pool property, eg {@code AZURE_AKS_NODE_POOL}, into a
+     * {@code Map}, so that a key that is missing falls back to its own default upon {@code Map#getOrDefault()}.
+     * The pairs may also be separated by {@code ;}, which the property used before, but which a shell reading the
+     * properties file takes as the end of a command, so it must be escaped there: {@code ,} is safe in both.
+     */
+    public static Map<String, String> parseNodePoolConfig(String encoded) {
+        Map<String, String> config = new HashMap<>();
+        if (encoded == null || encoded.isBlank()) {
+            return config;
+        }
+        for (String entry : encoded.split("[,;]")) {
+            String[] keyValue = entry.split(":", 2);
+            if (keyValue.length == 2) {
+                config.put(keyValue[0].trim(), keyValue[1].trim());
+            }
+        }
+        return config;
+    }
+
     public static @NonNull List<LocalExecProvisioner> uponDestroyRun(String... commands) {
         return Arrays.stream(commands).map(command ->
                                                    LocalExecProvisioner

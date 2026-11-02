@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.cdk.configs.NetworkConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import health.emrys.afon.config.AfonCloud;
@@ -54,6 +55,22 @@ public interface CloudPlatform extends CloudProvider {
      */
     default Map<String, String> ingressPodLabels() {
         return Map.of();
+    }
+
+    /**
+     * @return whether the cluster's dataplane registers the {@code cilium.io} CRDs itself, as GKE's Dataplane V2 does, rather than a Cilium
+     * that the stack installs and so cleans up: the destroy then leaves them alone, since the cluster depends on them to the end
+     */
+    default boolean dataplaneOwnsCiliumCrds() {
+        return false;
+    }
+
+    /**
+     * @return how the cluster's network enforces the rules by domain name that limit the egress of the notebooks and of Spark: Cilium's
+     * policies by default, as on AWS and Azure
+     */
+    default NetworkConfig.DomainPolicy domainPolicy() {
+        return NetworkConfig.DomainPolicy.CILIUM;
     }
 
     /**

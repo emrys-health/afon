@@ -31,9 +31,15 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
+import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.HttpsRoute;
+import health.emrys.afon.cdk.LogStorage;
+import health.emrys.afon.cdk.RetainedVolumeClaim;
+import health.emrys.afon.cdk.configs.NetworkConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -76,6 +82,9 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     public static final String NODE_CIDR = "10.10.0.0/24";
     /** The secondary range of the subnet that the pods get their addresses from. */
     public static final String POD_CIDR  = "10.20.0.0/16";
+    /** The names of the secondary ranges of the subnet, which the cluster is told to use for its pods and its services. */
+    static final String PODS_RANGE     = "pods";
+    static final String SERVICES_RANGE = "services";
 
     private final ContainerCluster   gkeCluster;
     private final String             projectId;
@@ -162,12 +171,12 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             .secondaryIpRange(List.of(
                 ComputeSubnetworkSecondaryIpRange
                     .builder()
-                    .rangeName("pods")
+                    .rangeName(PODS_RANGE)
                     .ipCidrRange(POD_CIDR)
                     .build(),
                 ComputeSubnetworkSecondaryIpRange
                     .builder()
-                    .rangeName("services")
+                    .rangeName(SERVICES_RANGE)
                     .ipCidrRange("10.30.0.0/20")
                     .build()
                                      ))
@@ -214,7 +223,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
                 .description("Public IP all outbound cluster traffic is seen to come from")
                 .build();
         }
-        new ComputeRouterNat(this, "nat", natConfig.build());
+        ComputeRouterNat nat = new ComputeRouterNat(this, "nat", natConfig.build());
 
         String gcloudCommand = format(
             "gcloud container clusters get-credentials %s --region %s --project %s",
@@ -226,6 +235,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             .interpreter(List.of("/bin/bash", "-c"))
             .type("local-exec")
             .build();
+        Map<String, String> nodePool = CdkUtils.parseNodePoolConfig(properties.getValue(AfonProperty.GCP_GKE_NODE_POOL, ""));
         ContainerClusterConfig clusterConfig = ContainerClusterConfig
             .builder()
             .name(clusterName)
@@ -233,7 +243,25 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             .network(vpc.getName())
             .subnetwork(subnet.getName())
             .networkingMode("VPC_NATIVE")
-            .initialNodeCount(1)
+            // Without this policy GKE picks its own ranges (eg 10.4.0.0/14 for the pods) and ignores the subnet's secondary ranges, so that
+            // the pod range that the Polaris allow-list admits (POD_CIDR) would not be the one the pods have, and they would be refused by
+            // the ingress when calling Polaris by its public domain name
+            .ipAllocationPolicy(ContainerClusterIpAllocationPolicy
+                                    .builder()
+                                    .clusterSecondaryRangeName(PODS_RANGE)
+                                    .servicesSecondaryRangeName(SERVICES_RANGE)
+                                    .build())
+            .initialNodeCount(Integer.parseInt(nodePool.getOrDefault("nodeCount", "1")))
+            // Dataplane V2, which is Cilium: without it GKE does not enforce Kubernetes network policies, so those of the
+            // NetworkPolicies component would be accepted and silently ignored
+            .datapathProvider("ADVANCED_DATAPATH")
+            // GKE has no CiliumNetworkPolicy, so the rules by domain name of the notebooks' and Spark's egress are FQDNNetworkPolicy
+            // resources, which GKE registers only on a cluster with this on (see NetworkConfig.DomainPolicy)
+            .enableFqdnNetworkPolicy(true)
+            .nodeConfig(ContainerClusterNodeConfig
+                            .builder()
+                            .machineType(nodePool.getOrDefault("machineType", "e2-medium"))
+                            .build())
             .nodeLocations(List.of("europe-west2-a", "europe-west2-b"))
             .removeDefaultNodePool(false)
             .timeouts(ContainerClusterTimeouts.builder().create("20m").build())
@@ -251,6 +279,9 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
                                                          .build())
                             .build())
             .deletionProtection(false)
+            // The NAT outlives the cluster on destroy: what runs on it, eg the pre-delete hooks of Helm releases such as Kyverno's,
+            // pulls images from external registries, which times out once the NAT is gone
+            .dependsOn(List.of(nat))
             .provisioners(List.of(refreshCredentials))
             .build();
         gkeCluster = new ContainerCluster(this, "gkeCluster", clusterConfig);
@@ -355,6 +386,16 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
 
 
     @Override
+    public boolean dataplaneOwnsCiliumCrds() {
+        return true;
+    }
+
+    @Override
+    public NetworkConfig.DomainPolicy domainPolicy() {
+        return NetworkConfig.DomainPolicy.GKE_FQDN;
+    }
+
+    @Override
     public AfonCloud cloud() {
         return GCP;
     }
@@ -362,6 +403,78 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     @Override
     public String clusterName() {
         return clusterName;
+    }
+
+    /**
+     * The logs are kept in the bucket of the "gcp" catalog (see catalogs-gcp.properties), with the service account of
+     * {@code GOOGLE_APPLICATION_CREDENTIALS}, which Polaris uses to reach it.  The Loki chart's {@code gcs} config takes no
+     * credentials, so they go into the config of its chunk store and of its ruler, as {@code service_account}, by the extra values.
+     */
+    @Override
+    public LogStorage logStorage() {
+        String bucket      = properties.getCatalogProperty("GCP_BUCKET_NAME", "gcp");
+        String credentials = properties.getValue(AfonProperty.GOOGLE_APPLICATION_CREDENTIALS, "").trim();
+        if (credentials.isBlank()) {
+            // Loki would otherwise only fail at startup, after the rest of the stack is deployed
+            throw new IllegalArgumentException(
+                "GOOGLE_APPLICATION_CREDENTIALS is not set, which the monitoring needs for Loki to write its logs to the bucket");
+        }
+        // a JSON string is a YAML double-quoted scalar, so the key is not parsed as YAML
+        String serviceAccount = quoted(credentials);
+        return new LogStorage("GCS", "gcs", format("""
+            type: gcs
+            bucketNames:
+              chunks: %1$s
+              ruler: %1$s
+              admin: %1$s
+            gcs:
+              chunkBufferSize: 0
+              requestTimeout: "0s"
+              enableHttp2: true
+            """, bucket), format("""
+            loki:
+              storage_config:
+                gcs:
+                  bucket_name: %1$s
+                  service_account: %2$s
+              rulerConfig:
+                storage:
+                  type: gcs
+                  gcs:
+                    bucket_name: %1$s
+                    service_account: %2$s
+            """, bucket, serviceAccount));
+    }
+
+    /**
+     * The disk is in the zone of the cluster's first node location, and is created by {@code gcp-create}, see {@link GcpRetainedVolume}.
+     */
+    @Override
+    public synchronized Optional<RetainedVolumeClaim> retainedVolumeClaim(String name, String size, String namespace) {
+        return Optional.of(new GcpRetainedVolume(name, retainedVolumeName(name), size, namespace, projectId, diskZone(properties))
+                               .deploy(this, storageDependencies(), new ArrayList<>()));
+    }
+
+    /**
+     * @param name what the volume is for, eg {@code gitea}
+     * @return the name of the disk, after what it is for and the cluster, eg {@code gitea-full-emrys}, so that a cluster of the
+     * same name finds it again
+     */
+    String retainedVolumeName(String name) {
+        return name + "-" + clusterName;
+    }
+
+    /** @return the zone of the disks, which {@code gcp-create} creates them in too, ie {@code <GCP_REGION>-a} */
+    static String diskZone(AfonPropertyProvider properties) {
+        return properties.getValue(AfonProperty.GCP_REGION) + "-a";
+    }
+
+    private static String quoted(String value) {
+        try {
+            return new ObjectMapper().writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Cannot quote the credentials", e);
+        }
     }
 
     @Override

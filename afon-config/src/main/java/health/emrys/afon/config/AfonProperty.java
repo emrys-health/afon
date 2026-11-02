@@ -119,11 +119,28 @@ public enum AfonProperty {
     /** GCS bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
     GCP_GITEA_BUCKET("GCP_GITEA_BUCKET"),
     /**
-     * HMAC key with which Gitea reaches {@link #GCP_GITEA_BUCKET}: Gitea has no GCS client of its own, so it goes
-     * through GCS' S3 compatible API, which only takes HMAC keys.
+     * Access id of the HMAC key of the service account, with which Gitea reaches {@link #GCP_GITEA_BUCKET}: Gitea has no GCS client of
+     * its own, so it goes through GCS' S3 compatible API, which only takes HMAC keys, as the AWS access key id and secret.  The log
+     * shipper of Polaris, which goes the same way, uses it too, as it is the key of the service account.
      */
-    GCP_GITEA_HMAC_ACCESS_ID("GCP_GITEA_HMAC_ACCESS_ID"),
-    GCP_GITEA_HMAC_SECRET("GCP_GITEA_HMAC_SECRET"),
+    GCP_HMAC_ACCESS_ID("GCP_HMAC_ACCESS_ID"),
+    /** Secret of the HMAC key of {@link #GCP_HMAC_ACCESS_ID}, which GCP shows only when the key is created. */
+    GCP_HMAC_SECRET("GCP_HMAC_SECRET"),
+    /**
+     * Whether the GCP stacks otherwise deploying their own KeyCloak use instead the one at
+     * {@code OIDC_DOMAIN_NAME} that the identity stack of the cloud deploys.  Optional: {@code false} when unset.
+     */
+    GCP_KEYCLOAK_EXTERNAL("GCP_KEYCLOAK_EXTERNAL"),
+    /**
+     * GCS bucket that Polaris' logs are shipped to, with the HMAC key of {@link #GCP_HMAC_ACCESS_ID}.  Optional: Polaris' logs are
+     * not shipped without it.
+     */
+    GCP_POLARIS_LOG_BUCKET("GCP_POLARIS_LOG_BUCKET"),
+    /**
+     * GKE node pool, as comma-separated {@code key:value} pairs, eg {@code machineType:e2-standard-4,nodeCount:1}, see
+     * {@code GcpCloudProvider}.  Optional: the defaults of each key when unset.
+     */
+    GCP_GKE_NODE_POOL("GCP_GKE_NODE_POOL"),
 
     // AZURE
     AZURE_SUBSCRIPTION("AZURE_SUBSCRIPTION"),

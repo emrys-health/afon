@@ -73,6 +73,11 @@ Loki logs are stored in the cloud, eg
 aws s3 ls s3://emrys-afon-bucket/spark-cluster
 ```
 
+On GCP Loki persists them to the bucket of the `gcp` catalog (`GCP_BUCKET_NAME_gcp`), with the service account of `GOOGLE_APPLICATION_CREDENTIALS`, the one Polaris uses, which must be able to write to it, eg
+```shell
+gcloud storage ls gs://<GCP_BUCKET_NAME_gcp>/<cluster-name>
+```
+
 ### Tetragon
 
 The `Tetragon` component of the full stacks runs [Tetragon](https://tetragon.io) on every node, watching the notebook pods

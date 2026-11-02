@@ -184,6 +184,7 @@ The stacks, as composed by `StackDefinitions`:
 | `azure-keycloak` | Keycloak |
 | `azure-polaris` | Polaris |
 | `azure-full` | The same components as `aws-full`, listed on their own, with its own Keycloak unless `AZURE_KEYCLOAK_EXTERNAL` |
+| `gcp-full` | The same components as `azure-full`; Loki keeps its logs in the bucket of the `gcp` catalog, and Polaris' logs are shipped to `GCP_POLARIS_LOG_BUCKET` if set; with its own Keycloak unless `GCP_KEYCLOAK_EXTERNAL`. The GKE cluster uses Dataplane V2, so that the network policies are enforced, and its nodes are those of `GCP_GKE_NODE_POOL` |
 | `gcp-keycloak` | Keycloak |
 | `gcp-polaris` | Polaris |
 

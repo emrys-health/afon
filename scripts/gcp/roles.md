@@ -15,6 +15,7 @@ The identity running `afon-cli.sh manage-stack ... gcp-polaris`, ie the active `
 | `roles/compute.networkAdmin`              | The VPC, subnet, Cloud Router and Cloud NAT                                                                                                                                                                 |
 | `roles/container.admin`                   | Creating, updating and deleting the GKE cluster, and the Kubernetes objects Helm and Kubernetes create in it: namespaces, Jobs, Secrets, Deployments, Services and Ingress, including cert-manager and nginx-ingress |
 | `roles/iam.serviceAccountUser`            | Acting as the cluster nodes' service account, by default the project's Compute Engine one, `<project-number>-compute@developer.gserviceaccount.com`, on the creation of the cluster                          |
+| `roles/compute.viewer`                    | Only for a stack with Git, ie `gcp-full`: looking up the Persistent Disk of Gitea's repositories, which `create.sh` creates.  The stack fails to plan if there is none |
 | `roles/dns.admin`                         | Reading the Polaris DNS zone, and creating the Polaris DNS record set.  `roles/dns.reader` is not enough                                                                                         |
 | `roles/serviceusage.serviceUsageConsumer` | Using the project's APIs                                                                                                                                                                                    |
 | `roles/secretmanager.secretAccessor`      | Only if `GCP_SECRETS_ENABLED=true`: reading the cached TLS cert and key from Secret Manager, to restore them into the `polaris-tls` Kubernetes secret                                                      |
@@ -63,6 +64,8 @@ Google Workspace session control forces a new login after a set time: run `gcp-l
 | `Error 403: Forbidden` reading `data.google_dns_managed_zone`                                 | `roles/dns.admin`, or no zone in the project |
 | `PERMISSION_DENIED ... serviceusage.services.enable` from `secrets.sh store`                  | `roles/serviceusage.serviceUsageAdmin`, or have an admin enable `secretmanager.googleapis.com` |
 | `PERMISSION_DENIED ... secretmanager.secrets.create`                                          | `roles/secretmanager.admin`                  |
+| `does not have storage.hmacKeys.create access to the Google Cloud project` from `gcp-create`  | `roles/storage.hmacKeyAdmin`, see [HMAC key](#hmac-key) |
+| `Policy update access denied` ... `setIamPolicy` from `gcp-destroy`                           | `roles/resourcemanager.projectIamAdmin`      |
 
 ### Project prerequisites
 
@@ -82,8 +85,41 @@ use `GCP_PROJECT_ID`, also needs to create service accounts, set IAM policies, a
 |-----------------------------------------|----------------------------------------------------------------------------------------------|
 | `roles/iam.serviceAccountAdmin`         | Creating and deleting the service accounts, and setting their IAM policies                   |
 | `roles/resourcemanager.projectIamAdmin` | Granting and revoking project roles, eg `roles/serviceusage.serviceUsageConsumer`            |
-| `roles/storage.admin`                   | Creating the buckets, and setting their IAM policies                                         |
+| `roles/storage.admin`                   | Creating the buckets, and setting their IAM policies, and, for the stacks with Git or Logging, creating and deleting the [HMAC key](#hmac-key) (`roles/storage.hmacKeyAdmin` is enough for the key alone) |
+| `roles/compute.storageAdmin`            | For the stacks with Git: creating and deleting the Persistent Disk of Gitea's repositories, which outlives the stacks |
 | `roles/serviceusage.serviceUsageAdmin`  | Enabling the project's APIs, including `secretmanager.googleapis.com` if `GCP_SECRETS_ENABLED=true` |
+
+### HMAC key
+
+The stacks with Git (Gitea) or with Logging, if `GCP_POLARIS_LOG_BUCKET` is set (the log shipper of Polaris), reach their buckets through
+the S3 compatible API of GCS, which only takes an HMAC key, not a Google login.  The key belongs to the service account
+`GCP_SERVICE_ACCOUNT`, so that whoever uses it has what that account has on the buckets.  It is set as
+`GCP_HMAC_ACCESS_ID` and `GCP_HMAC_SECRET` in `secret-gcp.properties`.
+
+Creating it, which `create.sh` does if the property has no access id, and deleting it, which `destroy.sh` does, need on the project:
+
+| Permission                  | Role that carries it, among others             | For                                          |
+|-----------------------------|------------------------------------------------|----------------------------------------------|
+| `storage.hmacKeys.create`   | `roles/storage.hmacKeyAdmin`, `roles/storage.admin` | `gcloud storage hmac create`            |
+| `storage.hmacKeys.update`, `storage.hmacKeys.delete` | the same         | `destroy.sh`, which deactivates the key, then deletes it |
+| `storage.hmacKeys.get`      | the same                                       | `create.sh` and `destroy.sh` checking that the configured key exists |
+
+```shell
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID --member="user:<account>" --role="roles/storage.hmacKeyAdmin"
+```
+
+The deployer of the stacks needs none of it: the stacks only use the credentials, they do not manage the key.  So an admin may create the key and
+hand the access id and secret over, with:
+
+```shell
+gcloud storage hmac create $GCP_SERVICE_ACCOUNT --project=$GCP_PROJECT_ID
+```
+
+**NOTE:** The secret is shown only once, when the key is created: GCP never shows it again.  A lost secret means a new key, and so deleting the old one.
+
+If the role is granted and the creation is still refused, an organisation policy may forbid HMAC keys, eg `constraints/storage.restrictAuthTypes`: that
+needs an organisation admin to change.  Without the key a stack with Git still deploys, but Gitea cannot use its bucket and crash-loops, and the log shipper of Polaris
+is refused by the bucket: leave `GCP_POLARIS_LOG_BUCKET` blank to skip it.
 
 ## TLS cert management
 

@@ -72,9 +72,12 @@ class AfonCloudPropertyTest {
     }
 
     @Test
-    void hasNoPropertyOfCloudWhenNotDeclared() {
-        // GCP has no log bucket
-        assertThat(AfonCloudProperty.POLARIS_LOG_BUCKET.forCloud(GCP)).isEmpty();
+    void hasThePropertyOfEveryCloud() {
+        for (AfonCloudProperty property : AfonCloudProperty.values()) {
+            for (AfonCloud cloud : AfonCloud.values()) {
+                assertThat(property.forCloud(cloud)).as(property + " of " + cloud).isPresent();
+            }
+        }
     }
 
     @Test
@@ -85,9 +88,6 @@ class AfonCloudPropertyTest {
 
     @Test
     void cannotReadValueOfCloudNotDeclaredOrNotSet() {
-        assertThatThrownBy(() -> properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_LOG_BUCKET))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("No property GCP_POLARIS_LOG_BUCKET for the cloud gcp");
         assertThatThrownBy(() -> properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_DOMAIN_NAME))
             .isInstanceOf(IllegalArgumentException.class);
     }

@@ -170,7 +170,7 @@ class StackPlanFactoryTest {
 
     @Test
     void deletesJustTheStackAndTheLegacyStackOrEveryStackOfTheCloud() {
-        for (String stack : List.of("aws-keycloak", "aws-polaris", "aws-full", "azure-keycloak", "azure-polaris", "gcp-keycloak", "gcp-polaris")) {
+        for (String stack : List.of("aws-keycloak", "aws-polaris", "aws-full", "azure-keycloak", "azure-polaris", "gcp-keycloak", "gcp-polaris", "gcp-full")) {
             assertThat(derived(DELETE, stack)).as(stack).containsExactly(deleteStack(stack), "deleteComplete(" + stack + ")");
         }
         for (String cloud : List.of("aws", "azure", "gcp")) {
@@ -324,7 +324,7 @@ class StackPlanFactoryTest {
     void providesTheStepsOfEveryActionOnEveryStackDefinedAndOnlyDeletesEveryStackOfACloud() {
         assertThat(factory.supportedActions().keySet().stream().map(StackId::toString)).containsExactly(
             "aws-all", "aws-full", "aws-keycloak", "aws-lab", "aws-polaris", "aws-snowflake",
-            "azure-all", "azure-full", "azure-keycloak", "azure-polaris", "gcp-all", "gcp-keycloak", "gcp-polaris");
+            "azure-all", "azure-full", "azure-keycloak", "azure-polaris", "gcp-all", "gcp-full", "gcp-keycloak", "gcp-polaris");
         factory.supportedActions().forEach((stackId, actions) -> assertThat(actions).as(stackId.toString())
             .isEqualTo(stackId.isAll() ? List.of(DELETE) : List.of(DELETE, DEPLOY, SETUP)));
 

@@ -26,6 +26,12 @@ public final class CrdCleanup {
     static final List<String> GROUPS = List.of("monitoring.coreos.com", "monitoring.grafana.com", "cilium.io");
 
     /**
+     * The CRDs of the {@code cilium.io} group that Tetragon registers, which are the only ones removed from a cluster whose
+     * dataplane owns the rest, see {@link #command(boolean)}.
+     */
+    static final List<String> TETRAGON_CRDS = List.of("tracingpolicies.cilium.io", "tracingpoliciesnamespaced.cilium.io");
+
+    /**
      * Destroy-time (a {@code local-exec}) removal of the CRDs in {@link #GROUPS}, run once the
      * releases that own custom resources of those kinds have been uninstalled. It never fails the
      * destroy: whatever it cannot remove within the time budget is reported on stderr instead.
@@ -42,7 +48,26 @@ public final class CrdCleanup {
      * {@code CRD_CLEANUP_INTERVAL} (5s).
      */
     public static @NonNull String command() {
-        String pattern = "[.](" + String.join("|", GROUPS).replace(".", "[.]") + ")$";
+        return command(false);
+    }
+
+    /**
+     * @param dataplaneOwnsCiliumCrds whether the cluster's dataplane registers the {@code cilium.io} CRDs, as GKE's Dataplane V2
+     *                                does, instead of a Cilium that the stack installs: they are then left alone, as the cluster's
+     *                                networking depends on them to the end, and deleting them stops any new pod from getting a
+     *                                network, so that the uninstall of a Helm release that needs one, eg for a pre-delete hook,
+     *                                hangs.  Only those of Tetragon, {@link #TETRAGON_CRDS}, are removed.
+     */
+    public static @NonNull String command(boolean dataplaneOwnsCiliumCrds) {
+        List<String> groups = dataplaneOwnsCiliumCrds
+                              ? GROUPS.stream().filter(group -> !group.equals("cilium.io")).toList()
+                              : GROUPS;
+        String pattern = "[.](" + String.join("|", groups).replace(".", "[.]") + ")$";
+        List<String> targets = new java.util.ArrayList<>(groups);
+        if (dataplaneOwnsCiliumCrds) {
+            pattern += "|/(" + String.join("|", TETRAGON_CRDS).replace(".", "[.]") + ")$";
+            targets.addAll(TETRAGON_CRDS);
+        }
         return """
             CRD_PATTERN='@CRD_PATTERN@'
             MAX_WAIT=${CRD_CLEANUP_MAX_WAIT:-300}
@@ -96,7 +121,7 @@ public final class CrdCleanup {
             done
             """
             .replace("@CRD_PATTERN@", pattern)
-            .replace("@GROUPS@", String.join(", ", GROUPS));
+            .replace("@GROUPS@", String.join(", ", targets));
     }
 
     /**
@@ -104,6 +129,13 @@ public final class CrdCleanup {
      * unescaped {@code ${VAR}} would be parsed as a Terraform interpolation and fail the plan.
      */
     public static @NonNull String provisionerCommand() {
-        return escapeTerraformTemplate(command());
+        return provisionerCommand(false);
+    }
+
+    /**
+     * {@link #command(boolean)} escaped for use as a Terraform provisioner command.
+     */
+    public static @NonNull String provisionerCommand(boolean dataplaneOwnsCiliumCrds) {
+        return escapeTerraformTemplate(command(dataplaneOwnsCiliumCrds));
     }
 }

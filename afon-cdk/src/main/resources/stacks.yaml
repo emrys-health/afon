@@ -75,7 +75,7 @@ stacks:
       - Git
 
   # GCP
-  # As on AWS and Azure, only the Keycloak, which gcp-polaris uses
+  # As on AWS and Azure, only the Keycloak, which gcp-polaris uses, and gcp-full if GCP_KEYCLOAK_EXTERNAL is set
   gcp-keycloak:
     role: identity
     pinnedEgressIp: false
@@ -83,3 +83,20 @@ stacks:
   gcp-polaris:
     role: catalog
     components: [Polaris]
+  gcp-full:
+    role: tre
+    components:
+      - name: Keycloak
+        unless: KEYCLOAK_EXTERNAL
+      - Polaris
+      - Jupyter
+      - NetworkPolicies
+      - SparkOperator
+      - Spark
+      - CrdCleanup
+      - Trino
+      - Monitoring
+      - Tetragon
+      - Kyverno
+      - Logging
+      - Git

@@ -105,8 +105,8 @@ class StackDefinitionsTest {
 
     @Test
     void cannotGetUnknownStack() {
-        assertThatThrownBy(() -> StackDefinitions.get(StackId.parse("gcp-full")))
-            .isInstanceOf(IllegalArgumentException.class).hasMessage("No such stack: gcp-full");
+        assertThatThrownBy(() -> StackDefinitions.get(StackId.parse("gcp-lab")))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("No such stack: gcp-lab");
     }
 
     private static List<String> namesOf(Map<StackId, StackDefinition> definitions, String stackId, AfonPropertyProvider properties) {
@@ -176,7 +176,7 @@ class StackDefinitionsTest {
     void bundledStacksAreTheOnesDocumented() {
         assertThat(StackDefinitions.load(null).keySet()).extracting(StackId::toString)
             .containsExactly("aws-full", "aws-keycloak", "aws-polaris", "aws-snowflake", "azure-full", "azure-keycloak",
-                             "azure-polaris", "gcp-keycloak", "gcp-polaris");
+                             "azure-polaris", "gcp-full", "gcp-keycloak", "gcp-polaris");
     }
 
     @Test
@@ -240,6 +240,13 @@ class StackDefinitionsTest {
         assertThat(componentsOf("aws-snowflake")).doesNotContain(TrinoComponent.class).contains(SnowflakeComponent.class);
     }
 
+    @Test
+    void gcpFullHasTheComponentsOfTheOtherFullStacks() {
+        assertThat(componentsOf("gcp-full")).contains(KeycloakComponent.class, PolarisComponent.class, JupyterComponent.class,
+                                                       SparkComponent.class, MonitoringComponent.class, TetragonComponent.class,
+                                                       KyvernoComponent.class, LoggingComponent.class, GitComponent.class);
+    }
+
     private List<String> componentNames(StackDefinition definition) {
         return definition.componentsFor(properties).stream().map(component -> component.getClass().getSimpleName()).toList();
     }
@@ -297,7 +304,7 @@ class StackDefinitionsTest {
         assertThat(StackDefinitions.withRole(AWS, StackRole.IDENTITY)).map(definition -> definition.id().toString()).contains("aws-keycloak");
         assertThat(StackDefinitions.withRole(AZURE, StackRole.CATALOG)).map(definition -> definition.id().toString()).contains("azure-polaris");
         assertThat(StackDefinitions.withRole(GCP, StackRole.IDENTITY)).map(definition -> definition.id().toString()).contains("gcp-keycloak");
-        assertThat(StackDefinitions.withRole(GCP, StackRole.TRE)).isEmpty();
+        assertThat(StackDefinitions.withRole(GCP, StackRole.TRE)).map(definition -> definition.id().toString()).contains("gcp-full");
         // a stack that extends another does not take its role
         assertThat(StackDefinitions.get(StackId.parse("aws-snowflake")).role()).isNull();
         assertThat(StackDefinitions.declaring(AWS, SnowflakeComponent.class)).map(definition -> definition.id().toString())
@@ -341,7 +348,7 @@ class StackDefinitionsTest {
         assertThat(StackDefinitions.resolve(StackId.parse("aws-lab"))).hasToString("aws-lab");
         // otherwise as it is, for the caller to report: no stack of the cloud has the role, or it is not a role or a stack
         assertThat(StackDefinitions.resolve(StackId.parse("gcp-identity"))).hasToString("gcp-keycloak");
-        assertThat(StackDefinitions.resolve(StackId.parse("gcp-tre"))).hasToString("gcp-tre");
+        assertThat(StackDefinitions.resolve(StackId.parse("gcp-tre"))).hasToString("gcp-full");
         assertThat(StackDefinitions.resolve(StackId.parse("aws-nonesuch"))).hasToString("aws-nonesuch");
         assertThat(StackDefinitions.resolve(StackId.all(AWS))).isEqualTo(StackId.all(AWS));
     }

@@ -41,6 +41,14 @@ class MonitoringComponentTest {
     }
 
     @Test
+    void lokiIsGivenTheExtraValuesOfTheStorageAfterItsOwn() {
+        LogStorage gcs = new LogStorage("GCS", "gcs", "type: gcs\n", "loki:\n  rulerConfig: {}\n");
+
+        assertThat(MonitoringComponent.lokiValuesOf(gcs)).containsExactly(MonitoringComponent.lokiValues(gcs), "loki:\n  rulerConfig: {}\n");
+        assertThat(MonitoringComponent.lokiValuesOf(s3)).containsExactly(MonitoringComponent.lokiValues(s3));
+    }
+
+    @Test
     void promtailSendsTheClusterNameAsTenant() {
         assertThat(MonitoringComponent.promtailValues("full-emrys-cluster", "S3"))
             .contains("tenant_id: full-emrys-cluster")

@@ -3,7 +3,7 @@
 The smoke tests check a deployed stack end to end, as a data scientist uses it: from a Jupyter notebook, through
 Spark Connect, to Polaris, authenticated with the user's own OIDC token.
 
-The smoke tests run against a real deployment (the AWS or the Azure full stack), so they also cover the deployed Spark Connect server, Keycloak and the Polaris grants configured from `users-acl.csv`.
+The smoke tests run against a real deployment (the AWS, Azure or GCP full stack), so they also cover the deployed Spark Connect server, Keycloak and the Polaris grants configured from `users-acl.csv`.
 They complement the [acceptance tests](acceptance_tests.md), which run against local containers.
 
 ## What is tested
@@ -30,7 +30,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ## Requirements
 
-- A deployed full stack, `aws-full` or `azure-full`, and a `kubectl` context pointing at its cluster.
+- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and a `kubectl` context pointing at its cluster.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
   `<CLOUD>_OIDC_DOMAIN_NAME` or else `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
@@ -138,7 +138,7 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 - **Check 4 fails**: the test user is authorised for `AFON_FORBIDDEN_CATALOG`, either in `users-acl.csv` or because
   the ACL has not been applied to Polaris since it changed (`./afon.sh -a configure-users <cloud> all`).
 - **The `network` test fails with `Managed to make an HTTP call to <polaris domain>`**: the machine running it is allowed to
-  reach Polaris, because its public address is in `AWS_POLARIS_ALLOWED_CIDRS` or `AZURE_POLARIS_ALLOWED_CIDRS`. Remove it from
+  reach Polaris, because its public address is in `AWS_POLARIS_ALLOWED_CIDRS`, `AZURE_POLARIS_ALLOWED_CIDRS` or `GCP_POLARIS_ALLOWED_CIDRS`. Remove it from
   there (see [the machine running the test](#the-machine-running-the-test-must-be-outside-the-allowed-cidrs)).
 
 ## Regression suite
@@ -149,10 +149,9 @@ afon-cli.sh smoke-test [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--
 ```
 
 runs the tests listed in a suite file, by default [scripts/smoke/tests-full.csv](../scripts/smoke/tests-full.csv), in
-order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, or `azure`: it sets the kubectl
-context to the cluster of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with
-`TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
-cloud, so the same file serves both:
+order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, `azure` or `gcp`: it sets the kubectl
+context to the cluster of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with `TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
+cloud, so the same file serves all of them:
 
 ```shell
 afon-cli.sh smoke-test azure
@@ -160,9 +159,8 @@ afon-cli.sh smoke-test azure
 
 It can also be run with `./afon.sh -a smoke-test azure`.
 
-**NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on both clouds if the stack's
-Polaris ingress is restricted, ie deployed with `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on Azure) set, see
-[the network test on AWS and Azure](#the-network-test-on-aws-and-azure). The suite changes nothing in the cluster: if the ingress is not
+**NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on every cloud if the stack's
+Polaris ingress is restricted, ie deployed with `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_` or `GCP_POLARIS_ALLOWED_CIDRS` on Azure and GCP) set, see [the network test on AWS, Azure and GCP](#the-network-test-on-aws-azure-and-gcp). The suite changes nothing in the cluster: if the ingress is not
 restricted, it warns, and prints the `kubectl` commands that restrict it. `--restrict-polaris` runs them for the duration of the suite.
 
 The first line of the suite file is the header `name|command|args`, and each other line a test: its
@@ -214,19 +212,19 @@ setups, and whether `--env` is given or not, the suite:
    `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, leaving it so after the suite;
 2. if a selected test is the network smoke test, checks, without changing the cluster, that the Polaris ingress of that cluster is
    restricted, ie has the annotation `alb.ingress.kubernetes.io/inbound-cidrs` (AWS) or
-   `nginx.ingress.kubernetes.io/whitelist-source-range` (Azure), which on Azure only works with `externalTrafficPolicy: Local` on the
+   `nginx.ingress.kubernetes.io/whitelist-source-range` (Azure and GCP), which there only works with `externalTrafficPolicy: Local` on the
    nginx controller's service, as that keeps the callers' IPs. If it is not, the suite warns that the `network` test is expected to
    fail, and prints the `kubectl` commands that restrict the ingress, for you to run, with the CIDRs to restrict it to: the
    configured ones, plus the cluster's own addresses, so that its pods calling Polaris by its public domain name are not locked out.
    These are, on AWS, the cluster's egress IP, read from its NAT gateway, as `AWS_EGRESS_IP` may be stale, falling back to
    `AWS_EGRESS_IP`; on Azure, the pod CIDR and the outbound IP, read from the cluster's load balancer (needs `az` logged in), falling back to
-   `AZURE_EGRESS_IP` if it is not found, and warning if the two differ, as on AWS. The
+   `AZURE_EGRESS_IP` if it is not found, and warning if the two differ, as on AWS; on GCP, the cluster's pod range and node subnet, and `GCP_EGRESS_IP` if one is pinned (no lookup, so nothing needs `gcloud`). The
    commands only last until the next deploy, which is why the permanent fix is to deploy with the property set. The tests run either
    way.
 
 With `--restrict-polaris` the suite runs those commands itself instead, after recording in a new
 `smoke/target/regression/polaris-ingress-snapshot-<yyyymmdd-hhmmss>.txt`, named like the results files, how the ingress is: its
-annotation, present or absent, and on Azure the controller's `externalTrafficPolicy`. When the script exits, however it exits (it fails,
+annotation, present or absent, and on Azure and GCP the controller's `externalTrafficPolicy`. When the script exits, however it exits (it fails,
 is interrupted, or finishes), it restores exactly that, before any `--teardown`, whatever the properties say: a hand-restricted ingress gets
 its own list back, and an unrestricted one loses the annotation. It leaves the ingress alone if someone changed the annotation since the suite
 set it, and does nothing if the ingress is gone.
@@ -236,25 +234,25 @@ a `finished=` line. A file without an `outcome=` is **pending**: the run did not
 warns, and keeps its exit status), or because it was killed, eg with `kill -9`. The next run with `--restrict-polaris` restores every pending
 file first, oldest first, and stops if that fails.
 
-#### The network test on AWS and Azure
+#### The network test on AWS, Azure and GCP
 
-The `network` test (`network-smoke`) runs the same three checks on both clouds, but how the first is satisfied differs:
+The `network` test (`network-smoke`) runs the same three checks on every cloud, but how the first is satisfied differs:
 
-| | AWS | Azure |
-|---|---|---|
-| Polaris ingress | ALB | nginx ingress controller, in the cluster, behind a public load balancer |
-| Restricted by | `alb.ingress.kubernetes.io/inbound-cidrs`, from `AWS_POLARIS_ALLOWED_CIDRS` | `nginx.ingress.kubernetes.io/whitelist-source-range`, from `AZURE_POLARIS_ALLOWED_CIDRS`, with `externalTrafficPolicy: Local` on the controller's service |
-| Always admitted | the cluster's egress IP (its NAT gateway) | the cluster's pod CIDR, and, with `--restrict-polaris`, its outbound IP |
-| A caller outside of them | the ALB drops its packets: the call fails or times out | nginx answers with its own `403 Forbidden` page, without calling Polaris |
-| The test passes when | the call fails or times out | the call times out, or gets nginx's own 403; any other response, eg a 403 from Polaris, fails it |
+| | AWS | Azure | GCP |
+|---|---|---|---|
+| Polaris ingress | ALB | nginx ingress controller, in the cluster, behind a public load balancer | as Azure |
+| Restricted by | `alb.ingress.kubernetes.io/inbound-cidrs`, from `AWS_POLARIS_ALLOWED_CIDRS` | `nginx.ingress.kubernetes.io/whitelist-source-range`, from `AZURE_POLARIS_ALLOWED_CIDRS`, with `externalTrafficPolicy: Local` on the controller's service | as Azure, from `GCP_POLARIS_ALLOWED_CIDRS` |
+| Always admitted | the cluster's egress IP (its NAT gateway) | the cluster's pod CIDR, and, with `--restrict-polaris`, its outbound IP | the cluster's pod range and node subnet, and `GCP_EGRESS_IP`, if pinned |
+| A caller outside of them | the ALB drops its packets: the call fails or times out | nginx answers with its own `403 Forbidden` page, without calling Polaris | as Azure |
+| The test passes when | the call fails or times out | the call times out, or gets nginx's own 403; any other response, eg a 403 from Polaris, fails it | as Azure |
 
-So on Azure a quick 403 is the expected outcome of check 1, not a failure, whereas on AWS any HTTP response is one.
+So on Azure and GCP a quick 403 is the expected outcome of check 1, not a failure, whereas on AWS any HTTP response is one.
 
 ##### The machine running the test must be outside the allowed CIDRs
 
 Check 1 calls Polaris **from the machine running the test**, and passes only if that call is stopped. So the machine's public
 address must not be among the CIDRs of the ingress, which are `AWS_POLARIS_ALLOWED_CIDRS` (`AZURE_POLARIS_ALLOWED_CIDRS` on
-Azure) plus the cluster's egress IP (AWS) or pod CIDR and outbound IP (Azure). If it is, Polaris answers the call and the test fails
+Azure, `GCP_POLARIS_ALLOWED_CIDRS` on GCP) plus the cluster's egress IP (AWS), pod CIDR and outbound IP (Azure), or pod range, node subnet and pinned egress IP (GCP). If it is, Polaris answers the call and the test fails
 with `Managed to make an HTTP call to <polaris domain>. Received HTTP code <code>`, whatever that code is.
 
 `manage-stack setup` of a stack with Polaris always ends by restricting it without the machine that ran it (the last step,

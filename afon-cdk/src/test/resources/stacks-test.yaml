@@ -86,3 +86,19 @@ stacks:
   gcp-polaris:
     role: catalog
     components: [Polaris]
+  gcp-full:
+    role: tre
+    components:
+      - name: Keycloak
+        unless: KEYCLOAK_EXTERNAL
+      - Polaris
+      - Jupyter
+      - NetworkPolicies
+      - SparkOperator
+      - Spark
+      - CrdCleanup
+      - Monitoring
+      - Tetragon
+      - Kyverno
+      - Logging
+      - Git

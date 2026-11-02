@@ -393,22 +393,23 @@ afon-cli.sh kube-polaris-whitelist gcp set
 ## Volumes that outlive the cluster
 
 Gitea's repositories are kept on a disk that is not destroyed with the stack, so that a cluster of the same name mounts the same disk
-again.  Its database `gitea_<cluster>` and its path `gitea/<cluster>/` in the Gitea bucket are named after the cluster and outlive it too,
-so without the disk the database would list repositories that no longer exist, and Gitea would answer `500` for them (`fork/exec
-/usr/bin/git: no such file or directory`, which Go also says when the repository's directory is missing). On deploy, the stack imports the disk of
-that name if there is one, else creates it. The disk is sized by `GITEA_STORAGE_SIZE` (default `10Gi`; it can grow, not shrink), and is named
-`gitea-<cluster>`, eg `gitea-full-emrys-cluster`.
+again.  Its database `gitea_<cloud>_<cluster>` and its path `gitea/<cluster>/` in the Gitea bucket are named after the cluster and outlive it too, so without the disk the database would list repositories that no longer exist, and Gitea would answer `500` for them (`fork/exec
+/usr/bin/git: no such file or directory`, which Go also says when the repository's directory is missing). 
+On deploy, the stack imports the disk of that name if there is one, else creates it. The disk is sized by `GITEA_STORAGE_SIZE` (default `10Gi`; it can grow, not shrink), and is named `gitea-<cluster>`, eg `gitea-full-emrys-cluster`.
 
-`afon-cli.sh manage-stack delete` keeps the disk: it excludes every resource with `prevent_destroy` from `tofu destroy`. A plain `tofu destroy`
-fails on it instead, rather than delete it. To destroy the stack by hand, exclude the disk (`aws_ebs_volume.retained_gitea_volume` on AWS,
-`azurerm_managed_disk.retained_gitea_volume` on Azure), eg:
+`afon-cli.sh manage-stack delete` keeps the disk: it excludes every resource with `prevent_destroy` from `tofu destroy`. A plain `tofu destroy`fails on it instead, rather than delete it. To destroy the stack by hand, exclude the disk (`aws_ebs_volume.retained_gitea_volume` on AWS, `azurerm_managed_disk.retained_gitea_volume` on Azure), eg:
 
 ```shell
 tofu destroy -exclude=aws_ebs_volume.retained_gitea_volume
 ```
 
 The volume is bound statically: its PersistentVolume has the reclaim policy `Retain` and a storage class that no provisioner serves.
-GCP does not keep it yet: there, Gitea's disk still goes with the cluster, as Azure's did before.
+
+On GCP the stack does not create the disk, as the Google provider cannot list disks to import one that exists: `gcp-create`, run with a stack
+that has Git, creates the Persistent Disk `gitea-<stack type>-<CLUSTER_NAME>` in `<GCP_REGION>-a`, with its bucket (`GCP_GITEA_BUCKET`) and its
+HMAC key, and the stack only looks it up, so it fails to plan if there is none.  So deleting the stack never deletes it, and nothing needs
+excluding from `tofu destroy`; `gcp-destroy` deletes the disks, the bucket and the key.  If it creates the HMAC key, it shows the access id and secret once,
+for you to set as `GCP_HMAC_ACCESS_ID` and `GCP_HMAC_SECRET` in `secret-gcp.properties`.
 
 ### AWS
 
