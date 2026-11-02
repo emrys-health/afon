@@ -49,10 +49,10 @@ import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
  */
 public class GuacamoleConfig {
 
-    static final int    WEB_PORT        = 8080;
-    static final int    GUACD_PORT      = 4822;
-    static final String SVC_NAME        = "guacamole-web";
-    static final String CONFIG_MAP_NAME = "guacamole-config";
+    public static final  int    WEB_PORT         = 8080;
+    static final         int    GUACD_PORT       = 4822;
+    public static final  String SVC_NAME         = "guacamole-web";
+    static final         String CONFIG_MAP_NAME  = "guacamole-config";
     /**
      * The active theme's branding extension jar (built from the afon-theme module's
      * {@code themes/<theme>/guacamole/} resources on the synth classpath — see {@link #themeJarBytes}).
@@ -68,18 +68,24 @@ public class GuacamoleConfig {
 
     private static final Map<String, String> LABELS = Map.of("app", "guacamole");
 
-    /** One Guacamole login → one in-pod VNC port → one independent X session. */
-    public record Session(String username, String password, int vncPort) {}
+    /**
+     * One Guacamole login → one in-pod VNC port → one independent X session.
+     */
+    public record Session(String username, String password, int vncPort) {
+    }
 
-    /** Connection details for the shared Postgres that backs Guacamole in transparent-SSO mode. */
+    /**
+     * Connection details for the shared Postgres that backs Guacamole in transparent-SSO mode.
+     */
     public record DbConfig(String host, int port, String database, String user, String password) {
 
         public static DbConfig create(AfonPropertyProvider properties) {
-            return new DbConfig(properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
-                                5432,
-                                "guacamole-" + properties.getValue(AfonProperty.CLUSTER_NAME),
-                                properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
-                                properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
+            return new DbConfig(
+                properties.getValue(AfonProperty.GUACAMOLE_DB_HOST),
+                5432,
+                "guacamole-" + properties.getValue(AfonProperty.CLUSTER_NAME),
+                properties.getValue(AfonProperty.GUACAMOLE_DB_USERNAME),
+                properties.getValue(AfonProperty.GUACAMOLE_DB_PASSWORD));
         }
 
     }
@@ -88,29 +94,30 @@ public class GuacamoleConfig {
     private static final String DB_INIT_JOB  = "guacamole-db-init";
 
     private static final String AUTHORIZE_BLOCK_TEMPLATE = """
-                <authorize username="%s" password="%s">
-                    <connection name="jupyter-vnc-%s">
-                        <protocol>vnc</protocol>
-                        <param name="hostname">%s</param>
-                        <param name="port">%d</param>
-                        <param name="password">%s</param>
-                        <param name="disable-copy">true</param>
-                        <param name="disable-paste">true</param>
-                    </connection>
-                </authorize>
-            """;
+                                                               <authorize username="%s" password="%s">
+                                                                   <connection name="jupyter-vnc-%s">
+                                                                       <protocol>vnc</protocol>
+                                                                       <param name="hostname">%s</param>
+                                                                       <param name="port">%d</param>
+                                                                       <param name="password">%s</param>
+                                                                       <param name="disable-copy">true</param>
+                                                                       <param name="disable-paste">true</param>
+                                                                   </connection>
+                                                               </authorize>
+                                                           """;
 
     private static final String GUACAMOLE_PROPERTIES = """
-            guacd-hostname: localhost
-            guacd-port: 4822
-            """;
+                                                       guacd-hostname: localhost
+                                                       guacd-port: 4822
+                                                       """;
 
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
                     String jupyterVncHost,
                     String jupyterVncPassword,
                     List<Session> sessions,
-                    String theme) {
+                    String theme
+    ) {
         // All sessions live on the same (single) Jupyter pod, just on different VNC ports.
         this(scope, dependsOn, session -> jupyterVncHost, jupyterVncPassword, sessions, theme);
     }
@@ -125,7 +132,8 @@ public class GuacamoleConfig {
                     Function<Session, String> hostResolver,
                     String jupyterVncPassword,
                     List<Session> sessions,
-                    String theme) {
+                    String theme
+    ) {
         this(scope, dependsOn, hostResolver, jupyterVncPassword, sessions, null, theme);
     }
 
@@ -150,7 +158,8 @@ public class GuacamoleConfig {
                     String jupyterVncPassword,
                     List<Session> sessions,
                     String ssoUsernameHeader,
-                    String theme) {
+                    String theme
+    ) {
 
         String guacamoleProperties = GUACAMOLE_PROPERTIES;
         if (ssoUsernameHeader != null) {
@@ -158,18 +167,18 @@ public class GuacamoleConfig {
         }
 
         ConfigMap configMap = ConfigMap.Builder
-                .create(scope, "guacamoleConfigMap")
-                .metadata(ConfigMapMetadata.builder()
-                                           .name(CONFIG_MAP_NAME)
-                                           .namespace("default")
-                                           .build())
-                .data(Map.of(
-                        "user-mapping.xml", buildUserMappingXml(
-                                hostResolver,
-                                jupyterVncPassword,
-                                sessions),
-                        "guacamole.properties", guacamoleProperties))
-                .build();
+            .create(scope, "guacamoleConfigMap")
+            .metadata(ConfigMapMetadata.builder()
+                                       .name(CONFIG_MAP_NAME)
+                                       .namespace("default")
+                                       .build())
+            .data(Map.of(
+                "user-mapping.xml", buildUserMappingXml(
+                    hostResolver,
+                    jupyterVncPassword,
+                    sessions),
+                "guacamole.properties", guacamoleProperties))
+            .build();
 
         ConfigMap themeCm = buildThemeConfigMap(scope, theme);
 
@@ -178,94 +187,94 @@ public class GuacamoleConfig {
         // can't host the extensions/ directory. The branding extension jar arrives the same way,
         // from its own ConfigMap.
         StringBuilder assemble = new StringBuilder()
-                .append("set -e; mkdir -p /etc/guacamole/extensions; ")
-                .append("cp /tmp/guacamole-config/* /etc/guacamole/; ")
-                .append("cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/; ");
+            .append("set -e; mkdir -p /etc/guacamole/extensions; ")
+            .append("cp /tmp/guacamole-config/* /etc/guacamole/; ")
+            .append("cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/; ");
         if (ssoUsernameHeader != null) {
             assemble.append("cp \"$(find /opt/guacamole -name 'guacamole-auth-header-*.jar' | head -1)\" ")
                     .append("/etc/guacamole/extensions/; ");
         }
 
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
-                .builder()
-                .name("guacamole-home-init")
-                .image(DockerImages.GUACAMOLE_IMAGE)
-                .command(List.of("sh", "-c", assemble.toString()))
-                .volumeMount(List.of(
-                        initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
-                        initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
-                        initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
-                .build();
+            .builder()
+            .name("guacamole-home-init")
+            .image(DockerImages.GUACAMOLE_IMAGE)
+            .command(List.of("sh", "-c", assemble.toString()))
+            .volumeMount(List.of(
+                initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
+                initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
+                initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
+            .build();
 
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
-                .builder()
-                .name("guacd")
-                .image(DockerImages.GUACD_IMAGE)
-                .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
-                                                                     .containerPort(GUACD_PORT)
-                                                                     .protocol("TCP")
-                                                                     .build()))
-                .build();
+            .builder()
+            .name("guacd")
+            .image(DockerImages.GUACD_IMAGE)
+            .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
+                                                                 .containerPort(GUACD_PORT)
+                                                                 .protocol("TCP")
+                                                                 .build()))
+            .build();
 
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
-                .builder()
-                .name("guacamole")
-                .image(DockerImages.GUACAMOLE_IMAGE)
-                .env(List.of(
-                        envVar("GUACD_HOSTNAME", "localhost"),
-                        envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
-                        // Deploy the webapp at the root context ("/") instead of the default
-                        // "/guacamole/". Guacamole owns the domain root behind oauth2-proxy (which maps
-                        // "/" here); without this, "/" returns 404 and only "/guacamole/" works.
-                        envVar("WEBAPP_CONTEXT", "ROOT"),
-                        envVar("GUACAMOLE_HOME", "/etc/guacamole")))
-                .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
-                                                                     .containerPort(WEB_PORT)
-                                                                     .protocol("TCP")
-                                                                     .build()))
-                .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                              .name(HOME_VOLUME)
-                                                              .mountPath(HOME_MOUNT)
-                                                              .build()))
-                .build();
+            .builder()
+            .name("guacamole")
+            .image(DockerImages.GUACAMOLE_IMAGE)
+            .env(List.of(
+                envVar("GUACD_HOSTNAME", "localhost"),
+                envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
+                // Deploy the webapp at the root context ("/") instead of the default
+                // "/guacamole/". Guacamole owns the domain root behind oauth2-proxy (which maps
+                // "/" here); without this, "/" returns 404 and only "/guacamole/" works.
+                envVar("WEBAPP_CONTEXT", "ROOT"),
+                envVar("GUACAMOLE_HOME", "/etc/guacamole")))
+            .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
+                                                                 .containerPort(WEB_PORT)
+                                                                 .protocol("TCP")
+                                                                 .build()))
+            .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
+                                                                               .name(HOME_VOLUME)
+                                                                               .mountPath(HOME_MOUNT)
+                                                                               .build()))
+            .build();
 
         DeploymentSpecTemplateSpecVolume configVolume = DeploymentSpecTemplateSpecVolume
-                .builder()
-                .name("guacamole-config")
-                .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
-                                                                    .name(CONFIG_MAP_NAME)
-                                                                    .build())
-                .build();
+            .builder()
+            .name("guacamole-config")
+            .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
+                                                                .name(CONFIG_MAP_NAME)
+                                                                .build())
+            .build();
 
         List<ITerraformDependable> deps = new ArrayList<>(dependsOn);
         deps.add(configMap);
         deps.add(themeCm);
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
-                .dependsOn(deps)
-                // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
-                // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
-                // rollout won't fail the apply — surface it via monitoring/kubectl.
-                .waitForRollout(false)
-                .metadata(DeploymentMetadata.builder()
-                                            .name("guacamole-deployment")
-                                            .labels(LABELS)
-                                            .build())
-                .spec(DeploymentSpec.builder()
-                                    .replicas("1")
-                                    .selector(DeploymentSpecSelector.builder().matchLabels(LABELS).build())
-                                    .template(DeploymentSpecTemplate.builder()
-                                            .metadata(DeploymentSpecTemplateMetadata.builder()
-                                                              .labels(withAppKubernetesIoName(LABELS))
-                                                              .build())
-                                            .spec(DeploymentSpecTemplateSpec.builder()
-                                                          .initContainer(List.of(initContainer))
-                                                          .container(List.of(guacdContainer, guacamoleContainer))
-                                                          .volume(List.of(configVolume, homeVolume(), themeVolume()))
-                                                          .build())
-                                            .build())
-                                    .build())
-                .build();
+                          .dependsOn(deps)
+                          // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                          // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
+                          // rollout won't fail the apply — surface it via monitoring/kubectl.
+                          .waitForRollout(false)
+                          .metadata(DeploymentMetadata.builder()
+                                                      .name("guacamole-deployment")
+                                                      .labels(LABELS)
+                                                      .build())
+                          .spec(DeploymentSpec.builder()
+                                              .replicas("1")
+                                              .selector(DeploymentSpecSelector.builder().matchLabels(LABELS).build())
+                                              .template(DeploymentSpecTemplate.builder()
+                                                                              .metadata(DeploymentSpecTemplateMetadata.builder()
+                                                                                                                      .labels(withAppKubernetesIoName(LABELS))
+                                                                                                                      .build())
+                                                                              .spec(DeploymentSpecTemplateSpec.builder()
+                                                                                                              .initContainer(List.of(initContainer))
+                                                                                                              .container(List.of(guacdContainer, guacamoleContainer))
+                                                                                                              .volume(List.of(configVolume, homeVolume(), themeVolume()))
+                                                                                                              .build())
+                                                                              .build())
+                                              .build())
+                          .build();
 
         List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
                                                              .name("http")
@@ -294,16 +303,17 @@ public class GuacamoleConfig {
                     List<Session> sessions,
                     DbConfig db,
                     String httpAuthHeader,
-                    String theme) {
+                    String theme
+    ) {
 
         ConfigMap provisionCm = ConfigMap.Builder
-                .create(scope, "guacamoleProvisionCm")
-                .metadata(ConfigMapMetadata.builder()
-                                           .name(PROVISION_CM)
-                                           .namespace("default")
-                                           .build())
-                .data(Map.of("provision.sql", buildProvisioningSql(hostResolver, vncPassword, sessions)))
-                .build();
+            .create(scope, "guacamoleProvisionCm")
+            .metadata(ConfigMapMetadata.builder()
+                                       .name(PROVISION_CM)
+                                       .namespace("default")
+                                       .build())
+            .data(Map.of("provision.sql", buildProvisioningSql(hostResolver, vncPassword, sessions)))
+            .build();
 
         List<ITerraformDependable> jobDeps = new ArrayList<>(dependsOn);
         jobDeps.add(provisionCm);
@@ -316,91 +326,92 @@ public class GuacamoleConfig {
         // template, cp -a'ing it into ~/.guacamole at boot (guacamole-docker's start.sh), so the
         // theme jar ends up alongside the JDBC/header jars the env vars below auto-install.
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
-                .builder()
-                .name("guacamole-home-init")
-                .image(DockerImages.GUACAMOLE_IMAGE)
-                .command(List.of("sh", "-c",
-                        "set -e; mkdir -p /etc/guacamole/extensions; "
-                        + "cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/;"))
-                .volumeMount(List.of(
-                        initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
-                        initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
-                .build();
+            .builder()
+            .name("guacamole-home-init")
+            .image(DockerImages.GUACAMOLE_IMAGE)
+            .command(List.of(
+                "sh", "-c",
+                "set -e; mkdir -p /etc/guacamole/extensions; "
+                + "cp " + THEME_MOUNT + "/*.jar /etc/guacamole/extensions/;"))
+            .volumeMount(List.of(
+                initVolumeMount(THEME_VOLUME, THEME_MOUNT, true),
+                initVolumeMount(HOME_VOLUME, HOME_MOUNT, false)))
+            .build();
 
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
-                .builder()
-                .name("guacd")
-                .image(DockerImages.GUACD_IMAGE)
-                .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
-                                                                     .containerPort(GUACD_PORT)
-                                                                     .protocol("TCP")
-                                                                     .build()))
-                .build();
+            .builder()
+            .name("guacd")
+            .image(DockerImages.GUACD_IMAGE)
+            .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
+                                                                 .containerPort(GUACD_PORT)
+                                                                 .protocol("TCP")
+                                                                 .build()))
+            .build();
 
         // The image self-configures: setting POSTGRESQL_* installs guacamole-auth-jdbc (+ the bundled
         // JDBC driver) and writes guacamole.properties; HEADER_ENABLED installs guacamole-auth-header.
         // No ConfigMap/user-mapping.xml — there is no login page in this mode.
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
-                .builder()
-                .name("guacamole")
-                .image(DockerImages.GUACAMOLE_IMAGE)
-                .env(List.of(
-                        envVar("GUACD_HOSTNAME", "localhost"),
-                        envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
-                        // The emptyDir the initContainer filled with the branding jar — copied
-                        // into ~/.guacamole at boot (see the initContainer above).
-                        envVar("GUACAMOLE_HOME", "/etc/guacamole"),
-                        // Served at the default /guacamole/ context (not ROOT): JupyterHub now owns the
-                        // domain root so that a bare visit auto-spawns the user's pod, then hands off to
-                        // Guacamole under /guacamole/ to stream that pod's desktop.
-                        envVar("POSTGRESQL_HOSTNAME", db.host()),
-                        envVar("POSTGRESQL_PORT", String.valueOf(db.port())),
-                        envVar("POSTGRESQL_DATABASE", db.database()),
-                        envVar("POSTGRESQL_USER", db.user()),
-                        envVar("POSTGRESQL_PASSWORD", db.password()),
-                        // We pre-provision every user, so don't auto-create (permission-less) accounts.
-                        envVar("POSTGRESQL_AUTO_CREATE_ACCOUNTS", "false"),
-                        envVar("HEADER_ENABLED", "true"),
-                        envVar("HTTP_AUTH_HEADER", httpAuthHeader)))
-                .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
-                                                                     .containerPort(WEB_PORT)
-                                                                     .protocol("TCP")
-                                                                     .build()))
-                .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
-                                                              .name(HOME_VOLUME)
-                                                              .mountPath(HOME_MOUNT)
-                                                              .build()))
-                .build();
+            .builder()
+            .name("guacamole")
+            .image(DockerImages.GUACAMOLE_IMAGE)
+            .env(List.of(
+                envVar("GUACD_HOSTNAME", "localhost"),
+                envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
+                // The emptyDir the initContainer filled with the branding jar — copied
+                // into ~/.guacamole at boot (see the initContainer above).
+                envVar("GUACAMOLE_HOME", "/etc/guacamole"),
+                // Served at the default /guacamole/ context (not ROOT): JupyterHub now owns the
+                // domain root so that a bare visit auto-spawns the user's pod, then hands off to
+                // Guacamole under /guacamole/ to stream that pod's desktop.
+                envVar("POSTGRESQL_HOSTNAME", db.host()),
+                envVar("POSTGRESQL_PORT", String.valueOf(db.port())),
+                envVar("POSTGRESQL_DATABASE", db.database()),
+                envVar("POSTGRESQL_USER", db.user()),
+                envVar("POSTGRESQL_PASSWORD", db.password()),
+                // We pre-provision every user, so don't auto-create (permission-less) accounts.
+                envVar("POSTGRESQL_AUTO_CREATE_ACCOUNTS", "false"),
+                envVar("HEADER_ENABLED", "true"),
+                envVar("HTTP_AUTH_HEADER", httpAuthHeader)))
+            .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
+                                                                 .containerPort(WEB_PORT)
+                                                                 .protocol("TCP")
+                                                                 .build()))
+            .volumeMount(List.of(DeploymentSpecTemplateSpecContainerVolumeMount.builder()
+                                                                               .name(HOME_VOLUME)
+                                                                               .mountPath(HOME_MOUNT)
+                                                                               .build()))
+            .build();
 
         List<ITerraformDependable> deployDeps = new ArrayList<>(dependsOn);
         deployDeps.add(dbInit);
         deployDeps.add(themeCm);
 
         Deployment.Builder.create(scope, "guacamoleDeployment")
-                .dependsOn(deployDeps)
-                // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
-                // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
-                // rollout won't fail the apply — surface it via monitoring/kubectl.
-                .waitForRollout(false)
-                .metadata(DeploymentMetadata.builder()
-                                            .name("guacamole-deployment")
-                                            .labels(LABELS)
-                                            .build())
-                .spec(DeploymentSpec.builder()
-                                    .replicas("1")
-                                    .selector(DeploymentSpecSelector.builder().matchLabels(LABELS).build())
-                                    .template(DeploymentSpecTemplate.builder()
-                                            .metadata(DeploymentSpecTemplateMetadata.builder()
-                                                              .labels(withAppKubernetesIoName(LABELS))
-                                                              .build())
-                                            .spec(DeploymentSpecTemplateSpec.builder()
-                                                          .initContainer(List.of(initContainer))
-                                                          .container(List.of(guacdContainer, guacamoleContainer))
-                                                          .volume(List.of(homeVolume(), themeVolume()))
-                                                          .build())
-                                            .build())
-                                    .build())
-                .build();
+                          .dependsOn(deployDeps)
+                          // See CdkUtils.deploy: don't burn the 15-minute EKS token window waiting for
+                          // pod readiness on an app workload nothing downstream depends on. Trade-off: a broken
+                          // rollout won't fail the apply — surface it via monitoring/kubectl.
+                          .waitForRollout(false)
+                          .metadata(DeploymentMetadata.builder()
+                                                      .name("guacamole-deployment")
+                                                      .labels(LABELS)
+                                                      .build())
+                          .spec(DeploymentSpec.builder()
+                                              .replicas("1")
+                                              .selector(DeploymentSpecSelector.builder().matchLabels(LABELS).build())
+                                              .template(DeploymentSpecTemplate.builder()
+                                                                              .metadata(DeploymentSpecTemplateMetadata.builder()
+                                                                                                                      .labels(withAppKubernetesIoName(LABELS))
+                                                                                                                      .build())
+                                                                              .spec(DeploymentSpecTemplateSpec.builder()
+                                                                                                              .initContainer(List.of(initContainer))
+                                                                                                              .container(List.of(guacdContainer, guacamoleContainer))
+                                                                                                              .volume(List.of(homeVolume(), themeVolume()))
+                                                                                                              .build())
+                                                                              .build())
+                                              .build())
+                          .build();
 
         List<ServiceSpecPort> ports = List.of(ServiceSpecPort.builder()
                                                              .name("http")
@@ -418,17 +429,18 @@ public class GuacamoleConfig {
      */
     private static JobV1 buildDbInitJob(Construct scope,
                                         List<ITerraformDependable> dependsOn,
-                                        DbConfig db) {
+                                        DbConfig db
+    ) {
         JobV1SpecTemplateSpecInitContainer schemaGen = JobV1SpecTemplateSpecInitContainer
-                .builder()
-                .name("schema-gen")
-                .image(DockerImages.GUACAMOLE_IMAGE)
-                .command(List.of("sh", "-c", "/opt/guacamole/bin/initdb.sh --postgresql > /sql/001-schema.sql"))
-                .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
-                                                                                  .name("sql")
-                                                                                  .mountPath("/sql")
-                                                                                  .build()))
-                .build();
+            .builder()
+            .name("schema-gen")
+            .image(DockerImages.GUACAMOLE_IMAGE)
+            .command(List.of("sh", "-c", "/opt/guacamole/bin/initdb.sh --postgresql > /sql/001-schema.sql"))
+            .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
+                                                                              .name("sql")
+                                                                              .mountPath("/sql")
+                                                                              .build()))
+            .build();
 
         String script = """
                         set -e
@@ -443,54 +455,54 @@ public class GuacamoleConfig {
                         """;
 
         JobV1SpecTemplateSpecContainer dbInit = JobV1SpecTemplateSpecContainer
-                .builder()
-                .name("db-init")
-                .image(DockerImages.POSTGRES_ALPINE_IMAGE)
-                .command(List.of("sh", "-c", script))
-                .env(List.of(
-                        jobEnv("PGHOST", db.host()),
-                        jobEnv("PGPORT", String.valueOf(db.port())),
-                        jobEnv("PGUSER", db.user()),
-                        jobEnv("PGPASSWORD", db.password()),
-                        jobEnv("GUAC_DB", db.database())))
-                .volumeMount(List.of(
-                        JobV1SpecTemplateSpecContainerVolumeMount.builder()
-                                .name("sql").mountPath("/sql").build(),
-                        JobV1SpecTemplateSpecContainerVolumeMount.builder()
-                                .name("provision").mountPath("/provision").readOnly(true).build()))
-                .build();
+            .builder()
+            .name("db-init")
+            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .command(List.of("sh", "-c", script))
+            .env(List.of(
+                jobEnv("PGHOST", db.host()),
+                jobEnv("PGPORT", String.valueOf(db.port())),
+                jobEnv("PGUSER", db.user()),
+                jobEnv("PGPASSWORD", db.password()),
+                jobEnv("GUAC_DB", db.database())))
+            .volumeMount(List.of(
+                JobV1SpecTemplateSpecContainerVolumeMount.builder()
+                                                         .name("sql").mountPath("/sql").build(),
+                JobV1SpecTemplateSpecContainerVolumeMount.builder()
+                                                         .name("provision").mountPath("/provision").readOnly(true).build()))
+            .build();
 
         return JobV1.Builder.create(scope, "guacamoleDbInitJob")
-                .dependsOn(dependsOn)
-                // The provider waits only 1 minute for completion by default, most of which is spent
-                // pulling the two images before any SQL runs. The work itself takes about a second.
-                .timeouts(JobV1Timeouts.builder().create("10m").build())
-                .metadata(JobV1Metadata.builder().name(DB_INIT_JOB).namespace("default").build())
-                .spec(JobV1Spec.builder()
-                              .backoffLimit(6)
-                              .template(JobV1SpecTemplate.builder()
-                                    .metadata(JobV1SpecTemplateMetadata.builder()
-                                                      .labels(Map.of("app", DB_INIT_JOB))
-                                                      .build())
-                                    .spec(JobV1SpecTemplateSpec.builder()
-                                                  .restartPolicy("OnFailure")
-                                                  .initContainer(List.of(schemaGen))
-                                                  .container(List.of(dbInit))
-                                                  .volume(List.of(
-                                                          JobV1SpecTemplateSpecVolume.builder()
-                                                                  .name("sql")
-                                                                  .emptyDir(JobV1SpecTemplateSpecVolumeEmptyDir.builder().build())
-                                                                  .build(),
-                                                          JobV1SpecTemplateSpecVolume.builder()
-                                                                  .name("provision")
-                                                                  .configMap(JobV1SpecTemplateSpecVolumeConfigMap.builder()
-                                                                                     .name(PROVISION_CM)
-                                                                                     .build())
-                                                                  .build()))
-                                                  .build())
-                                    .build())
-                              .build())
-                .build();
+                            .dependsOn(dependsOn)
+                            // The provider waits only 1 minute for completion by default, most of which is spent
+                            // pulling the two images before any SQL runs. The work itself takes about a second.
+                            .timeouts(JobV1Timeouts.builder().create("10m").build())
+                            .metadata(JobV1Metadata.builder().name(DB_INIT_JOB).namespace("default").build())
+                            .spec(JobV1Spec.builder()
+                                           .backoffLimit(6)
+                                           .template(JobV1SpecTemplate.builder()
+                                                                      .metadata(JobV1SpecTemplateMetadata.builder()
+                                                                                                         .labels(Map.of("app", DB_INIT_JOB))
+                                                                                                         .build())
+                                                                      .spec(JobV1SpecTemplateSpec.builder()
+                                                                                                 .restartPolicy("OnFailure")
+                                                                                                 .initContainer(List.of(schemaGen))
+                                                                                                 .container(List.of(dbInit))
+                                                                                                 .volume(List.of(
+                                                                                                     JobV1SpecTemplateSpecVolume.builder()
+                                                                                                                                .name("sql")
+                                                                                                                                .emptyDir(JobV1SpecTemplateSpecVolumeEmptyDir.builder().build())
+                                                                                                                                .build(),
+                                                                                                     JobV1SpecTemplateSpecVolume.builder()
+                                                                                                                                .name("provision")
+                                                                                                                                .configMap(JobV1SpecTemplateSpecVolumeConfigMap.builder()
+                                                                                                                                                                               .name(PROVISION_CM)
+                                                                                                                                                                               .build())
+                                                                                                                                .build()))
+                                                                                                 .build())
+                                                                      .build())
+                                           .build())
+                            .build();
     }
 
     private static JobV1SpecTemplateSpecContainerEnv jobEnv(String name, String value) {
@@ -505,7 +517,8 @@ public class GuacamoleConfig {
      */
     private static String buildProvisioningSql(Function<Session, String> hostResolver,
                                                String vncPassword,
-                                               List<Session> sessions) {
+                                               List<Session> sessions
+    ) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
                   BEGIN;
@@ -541,14 +554,15 @@ public class GuacamoleConfig {
 
     private static String buildUserMappingXml(java.util.function.Function<Session, String> hostResolver,
                                               String vncPassword,
-                                              List<Session> sessions) {
+                                              List<Session> sessions
+    ) {
         StringBuilder sb = new StringBuilder("<user-mapping>\n");
         for (Session s : sessions) {
             sb.append(String.format(
-                    AUTHORIZE_BLOCK_TEMPLATE,
-                    s.username(), s.password(),
-                    s.username(),
-                    hostResolver.apply(s), s.vncPort(), vncPassword));
+                AUTHORIZE_BLOCK_TEMPLATE,
+                s.username(), s.password(),
+                s.username(),
+                hostResolver.apply(s), s.vncPort(), vncPassword));
         }
         sb.append("</user-mapping>\n");
         return sb.toString();
@@ -560,35 +574,37 @@ public class GuacamoleConfig {
      */
     private static ConfigMap buildThemeConfigMap(Construct scope, String theme) {
         return ConfigMap.Builder
-                .create(scope, "guacamoleThemeConfigMap")
-                .metadata(ConfigMapMetadata.builder()
-                                           .name(THEME_CONFIG_MAP)
-                                           .namespace("default")
-                                           .build())
-                .binaryData(Map.of(THEME_JAR_NAME,
-                                   Base64.getEncoder().encodeToString(themeJarBytes(theme))))
-                .build();
+            .create(scope, "guacamoleThemeConfigMap")
+            .metadata(ConfigMapMetadata.builder()
+                                       .name(THEME_CONFIG_MAP)
+                                       .namespace("default")
+                                       .build())
+            .binaryData(Map.of(
+                THEME_JAR_NAME,
+                Base64.getEncoder().encodeToString(themeJarBytes(theme))))
+            .build();
     }
 
     private static DeploymentSpecTemplateSpecVolume themeVolume() {
         return DeploymentSpecTemplateSpecVolume.builder()
-                .name(THEME_VOLUME)
-                .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
-                                                                    .name(THEME_CONFIG_MAP)
-                                                                    .build())
-                .build();
+                                               .name(THEME_VOLUME)
+                                               .configMap(DeploymentSpecTemplateSpecVolumeConfigMap.builder()
+                                                                                                   .name(THEME_CONFIG_MAP)
+                                                                                                   .build())
+                                               .build();
     }
 
     private static DeploymentSpecTemplateSpecVolume homeVolume() {
         return DeploymentSpecTemplateSpecVolume.builder()
-                .name(HOME_VOLUME)
-                .emptyDir(DeploymentSpecTemplateSpecVolumeEmptyDir.builder().build())
-                .build();
+                                               .name(HOME_VOLUME)
+                                               .emptyDir(DeploymentSpecTemplateSpecVolumeEmptyDir.builder().build())
+                                               .build();
     }
 
     private static DeploymentSpecTemplateSpecInitContainerVolumeMount initVolumeMount(String name,
                                                                                       String path,
-                                                                                      boolean readOnly) {
+                                                                                      boolean readOnly
+    ) {
         return DeploymentSpecTemplateSpecInitContainerVolumeMount.builder()
                                                                  .name(name)
                                                                  .mountPath(path)
@@ -603,7 +619,7 @@ public class GuacamoleConfig {
      * Guacamole requires.
      */
     private static byte[] themeJarBytes(String theme) {
-        Map<String, byte[]> files = ThemeResources.list("themes/" + theme + "/guacamole/", "guac-manifest.json");
+        Map<String, byte[]>   files = ThemeResources.list("themes/" + theme + "/guacamole/", "guac-manifest.json");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
             // The jar goes into the plan, so is the same on each synthesis: the files are in the order of their names and

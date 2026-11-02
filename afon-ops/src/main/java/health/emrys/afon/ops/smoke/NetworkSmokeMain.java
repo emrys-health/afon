@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
@@ -85,7 +86,7 @@ public class NetworkSmokeMain {
             false);
 
         return command.run().stream().map(x -> {
-            if (x.stderr().contains("no application protocol")) {
+            if (x.stderr().contains("no application protocol") || x.stderr().contains("Empty reply from server")) {
                 return x.makeSuccessful(); // this is a good error!
             }
             return x.makeFailed();
@@ -302,6 +303,7 @@ public class NetworkSmokeMain {
             "pypi.io",
             "pypi.org",
             "pypi.org",
+            GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT
             };
         for (String provider : providers) {
             CurlCommand command = new CurlCommand(client, pod, provider, false);

@@ -13,7 +13,7 @@ public class CurlCommand extends CliCommand {
     private final boolean    expectHttp;
 
     public CurlCommand(KubeClient client, String pod, String domain, boolean expectHttp) {
-        super(client, "curl -I --connect-timeout 3 --max-time 3 https://" + domain);
+        super(client, "curl -L -I --connect-timeout 3 --max-time 3 http://" + domain);
         this.client     = client;
         this.pod        = pod;
         this.expectHttp = expectHttp;
