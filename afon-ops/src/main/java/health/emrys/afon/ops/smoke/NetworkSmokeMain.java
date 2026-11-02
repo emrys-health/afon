@@ -25,6 +25,8 @@ import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -73,7 +75,9 @@ public class NetworkSmokeMain {
             sparkPods(), List.of(
                 this::checkCanSeeAllowedDomains,
                 this::checkCannotSeeOtherBuckets)));
-        results.addAll(checkNetworkWithPods(jupyterPods(), List.of(this::checkCannotSeeOtherBuckets)));
+        results.addAll(checkNetworkWithPods(jupyterPods(), List.of(
+            this::checkCannotSeeOtherBuckets,
+            this::checkVncPasswordIsNotShared)));
         return results;
     }
 
@@ -310,6 +314,38 @@ public class NetworkSmokeMain {
             results.addAll(command.run());
         }
         return results;
+    }
+
+    /**
+     * Checks that the pod's VNC server is not behind {@code JUPYTER_VNC_PASSWORD}, which is shared by, ie known to, every
+     * user's desktop if it is used as is: each user's pod must have its own password, derived from it.
+     */
+    private List<ExecResult> checkVncPasswordIsNotShared(String pod) throws Exception {
+        ExecResult read = client.exec(pod, "sh", "-c", "base64 \"$HOME/.vnc/passwd\"");
+        return List.of(vncPasswordIsNotShared(read, properties.getValue(JUPYTER_VNC_PASSWORD)));
+    }
+
+    /**
+     * @param read   the result of base64-encoding the pod's {@code ~/.vnc/passwd}
+     * @param shared the value of {@code JUPYTER_VNC_PASSWORD}
+     * @return a failure if the file could not be read, or holds the shared password, else a success; never with the file's
+     * contents, which give away the password
+     */
+    static ExecResult vncPasswordIsNotShared(ExecResult read, String shared) {
+        String command = "base64 ~/.vnc/passwd";
+        if (!read.isSuccess()) {
+            return new ExecResult(
+                -1, "", format("Could not read ~/.vnc/passwd on %s: %s", read.host(), read.stderr()), command, read.host());
+        }
+        byte[] passwd = Base64.getMimeDecoder().decode(read.stdout().strip());
+        if (Arrays.equals(passwd, VncPasswd.encode(shared))) {
+            return new ExecResult(
+                -1, "", format(
+                "The VNC password of %s is JUPYTER_VNC_PASSWORD, which every user's desktop would share, not the user's own",
+                read.host()), command, read.host());
+        }
+        return new ExecResult(
+            0, format("The VNC password of %s is not JUPYTER_VNC_PASSWORD", read.host()), "", command, read.host());
     }
 
     private List<ExecResult> checkCanSeeAllowedDomains(String pod) throws Exception {
