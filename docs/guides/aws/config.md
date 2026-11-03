@@ -47,9 +47,9 @@ AWS_REGION=eu-west-2
 AWS_S3_ROLE_ARN=arn:aws:iam::<account>:role/S3ReadWriteRole   # created by aws-create
 AWS_GLUE_ROLE_ARN=<optional: only for the Glue catalog>
 ```
-Set in `secret-aws.properties` the access keys of the user that Polaris and Gitea reach the buckets with (see the [user setup](../../../scripts/aws/user/README.md)):
+Set in `secret-aws.properties` the access keys of the service user that Polaris and Gitea reach the buckets with (create the user and its key with `afon-cli.sh aws-service-user create` and `afon-cli.sh aws-service-user create-key`):
 ```shell
-AWS_ACCESS_KEY_ID=<key id>
+AWS_ACCESS_KEY_ID=<access-key>
 AWS_SECRET_ACCESS_KEY=<secret>
 ```
 Set the Polaris user in `secret.properties` (`USER_ID`).  The stack-specific properties are in the docs of each side.

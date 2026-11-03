@@ -71,6 +71,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsLoginMain", "aws/login.sh"),
         new ScriptEntry("aws", "AwsMountDataMain", "aws/mount-data.sh"),
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh", "aws", "Polaris"),
+        new ScriptEntry("aws", "AwsServiceUserMain", "aws/service-user.sh"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
         new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh", "aws"),
         new ScriptEntry("aws", "AwsUserMain", "aws/user.sh"),
