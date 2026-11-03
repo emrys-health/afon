@@ -2,6 +2,18 @@
 
 The scope of the guides to provide step-by-step documentation to set up and deploy a TRE or Data Provider for the diffent clouds. 
 
+# AWS docs
+
+End-to-end procedure to set up the AWS env and deploy the stacks of a TRE and its data providers:
+
+| Doc                     | Stack | Contents |
+|-------------------------|-------|----------|
+| [config](./aws/config.md) | any | The config and setup steps common to both sides: installing the Afon CLI and local tools, creating and filling the config, user credentials (login, IAM user and access key), `aws-create`, Route 53 zones, ACM certs, checks and teardown. |
+| [tre](./aws/tre.md)   | `aws-full` | The TRE side: KeyCloak, Polaris, Spark, Trino, Jupyter, Gitea and monitoring on EKS. Step table, stack-specific config, deploy, verify, Data Provider whitelisting, teardown. |
+| [data](./aws/data.md) | `aws-polaris` | The Data Provider side: a Polaris catalog on EKS, relying on the TRE's KeyCloak. Same layout as the TRE doc. |
+
+Start with [config](./aws/config.md), then follow the doc of the side you deploy.
+
 # Azure docs
 
 End-to-end procedure to set up the Azure env and deploy the stacks of a TRE and its data providers:

@@ -53,7 +53,7 @@ fi
 if cluster_kubectl get --raw /readyz >/dev/null 2>"$CLUSTER_ERR"; then
   # Listing nodes needs more rights than /readyz, and is only there for information.
   if CLUSTER_NODES=$(cluster_kubectl get nodes -o name 2>/dev/null); then
-    CLUSTER_NODES_INFO="$(echo "$CLUSTER_NODES" | grep -c .) node(s)"
+    CLUSTER_NODES_INFO="$(echo "$CLUSTER_NODES" | grep -c . || true) node(s)"
   else
     CLUSTER_NODES_INFO="node count unavailable"
   fi

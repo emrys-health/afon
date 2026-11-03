@@ -73,6 +73,7 @@ public class GenerateScriptMains {
         new ScriptEntry("aws", "AwsPolarisMain", "aws/polaris.sh", "aws", "Polaris"),
         new ScriptEntry("aws", "AwsSnowflakeMain", "aws/snowflake.sh"),
         new ScriptEntry("aws", "AwsUpdateKubeConfigMain", "aws/update-kube-config.sh", "aws"),
+        new ScriptEntry("aws", "AwsUserMain", "aws/user.sh"),
         new ScriptEntry("aws", "AwsVpcsMain", "aws/vpcs.sh", "aws"),
 
         new ScriptEntry("azure", "AzureAccountPrincipalMain", "azure/account-principal.sh"),
