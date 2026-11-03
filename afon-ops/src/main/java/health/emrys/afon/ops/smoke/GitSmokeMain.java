@@ -37,7 +37,6 @@ public class GitSmokeMain {
         }
     }
 
-
     static final String GITEA     = "gitea-http:3000";
     static final String TEST_REPO = "test-repo";
 
@@ -100,7 +99,8 @@ public class GitSmokeMain {
                                              format("--post-data={\"name\":\"%s\",\"auto_init\":true}", TEST_REPO),
                                              format("http://%s/api/v1/user/repos", GITEA));
             if (!created.isSuccess()) {
-                errors.add(format("Could not create %s: %s", TEST_REPO, created.stderr()));
+                errors.add(format("Could not create %s:\nerror=%s\nstdout=%s\ncommand=%s\nhost=%s",
+                                  TEST_REPO, created.stderr(), created.stdout(), created.command(), created.host()));
                 return errors;
             }
         }
