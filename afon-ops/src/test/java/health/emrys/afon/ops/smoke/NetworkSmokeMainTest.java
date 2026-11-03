@@ -9,8 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class NetworkSmokeMainTest {
 
-    private static final ExecResult OK     = new ExecResult(0, "HTTP/2 200", "", "curl -I https://up.example");
-    private static final ExecResult FAILED = new ExecResult(6, "", "Could not resolve host", "curl -I https://down.example");
+    private static final ExecResult OK     = new ExecResult(0, "HTTP/2 200", "", "curl -I https://up.example", "host");
+    private static final ExecResult FAILED = new ExecResult(6, "", "Could not resolve host", "curl -I https://down.example", "host");
 
     @Test
     void aDomainThatRespondsIsPassedOn() {
