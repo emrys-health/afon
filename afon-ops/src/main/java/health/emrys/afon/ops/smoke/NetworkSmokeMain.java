@@ -34,7 +34,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.configs.PolarisConfig.DB_PORT;
-import static health.emrys.afon.cdk.configs.SparkWorkloads.MASTER;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
