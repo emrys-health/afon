@@ -66,8 +66,8 @@ public class NetworkConfig {
     private static final int SEARCH_PATH_LABELS = 2;
 
     /**
-     * The pods backing {@code emrys-master-svc}, expressed exactly as the Service selects them.
-     * {@link SparkWorkloads#MASTER} names the
+     * The pods backing the Spark master's service ({@link SparkNames#masterService()}), expressed exactly as the Service selects them.
+     * {@link SparkNames#master()} names the
      * StatefulSet the Spark operator creates for the {@code SparkCluster}; the {@code k8s:} prefix
      * is Cilium's source qualifier for a Kubernetes label.
      */
@@ -124,6 +124,7 @@ public class NetworkConfig {
     private final List<AllowedDomain> allowedDomains;
     private final Map<String, String> ingressPodLabels;
     private final DomainPolicy        domainPolicy;
+    private final SparkNames          sparkNames;
 
     /**
      * For debugging purposes only.
@@ -133,7 +134,7 @@ public class NetworkConfig {
 
         List<AllowedDomain> whitelist = new ArrayList<>();
         whitelist.addAll(allowedDomains);
-//        whitelist.add(AllowedDomain.create(MASTER + "-svc"));
+//        whitelist.add(AllowedDomain.create(sparkNames.masterService()));
 //        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
 //                                                     "spark-driver",
 //                                                     whitelist);
@@ -171,6 +172,7 @@ public class NetworkConfig {
         allowedDomains        = getAllowedDomainsFrom(properties);
         this.ingressPodLabels = ingressPodLabels;
         this.domainPolicy     = domainPolicy;
+        this.sparkNames       = SparkNames.from(properties);
     }
 
     /**
@@ -179,9 +181,7 @@ public class NetworkConfig {
      *                  knows about and so would otherwise be scheduled anywhere in the graph -
      *                  including before the cluster exists. See {@link #lockdownJupyterPods}.
      */
-    public void networkPolicies(String sparkConnectorName,
-                                List<ITerraformDependable> dependsOn
-    ) {
+    public void networkPolicies(List<ITerraformDependable> dependsOn) {
         // The only default-namespace peers a notebook pod may reach. An egress `to` entry carrying
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
         // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
@@ -207,7 +207,7 @@ public class NetworkConfig {
             NetworkPolicySpecEgress.builder()
                                    .to(allowedNamespacePeers)
                                    .build(),
-            createSparkConnectorEgressPolicy(sparkConnectorName),
+            createSparkConnectorEgressPolicy(),
             createGiteaEgressPolicy());
         networkPolicyFor(USER_POD_LABELS, egress);
 
@@ -222,7 +222,7 @@ public class NetworkConfig {
 
         // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
         lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
-        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(MASTER + "-svc")), ingressPodLabels);
+        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(sparkNames.masterService())), ingressPodLabels);
     }
 
     /**
@@ -436,7 +436,7 @@ public class NetworkConfig {
             );
             allowedEgress.add(domainEgress);
         }
-        // Egress to emrys-master-svc, the Spark master (spark://emrys-master-svc:7077).
+        // Egress to the service of the Spark master, SparkNames#masterService (spark://<master>-svc:7077).
         // Named rather than listed among the whitelisted domains because a cluster-local name is
         // not something toFQDNs can express: Cilium's DNS proxy turns an answer into a CIDR
         // identity, whereas a pod inside the cluster carries a label-derived one, so the FQDN rule
@@ -502,7 +502,7 @@ public class NetworkConfig {
      * Hence the ladder. Cilium's {@code *} is not a glob over the whole name: {@code
      * escapeRegexpCharacters} rewrites it to {@code [-a-zA-Z0-9_]*}, which excludes the dot, so one
      * {@code *} spans exactly one label and {@code *.cluster.local} does not match
-     * {@code emrys-master-svc.default.svc.cluster.local}. Covering every depth therefore means
+     * {@code <spark-cluster>-master-svc.default.svc.cluster.local}. Covering every depth therefore means
      * emitting a pattern per depth, up to the longest whitelisted name plus
      * {@link #SEARCH_PATH_LABELS}.
      */
@@ -536,13 +536,11 @@ public class NetworkConfig {
      * {@code spark-role=driver} narrows it to the single pod serving Connect: executors carry the
      * same app name but do not listen on 15002.
      */
-    private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy(
-        String sparkConnectorName
-    ) {
+    private static @NonNull NetworkPolicySpecEgress createSparkConnectorEgressPolicy() {
         List<NetworkPolicySpecEgressTo> sparkConnectorPods = specEgressFor(
             egressPodSelectorFor(addMaps(
                 DRIVER_LABELS, Map.of(
-                    "spark.operator/spark-app-name", sparkConnectorName))));
+                    "spark.operator/spark-app-name", SPARK_CONNECTOR_NAME))));
         List<NetworkPolicySpecEgressPorts> sparkConnectorPorts = List.of(
             NetworkPolicySpecEgressPorts.builder().protocol("TCP").port("15002").build());
         return NetworkPolicySpecEgress

@@ -14,30 +14,47 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.cdk.CdkHelper.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.cdk.CdkUtils.*;
 import static java.lang.String.format;
 
 /**
  * Cloud-agnostic application of the Spark operator's custom resources: a {@code SparkCluster}
- * ("emrys") and a {@code SparkApplication} ("spark-connector"). The spark-kubernetes-operator
+ * (named by {@link SparkNames}) and a {@code SparkApplication} ("spark-connector"). The spark-kubernetes-operator
  * is only a controller — it launches a master/workers and a driver/executors solely in response
  * to these CRs. Installing the operator (see {@link SparkConfig}) without applying these
  * manifests leaves it idle, which is why both the AWS and Azure stacks must call {@link #deploy}.
+ *
+ * <p>The resources applying them are triggered by the name of the cluster, so that renaming it replaces them: the old
+ * cluster is deleted, by the name it was created with, then the new one is created.
  *
  * <p>The Spark Connect server is shared by all users, so it registers no Iceberg catalogs and holds
  * no Polaris credentials: each user declares their catalogs in their own session, authenticating
  * with their own OIDC token (see {@code SparkWarehouseConfig#sparkConfigsWithToken}).
  */
 public class SparkWorkloads {
-    public static final String MASTER = "emrys-master";
+    /** Name of the {@code SparkApplication} serving Spark Connect, which the network policies select its pods by. */
+    public static final String SPARK_CONNECTOR_NAME = "spark-connector";
+    /** The trigger holding the name of the {@code SparkCluster}, which replaces the resources applying it when it changes. */
+    private static final String CLUSTER_NAME_TRIGGER = "clusterName";
+    /**
+     * The name of the cluster for the destroy-time commands, which may only refer to the resource itself: the one it was created
+     * with, not the one now configured, which is what is replaced.  A stack created before the trigger existed has none, hence
+     * the fallback to the name it was then given.
+     */
+    static final String EXISTING_CLUSTER = "${try(self.triggers." + CLUSTER_NAME_TRIGGER + ", \"" + SparkNames.LEGACY_CLUSTER_NAME + "\")}";
     /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */
     static final int MASTER_WAIT_SECONDS = 600;
     public static final Map<String, String> MASTER_LABELS = Map.of(
         "spark-role", "master");
     public static final Map<String, String> DRIVER_LABELS = Map.of(
         "spark-role", "driver");
+
+    private final SparkNames names;
+
+    public SparkWorkloads(SparkNames names) {
+        this.names = names;
+    }
 
     /**
      * Applies the {@code SparkCluster} and {@code SparkApplication} manifests against the cluster
@@ -57,7 +74,7 @@ public class SparkWorkloads {
             "apiVersion", "spark.apache.org/v1alpha1",
             "kind", "SparkCluster",
             "metadata", Map.of(
-                "name", "emrys",
+                "name", names.clusterName(),
                 "namespace", "default"
             ),
             "spec", Map.of(
@@ -85,12 +102,14 @@ public class SparkWorkloads {
         List<LocalExecProvisioner> allClusterProvisioners = new ArrayList<>();
         allClusterProvisioners.addAll(uponCreateRun("echo '" + sparkClusterJson + "' | kubectl apply -f -"));
         allClusterProvisioners.addAll(uponDestroyRun(
-            "kubectl delete statefulset emrys-master --force --grace-period=0",
-            "kubectl delete statefulset emrys-worker --force --grace-period=0",
-            "kubectl patch sparkclusters emrys  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+            "kubectl delete sparkcluster " + EXISTING_CLUSTER + " --ignore-not-found --wait=false",
+            "kubectl delete statefulset " + EXISTING_CLUSTER + "-master --force --grace-period=0",
+            "kubectl delete statefulset " + EXISTING_CLUSTER + "-worker --force --grace-period=0",
+            "kubectl patch sparkclusters " + EXISTING_CLUSTER + "  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
         Resource sparkCluster = Resource.Builder.create(scope, "sparkClusterManifest")
                         .provisioners(allClusterProvisioners)
+                        .triggers(Map.of(CLUSTER_NAME_TRIGGER, names.clusterName()))
                         .dependsOn(dependsOn)
                         .build();
 
@@ -101,10 +120,12 @@ public class SparkWorkloads {
         List<LocalExecProvisioner> allConnectProvisioners = new ArrayList<>();
         allConnectProvisioners.addAll(uponCreateRun(waitForMasterCommand(), startConnectCommand()));
         allConnectProvisioners.addAll(uponDestroyRun(
-            "kubectl patch sparkapplication spark-connector  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
+            "kubectl delete sparkapplication " + SPARK_CONNECTOR_NAME + " --ignore-not-found --wait=false",
+            "kubectl patch sparkapplication " + SPARK_CONNECTOR_NAME + "  -p '{\"metadata\":{\"finalizers\":null}}' --type=merge"
         ));
         Resource.Builder.create(scope, "sparkConnectManifest")
                         .provisioners(allConnectProvisioners)
+                        .triggers(Map.of(CLUSTER_NAME_TRIGGER, names.clusterName()))
                         .dependsOn(connectDependsOn)
                         .build();
     }
@@ -115,7 +136,7 @@ public class SparkWorkloads {
      * {@value #MASTER_WAIT_SECONDS}s, saying why, rather than leaving a driver that cannot register
      */
     public String waitForMasterCommand() {
-        String pod = MASTER + "-0";
+        String pod = names.masterPod();
         return format(
             "for i in $(seq 1 %d); do kubectl get pod %s >/dev/null 2>&1 && break; sleep 5; done; "
             + "kubectl wait --for=condition=Ready pod/%s --timeout=%ds "
@@ -181,7 +202,7 @@ public class SparkWorkloads {
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",
             "spark.ui.reverseProxy", "true",
-            "spark.master", format("spark://%s-svc:7077", MASTER),
+            "spark.master", format("spark://%s:7077", names.masterService()),
             "spark.submit.deployMode", "cluster",
             "spark.executor.cores", "1",
             "spark.cores.max", "3",

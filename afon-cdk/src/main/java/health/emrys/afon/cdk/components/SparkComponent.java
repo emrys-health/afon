@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.StackComponent;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import health.emrys.afon.cdk.CloudPlatform;
+import health.emrys.afon.cdk.configs.SparkNames;
 import health.emrys.afon.cdk.configs.SparkWorkloads;
 
 import java.util.ArrayList;
@@ -26,6 +27,6 @@ public class SparkComponent implements StackComponent {
         CloudPlatform platform = context.platform();
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.add(context.require(SparkOperatorComponent.class).operatorReady());
-        new SparkWorkloads().deploy(context.stack(), platform.cloud(), dependsOn);
+        new SparkWorkloads(SparkNames.from(context.properties())).deploy(context.stack(), platform.cloud(), dependsOn);
     }
 }

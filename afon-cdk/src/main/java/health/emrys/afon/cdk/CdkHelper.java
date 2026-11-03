@@ -46,7 +46,6 @@ public class CdkHelper {
         "k8s:app.kubernetes.io/name", "ingress-nginx");
     public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
     public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
-    public static final String SPARK_CONNECTOR_NAME = "spark-connector";
     public static final String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
     public static final String TRINO_SERVICE_NAME = "trino";
 

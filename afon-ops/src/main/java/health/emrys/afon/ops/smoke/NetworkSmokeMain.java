@@ -31,6 +31,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.configs.PolarisConfig.DB_PORT;
+import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
@@ -278,8 +279,8 @@ public class NetworkSmokeMain {
 
     protected List<String> sparkPods() throws Exception {
         List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
-            return //name.contains(MASTER) ||name.contains("emrys-worker") || // don't need to worry about Spark as need the connector to upload JARS
-                name.contains("spark-connector");
+            return //name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) || // don't need to worry about Spark as need the connector to upload JARS
+                name.contains(SPARK_CONNECTOR_NAME);
         }).toList();
         logger.info("Checking Spark pods: {}", pods);
         return pods;

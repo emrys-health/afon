@@ -8,7 +8,7 @@ class SparkWorkloadsTest {
 
     @Test
     void sparkConnectServerRegistersNoCatalogsOrCredentials() {
-        String command = new SparkWorkloads().startConnectCommand();
+        String command = new SparkWorkloads(new SparkNames("emrys")).startConnectCommand();
 
         assertThat(command)
             .contains("org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -19,7 +19,7 @@ class SparkWorkloadsTest {
 
     @Test
     void sparkConnectWaitsForTheMasterToBeReadyAndFailsIfItIsNot() {
-        String command = new SparkWorkloads().waitForMasterCommand();
+        String command = new SparkWorkloads(new SparkNames("emrys")).waitForMasterCommand();
 
         assertThat(command)
             .contains("kubectl get pod emrys-master-0")

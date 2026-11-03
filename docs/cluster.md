@@ -18,9 +18,9 @@ A healthy cluster (on AWS) will look something like:
 ```shell
 NAMESPACE     NAME                                                       READY   STATUS      RESTARTS        AGE
 default       alertmanager-kube-prometheus-stack-alertmanager-0          2/2     Running     0               2d22h
-default       emrys-master-0                                             1/1     Running     0               2d22h
-default       emrys-worker-0                                             1/1     Running     0               2d22h
-default       emrys-worker-1                                             1/1     Running     0               2d22h
+default       <spark-cluster>-master-0                                   1/1     Running     0               2d22h
+default       <spark-cluster>-worker-0                                   1/1     Running     0               2d22h
+default       <spark-cluster>-worker-1                                   1/1     Running     0               2d22h
 default       guacamole-db-init-xv559                                    0/1     Completed   0               2d22h
 default       guacamole-deployment-847bfbc549-vmktx                      2/2     Running     0               2d22h
 default       hub-deployment-6777cd5cd6-wjtvl                            1/1     Running     0               2d22h
@@ -68,7 +68,7 @@ They automate deployment and self-heal the cluster.
 
 ### The Spark pods
 
-The pods `emrys-*` are the Spark master/worker nodes.
+The pods `<spark-cluster>-*` are the Spark master/worker nodes, where `<spark-cluster>` is `SPARK_CLUSTER_NAME` (`spark` unless set; `emrys` on stacks deployed before it was configurable).
 
 The `spark-kubernetes-operator-*` pod manages the Spark cluster by (for example) spinning up worker and driver pods.
 

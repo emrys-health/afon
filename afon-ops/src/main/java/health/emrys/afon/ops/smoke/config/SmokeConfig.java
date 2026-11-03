@@ -11,12 +11,13 @@ import java.util.Locale;
 
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
 import static health.emrys.afon.config.AfonProperty.TRE_CLOUD;
+import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static java.lang.String.format;
 
 public class SmokeConfig {
 
     public static final String KUBERNETES_NAMESPACE = "default";
-    public static final String SPARK_CONNECTOR_POD = "spark-connector-0-driver";
+    public static final String SPARK_CONNECTOR_POD = SPARK_CONNECTOR_NAME + "-0-driver";
     public static final long PROGRESS_INTERVAL_SECONDS = 10;
     public static final long CALL_TIMEOUT_SECONDS = 30;
     public static final AfonCloud DEFAULT_TRE_CLOUD = AfonCloud.AWS;

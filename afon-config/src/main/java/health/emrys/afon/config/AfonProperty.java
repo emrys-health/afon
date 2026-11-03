@@ -16,6 +16,13 @@ public enum AfonProperty {
     /** Where the tofu output goes, one of "console" (logged and System.out) or "logger" (only logged). Defaults to "logger". */
     TOFU_OUTPUT("TOFU_OUTPUT"),
 
+    /**
+     * Name of the {@code SparkCluster}, from which the Spark operator names the master and the workers, {@code <name>-master} and
+     * {@code <name>-worker}.  A lowercase DNS label.  Optional: {@code spark} when blank or unset.  Changing it on a deployed stack
+     * replaces the Spark cluster and the Spark Connect server on the next deploy.
+     */
+    SPARK_CLUSTER_NAME("SPARK_CLUSTER_NAME"),
+
     /** Selects which theme under afon-theme's {@code themes/<name>/} to deploy. Defaults to "emrys-hdrs". */
     AFON_THEME("AFON_THEME"),
 

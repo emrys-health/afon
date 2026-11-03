@@ -5,6 +5,7 @@ import health.emrys.afon.spark.SparkWarehouseConfig;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static java.lang.String.format;
 
 /**
@@ -31,8 +32,8 @@ class PySparkSessionCode {
                                                  import os as os
 
                                                  OIDC_TOKEN = os.environ["OIDC_TOKEN"]
-                                                 spark = (SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002")
-                                                 """);
+                                                 spark = (SparkSession.builder.appName("test").remote("sc://%s-0-driver-svc:15002")
+                                                 """.formatted(SPARK_CONNECTOR_NAME));
         catalogs.forEach((sparkCatalog, catalogName) -> {
             python.append(format("# %s \n", catalogName));
             new TreeMap<>(config.sparkConfigsWithToken(sparkCatalog, catalogName, OIDC_TOKEN))

@@ -10,6 +10,9 @@
 
 **IMPORTANT:** one-off steps when upgrading from 1.0-beta-8:
 
+- **The Spark cluster is replaced on the first deploy after upgrading:**
+  - The name of the Spark cluster is now `SPARK_CLUSTER_NAME` (optional, `spark` when empty) and triggers the replacement of the Spark cluster and the Spark Connect server when it changes.  The default is `spark`, where the cluster was named `emrys`, so every deployed stack replaces its Spark cluster on the first deploy after upgrading, and Spark is unavailable for the minute or so that takes.  To keep `emrys`, set `SPARK_CLUSTER_NAME=emrys` in `afon.properties` before deploying; the cluster is still replaced once, as the triggers are new, but with the same name.
+  - To rename the cluster, eg to `afon-spark`, set `SPARK_CLUSTER_NAME` in `afon.properties` and redeploy: the old cluster is deleted by the name it was created with, then the new one is created.  The Spark pods are then named `<name>-master-0` and `<name>-worker-*`.
 - **`azure-create` and `gcp-create` no longer create DNS zones ([#346](https://github.com/emrys-health/afon/issues/346)):**
   - Run `afon-cli.sh dns-create-zones <aws|azure|gcp> <stack>` to create the DNS zone of each domain name the stack serves, the same way on every cloud.  On `azure`, run it after `azure-create`, which creates the resource group.  `gcp-create` no longer enables the Cloud DNS API either: `dns-create-zones gcp` does.
   - The zones that already exist are found by name and left as they are, so a deployed env needs no action, until it is created again.
