@@ -7,6 +7,7 @@ import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.*;
+import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -282,6 +283,7 @@ public class GuacamoleConfig {
                                                              .protocol("TCP")
                                                              .build());
         clusterIpService(deps, LABELS, SVC_NAME, ports, scope);
+        onlyOauth2ProxyIngress(scope);
     }
 
     /**
@@ -418,6 +420,43 @@ public class GuacamoleConfig {
                                                              .protocol("TCP")
                                                              .build());
         clusterIpService(deployDeps, LABELS, SVC_NAME, ports, scope);
+        onlyOauth2ProxyIngress(scope);
+    }
+
+    /** The name of the {@link NetworkPolicy} that only lets oauth2-proxy reach Guacamole. */
+    static final String INGRESS_POLICY_NAME = "guacamole-only-from-oauth2-proxy";
+
+    /**
+     * Lets only the oauth2-proxy pods reach Guacamole, and only on {@link #WEB_PORT}.  Guacamole logs in whoever the
+     * {@code X-Forwarded-Email} header names, which only oauth2-proxy, having authenticated the user, may set: any other pod that
+     * reached it could name any user and take over their desktop.  guacd, in the same pod, is reached over localhost, which no
+     * policy applies to, so its port is closed to every other pod too.
+     */
+    private static void onlyOauth2ProxyIngress(Construct scope) {
+        NetworkPolicySpecIngress fromOauth2Proxy = NetworkPolicySpecIngress
+            .builder()
+            .from(List.of(NetworkPolicySpecIngressFrom
+                              .builder()
+                              .podSelector(NetworkPolicySpecIngressFromPodSelector.builder()
+                                                                                  .matchLabels(JupyterMfaConfig.PROXY_LABELS)
+                                                                                  .build())
+                              .build()))
+            .ports(List.of(NetworkPolicySpecIngressPorts.builder()
+                                                        .protocol("TCP")
+                                                        .port(String.valueOf(WEB_PORT))
+                                                        .build()))
+            .build();
+        NetworkPolicy.Builder.create(scope, "guacamoleIngressPolicy")
+                             .metadata(NetworkPolicyMetadata.builder()
+                                                            .name(INGRESS_POLICY_NAME)
+                                                            .namespace("default")
+                                                            .build())
+                             .spec(NetworkPolicySpec.builder()
+                                                    .podSelector(NetworkPolicySpecPodSelector.builder().matchLabels(LABELS).build())
+                                                    .policyTypes(List.of("Ingress"))
+                                                    .ingress(List.of(fromOauth2Proxy))
+                                                    .build())
+                             .build();
     }
 
     /**

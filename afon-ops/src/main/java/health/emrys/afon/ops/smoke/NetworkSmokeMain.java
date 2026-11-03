@@ -71,6 +71,7 @@ public class NetworkSmokeMain {
         results.addAll(checkPolarisCanTalkToDB());
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
+        results.addAll(checkGuacamoleOnlyReachableFromOauth2Proxy());
         results.addAll(checkNetworkWithPods(
             sparkPods(), List.of(
                 this::checkCanSeeAllowedDomains,
@@ -79,6 +80,16 @@ public class NetworkSmokeMain {
             this::checkCannotSeeOtherBuckets,
             this::checkVncPasswordIsNotShared)));
         return results;
+    }
+
+    /**
+     * Checks that a pod other than oauth2-proxy cannot reach Guacamole, which logs in whoever the {@code X-Forwarded-Email}
+     * header names.  From Polaris, which no egress policy limits, so that only Guacamole's own ingress policy can stop it.
+     */
+    private List<ExecResult> checkGuacamoleOnlyReachableFromOauth2Proxy() throws Exception {
+        String polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+        logger.info("Checking Guacamole cannot be reached from {}", polarisPodName);
+        return new CurlCommand(client, polarisPodName, GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT, false).run();
     }
 
     public List<ExecResult> checkPolarisCanTalkToDB() throws Exception {

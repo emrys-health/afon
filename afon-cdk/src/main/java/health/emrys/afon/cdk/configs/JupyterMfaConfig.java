@@ -35,7 +35,8 @@ import static java.lang.String.format;
  */
 public class JupyterMfaConfig {
 
-    private static final Map<String, String> PROXY_LABELS = Map.of("app", CdkHelper.PROXY_SERVICE_NAME);
+    /** The labels of the oauth2-proxy pods, the only ones that may reach Guacamole, see {@link GuacamoleConfig}. */
+    static final Map<String, String> PROXY_LABELS = Map.of("app", CdkHelper.PROXY_SERVICE_NAME);
     private static final String              SECRET_NAME  = CdkHelper.PROXY_SERVICE_NAME +"-secret";
     /** oauth2-proxy answers this itself, unauthenticated, so the load balancer can health check it. */
     public static final String               PING_PATH    = "/ping";
