@@ -6,7 +6,7 @@ import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.configs.NetworkConfig;
 
 /**
- * The network policies locking down the notebook pods and the Spark master and driver, which need the cluster's CNI to
+ * The network policies locking down the notebook pods and the Spark master, driver and workers, which need the cluster's CNI to
  * enforce them.
  */
 public class NetworkPoliciesComponent implements StackComponent {

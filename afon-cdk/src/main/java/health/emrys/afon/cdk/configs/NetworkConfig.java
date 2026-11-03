@@ -76,6 +76,18 @@ public class NetworkConfig {
         "k8s:spark-role", "master");
 
     /**
+     * What the pods of the workers reach besides what the driver does.  The executors run in them, and register with the driver and
+     * fetch the session's jars from it, and fetch the blocks of a shuffle from each other.  Every Spark pod reaches the master.
+     */
+    private static final List<Map<String, String>> WORKER_PEERS = List.of(DRIVER_LABELS, WORKER_LABELS);
+
+    /**
+     * What the driver reaches besides the master: the workers, as it fetches from an executor's block manager a task's result too
+     * large to come back with the task's status ({@code spark.task.maxDirectResultSize}), eg of a large {@code collect()}.
+     */
+    private static final List<Map<String, String>> DRIVER_PEERS = List.of(WORKER_LABELS);
+
+    /**
      * One entry in {@link #allowedDomains}. Cilium offers two matchers and they are not the
      * same thing, so which one applies is stated per domain rather than guessed at from the
      * presence of a {@code *}:
@@ -214,15 +226,19 @@ public class NetworkConfig {
         if (gke) {
             // The notebooks have no domain to reach: the policy above is all they need.  Only the driver calls what the ingress
             // exposes, ie Polaris, so only it may reach the ingress controller
-            lockdownSparkOnGke(dependsOn, MASTER_LABELS, "spark-master", Map.of());
-            lockdownSparkOnGke(dependsOn, DRIVER_LABELS, "spark-driver", ingressPodLabels);
+            lockdownSparkOnGke(dependsOn, MASTER_LABELS, "spark-master", Map.of(), List.of());
+            lockdownSparkOnGke(dependsOn, DRIVER_LABELS, "spark-driver", ingressPodLabels, DRIVER_PEERS);
+            lockdownSparkOnGke(dependsOn, WORKER_LABELS, "spark-worker", ingressPodLabels, WORKER_PEERS);
             return;
         }
         lockdownJupyterPods(USER_POD_LABELS, dependsOn);
 
-        // only the driver calls what the ingress exposes, ie Polaris, so only it may reach the ingress controller
-        lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of());
-        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", List.of(AllowedDomain.create(sparkNames.masterService())), ingressPodLabels);
+        // only the driver and the executors, which run the users' code in the workers, call what the ingress exposes, ie Polaris,
+        // so only they may reach the ingress controller
+        List<AllowedDomain> masterService = List.of(AllowedDomain.create(sparkNames.masterService()));
+        lockdownSpark(dependsOn, MASTER_LABELS, "spark-master", List.of(), Map.of(), List.of());
+        lockdownSpark(dependsOn, DRIVER_LABELS, "spark-driver", masterService, ingressPodLabels, DRIVER_PEERS);
+        lockdownSpark(dependsOn, WORKER_LABELS, "spark-worker", masterService, ingressPodLabels, WORKER_PEERS);
     }
 
     /**
@@ -232,15 +248,20 @@ public class NetworkConfig {
      * <p>
      * Unlike Cilium's, the DNS lookups are not filtered, as GKE cannot: a name that is not whitelisted cannot be connected to, but can
      * be looked up, so data can still leave in the labels of a query.
+     *
+     * @param peers the labels of the other Spark pods it may reach, on every port, besides the master
      */
     private void lockdownSparkOnGke(List<ITerraformDependable> dependsOn,
                                     Map<String, String> labels,
                                     String pod,
-                                    Map<String, String> ingressPodLabels
+                                    Map<String, String> ingressPodLabels,
+                                    List<Map<String, String>> peers
     ) {
+        List<NetworkPolicySpecEgressTo> sparkPods = new ArrayList<>(List.of(podEgressTo(MASTER_LABELS)));
+        peers.forEach(peer -> sparkPods.add(podEgressTo(peer)));
         List<NetworkPolicySpecEgress> egress = new ArrayList<>(List.of(
             createDnsEgressPolicy(domainPolicy),
-            NetworkPolicySpecEgress.builder().to(List.of(podEgressTo(MASTER_LABELS))).build()));
+            NetworkPolicySpecEgress.builder().to(sparkPods).build()));
         if (!ingressPodLabels.isEmpty()) {
             egress.add(ingressEgressPolicy(ingressPodLabels));
         }
@@ -300,13 +321,19 @@ public class NetworkConfig {
                                Map<String, String> labels,
                                String pod,
                                List<AllowedDomain> additional,
-                               Map<String, String> ingressPodLabels
+                               Map<String, String> ingressPodLabels,
+                               List<Map<String, String>> peers
     ) {
         List<AllowedDomain> whitelist = new ArrayList();
         whitelist.addAll(additional);
         whitelist.addAll(allowedDomains);
-        Map<String, Object> manifest = sparkManifest(labels, pod, whitelist, ingressPodLabels);
-        createWhitelistFor(dependsOn, manifest, pod + "-policy", "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default");
+        Map<String, Object> manifest = sparkManifest(labels, pod, whitelist, ingressPodLabels, peers);
+        // the policy's own name: that of the notebooks' would delete theirs whenever this one is replaced, eg by a change of the whitelist
+        createWhitelistFor(dependsOn, manifest, pod + "-policy", "kubectl delete ciliumnetworkpolicy " + manifestName(pod) + " -n default");
+    }
+
+    private static String manifestName(String pod) {
+        return pod + "-manifest";
     }
 
     /**
@@ -314,16 +341,20 @@ public class NetworkConfig {
      *                         HTTPS is then allowed to them, as the addresses that the ingress exposes are those of its load
      *                         balancer, which Cilium translates to its pods, so that the rule of the domain names, which
      *                         matches an address outside of the cluster, never applies to them
+     * @param peers            the labels of the other Spark pods it may reach, on every port, besides the master
      */
     static @NonNull Map<String, Object> sparkManifest(Map<String, String> labels,
                                                       String pod,
                                                       List<AllowedDomain> whitelist,
-                                                      Map<String, String> ingressPodLabels
+                                                      Map<String, String> ingressPodLabels,
+                                                      List<Map<String, String>> peers
     ) {
         List<Map<String, Object>> matchNames = new ArrayList<>();
 
+        List<Map<String, Object>> sparkPods = new ArrayList<>(List.of(Map.of("matchLabels", MASTER_LABELS)));
+        peers.forEach(peer -> sparkPods.add(Map.of("matchLabels", peer)));
         Map<String, Object> sparkEndpoints = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", MASTER_LABELS))
+            "toEndpoints", sparkPods
         );
 
         matchNames.addAll(
@@ -354,7 +385,7 @@ public class NetworkConfig {
 
         Map<String, Object> manifest = manifestUsing(
             labels,
-            pod + "-manifest",
+            manifestName(pod),
             egressConfig);
         return manifest;
     }

@@ -49,6 +49,12 @@ public class SparkWorkloads {
         "spark-role", "master");
     public static final Map<String, String> DRIVER_LABELS = Map.of(
         "spark-role", "driver");
+    /**
+     * The pods of the workers, which the executors, and so the users' code, run in, the cluster being a standalone one.
+     * Note: these values are from the Helm chart.
+     * */
+    public static final Map<String, String> WORKER_LABELS = Map.of(
+        "spark-role", "worker");
 
     private final SparkNames names;
 

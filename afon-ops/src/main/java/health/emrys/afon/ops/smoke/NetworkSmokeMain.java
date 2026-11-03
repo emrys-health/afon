@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
+import health.emrys.afon.cdk.configs.SparkNames;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
@@ -283,8 +284,9 @@ public class NetworkSmokeMain {
     }
 
     protected List<String> sparkPods() throws Exception {
+        SparkNames sparkNames = SparkNames.from(properties);
         List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
-            return //name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) || // don't need to worry about Spark as need the connector to upload JARS
+            return name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) || 
                 name.contains(SPARK_CONNECTOR_NAME);
         }).toList();
         logger.info("Checking Spark pods: {}", pods);
