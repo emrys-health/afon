@@ -14,6 +14,10 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerReadinessProbe;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerReadinessProbeHttpGet;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerVolumeMount;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainer;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnvValueFrom;
+import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecInitContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolume;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecVolumeConfigMapItems;
@@ -25,6 +29,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -69,6 +74,8 @@ public class KeyCloakConfig extends Construct {
     private static final String ENV_KC_DB_PASSWORD = "KC_DB_PASSWORD";
     private static final String ENV_KC_BOOTSTRAP_ADMIN_USERNAME = "KC_BOOTSTRAP_ADMIN_USERNAME";
     private static final String ENV_KC_BOOTSTRAP_ADMIN_PASSWORD = "KC_BOOTSTRAP_ADMIN_PASSWORD";
+    private static final String POSTGRES = "postgres";
+    private static final String JDBC_POSTGRES_PREFIX = "jdbc:postgresql:";
     private static final ServiceSpecPort SERVICE_SPEC_PORT = ServiceSpecPort.builder()
             .name("web")
             .port(KEYCLOAK_PORT)
@@ -229,13 +236,20 @@ public class KeyCloakConfig extends Construct {
         dependants.add(kcSecrets);
         dependants.add(themeCm);
         Map<String, String> labels = Map.of("app", APP_NAME);
+        // KeyCloak creates its own schema on start, but not its database, without which it crash loops.
+        List<DeploymentSpecTemplateSpecInitContainer> initContainers =
+            POSTGRES.equalsIgnoreCase(properties.getValue(KEYCLOAK_DB))
+                ? List.of(createPostgresDatabase(PostgresUrl.parse(properties.getValue(KEYCLOAK_DB_URL))))
+                : List.of();
         Deployment app = CdkUtils.deploy(
             this,
             dependants,
             labels,
             List.of(keyCloak),
+            initContainers,
             List.of(themeVolume),
-            APP_NAME);
+            APP_NAME,
+            null);
 
         dependants.add(app);
         // The Service must not be created until the load balancer controller's mutating webhook is
@@ -247,6 +261,79 @@ public class KeyCloakConfig extends Construct {
         // The management port is exposed too, so the load balancer can reach the health checks.
         nodePortService(dependants, labels, KEYCLOAK_SERVICE_NAME,
                         List.of(SERVICE_SPEC_PORT, MANAGEMENT_SERVICE_SPEC_PORT), this);
+    }
+
+    /**
+     * The host, port, database and sslmode of a {@code jdbc:postgresql://host[:port]/database[?params]} URL.
+     */
+    record PostgresUrl(String host, int port, String database, Optional<String> sslMode) {
+        static PostgresUrl parse(String jdbcUrl) {
+            if (jdbcUrl == null || !jdbcUrl.startsWith(JDBC_POSTGRES_PREFIX)) {
+                throw new IllegalArgumentException(
+                    KEYCLOAK_DB_URL.getName() + " must start with " + JDBC_POSTGRES_PREFIX + " but was " + jdbcUrl);
+            }
+            URI uri = URI.create(jdbcUrl.substring("jdbc:".length()));
+            String database = uri.getPath() == null ? "" : uri.getPath().replaceFirst("^/", "");
+            if (uri.getHost() == null || database.isEmpty()) {
+                throw new IllegalArgumentException(
+                    KEYCLOAK_DB_URL.getName() + " must name a host and a database but was " + jdbcUrl);
+            }
+            Optional<String> sslMode = uri.getQuery() == null
+                ? Optional.empty()
+                : Arrays.stream(uri.getQuery().split("&"))
+                        .filter(param -> param.startsWith("sslmode="))
+                        .map(param -> param.substring("sslmode=".length()))
+                        .findFirst();
+            return new PostgresUrl(uri.getHost(), uri.getPort() == -1 ? PolarisConfig.DB_PORT : uri.getPort(),
+                                   database, sslMode);
+        }
+    }
+
+    /**
+     * Creates KeyCloak's database, if it does not already exist, as its own user, whose credentials come from
+     * {@link #SECRET_NAME} just as KeyCloak's do.  Waits for Postgres first, so KeyCloak does not start before it.
+     */
+    static DeploymentSpecTemplateSpecInitContainer createPostgresDatabase(PostgresUrl url) {
+        String script = String.join(
+            "\n",
+            "set -e",
+            "until pg_isready -h \"$PGHOST\" -p \"$PGPORT\" -U \"$PGUSER\"; do echo 'waiting for postgres'; sleep 2; done",
+            "psql -d postgres -tAc \"SELECT 1 FROM pg_database WHERE datname='$KC_DATABASE'\" | grep -q 1 \\",
+            "  || psql -d postgres -c \"CREATE DATABASE \\\"$KC_DATABASE\\\"\"",
+            "echo 'keycloak db ready'");
+        List<DeploymentSpecTemplateSpecInitContainerEnv> env = new ArrayList<>(List.of(
+            initEnv("PGHOST", url.host()),
+            initEnv("PGPORT", String.valueOf(url.port())),
+            initEnvFromSecret("PGUSER", ENV_KC_DB_USERNAME),
+            initEnvFromSecret("PGPASSWORD", ENV_KC_DB_PASSWORD),
+            initEnv("KC_DATABASE", url.database())));
+        url.sslMode().ifPresent(sslMode -> env.add(initEnv("PGSSLMODE", sslMode)));
+        return DeploymentSpecTemplateSpecInitContainer
+            .builder()
+            .name("create-database")
+            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .command(List.of("sh", "-c", script))
+            .env(env)
+            .build();
+    }
+
+    private static DeploymentSpecTemplateSpecInitContainerEnv initEnv(String name, String value) {
+        return DeploymentSpecTemplateSpecInitContainerEnv.builder().name(name).value(value).build();
+    }
+
+    private static DeploymentSpecTemplateSpecInitContainerEnv initEnvFromSecret(String name, String secretKey) {
+        return DeploymentSpecTemplateSpecInitContainerEnv
+            .builder()
+            .name(name)
+            .valueFrom(DeploymentSpecTemplateSpecInitContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(DeploymentSpecTemplateSpecInitContainerEnvValueFromSecretKeyRef
+                                             .builder()
+                                             .name(SECRET_NAME)
+                                             .key(secretKey)
+                                             .build())
+                           .build())
+            .build();
     }
 
     private static DeploymentSpecTemplateSpecVolumeConfigMapItems themeItem(String key, String path) {
