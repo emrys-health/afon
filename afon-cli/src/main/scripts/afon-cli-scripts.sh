@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
-  echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
+  echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>] [--debug]"
   echo "          <script-path|action> [script-args...]"
   echo "          <script-path> is relative to the scripts dir, eg 'config/switch.sh'; a kebab-case"
   echo "          <action> name (eg 'config-switch') is also accepted, matching afon.sh's own actions."
@@ -15,6 +15,8 @@ usage(){
   echo "  --cdktf-env / AFON_CDKTF_ENV:   the cdktf env name.  If set, switches AFON_CDKTF to 'AFON_CDKTF-<env>' before running the script."
   echo "  --config-env / AFON_CONFIG_ENV: the config env name.  If set, switches AFON_HOME/config to 'config-<env>' before running the script."
   echo "  --env / AFON_ENV:               sets both --cdktf-env and --config-env.  Overrides them if also set."
+  echo "  --debug / AFON_DEBUG=true:      explains why a script failed: traces every command the script runs (with file:line and"
+  echo "                                  function) and, on failure, reports the failing command, its exit code and the call stack."
   echo "  AFON_CLI_DIR (env only):        the cli distribution dir. Defaults to 'AFON_HOME/cli'."
   echo "options specific to a single script (eg config/export.sh's zip path) are not flags here -"
   echo "pass them as script-args, eg: $0 config/export.sh myconfig.zip"
@@ -28,6 +30,7 @@ AFON_CDKTF="${AFON_CDKTF:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
 AFON_ENV="${AFON_ENV:-}"
+AFON_DEBUG="${AFON_DEBUG:-}"
 
 ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -44,6 +47,8 @@ while [[ $# -gt 0 ]]; do
       AFON_CDKTF_ENV="$2"; shift 2 ;;
     --env|-e)
       AFON_ENV="$2"; shift 2 ;;
+    --debug)
+      AFON_DEBUG=true; shift ;;
     --help|-h)
       # Only show this script's own usage when no script-path has been given yet; once one is
       # in ARGS, forward -h/--help through as a plain script-arg instead of swallowing it.
@@ -134,4 +139,13 @@ ACTION="${ACTION//\//-}"
 ALREADY_RUN=
 [ "$ACTION" == "config-switch" ] && [ -n "$CONFIG_SWITCHED" ] && ALREADY_RUN=true
 [ "$ACTION" == "cdktf-switch" ] && [ -n "$CDKTF_SWITCHED" ] && ALREADY_RUN=true
-[ -n "$ALREADY_RUN" ] || source $AFON_SCRIPT "$@"
+if [ -z "$ALREADY_RUN" ]; then
+  if [ "$AFON_DEBUG" == "true" ]; then
+    source "$AFON_ROOT/scripts/debug/debug-source.sh"
+    debug_enable "$AFON_SCRIPT"
+  fi
+  source $AFON_SCRIPT "$@"
+  if [ "$AFON_DEBUG" == "true" ]; then
+    debug_disable
+  fi
+fi

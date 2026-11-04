@@ -7,7 +7,7 @@ set -euo pipefail
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
   echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
-  echo "          [--logging|-l <level>] [--logging-console|-lc <level>]"
+  echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--debug]"
   echo "          <command> [args...]"
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
   echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
@@ -19,6 +19,9 @@ usage(){
   echo "                                            the AFON_ENV env var only overrides their env vars, not their flags."
   echo "  --logging / AFON_LOGGING:                 the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
   echo "  --logging-console / AFON_LOGGING_CONSOLE: the console logging level.  Defaults to 'OFF'."
+  echo "  --debug / AFON_DEBUG=true:                explains why a command failed: sets the console logging to DEBUG (unless given), traces"
+  echo "                                            this script, and for the script commands traces each command run and reports"
+  echo "                                            the failing command, its exit code and the call stack."
   echo "  AFON_CLI_DIR (env only):                  the cli distribution dir this script lives in.  Auto-detected."
   echo "  AFON_ENVS (env only):                     NAME=VALUE pairs of system properties passed to the CLI java process."
 }
@@ -47,6 +50,7 @@ AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_ENV="${AFON_ENV:-}"
 AFON_ENVS="${AFON_ENVS:-}"
+AFON_DEBUG="${AFON_DEBUG:-}"
 
 # Which of the env options were given as flags, which win over any env var.
 ENV_FLAG=
@@ -72,6 +76,8 @@ while [[ $# -gt 0 ]]; do
       AFON_LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
       AFON_LOGGING_CONSOLE="$2"; shift 2 ;;
+    --debug)
+      AFON_DEBUG=true; shift ;;
     --help|-h)
       # Only show this script's own usage when no command has been given yet; once a command
       # (eg "azure") is in ARGS, forward -h/--help so the java side can handle it - eg to list
@@ -112,6 +118,16 @@ AFON_HOME="${AFON_HOME:-$HOME/.afon}"
 AFON_CDKTF="${AFON_CDKTF:-$AFON_HOME/cdktf}"
 AFON_CLOUD="${AFON_CLOUD:-ALL}"
 AFON_LOGGING="${AFON_LOGGING:-INFO}"
+if [ "$AFON_DEBUG" == "true" ]; then
+  # The console logging is OFF by default: debug it, unless explicitly given.
+  AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-DEBUG}"
+  # Exported so that the script commands (which exec afon-cli-scripts.sh) debug the script they run.
+  export AFON_DEBUG
+  if [ -f "$AFON_CLI_DIR/scripts/debug/debug-source.sh" ]; then
+    source "$AFON_CLI_DIR/scripts/debug/debug-source.sh"
+    debug_enable "afon-cli.sh"
+  fi
+fi
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
 
 # CONFIG_ENV/CDKTF_ENV are global: if set, apply the switch commands upstream via afon-cli-scripts.sh

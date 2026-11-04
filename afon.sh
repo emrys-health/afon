@@ -3,6 +3,8 @@ set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
+# Shared with afon-cli.sh and afon-cli-scripts.sh: debug_enable, debug_disable.
+source "$AFON_ROOT/scripts/debug/debug-source.sh"
 
 # Lists the kebab-case names of the ops *Main classes (eg ShowEnvMain -> show-env).
 # The ops/scripts package is excluded: it holds the script-command template, handled by the <dir>-<name> actions.
@@ -19,7 +21,7 @@ usage (){
   echo "          [--config-env <config-env>] [--config-zip <zip>]"
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>]"
-  echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q]"
+  echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q] [--debug]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
@@ -59,6 +61,10 @@ usage (){
   echo "                  nor the output of the scripts and mvn commands it runs."
   echo "mvn-quiet:        the flag to hush the mvn output"
   echo "quiet:            the flag to hush both the afon.sh messages and the mvn output.  Sets both --bash-quiet and --mvn-quiet."
+  echo "debug:            the flag to explain why a script failed.  Traces every command the script runs (with file:line and"
+  echo "                  function), and on failure reports the failing command, its exit code and the call stack."
+  echo "                  Also settable via env variable 'AFON_DEBUG=true' (the flag wins over the env variable)."
+  echo "                  Applies to the script actions, ie 'script' and '<dir>-<name>'."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
   echo "build-args:       the build args.  eg '--offline'."
@@ -279,7 +285,13 @@ exec_script(){
     usage; exit 0
   fi
   info_exec "Executing $SCRIPT_PATH $SCRIPT_ARGS"
+  if [ -n "$DEBUG" ]; then
+    debug_enable "$SCRIPT_PATH"
+  fi
   source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
+  if [ -n "$DEBUG" ]; then
+    debug_disable
+  fi
 }
 
 capitaliseFirst(){
@@ -303,6 +315,7 @@ CLOUD=
 CONFIG_ENV=
 CONFIG_SWITCHED=
 CONFIG_ZIP=
+DEBUG=
 ENV=
 EXEC_CLASS=
 EXEC_ARGS=
@@ -347,6 +360,8 @@ while [[ $# -gt 0 ]]; do
       CONFIG_ENV="$2"; shift 2 ;;
     --config-zip)
       CONFIG_ZIP="$2"; shift 2 ;;
+    --debug)
+      DEBUG=true; shift ;;
     --env|-e)
       ENV="$2"; shift 2 ;;
     --exec-class|-ec)
@@ -416,6 +431,11 @@ if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
 fi
 
 info "Using AFON_ROOT=$AFON_ROOT"
+
+# A flag always wins over its env var; AFON_DEBUG only turns debug on when it is 'true'.
+if [ -z "$DEBUG" ] && [ "${AFON_DEBUG:-}" == "true" ]; then
+  DEBUG=true
+fi
 
 # A flag always wins over its env var, as in afon-cli.sh: the env var only applies when the flag is not given.
 AFON_HOME="${AFON_HOME:-}"
