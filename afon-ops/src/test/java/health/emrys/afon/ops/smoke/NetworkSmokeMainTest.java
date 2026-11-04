@@ -12,6 +12,31 @@ class NetworkSmokeMainTest {
     private static final ExecResult OK     = new ExecResult(0, "HTTP/2 200", "", "curl -I https://up.example", "host");
     private static final ExecResult FAILED = new ExecResult(6, "", "Could not resolve host", "curl -I https://down.example", "host");
 
+    private static ExecResult connectedAfter(String seconds) {
+        return new ExecResult(28, seconds, "", "curl -w %{time_connect} telnet://10.0.0.1:5901", "polaris-pod");
+    }
+
+    @Test
+    void aNotebookPortThatCannotBeConnectedToPasses() {
+        assertThat(NetworkSmokeMain.notConnected(connectedAfter("0.000000"), "jupyter-pod").isSuccess()).isTrue();
+    }
+
+    @Test
+    void aNotebookPortThatCanBeConnectedToFails() {
+        // curl times out still, the VNC server never closing the connection
+        ExecResult result = NetworkSmokeMain.notConnected(connectedAfter("0.001234"), "jupyter-pod");
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.stderr()).contains("jupyter-pod").contains("polaris-pod");
+    }
+
+    @Test
+    void aCurlThatSaysNothingOfTheConnectionFails() {
+        ExecResult noCurl = new ExecResult(127, "", "sh: curl: not found", "curl", "polaris-pod");
+
+        assertThat(NetworkSmokeMain.notConnected(noCurl, "jupyter-pod").isSuccess()).isFalse();
+    }
+
     @Test
     void aDomainThatRespondsIsPassedOn() {
         List<ExecResult> results = NetworkSmokeMain.leavingOutDownDomain("up.example", List.of(OK), domain -> {
