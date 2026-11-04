@@ -4,6 +4,7 @@
 # (docker), the checkout (git), and the config steps of afon.sh
 # (base64, unzip, perl, jq).
 verify_commands:
+  - bash --version
   - java -version
   - mvn -version
   - docker version
