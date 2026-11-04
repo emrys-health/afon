@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Points kubectl at the GKE cluster of the given stack, by its id or its role (identity, catalog or tre), eg:
 # afon-cli.sh gcp-update-kube-config catalog
 STACK_ARG="${1:-}"

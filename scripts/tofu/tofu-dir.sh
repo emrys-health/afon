@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Sourced by the tofu scripts, whose args ($@) are passed on to tofu, after the optional stack id, eg:
 #   afon-cli.sh tofu-plan aws-polaris -target=...
 # Each stack has its own dir stacks/<cloud>-<name> and tofu state terraform.<cloud>-<name>.tfstate,

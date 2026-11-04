@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} aws|azure|gcp <stack-id|identity|catalog|tre>"
   echo "Creates the DNS zone of each domain name that the stack serves from the cluster, ie those of its components, as stacks.yaml and the"

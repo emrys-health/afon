@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 # The stack the env is created for, given as its id, or its role in the cloud (identity, catalog or tre), which is required,

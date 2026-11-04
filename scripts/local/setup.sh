@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 SETUP_OS=$(uname -a| awk '{print $NF}')
 
 source $AFON_ROOT/scripts/local/pinned.sh
@@ -284,8 +285,14 @@ is_linux(){
   [ "$(bin_os)" == linux ]
 }
 
+# bash, on macos only, as the system one is 3.2.  Not pinned: brew offers only the current version.
+install_bash_macos(){
+  brew list bash >/dev/null 2>&1 || brew install bash
+}
+
 # The tools come from release downloads, with curl, except git, java, maven and the cloud clis, which come from apt or brew.
 setup_tools(){
+  [ "$(bin_os)" == darwin ] && install_bash_macos
   install_package git git git
   install_package openjdk-17-jdk openjdk@17 java
   install_package maven maven mvn

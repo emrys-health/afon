@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 if aws iam get-role --role-name GlueIcebergRole >/dev/null 2>&1; then

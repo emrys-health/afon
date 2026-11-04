@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 if aws iam get-role --role-name S3ReadWriteRoleSA >/dev/null 2>&1 && aws iam list-attached-role-policies --role-name S3ReadWriteRoleSA --query "AttachedPolicies[?PolicyArn=='arn:aws:iam::$AWS_ACCOUNT_ID:policy/AfonBucketWhiteList'].PolicyArn" --output text | grep -q AfonBucketWhiteList; then

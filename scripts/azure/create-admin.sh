@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 APP_NAME="${1:-AfonMultiTenantApp}"
 echo "- Creating app '$APP_NAME'"
 

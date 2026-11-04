@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -d $CONFIG_DIR ]; then
   if [ -f "$CONFIG_DIR/afon.md" ]; then
     cat $CONFIG_DIR/afon.md

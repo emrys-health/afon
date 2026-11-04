@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the GCP status scripts, eg gcp/polaris.sh and gcp/keycloak.sh, which source it after the source of
 # what they check, eg kube/polaris-source.sh.  Not run on its own.
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # The versions of the local tools that afon setups are known to work with, to make local setups reproducible.
 # Sourced by setup.sh, which installs these versions from release downloads, except git, java, maven and the cloud clis, which
 # come from apt or brew, and by versions.sh, which checks the installed versions against them.
@@ -6,6 +7,7 @@
 # as apt and brew offer different versions of what they provide.  On Ubuntu, PINNED_<tool>_ubuntu<release without the dot>, eg
 # PINNED_git_ubuntu2204 for 22.04, overrides the linux one, as each release offers other versions.
 
+PINNED_bash=5
 PINNED_git=2.56
 PINNED_java=17.0.20
 PINNED_gh=2.103.0
@@ -74,6 +76,7 @@ installed_java(){
 # The installed version of a tool, empty if not installed or not detectable.
 installed_version(){
   case "$1" in
+    bash) bash --version 2>/dev/null | head -1 | sed -E 's/.*version ([0-9.]+).*/\1/' ;;
     gh) gh --version 2>/dev/null | head -1 | awk '{print $3}' ;;
     git) git --version 2>/dev/null | awk '{print $3}' ;;
     java) installed_java -version 2>&1 | head -1 | sed -E 's/.*"([^"]+)".*/\1/' ;;
@@ -124,7 +127,7 @@ check_tool_versions(){
 
 # The tools relevant to the cloud targeted: all the clouds' if CLOUD is empty.
 pinned_tools(){
-  echo git java mvn gh docker tofu kubectl jq yq helm hubble kind cosign
+  echo bash git java mvn gh docker tofu kubectl jq yq helm hubble kind cosign
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then echo aws eksctl; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then echo az kubelogin; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then echo gcloud; fi

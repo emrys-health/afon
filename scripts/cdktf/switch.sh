@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -z "$CDKTF_ENV" ]; then
   echo "Action cdktf-switch requires option --cdktf-env"
   usage; exit 0

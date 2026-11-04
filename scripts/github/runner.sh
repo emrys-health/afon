@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # GibHub actions runner
 # ./runner.sh {install|configure|service}
 #

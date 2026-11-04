@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Background a plain, token-less Jupyter Lab bound to the loopback interface only.
 #
 # This is the workspace the user actually works in. Under JupyterHub the hub-facing

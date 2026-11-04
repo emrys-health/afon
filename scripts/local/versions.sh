@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # --versions-output is only a flag on afon.sh (which sets VERSIONS_OUTPUT before sourcing this script);
 # afon-cli-scripts.sh/afon-cli.sh users pass it as a plain script-arg instead, eg
 # 'afon-cli.sh local-versions <output-file>' - same fallback pattern as config/export.sh's zip path.
@@ -16,6 +17,8 @@ source $AFON_ROOT/scripts/local/pinned.sh
 echo "## Local setup" > $VERSIONS_OUTPUT
 echo "### os" >> $VERSIONS_OUTPUT
 uname -a >> $VERSIONS_OUTPUT
+echo "### bash" >> $VERSIONS_OUTPUT
+bash --version | head -1 >> $VERSIONS_OUTPUT
 echo "### kubectl" >> $VERSIONS_OUTPUT
 kubectl version --client>> $VERSIONS_OUTPUT
 echo "### tofu" >> $VERSIONS_OUTPUT

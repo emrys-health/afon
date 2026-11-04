@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by aws/dns-zones.sh, azure/dns-zones.sh and gcp/dns-zones.sh, which source it, to show the nameservers of the DNS zone of
 # each domain name of the cloud, and whether the registrar delegates the domain to them, so that the three do it the same way.  Not
 # run on its own.

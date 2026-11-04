@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Sourced by jupyter docker-stacks' start-notebook.sh from
 # /usr/local/bin/before-notebook.d/, so the resulting DISPLAY propagates into
 # the notebook server.

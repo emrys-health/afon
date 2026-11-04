@@ -6,6 +6,11 @@ Env setup requires *bash* installed on your machine.
 
 For linux and macOS bash is provided.  
 
+The scripts declare `#!/usr/bin/env bash`, so that they are always run by bash, whatever the default shell of the user (sh, csh, zsh), and by the
+first bash on the PATH, not necessarily `/bin/bash`.  This matters on macOS, whose `/bin/bash` is 3.2 (the last GPLv2 version, as Apple does not ship
+GPLv3 software), too old for bash 4+ features.  `local-setup` installs a current bash with brew, which is used as long as brew's bin directory
+comes before `/bin` on the PATH.  `env` is at `/usr/bin/env` on both linux and macOS.  
+
 To set up on a given OS, run: 
 
 ```shell

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the <cloud>/keycloak.sh status scripts, ie aws/keycloak.sh, azure/keycloak.sh and gcp/keycloak.sh, which source it after
 # afon-source.sh.  Not run on its own.
 #

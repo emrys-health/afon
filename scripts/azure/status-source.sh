@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the Azure status scripts, eg azure/polaris.sh and azure/keycloak.sh, which source it after the source of
 # what they check, eg kube/polaris-source.sh.  Not run on its own.
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 echo "az login as service principal '$AZURE_APP_ID' for tenant '$AZURE_TENANT_ID'"

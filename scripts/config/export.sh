@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 EXPORT_DIR=
 if [ -n "$CONFIG_ENV" ]; then
   EXPORT_DIR="$CONFIG_DIR-$CONFIG_ENV"

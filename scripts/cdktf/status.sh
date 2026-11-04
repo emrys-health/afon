@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -d $CDKTF_DIR ]; then
   if [ -f "$CDKTF_DIR/manifest.json" ]; then
     cat $CDKTF_DIR/manifest.json

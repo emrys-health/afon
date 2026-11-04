@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 INIT_DIR=
 if [ -n "$CONFIG_ENV" ]; then
   INIT_DIR="$CONFIG_DIR-$CONFIG_ENV"

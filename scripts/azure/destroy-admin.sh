@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 APP_NAME="${1:-AfonMultiTenantApp}"
 echo "- destroy-admin.sh '$APP_NAME'"
 echo "- Run destroy.sh <false> first (with APP_ID set) to destroy role assignments, storage and resource group, before removing the app."

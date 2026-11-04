@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the status scripts, eg <cloud>/polaris.sh and aws/keycloak.sh, through the source of what they check, eg
 # kube/polaris-source.sh, which sets STATUS_SUBJECT, eg Polaris, before sourcing it.  Not run on its own.
 #

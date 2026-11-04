@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -z "$AFON_HOME" ]; then
   echo "AFON_HOME is not set"
   exit 1

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shows, or cancels, the rolling upgrades on the node scale sets of the AKS cluster of the given stack, by its id or its role
 # (identity, catalog or tre), eg:
 # afon-cli.sh azure-rolling-upgrades tre            # status is the default

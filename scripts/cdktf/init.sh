@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 INIT_DIR=
 if [ -n "$CDKTF_ENV" ]; then
   INIT_DIR="$CDKTF_DIR-$CDKTF_ENV"

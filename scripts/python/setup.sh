@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Sets up the common python env, ie the venv at scripts/python/.venv with the packages of scripts/python/pyproject.toml
 # and the ipykernel 'afon', then checks it: uv, python, jupyter and the kernel are there.  Does nothing if it is set up
 # already.  The scripts needing the env, eg jupyter/execute.sh, set it up themselves, so this is to do it, and find out

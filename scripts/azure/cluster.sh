@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Given the stack, by its id or its role (identity, catalog or tre), eg: afon-cli.sh azure-cluster identity
 STACK_ARG="${1:-}"
 source $AFON_ROOT/scripts/config/afon-source.sh azure

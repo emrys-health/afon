@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared RBAC checks for the Azure create/destroy scripts.
 # Source this file to use the functions below
 

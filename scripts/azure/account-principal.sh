@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 JWT_PAYLOAD="$(az account get-access-token --query accessToken -o tsv | cut -d. -f2 | tr '_-' '/+')"
 case $(( ${#JWT_PAYLOAD} % 4 )) in
   2) JWT_PAYLOAD="${JWT_PAYLOAD}==" ;;

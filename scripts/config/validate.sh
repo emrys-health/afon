@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 CONFIG_DIR="$AFON_HOME/config"
 if [ ! -d $CONFIG_DIR ]; then
   echo "Missing config dir $CONFIG_DIR"

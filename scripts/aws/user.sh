@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 DEFAULT_GROUP="afon-deployers"

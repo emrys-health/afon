@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Common Python setup, shared by any script needing a python env (eg jupyter/execute.sh).
 # Sets up (once) and activates the common venv at scripts/python/.venv via uv, syncing
 # scripts/python/pyproject.toml, and registers an ipykernel kernelspec named 'afon'.

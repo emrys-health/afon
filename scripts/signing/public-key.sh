@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # The config is read, not sourced as the other scripts do, as this script is what repairs it: the property used to be written as a PEM on
 # one line, with spaces, which the shell cannot source (it runs the words after the first as a command), and sourcing it would stop here.
 CLOUD="${1:-}"

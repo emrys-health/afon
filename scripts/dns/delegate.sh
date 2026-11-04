@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} aws|azure|gcp <stack-id|identity|catalog|tre> [--route53]"
   echo "Shows the NS records that delegate each domain name that the stack serves, see dns-create-zones,"

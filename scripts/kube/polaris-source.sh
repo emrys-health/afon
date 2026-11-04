@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the <cloud>/polaris.sh status scripts, which source it after afon-source.sh, so that the
 # three clouds report Polaris in exactly the same way.  Not run on its own.
 #

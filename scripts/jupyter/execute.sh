@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/python/python-source.sh
 
 NOTEBOOK="${1:-}"

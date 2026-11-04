@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Sourced by the scripts that act on a stack of stacks.yaml, to have what they need to know about it in their env, whichever way
 # they are run:
 #   afon-cli.sh <command>   the launcher, ScriptMain, finds the stack and gives it already, as the AFON_STACK_* env vars

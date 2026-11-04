@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the AWS status scripts, eg aws/polaris.sh and aws/keycloak.sh, which source it after the source of
 # what they check, eg kube/polaris-source.sh.  Not run on its own.
 

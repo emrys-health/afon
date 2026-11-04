@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 CONFIG_FILES="afon.properties secret.properties catalogs.properties"
 if [ -n "$CLOUD" ] && [ "$CLOUD" != "ALL" ]; then
   echo "Config relative to cloud $CLOUD only"

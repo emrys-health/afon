@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 # AWS has no service accounts, so a user with limited privileges approximates one: it can only assume the S3 role

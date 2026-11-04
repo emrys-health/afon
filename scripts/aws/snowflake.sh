@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 aws iam update-assume-role-policy \
   --role-name S3ReadWriteRoleSF2 \
   --policy-document '{

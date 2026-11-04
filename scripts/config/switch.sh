@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -z "$CONFIG_ENV" ]; then
   echo "Action config-switch requires option --config-env"
   usage; exit 0

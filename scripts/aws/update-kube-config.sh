@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Points kubectl at the EKS cluster of the given stack, by its id or its role (identity, catalog or tre), eg:
 # afon-cli.sh aws-update-kube-config tre
 STACK_ARG="${1:-}"

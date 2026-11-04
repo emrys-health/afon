@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by scripts/smoke/test.sh and kube/polaris-whitelist.sh, which source it, to read and decide the restriction of the
 # Polaris ingress of a cluster, so that both do it the same way.  Not run on its own.
 #

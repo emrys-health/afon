@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 IMPORT_DIR=
 if [ -n "$CONFIG_ENV" ]; then
   IMPORT_DIR="$CONFIG_DIR-$CONFIG_ENV"

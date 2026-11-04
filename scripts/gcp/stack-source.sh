@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Sourced by the GCP scripts acting on a stack, given as $1 by its id, eg gcp-polaris, or its role in the cloud (identity,
 # catalog or tre), which is looked up in stacks.yaml, see scripts/stack/needs-source.sh: by the launcher when run by
 # afon-cli.sh, which passes the id, else by asking the ops command stack-needs, as when run by afon.sh.

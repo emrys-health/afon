@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 CLOUD=${1:-}
 set -a
 source $AFON_HOME/config/secret.properties

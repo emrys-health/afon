@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Sourced by the scripts that need the reference of a Docker image of docker-images.yaml, whichever way they are run, asking the
 # ops command docker-image of the launcher, as scripts/stack/needs-source.sh does for stack-needs: the one in AFON_ROOT, ie
 # afon-cli.sh of the cli distribution or afon.sh of the source tree, else AFON_CLI_DIR/afon-cli.sh.

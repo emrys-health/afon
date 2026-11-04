@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Optionally given the stack serving Polaris, by its id or its role, eg: afon-cli.sh azure-polaris [catalog]
 # Without it, the stack is found among the running stacks that deploy Polaris, by their AKS clusters
 # <stack>-<CLUSTER_NAME>: as they all hold the DNS record of AZURE_POLARIS_DOMAIN_NAME, only one runs at a time.  The
