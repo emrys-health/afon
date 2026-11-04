@@ -255,6 +255,9 @@ add_apt_repo(){
   local name=$1 keyring="/etc/apt/keyrings/$2.asc" key_url=$3 repo_url=$4 suite=$5
   local list="/etc/apt/sources.list.d/$name.list"
   [ -f "$list" ] && return 0
+  # Also if the repo was added another way, eg by Microsoft's install script (a .sources file with its own keyring): apt refuses a repo
+  # listed with two different keyrings, and then fails to read any source.
+  grep -rqsF "$repo_url" /etc/apt/sources.list /etc/apt/sources.list.d/ && return 0
   no_sudo && return 0
   sudo install -m 0755 -d /etc/apt/keyrings
   sudo curl -fsSL -o "$keyring" "$key_url" && sudo chmod a+r "$keyring" || return 1
