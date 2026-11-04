@@ -62,8 +62,10 @@ if [ "$CLOUD" == "gcp" ]; then
   gke-gcloud-auth-plugin --version >> $VERSIONS_OUTPUT
 fi
 echo "### pinned" >> $VERSIONS_OUTPUT
-check_tool_versions $(pinned_tools) | tee -a $VERSIONS_OUTPUT
-PINNED_RC=${PIPESTATUS[0]}
+# check_tool_versions returns non-zero when tools are missing or differ from the pinned versions.  The caller runs
+# with 'set -e' and 'pipefail', so that must be handled here to reach the report below, keeping the return code.
+PINNED_RC=0
+check_tool_versions $(pinned_tools) | tee -a $VERSIONS_OUTPUT || PINNED_RC=$?
 echo "Versions output written to $VERSIONS_OUTPUT"
 if [ $PINNED_RC -ne 0 ]; then
   echo "Installed versions differ from the pinned ones (scripts/local/pinned.sh)"

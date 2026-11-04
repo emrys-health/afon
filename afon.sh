@@ -21,7 +21,7 @@ usage (){
   echo "          [--config-env <config-env>] [--config-zip <zip>]"
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>]"
-  echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q] [--debug]"
+  echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q] [--debug] [--lenient]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
   echo "          [--exec-class|-ec <class>] [--exec-args|-ea <args>] [--exec-envs|-ee <envs>] [--exec-package|-ep <package>]"
@@ -64,6 +64,9 @@ usage (){
   echo "debug:            the flag to explain why a script failed.  Traces every command the script runs (with file:line and"
   echo "                  function), and on failure reports the failing command, its exit code and the call stack."
   echo "                  Also settable via env variable 'AFON_DEBUG=true' (the flag wins over the env variable)."
+  echo "                  Applies to the script actions, ie 'script' and '<dir>-<name>'."
+  echo "lenient:          the flag to run the scripts without 'set -e' and 'pipefail', so that a failing command does not abort them."
+  echo "                  Also settable via env variable 'AFON_LENIENT=true' (the flag wins over the env variable)."
   echo "                  Applies to the script actions, ie 'script' and '<dir>-<name>'."
   echo "ansible-playbook: the ansible args.  Defaults to 'runner-setup.yml'."
   echo "ansible-args:     the ansible args.  eg '--tags verify'."
@@ -288,7 +291,13 @@ exec_script(){
   if [ -n "$DEBUG" ]; then
     debug_enable "$SCRIPT_PATH"
   fi
+  if [ -n "$LENIENT" ]; then
+    set +e +o pipefail
+  fi
   source $AFON_ROOT/scripts/$SCRIPT_PATH $SCRIPT_ARGS
+  if [ -n "$LENIENT" ]; then
+    set -e -o pipefail
+  fi
   if [ -n "$DEBUG" ]; then
     debug_disable
   fi
@@ -323,6 +332,7 @@ EXEC_ENVS=
 EXEC_PACKAGE=
 HELP=
 HOME_DIR=
+LENIENT=
 LOGGING=
 LOGGING_CONSOLE=
 MVN_PROFILES=
@@ -376,6 +386,8 @@ while [[ $# -gt 0 ]]; do
       HOME_DIR="$2"; shift 2 ;;
     --help|-h)
       HELP=true; shift ;;
+    --lenient)
+      LENIENT=true; shift ;;
     --logging|-l)
       LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
@@ -431,6 +443,11 @@ if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
 fi
 
 info "Using AFON_ROOT=$AFON_ROOT"
+
+# A flag always wins over its env var; AFON_LENIENT only turns lenient on when it is 'true'.
+if [ -z "$LENIENT" ] && [ "${AFON_LENIENT:-}" == "true" ]; then
+  LENIENT=true
+fi
 
 # A flag always wins over its env var; AFON_DEBUG only turns debug on when it is 'true'.
 if [ -z "$DEBUG" ] && [ "${AFON_DEBUG:-}" == "true" ]; then

@@ -7,7 +7,7 @@ set -euo pipefail
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
   echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
-  echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--debug]"
+  echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--debug] [--lenient]"
   echo "          <command> [args...]"
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
   echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
@@ -22,6 +22,7 @@ usage(){
   echo "  --debug / AFON_DEBUG=true:                explains why a command failed: sets the console logging to DEBUG (unless given), traces"
   echo "                                            this script, and for the script commands traces each command run and reports"
   echo "                                            the failing command, its exit code and the call stack."
+  echo "  --lenient / AFON_LENIENT=true:            runs the script commands without 'set -e' and 'pipefail', so a failing command does not abort them."
   echo "  AFON_CLI_DIR (env only):                  the cli distribution dir this script lives in.  Auto-detected."
   echo "  AFON_ENVS (env only):                     NAME=VALUE pairs of system properties passed to the CLI java process."
 }
@@ -51,6 +52,7 @@ AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_ENV="${AFON_ENV:-}"
 AFON_ENVS="${AFON_ENVS:-}"
 AFON_DEBUG="${AFON_DEBUG:-}"
+AFON_LENIENT="${AFON_LENIENT:-}"
 
 # Which of the env options were given as flags, which win over any env var.
 ENV_FLAG=
@@ -78,6 +80,8 @@ while [[ $# -gt 0 ]]; do
       AFON_LOGGING_CONSOLE="$2"; shift 2 ;;
     --debug)
       AFON_DEBUG=true; shift ;;
+    --lenient)
+      AFON_LENIENT=true; shift ;;
     --help|-h)
       # Only show this script's own usage when no command has been given yet; once a command
       # (eg "azure") is in ARGS, forward -h/--help so the java side can handle it - eg to list
@@ -147,7 +151,8 @@ fi
 # script commands (which exec afon-cli-scripts.sh) inherit them from this process's env.
 # AFON_CONFIG_SWITCHED/AFON_CDKTF_SWITCHED are internal: they tell afon-cli-scripts.sh the
 # switch above already ran, so it doesn't redundantly repeat it for a script command.
-export AFON_CONFIG_ENV AFON_CDKTF_ENV AFON_CONFIG_SWITCHED AFON_CDKTF_SWITCHED
+# AFON_LENIENT is likewise passed on to the script commands.
+export AFON_CONFIG_ENV AFON_CDKTF_ENV AFON_CONFIG_SWITCHED AFON_CDKTF_SWITCHED AFON_LENIENT
 
 AFON_JVM_ENVS=
 for pair in $AFON_ENVS; do
