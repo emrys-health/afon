@@ -10,6 +10,7 @@ import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
+import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
 import com.hashicorp.cdktf.providers.kubernetes.role.Role;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.role.RoleRule;
@@ -82,11 +83,11 @@ public class JupyterHubConfig {
      * work in via the VNC desktop ({@code http://localhost:8888}). The hub server exists only so
      * the hub considers the pod healthy; users never reach it (its public path is blocked).
      */
-    private static final int SINGLEUSER_PORT = 8090;
+    public static final int SINGLEUSER_PORT  = 8090;
     /**
      * Port the in-pod VNC server listens on (display :1) — Guacamole connects here per user.
      */
-    private static final int VNC_PORT        = 5901;
+    public static final int VNC_PORT         = 5901;
     /**
      * VNC authentication only uses the first 8 characters of a password; both x11vnc and Guacamole silently drop the rest.
      */
@@ -359,8 +360,55 @@ public class JupyterHubConfig {
         getMFAConfig(mfaDeps);
 
         configureHttpsAndDNS();
+        onlyHubAndGuacamoleIngress();
 
         return USER_POD_LABELS;
+    }
+
+    /** The name of the {@link NetworkPolicy} that only lets the hub and Guacamole reach the notebook pods. */
+    static final String INGRESS_POLICY_NAME = "jupyter-only-from-hub-and-guacamole";
+
+    /**
+     * Lets only the hub, on {@link #SINGLEUSER_PORT}, which it calls to check that a spawned server is up, and Guacamole, on
+     * {@link #VNC_PORT}, which it streams the desktop from, reach the notebook pods.  Every other pod, eg another user's
+     * notebook, Spark or Trino, cannot connect to them at all.
+     *
+     * <p>The JupyterHub proxy is left out, although it serves {@code /user/<name>/} from {@link #SINGLEUSER_PORT}: the
+     * desktop, through Guacamole, is then the only way into a pod, as the browser cannot reach it through the proxy.  Users
+     * never work in that server, which only exists for the hub to see the pod as healthy, so all that is lost is the page the
+     * hub sent the browser to after a spawn without {@code ?next}, which it no longer does, see {@code redirect_to_server}.
+     */
+    private void onlyHubAndGuacamoleIngress() {
+        NetworkPolicy.Builder.create(stack, "jupyterIngressPolicy")
+                             .metadata(NetworkPolicyMetadata.builder()
+                                                            .name(INGRESS_POLICY_NAME)
+                                                            .namespace("default")
+                                                            .build())
+                             .spec(NetworkPolicySpec.builder()
+                                                    .podSelector(NetworkPolicySpecPodSelector.builder()
+                                                                                             .matchLabels(USER_POD_LABELS)
+                                                                                             .build())
+                                                    .policyTypes(List.of("Ingress"))
+                                                    .ingress(List.of(
+                                                        ingressFrom(HUB_LABELS, SINGLEUSER_PORT),
+                                                        ingressFrom(GuacamoleConfig.LABELS, VNC_PORT)))
+                                                    .build())
+                             .build();
+    }
+
+    /** From the pods of the namespace with the labels, on the port, over TCP. */
+    private static NetworkPolicySpecIngress ingressFrom(Map<String, String> labels, int port) {
+        return NetworkPolicySpecIngress
+            .builder()
+            .from(List.of(NetworkPolicySpecIngressFrom
+                              .builder()
+                              .podSelector(NetworkPolicySpecIngressFromPodSelector.builder().matchLabels(labels).build())
+                              .build()))
+            .ports(List.of(NetworkPolicySpecIngressPorts.builder()
+                                                        .protocol("TCP")
+                                                        .port(String.valueOf(port))
+                                                        .build()))
+            .build();
     }
 
     private static String vncServiceName(String slug) {
@@ -545,7 +593,9 @@ public class JupyterHubConfig {
                # A bare visit to the domain root auto-spawns the user's pod and then hands off to
                # Guacamole, which streams that pod's VNC desktop. Sending root traffic to the spawn
                # page makes it auto-submit (there is no options form); ?next redirects the browser to
-               # Guacamole once the pod is up, rather than to the (blocked) single-user web UI.
+               # Guacamole once the pod is up, rather than to the single-user web UI, which the
+               # browser cannot reach (see redirect_to_server below). Keep ?next: without it a spawn
+               # ends on /hub/home, not the desktop.
                c.JupyterHub.default_url = '/hub/spawn?next=%13$s'
                
                # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
@@ -557,10 +607,12 @@ public class JupyterHubConfig {
                c.JupyterHub.hub_connect_ip = '%3$s'
                c.JupyterHub.hub_port = %4$d
                c.JupyterHub.cleanup_servers = False
-               # /user/* is exposed through oauth2-proxy (the hub owns root), so the hub may redirect to
-               # the spawned notebook. In normal use ?next (above) sends the browser to Guacamole first;
-               # this is only the fallback when no next is supplied.
-               c.JupyterHub.redirect_to_server = True
+               # Never send the browser to the single-user server at /user/<name>/. Only the hub and
+               # Guacamole may reach a notebook pod (see onlyHubAndGuacamoleIngress), not the proxy that
+               # serves /user/*, so that the desktop is the only way into the pod: that page would not load.
+               # With ?next (above) the browser goes to Guacamole; without it, eg from a bookmark of
+               # /hub/spawn or the Start My Server button, it now goes to /hub/home instead.
+               c.JupyterHub.redirect_to_server = False
                
                # --- One pod per user, spawned on demand by KubeSpawner. ---
                c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'

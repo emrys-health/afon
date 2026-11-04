@@ -67,7 +67,8 @@ public class GuacamoleConfig {
     private static final String HOME_VOLUME      = "guacamole-home";
     private static final String HOME_MOUNT       = "/etc/guacamole";
 
-    private static final Map<String, String> LABELS = Map.of("app", "guacamole");
+    /** The labels of the Guacamole pod, which {@link JupyterHubConfig} lets reach the notebooks' VNC servers. */
+    static final Map<String, String> LABELS = Map.of("app", "guacamole");
 
     /**
      * One Guacamole login → one in-pod VNC port → one independent X session.

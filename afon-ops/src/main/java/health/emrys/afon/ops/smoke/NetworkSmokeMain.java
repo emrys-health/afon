@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
+import health.emrys.afon.cdk.configs.JupyterHubConfig;
 import health.emrys.afon.cdk.configs.SparkNames;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -78,7 +79,8 @@ public class NetworkSmokeMain {
                 this::checkCannotSeeOtherBuckets)));
         results.addAll(checkNetworkWithPods(jupyterPods(), List.of(
             this::checkCannotSeeOtherBuckets,
-            this::checkVncPasswordIsNotShared)));
+            this::checkVncPasswordIsNotShared,
+            this::checkNotebookOnlyReachableFromHubAndGuacamole)));
         return results;
     }
 
@@ -326,6 +328,47 @@ public class NetworkSmokeMain {
             results.addAll(command.run());
         }
         return results;
+    }
+
+    /**
+     * Checks that a pod other than the hub and Guacamole cannot connect to the notebook's VNC server or single-user server.
+     * From Polaris, which no egress policy limits, so that only the notebook's own ingress policy can stop it.  By whether a
+     * TCP connection was made at all, as VNC answers no HTTP.
+     */
+    private List<ExecResult> checkNotebookOnlyReachableFromHubAndGuacamole(String pod) throws Exception {
+        String polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+        String ip = client.listPods().stream()
+                          .filter(p -> pod.equals(KubeClient.nameOfPod(p)))
+                          .map(p -> p.getStatus().getPodIP())
+                          .findFirst()
+                          .orElseThrow(() -> new IllegalStateException("No IP for pod " + pod));
+        List<ExecResult> results = new ArrayList<>();
+        for (int port : List.of(JupyterHubConfig.VNC_PORT, JupyterHubConfig.SINGLEUSER_PORT)) {
+            String target = format("%s (%s:%d)", pod, ip, port);
+            logger.info("Checking {} cannot be reached from {}", target, polarisPodName);
+            ExecResult connect = client.exec(
+                polarisPodName, "curl", "-s", "-o", "/dev/null", "-w", "%{time_connect}", "--connect-timeout", "3",
+                "--max-time", "3", "telnet://" + ip + ":" + port);
+            results.add(notConnected(connect, target));
+        }
+        return results;
+    }
+
+    /**
+     * @param connect the result of curl writing out {@code %{time_connect}}, which is 0 when no connection was made
+     * @return a success if no connection was made to the target, else a failure
+     */
+    static ExecResult notConnected(ExecResult connect, String target) {
+        double secondsToConnect;
+        try {
+            secondsToConnect = Double.parseDouble(connect.stdout().strip());
+        } catch (NumberFormatException e) {
+            return new ExecResult(-1, connect.stdout(), format("Could not tell whether %s was reached: %s", target, connect.stderr()),
+                                  connect.command(), connect.host());
+        }
+        return secondsToConnect == 0
+               ? new ExecResult(0, format("%s cannot be reached from %s", target, connect.host()), "", connect.command(), connect.host())
+               : new ExecResult(-1, "", format("%s can be reached from %s", target, connect.host()), connect.command(), connect.host());
     }
 
     /**
