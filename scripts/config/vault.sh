@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Stores snapshots of the afon config files in AWS Secrets Manager under a tag, and retrieves them by it.
+# Stores snapshots of the afon config files in the secret store of a cloud, and retrieves them by a tag:
+# AWS Secrets Manager (the default), Azure Key Vault or GCP Secret Manager.
 #
-# ./afon.sh -a config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [-- [--region <region>] [--force] [--dry-run]]
-# afon-cli.sh config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [--region <region>] [--force] [--dry-run]
+# ./afon.sh -a config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [-c|--cloud {aws|azure|gcp}] [-- [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]]
+# afon-cli.sh config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]
 # (the -- is needed by afon.sh before the script's own options, eg: ./afon.sh -a config-vault push v1 -e dev -- --force)
 #
 # The env and the afon home are the global ones of afon.sh and afon-cli.sh (--env, --config-env, AFON_ENV,
@@ -11,41 +12,67 @@
 # those of <afon-home>/config-<env>.
 #
 # The tag is required by push, pull and delete.  It is free-form text without spaces, eg a release, a git tag or a
-# name, so that the snapshot is easy to retrieve by it.  AWS only allows letters, digits and / _ + = . @ - in it, as
-# it is part of the name of the secret.
+# name, so that the snapshot is easy to retrieve by it.  As it is part of the name of the secret, the cloud limits
+# its characters:
+#   aws    letters, digits and / _ + = . @ -
+#   azure  letters, digits and -
+#   gcp    letters, digits and _ -
+# On azure and gcp a dot or underscore in the tag is converted to a dash, for consistency (azure allows no underscores,
+# nor dots, and gcp no dots), eg 1.0-beta-9 becomes 1-0-beta-9.  That is the tag that is stored, and the x.y.z, x_y_z
+# and x-y-z forms can be given to push, pull and delete.
 #
-# 'push' stores all the config files of the config dir, empty ones included, as one secret named afon/<env>/<tag>,
-# whose value is a JSON object of the file names to their base64-encoded contents.  base64 is used so that
-# multi-line values (SNOWFLAKE_PRIVATE_KEY, GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
-# The secret is tagged with:
-#   afon:env  the env
-#   afon:tag  the tag
-# Pushing again with the same tag and env needs --force, which replaces the value of the snapshot.
+# 'push' stores all the config files of the config dir, empty ones included, as one secret, whose value is a JSON
+# object of the file names to their base64-encoded contents.  base64 is used so that multi-line values
+# (SNOWFLAKE_PRIVATE_KEY, GOOGLE_APPLICATION_CREDENTIALS) survive the round trip byte for byte.
+# The secret is named and tagged as follows:
+#   aws    afon/<env>/<tag>, with the tags afon:env and afon:tag
+#   azure  afon-<env>-<tag>, with the tags afon-env and afon-tag
+#   gcp    afon-<env>-<tag>, with the annotations afon-env and afon-tag
+# A snapshot over the size limit of the cloud is gzipped and base64-encoded, and pull decompresses it.
+# Pushing again with the same tag and env needs --force, which replaces the value of the snapshot (on Azure and GCP
+# by adding a new version of the secret, which keeps the previous ones).
 #
 # 'pull' finds the snapshot of the env by its tag, compares its files with those of the config dir, and writes back
 # those that differ or are missing.  Overwriting the files that differ needs --force.
 #
 # 'list' lists the snapshots of the env, and 'delete' removes the snapshot of the tag.  Deleted secrets are kept by
 # AWS for a recovery window of 30 days, in which the same tag cannot be pushed again, unless deleted with --force.
+# Azure soft-deletes them, so the same tag cannot be pushed again until the secret is purged, which --force does
+# (needing the permission to purge).  GCP deletes them at once.
 #
-# The secrets are encrypted with the AWS managed key aws/secretsmanager.  Requires the aws CLI, logged in with
+# AWS: the secrets are encrypted with the AWS managed key aws/secretsmanager.  Requires the aws CLI, logged in with
 # permissions secretsmanager:CreateSecret, PutSecretValue, UpdateSecret, TagResource, ListSecrets, GetSecretValue
 # and DeleteSecret, and jq.
 # The region is --region, else the default of the aws CLI (AWS_REGION, AWS_DEFAULT_REGION or the profile).  It is
 # not read from the afon config, as pull may have to run before there is any.
+#
+# Azure: the secrets are kept in the Key Vault --vault, else AZURE_KEY_VAULT_NAME of afon-azure.properties, which is
+# created by 'azure-keyvault create'.  Requires the az CLI, logged in with the role Key Vault Secrets Officer (or
+# Key Vault Secrets User to pull and list only) on the vault, and jq.  A Key Vault secret holds at most 25 KB.
+#
+# GCP: the secrets are kept in the project --project, else GCP_PROJECT_ID of afon-gcp.properties, whose Secret
+# Manager API must be enabled.  Requires the gcloud CLI, logged in with the role Secret Manager Admin, and jq.
+# A Secret Manager secret holds at most 64 KiB.
 set -euo pipefail
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [--region <region>] [--force] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]"
   echo "actions:  push   :  writes the config files to the snapshot secret of the tag.  Refuses to replace an existing"
   echo "                    snapshot of the same tag without --force"
   echo "          pull   :  writes the config files held in the snapshot of the tag back into the config dir, if they"
   echo "                    differ.  Refuses to overwrite the files that differ without --force"
   echo "          list   :  lists the snapshots of the env"
-  echo "          delete :  removes the snapshot of the tag, with a recovery window of $RECOVERY_DAYS days, or at once with --force"
-  echo "tag:        the tag of the snapshot, free-form text without spaces, of letters, digits and / _ + = . @ -"
-  echo "            Required by push, pull and delete."
-  echo "region:     the AWS region.  Defaults to the one of the aws CLI."
+  echo "          delete :  removes the snapshot of the tag.  AWS keeps it for a recovery window of $RECOVERY_DAYS days, Azure"
+  echo "                    soft-deletes it, GCP deletes it at once.  With --force it is removed at once (purged on Azure)"
+  echo "cloud:      the cloud of the secret store: aws (Secrets Manager), azure (Key Vault) or gcp (Secret Manager)."
+  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Defaults to aws,"
+  echo "            also if it is ALL."
+  echo "tag:        the tag of the snapshot, free-form text without spaces.  The characters allowed are those of the"
+  echo "            secret names of the cloud: aws letters, digits and / _ + = . @ -, azure letters, digits and -,"
+  echo "            gcp letters, digits and _ -.  Required by push, pull and delete."
+  echo "region:     the AWS region.  Defaults to the one of the aws CLI.  Only for aws."
+  echo "vault:      the Azure Key Vault.  Defaults to AZURE_KEY_VAULT_NAME of afon-azure.properties.  Only for azure."
+  echo "project:    the GCP project.  Defaults to GCP_PROJECT_ID of afon-gcp.properties.  Only for gcp."
   echo "force:      the flag to let push replace a snapshot, pull overwrite the config files that differ, and"
   echo "            delete skip the recovery window."
   echo "dry-run:    the flag to report what would be done, without writing anything."
@@ -54,14 +81,50 @@ usage(){
 }
 
 NAME_PREFIX="afon"
-TAG_ENV="afon:env"
-TAG_TAG="afon:tag"
-# The characters AWS allows in a secret name, which also go in a tag value.  A tag value is at most 256 characters.
-TAG_PATTERN='^[A-Za-z0-9/_+=.@-]+$'
-TAG_MAX_LENGTH=256
-# Secrets Manager limits the value of a secret to 64 KB.
-SNAPSHOT_MAX_BYTES=65536
 RECOVERY_DAYS=30
+
+# Sets what depends on the cloud: the CLI it needs, the name of its secrets and the limits on them.  The name of a
+# secret is checked as a whole, as the tag is part of it.
+set_cloud(){
+  case "$VAULT_CLOUD" in
+    aws)
+      CLI=aws
+      NAME_SEPARATOR="/"
+      NAME_PATTERN='^[A-Za-z0-9/_+=.@-]+$'
+      NAME_CHARACTERS="letters, digits and / _ + = . @ -"
+      NAME_MAX_LENGTH=512
+      # Secrets Manager limits the value of a secret to 64 KB.
+      SNAPSHOT_MAX_BYTES=65536
+      TAG_ENV="afon:env"
+      TAG_TAG="afon:tag"
+      ;;
+    azure)
+      CLI=az
+      NAME_SEPARATOR="-"
+      NAME_PATTERN='^[A-Za-z0-9-]+$'
+      NAME_CHARACTERS="letters, digits and -"
+      NAME_MAX_LENGTH=127
+      # Key Vault limits the value of a secret to 25 KB.
+      SNAPSHOT_MAX_BYTES=25600
+      TAG_ENV="afon-env"
+      TAG_TAG="afon-tag"
+      ;;
+    gcp)
+      CLI=gcloud
+      NAME_SEPARATOR="-"
+      NAME_PATTERN='^[A-Za-z0-9_-]+$'
+      NAME_CHARACTERS="letters, digits and _ -"
+      NAME_MAX_LENGTH=255
+      # Secret Manager limits the value of a secret to 64 KiB.
+      SNAPSHOT_MAX_BYTES=65536
+      TAG_ENV="afon-env"
+      TAG_TAG="afon-tag"
+      ;;
+    *)
+      echo "Unknown cloud $VAULT_CLOUD: it must be aws, azure or gcp" >&2
+      exit 1 ;;
+  esac
+}
 
 aws_sm(){
   aws secretsmanager ${REGION:+--region "$REGION"} "$@"
@@ -69,7 +132,7 @@ aws_sm(){
 
 check_tools(){
   local TOOL
-  for TOOL in aws jq ; do {
+  for TOOL in $CLI jq ; do {
     if ! command -v "$TOOL" > /dev/null 2>&1; then
       echo "Requires $TOOL on the PATH" >&2
       exit 1
@@ -90,15 +153,35 @@ check_tag(){
     echo "Missing tag, required by $ACTION" >&2
     usage; exit 1
   fi
-  echo "Using tag $TAG"
-  if [[ ! "$TAG" =~ $TAG_PATTERN ]] || [ ${#TAG} -gt $TAG_MAX_LENGTH ]; then
-    echo "Invalid tag $TAG: it must be at most $TAG_MAX_LENGTH letters, digits and / _ + = . @ -" >&2
+  # Azure and GCP do not allow dots in the name of a secret, nor does Azure allow underscores, so on both a tag like
+  # 1.0-beta-9 is kept as 1-0-beta-9, whichever form (x.y.z, x_y_z or x-y-z) is given, to push, pull and delete it.
+  local CONVERTED="$TAG"
+  if [ "$VAULT_CLOUD" != "aws" ]; then
+    CONVERTED="${TAG//[._]/-}"
+  fi
+  if [ "$CONVERTED" != "$TAG" ]; then
+    echo "Using tag $CONVERTED (converted from $TAG)"
+    TAG="$CONVERTED"
+  else
+    echo "Using tag $TAG"
+  fi
+  # The name of the secret is checked, as it is made of the env and the tag, and the tag is also a tag value.
+  local NAME
+  NAME=$(snapshot_name)
+  if [[ ! "$NAME" =~ $NAME_PATTERN ]] || [ ${#NAME} -gt $NAME_MAX_LENGTH ]; then
+    echo "Invalid tag $TAG for env $SNAPSHOT_ENV on $VAULT_CLOUD: the name of the secret $NAME must be at most $NAME_MAX_LENGTH" >&2
+    echo "characters of $NAME_CHARACTERS" >&2
     exit 1
   fi
 }
 
+# The name of the secret.  On Azure and GCP the dots and underscores of the env become dashes too.
 snapshot_name(){
-  echo "$NAME_PREFIX/$SNAPSHOT_ENV/$TAG"
+  local ENV_PART="$SNAPSHOT_ENV"
+  if [ "$VAULT_CLOUD" != "aws" ]; then
+    ENV_PART="${SNAPSHOT_ENV//[._]/-}"
+  fi
+  echo "$NAME_PREFIX$NAME_SEPARATOR$ENV_PART$NAME_SEPARATOR$TAG"
 }
 
 # The config files present in the config dir.
@@ -120,31 +203,134 @@ snapshot_json(){
   } done | jq -s 'add // {}'
 }
 
-# Prints the snapshots of the env, as a JSON array of {Name, ARN, Tag, LastChangedDate}.  The name
-# filter of ListSecrets matches by prefix, so the env is also checked on its tag.
+# What follows is the part that depends on the cloud.  A snapshot is identified by its SNAPSHOT_ID: the ARN on AWS,
+# the name of the secret on Azure and GCP.
+
+# Prints the snapshots of the env, as a JSON array of {Name, Id, Tag, LastChangedDate}.  On Azure and GCP the tag is
+# normalised as TAG is, so that a snapshot pushed with another form of it, eg 1_0-beta-9, is still found.
 list_snapshots(){
-  aws_sm list-secrets --filters Key=name,Values="$NAME_PREFIX/$SNAPSHOT_ENV/" --output json \
-    | jq --arg env "$SNAPSHOT_ENV" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
-      [.SecretList[]
-        | (.Tags // [] | from_entries) as $tags
-        | select($tags[$tenv] == $env)
-        | {Name, ARN, Tag: ($tags[$ttag] // ""), LastChangedDate}]'
+  case "$VAULT_CLOUD" in
+    aws)
+      # The name filter of ListSecrets matches by prefix, so the env is also checked on its tag.
+      aws_sm list-secrets --filters Key=name,Values="$NAME_PREFIX/$SNAPSHOT_ENV/" --output json \
+        | jq --arg env "$SNAPSHOT_ENV" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
+          [.SecretList[]
+            | (.Tags // [] | from_entries) as $tags
+            | select($tags[$tenv] == $env)
+            | {Name, Id: .ARN, Tag: ($tags[$ttag] // ""), LastChangedDate}]'
+      ;;
+    azure)
+      az keyvault secret list --vault-name "$VAULT_NAME" --output json \
+        | jq --arg env "$SNAPSHOT_ENV" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
+          [.[]
+            | (.tags // {}) as $tags
+            | select($tags[$tenv] == $env)
+            | {Name: .name, Id: .name, Tag: ($tags[$ttag] // "" | gsub("[._]"; "-")), LastChangedDate: .attributes.updated}]'
+      ;;
+    gcp)
+      gcloud secrets list --project "$VAULT_PROJECT" --format=json \
+        | jq --arg env "$SNAPSHOT_ENV" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
+          [.[]
+            | (.annotations // {}) as $tags
+            | select($tags[$tenv] == $env)
+            | (.name | split("/") | last) as $name
+            | {Name: $name, Id: $name, Tag: ($tags[$ttag] // "" | gsub("[._]"; "-")), LastChangedDate: .createTime}]'
+      ;;
+  esac
 }
 
-# Prints the ARN of the snapshot of the env tagged with TAG, or nothing if there is none.  The tag filters of
-# ListSecrets match any tag with the key and any with the value, by prefix, so the match is made exactly here.
+# Prints the id of the snapshot of the env tagged with TAG, or nothing if there is none.
 find_snapshot(){
-  aws_sm list-secrets --filters Key=tag-key,Values="$TAG_TAG" Key=tag-value,Values="$TAG" --output json \
-    | jq -r --arg env "$SNAPSHOT_ENV" --arg tag "$TAG" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
-      .SecretList[] | (.Tags // [] | from_entries) as $tags
-        | select($tags[$tenv] == $env and $tags[$ttag] == $tag) | .ARN' \
-    | head -1
+  if [ "$VAULT_CLOUD" == "aws" ]; then
+    # The tag filters of ListSecrets match any tag with the key and any with the value, by prefix, so the match is
+    # made exactly here.
+    aws_sm list-secrets --filters Key=tag-key,Values="$TAG_TAG" Key=tag-value,Values="$TAG" --output json \
+      | jq -r --arg env "$SNAPSHOT_ENV" --arg tag "$TAG" --arg tenv "$TAG_ENV" --arg ttag "$TAG_TAG" '
+        .SecretList[] | (.Tags // [] | from_entries) as $tags
+          | select($tags[$tenv] == $env and $tags[$ttag] == $tag) | .ARN' \
+      | head -1
+  else
+    list_snapshots | jq -r --arg tag "$TAG" '.[] | select(.Tag == $tag) | .Id' | head -1
+  fi
 }
 
-# Sets SNAPSHOT_ARN to the snapshot of the env tagged with TAG, or stops if there is none.
+# Prints the value of the snapshot of the given id.
+read_snapshot(){
+  case "$VAULT_CLOUD" in
+    aws)
+      aws_sm get-secret-value --secret-id "$1" --query SecretString --output text ;;
+    azure)
+      az keyvault secret show --vault-name "$VAULT_NAME" --name "$1" --query value --output tsv ;;
+    gcp)
+      gcloud secrets versions access latest --secret "$1" --project "$VAULT_PROJECT" ;;
+  esac
+}
+
+# Creates the snapshot NAME, tagged for the env and TAG, with the value in the file.
+create_snapshot(){
+  local NAME="$1" VALUE_FILE="$2"
+  case "$VAULT_CLOUD" in
+    aws)
+      aws_sm create-secret --name "$NAME" --description "$DESCRIPTION" \
+        --secret-string "file://$VALUE_FILE" --tags "Key=$TAG_ENV,Value=$SNAPSHOT_ENV" "Key=$TAG_TAG,Value=$TAG" > /dev/null ;;
+    azure)
+      az keyvault secret set --vault-name "$VAULT_NAME" --name "$NAME" --file "$VALUE_FILE" \
+        --description "$DESCRIPTION" --tags "$TAG_ENV=$SNAPSHOT_ENV" "$TAG_TAG=$TAG" --output none ;;
+    gcp)
+      gcloud secrets create "$NAME" --project "$VAULT_PROJECT" --replication-policy=automatic \
+        --set-annotations="$TAG_ENV=$SNAPSHOT_ENV,$TAG_TAG=$TAG" > /dev/null \
+        && gcloud secrets versions add "$NAME" --project "$VAULT_PROJECT" --data-file="$VALUE_FILE" > /dev/null ;;
+  esac
+}
+
+# Replaces the value of the existing snapshot of the given id with the one in the file, and refreshes its tags.
+replace_snapshot(){
+  local ID="$1" VALUE_FILE="$2"
+  case "$VAULT_CLOUD" in
+    aws)
+      aws_sm put-secret-value --secret-id "$ID" --secret-string "file://$VALUE_FILE" > /dev/null \
+        && aws_sm update-secret --secret-id "$ID" --description "$DESCRIPTION" > /dev/null \
+        && aws_sm tag-resource --secret-id "$ID" --tags "Key=$TAG_ENV,Value=$SNAPSHOT_ENV" "Key=$TAG_TAG,Value=$TAG" ;;
+    azure)
+      # Setting a secret adds a version of it.  The tags are those of the new version, so they are given again.
+      az keyvault secret set --vault-name "$VAULT_NAME" --name "$ID" --file "$VALUE_FILE" \
+        --description "$DESCRIPTION" --tags "$TAG_ENV=$SNAPSHOT_ENV" "$TAG_TAG=$TAG" --output none ;;
+    gcp)
+      gcloud secrets versions add "$ID" --project "$VAULT_PROJECT" --data-file="$VALUE_FILE" > /dev/null ;;
+  esac
+}
+
+# Deletes the snapshot of the given id: at once if FORCE, else, where the cloud has one, with a recovery.
+delete_snapshot(){
+  local ID="$1"
+  case "$VAULT_CLOUD" in
+    aws)
+      if [ "$FORCE" == "true" ]; then
+        aws_sm delete-secret --secret-id "$ID" --force-delete-without-recovery > /dev/null
+      else
+        aws_sm delete-secret --secret-id "$ID" --recovery-window-in-days $RECOVERY_DAYS > /dev/null
+      fi ;;
+    azure)
+      az keyvault secret delete --vault-name "$VAULT_NAME" --name "$ID" --output none || return 1
+      if [ "$FORCE" == "true" ]; then
+        # A soft-deleted secret may take a moment to be purgeable.
+        local I
+        for I in 1 2 3 4 5 6 ; do {
+          az keyvault secret purge --vault-name "$VAULT_NAME" --name "$ID" 2>/dev/null && return 0
+          sleep 5
+        } done
+        echo "$ID: deleted, but failed to purge it: the permission to purge may be missing" >&2
+        return 1
+      fi ;;
+    gcp)
+      gcloud secrets delete "$ID" --project "$VAULT_PROJECT" --quiet > /dev/null ;;
+  esac
+}
+
+# Sets SNAPSHOT_ID to the snapshot of the env tagged with TAG, or stops if there is none.
 require_snapshot(){
-  SNAPSHOT_ARN=$(find_snapshot)
-  if [ -z "$SNAPSHOT_ARN" ]; then
+  SNAPSHOT_ID=$(find_snapshot)
+  if [ -z "$SNAPSHOT_ID" ]; then
     echo "No snapshot of env $SNAPSHOT_ENV tagged $TAG" >&2
     exit 1
   fi
@@ -158,8 +344,7 @@ push(){
   local NAME COUNT
   NAME=$(snapshot_name)
   COUNT=$(snapshot_files | wc -l | tr -d ' ')
-  local TAGS=("Key=$TAG_ENV,Value=$SNAPSHOT_ENV" "Key=$TAG_TAG,Value=$TAG")
-  local DESCRIPTION="afon config $CONFIG_DIR of env $SNAPSHOT_ENV tagged $TAG"
+  DESCRIPTION="afon config $CONFIG_DIR of env $SNAPSHOT_ENV tagged $TAG"
 
   if [ "$DRY_RUN" == "true" ]; then
     echo "$NAME: would store $COUNT files from $CONFIG_DIR, tagged $TAG_ENV=$SNAPSHOT_ENV $TAG_TAG=$TAG"
@@ -176,22 +361,24 @@ push(){
   local SIZE
   SIZE=$(wc -c < "$VALUE_FILE" | tr -d ' ')
   if [ "$SIZE" -gt $SNAPSHOT_MAX_BYTES ]; then
-    fail "The snapshot is $SIZE bytes, over the $SNAPSHOT_MAX_BYTES bytes AWS allows for a secret"
+    # Too big as it is: it is gzipped and base64-encoded, which pull recognises as the value is not a JSON object.
+    gzip -9 -c < "$VALUE_FILE" | base64 | tr -d '\n' > "$VALUE_FILE.gz" || fail "Failed to compress the snapshot"
+    mv "$VALUE_FILE.gz" "$VALUE_FILE"
+    echo "The snapshot is $SIZE bytes, over the $SNAPSHOT_MAX_BYTES bytes $VAULT_CLOUD allows for a secret: compressed"
+    SIZE=$(wc -c < "$VALUE_FILE" | tr -d ' ')
+  fi
+  if [ "$SIZE" -gt $SNAPSHOT_MAX_BYTES ]; then
+    fail "The snapshot is $SIZE bytes, over the $SNAPSHOT_MAX_BYTES bytes $VAULT_CLOUD allows for a secret"
   fi
 
   local EXISTING
   EXISTING=$(find_snapshot)
   if [ -z "$EXISTING" ]; then
-    aws_sm create-secret --name "$NAME" --description "$DESCRIPTION" \
-      --secret-string "file://$VALUE_FILE" --tags "${TAGS[@]}" > /dev/null \
-      || fail "Failed to create $NAME"
+    create_snapshot "$NAME" "$VALUE_FILE" || fail "Failed to create $NAME"
   elif [ "$FORCE" != "true" ]; then
     fail "$NAME already exists.  Use --force to replace it, or delete it first."
   else
-    aws_sm put-secret-value --secret-id "$EXISTING" --secret-string "file://$VALUE_FILE" > /dev/null \
-      || fail "Failed to replace $NAME"
-    aws_sm update-secret --secret-id "$EXISTING" --description "$DESCRIPTION" > /dev/null
-    aws_sm tag-resource --secret-id "$EXISTING" --tags "${TAGS[@]}"
+    replace_snapshot "$EXISTING" "$VALUE_FILE" || fail "Failed to replace $NAME"
   fi
   rm -rf "$WORK_DIR"
   echo "$NAME: stored $COUNT files from $CONFIG_DIR ($SIZE bytes), tagged $TAG_ENV=$SNAPSHOT_ENV $TAG_TAG=$TAG"
@@ -202,8 +389,12 @@ pull(){
   local SNAPSHOT
   SNAPSHOT=$(snapshot_name)
   local VALUE
-  VALUE=$(aws_sm get-secret-value --secret-id "$SNAPSHOT_ARN" --query SecretString --output text) \
+  VALUE=$(read_snapshot "$SNAPSHOT_ID") \
     || { echo "Failed to read $SNAPSHOT" >&2; exit 1; }
+  # A snapshot too big to store as it is was compressed by push: gzipped, then base64-encoded.
+  if [[ "$VALUE" != "{"* ]]; then
+    VALUE=$(printf '%s' "$VALUE" | base64 -d | gunzip) || { echo "Failed to decompress $SNAPSHOT" >&2; exit 1; }
+  fi
 
   # The files are all decoded first, so that a bad snapshot leaves the config dir alone, and so that they can be
   # compared with those of the config dir.
@@ -272,24 +463,51 @@ delete(){
   require_snapshot
   local SNAPSHOT
   SNAPSHOT=$(snapshot_name)
+  local OUTCOME
+  case "$VAULT_CLOUD" in
+    aws)
+      if [ "$FORCE" == "true" ]; then OUTCOME="at once"; else OUTCOME="with a recovery window of $RECOVERY_DAYS days"; fi ;;
+    azure)
+      if [ "$FORCE" == "true" ]; then OUTCOME="and purged at once"; else OUTCOME="soft-deleted, until purged or retained for the vault's retention days"; fi ;;
+    gcp)
+      OUTCOME="at once" ;;
+  esac
   if [ "$DRY_RUN" == "true" ]; then
-    echo "$SNAPSHOT: would delete$([ "$FORCE" == "true" ] && echo " at once" || echo ", with a recovery window of $RECOVERY_DAYS days")"
+    echo "$SNAPSHOT: would delete, $OUTCOME"
     return
   fi
-  if [ "$FORCE" == "true" ]; then
-    aws_sm delete-secret --secret-id "$SNAPSHOT_ARN" --force-delete-without-recovery > /dev/null
-    echo "$SNAPSHOT: deleted"
-  else
-    aws_sm delete-secret --secret-id "$SNAPSHOT_ARN" --recovery-window-in-days $RECOVERY_DAYS > /dev/null
-    echo "$SNAPSHOT: deleted, recoverable for $RECOVERY_DAYS days with 'aws secretsmanager restore-secret --secret-id $SNAPSHOT'"
-  fi
+  delete_snapshot "$SNAPSHOT_ID" || { echo "Failed to delete $SNAPSHOT" >&2; exit 1; }
+  case "$VAULT_CLOUD" in
+    aws)
+      if [ "$FORCE" == "true" ]; then
+        echo "$SNAPSHOT: deleted"
+      else
+        echo "$SNAPSHOT: deleted, recoverable for $RECOVERY_DAYS days with 'aws secretsmanager restore-secret --secret-id $SNAPSHOT'"
+      fi ;;
+    azure)
+      if [ "$FORCE" == "true" ]; then
+        echo "$SNAPSHOT: deleted and purged"
+      else
+        echo "$SNAPSHOT: soft-deleted, recoverable with 'az keyvault secret recover --vault-name $VAULT_NAME --name $SNAPSHOT_ID'; it can be pushed again once purged"
+      fi ;;
+    gcp)
+      echo "$SNAPSHOT: deleted" ;;
+  esac
 }
 
 ACTION="${1:-}"
 shift || true
 
 TAG=
+# The cloud is the global one of afon.sh and afon-cli.sh (-c|--cloud, AFON_CLOUD), given to the script as CLOUD.
+# Without one, or with ALL, it is aws.
+VAULT_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
+if [ -z "$VAULT_CLOUD" ] || [ "$VAULT_CLOUD" == "all" ]; then
+  VAULT_CLOUD=aws
+fi
 REGION=
+VAULT_NAME=
+VAULT_PROJECT=
 FORCE=false
 DRY_RUN=false
 
@@ -297,6 +515,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --region)
       REGION="$2"; shift 2 ;;
+    --vault)
+      VAULT_NAME="$2"; shift 2 ;;
+    --project)
+      VAULT_PROJECT="$2"; shift 2 ;;
     --force)
       FORCE=true; shift ;;
     --dry-run)
@@ -335,9 +557,62 @@ fi
 CONFIG_DIR="$AFON_HOME/config-$SNAPSHOT_ENV"
 echo "Using env $SNAPSHOT_ENV"
 echo "Using config dir $CONFIG_DIR"
+
+set_cloud
+echo "Using cloud $VAULT_CLOUD"
+if [ -n "$REGION" ] && [ "$VAULT_CLOUD" != "aws" ]; then
+  echo "--region is for aws only" >&2; exit 1
+fi
+if [ -n "$VAULT_NAME" ] && [ "$VAULT_CLOUD" != "azure" ]; then
+  echo "--vault is for azure only" >&2; exit 1
+fi
+if [ -n "$VAULT_PROJECT" ] && [ "$VAULT_CLOUD" != "gcp" ]; then
+  echo "--project is for gcp only" >&2; exit 1
+fi
 if [ -n "$REGION" ] ; then
   echo "Using region $REGION"
 fi
+
+# Prints the value of a property of the config dir of the env, which may be set in terms of others, eg
+# ${ENV_NAME}-afon-key-vault.  The files are read from the config dir of the env rather than via the config symlink,
+# which may not exist yet, eg to pull.  Prints nothing if there is none.
+config_property(){
+  local PROPERTY="$1" CLOUD_NAME="$2" FILE
+  (
+    set +eu
+    set -a
+    for FILE in afon.properties "afon-$CLOUD_NAME.properties" ; do {
+      [ -f "$CONFIG_DIR/$FILE" ] && source "$CONFIG_DIR/$FILE" > /dev/null 2>&1
+    } done
+    printf '%s' "${!PROPERTY:-}"
+  )
+}
+
+# The Azure Key Vault and the GCP project are --vault and --project, else read from the config of the cloud.
+if [ "$VAULT_CLOUD" == "azure" ] && [ -z "$VAULT_NAME" ]; then
+  VAULT_NAME=$(config_property AZURE_KEY_VAULT_NAME azure)
+  if [ -z "$VAULT_NAME" ]; then
+    # No config, eg to pull into a new env: the name that the templates give it.
+    VAULT_NAME="$SNAPSHOT_ENV-afon-key-vault"
+    echo "No AZURE_KEY_VAULT_NAME in the config of $CONFIG_DIR: using the default $VAULT_NAME, or give --vault"
+  fi
+fi
+if [ "$VAULT_CLOUD" == "gcp" ] && [ -z "$VAULT_PROJECT" ]; then
+  VAULT_PROJECT=$(config_property GCP_PROJECT_ID gcp)
+  if [ -z "$VAULT_PROJECT" ] && command -v gcloud > /dev/null 2>&1; then
+    # No config, eg to pull into a new env: the project of the gcloud CLI.
+    VAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
+    [ -n "$VAULT_PROJECT" ] && echo "No GCP_PROJECT_ID in the config of $CONFIG_DIR: using the project of gcloud, or give --project"
+  fi
+  if [ -z "$VAULT_PROJECT" ]; then
+    echo "No GCP project: give --project, set GCP_PROJECT_ID in afon-gcp.properties of $CONFIG_DIR, or set one in gcloud" >&2
+    exit 1
+  fi
+fi
+case "$VAULT_CLOUD" in
+  azure) echo "Using Key Vault $VAULT_NAME" ;;
+  gcp)   echo "Using project $VAULT_PROJECT" ;;
+esac
 
 # All clouds are always stored, so that the config dir is restored whole.
 CLOUD=

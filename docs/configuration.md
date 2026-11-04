@@ -58,13 +58,14 @@ If a config dir is already present, it will stop.
 
 ### Command config-vault
 
-You can store snapshots of a config env in AWS Secrets Manager under a tag, and pull them back by it:
+You can store snapshots of a config env in the secret store of a cloud under a tag, and pull them back by it: AWS Secrets Manager (the default), Azure Key Vault or GCP Secret Manager, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`), `aws` if none:
 ```shell
 afon-cli.sh config-vault push <tag> -e <env>                # stores config-<env>, tagged with <tag>
 afon-cli.sh config-vault list -e <env>                      # lists the snapshots of the env
 afon-cli.sh config-vault pull <tag> -e <env>                # writes the missing files of the snapshot to config-<env>
 afon-cli.sh config-vault pull <tag> -e <env> -- --force     # also overwrites the files of config-<env> that differ
 afon-cli.sh config-vault delete <tag> -e <env>              # removes the snapshot, recoverable for 30 days
+afon-cli.sh config-vault push <tag> -e <env> -c azure       # the same in Azure Key Vault, likewise with -c gcp
 ```
 The env is the global one of `afon.sh` or `afon-cli.sh`: `--env`, `--config-env`, or `AFON_ENV`, which also switch
 the `config` symlink to `config-<env>`.  Without one, it is the env that `config` currently points to.  Likewise the afon home is the global `--home` or `AFON_HOME`.
@@ -82,6 +83,27 @@ Each snapshot is one secret `afon/<env>/<tag>` holding all the config files, emp
 
 It needs the `aws` CLI, logged in with the `secretsmanager` permissions to create, update, tag, list, read and delete secrets, and `jq`.  The region is `--region`, else the default of the `aws` CLI, as `pull` may run before
 there is any afon config to read it from.
+
+The cloud changes where and how the snapshot is kept:
+
+| | `aws` | `azure` | `gcp` |
+|---|---|---|---|
+| Store | Secrets Manager | Key Vault | Secret Manager |
+| Secret name | `afon/<env>/<tag>` | `afon-<env>-<tag>` | `afon-<env>-<tag>` |
+| Characters of the tag | letters, digits, `/ _ + = . @ -` | letters, digits, `-` | letters, digits, `_ -` |
+| Tagged with | tags `afon:env`, `afon:tag` | tags `afon-env`, `afon-tag` | annotations `afon-env`, `afon-tag` |
+| Max size | 64 KB | 25 KB | 64 KiB |
+| `delete` | recovery window of 30 days | soft-deleted | at once |
+| `delete --force` | at once | purged at once (needs the purge permission) | same |
+| `push --force` | replaces the value | adds a version | adds a version |
+| Where | `--region`, else the `aws` default | `--vault`, else `AZURE_KEY_VAULT_NAME` | `--project`, else `GCP_PROJECT_ID` |
+| Needs | `aws` CLI | `az` CLI, role Key Vault Secrets Officer on the vault | `gcloud` CLI, role Secret Manager Admin, Secret Manager API enabled |
+
+On `azure` and `gcp` a dot or underscore in the tag is converted to a dash, as the name of a secret cannot have dots there, nor underscores on `azure`, so a version like `1.0-beta-9` is stored with the tag `1-0-beta-9` (the secret is `afon-<env>-1-0-beta-9`).  The `1.0-beta-9`, `1_0-beta-9` and `1-0-beta-9` forms all find it with `push`, `pull` and `delete`.  The same goes for the env in the name.  `aws` keeps the tag as given.
+
+A snapshot over the size limit is gzipped and base64-encoded by `push`, which `pull` recognises and decompresses; it fails only if it is still over the limit.
+
+All need `jq`.  On Azure, the Key Vault is created by `azure-keyvault create`; on GCP, the Secret Manager API is enabled by `gcp-create` if `GCP_SECRETS_ENABLED=true` in `afon-gcp.properties`, by `gcp-secrets store`, or by a project admin.  Unlike `AZURE_KEY_VAULT_NAME`, which names the Key Vault, `GCP_SECRETS_ENABLED` is a plain on/off switch for the use of Secret Manager by the stack, and `config-vault` does not need it: it needs only `GCP_PROJECT_ID` (or `--project`) and the API enabled.  Unless `--vault` or `--project` is given, the Key Vault and the project are read from `AZURE_KEY_VAULT_NAME` and `GCP_PROJECT_ID` in `afon-azure.properties` and `afon-gcp.properties` of `config-<env>`. No config is needed, eg to `pull` into a new env: the Key Vault is then `<env>-afon-key-vault`, as in the templates, and the project that of the `gcloud` CLI.
 
 ### Command config-status
 
