@@ -677,6 +677,38 @@ afon-cli.sh cdktf-status
 If found, it will output the content of the file `manifest.json` in the cdktf dir, which can be used to
 provide information to the user of the cdktf content.  It will also list the files in the cdktf dir.
 
+#### Command cdktf-store
+
+You can keep snapshots of the tofu state and plans of the cdktf dir in the object storage of a cloud under a tag, and pull them back by it: AWS S3 (the default), Azure Blob Storage or GCP Cloud Storage, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`).  Unlike [config-vault](configuration.md#command-config-vault), which keeps the small config files in the secret store of the cloud, object storage has no size limit that matters, so the state and the plans fit, however many stacks.  It can be applied to one stack only:
+```shell
+afon-cli.sh cdktf-store push <tag> -e <env>                          # stores the state and plans of all the stacks of cdktf-<env>
+afon-cli.sh cdktf-store push <tag> aws-keycloak -e <env>             # stores just those of the stack
+afon-cli.sh cdktf-store list -e <env>                                # lists the snapshots of the env, and their stacks
+afon-cli.sh cdktf-store pull <tag> -e <env>                          # writes the missing files of the snapshot to cdktf-<env>
+afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env>             # just the files of the stack
+afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env> -- --force  # also overwrites the files that differ
+afon-cli.sh cdktf-store delete <tag> aws-keycloak -e <env>           # removes the files of the stack from the snapshot
+```
+The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
+
+For each stack, or just the one given, it stores `terraform.<stack-id>.tfstate` and the plan `stacks/<stack-id>/` (`cdk.tf.json` and `assets`), so that a stack can be destroyed with `tofu-destroy` after a pull on another machine.  It leaves out `.terraform` and `.terraform.lock.hcl`, which `tofu init` creates again, the kubeconfig `kube/` and the `*.backup` state backups.  The objects are named `<env>/<tag>/<file>`, eg `dev/v1/terraform.aws-keycloak.tfstate`, so stacks can be pushed to the same tag one at a time.  `<tag>` is free-form text of letters, digits and `. _ -`.
+
+The store is created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned, so what a `push --force` or a `delete` replaced can be recovered from its previous versions:
+
+| | `aws` | `azure` | `gcp` |
+|---|---|---|---|
+| Store | S3 bucket `afon-cdktf-<account-id>` | container `afon-cdktf` | Cloud Storage bucket `afon-cdktf-<project-id>` |
+| Where | `--region` (to create), else the `aws` default | storage account `--account`, else `AZURE_STORAGE_ACCOUNT` (the one of `azure-create`) | `--project`, else `GCP_PROJECT_ID`; `--region`, else `GCP_REGION` (to create) |
+| Needs | `aws` CLI | `az` CLI, role Storage Blob Data Contributor | `gcloud` CLI, role Storage Admin |
+
+The bucket names of `aws` and `gcp` are global, hence the account or project in them.  On `azure` the storage account must already exist, and blob versioning is a setting of the account, which `cdktf-store` leaves as it is.  All need `jq`.
+
+Pushing files that the snapshot already has needs `--force`.  `pull` writes the files that are missing, and stops if any differ unless given `--force`; **take care when pulling over the state of a deployed stack with `--force`**, as it replaces what tofu knows of its resources.  Add `--dry-run` to see what would be done.
+
+Before it does anything, `cdktf-store` checks that the CLI is logged in (else it says to run `aws-login`, `azure-login` or `gcp-login`) and that the user may access the store.  If a call is refused it says which permission is missing, and what to ask an admin to grant, or to run if you can: `aws` needs `s3:ListBucket` and `s3:GetObject` to read, plus `s3:PutObject` and `s3:DeleteObject` to write, plus the bucket-creating `s3:CreateBucket`, `s3:PutBucketPublicAccessBlock`, `s3:PutEncryptionConfiguration` and `s3:PutBucketVersioning` on the first push; `azure` needs `Storage Blob Data Reader` to read and `Storage Blob Data Contributor` to write or create, on the data of the storage account, which the subscription roles Owner and Contributor do not include; `gcp` needs `roles/storage.objectViewer` to read, `roles/storage.objectAdmin` to write and `roles/storage.admin` to create the bucket.
+
+**NOTE:** the state and the plans hold secrets in plain text (passwords, tokens), so restrict who can read the store.
+
 ## Stack teardown 
 
 The stack can be brought down using tofu, which will use the locally stored tfstate.

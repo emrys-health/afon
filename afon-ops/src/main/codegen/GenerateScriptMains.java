@@ -50,6 +50,7 @@ public class GenerateScriptMains {
         new ScriptEntry("cdktf", "CdktfInitMain", "cdktf/init.sh"),
         new ScriptEntry("cdktf", "CdktfStatusMain", "cdktf/status.sh"),
         new ScriptEntry("cdktf", "CdktfSwitchMain", "cdktf/switch.sh"),
+        new ScriptEntry("cdktf", "CdktfStoreMain", "cdktf/store.sh"),
 
         new ScriptEntry("tofu", "TofuApplyMain", "tofu/apply.sh"),
         new ScriptEntry("tofu", "TofuDestroyMain", "tofu/destroy.sh"),
