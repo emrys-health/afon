@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 #
-# Builds the afon docker images: the base image of the cli tools (including maven, to build afon), and the cli image,
-# being the base image with the pre-built afon-cli zip installed.  The version is the project version (from mvn), and
+# Builds the afon docker images: the base image of the cli tools (including maven, to build afon), the cli image, being
+# the base image with the pre-built afon-cli zip installed, and the azure-agent image, being the cli image with an Azure
+# Pipelines agent entrypoint.  The version is the project version (from mvn), and
 # the tags are taken from it and from git.
 #
-# usage: scripts/docker/afon/build.sh [--push] [--registry <registry>] [--platform <platform>] [--zip <zip>] [base|cli|all]
-#   base|cli|all
-#             the images to build (default: all).  cli needs the base image of the same version, so build it first.
+# usage: scripts/docker/afon/build.sh [--push] [--registry <registry>] [--platform <platform>] [--zip <zip>] [base|cli|azure-agent|all]
+#   base|cli|azure-agent|all
+#             the images to build (default: all).  cli needs the base image of the same version, and agent the cli
+#             image of the same version, so build those first.
 #   --zip     the pre-built afon-cli zip for the cli image.  Defaults to afon-distribution/target/afon-<version>-cli.zip,
 #             built with 'afon.sh -bg "clean package" -bp cli,distribution' (or in the afon-base image).
 #   --push    pushes every tag of the built images
@@ -27,6 +29,7 @@ AFON_ROOT="$(cd "$DIR/../../.." && pwd)"
 
 BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base}"
 CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
+AGENT_IMAGE="${AGENT_IMAGE:-emryshealth/afon-azure-agent}"
 ZIP=""
 PLATFORM=linux/amd64
 PUSH=false
@@ -39,7 +42,7 @@ while [ $# -gt 0 ]; do
     --platform) PLATFORM="$2"; shift ;;
     --registry) REGISTRY="$2"; shift ;;
     --zip) ZIP="$2"; shift ;;
-    base|cli|all) WHAT="$1" ;;
+    base|cli|azure-agent|all) WHAT="$1" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -49,6 +52,7 @@ done
 if [ -n "$REGISTRY" ]; then
   BASE_IMAGE="$REGISTRY/$BASE_IMAGE"
   CLI_IMAGE="$REGISTRY/$CLI_IMAGE"
+  AGENT_IMAGE="$REGISTRY/$AGENT_IMAGE"
 fi
 
 cd "$AFON_ROOT"
@@ -120,4 +124,12 @@ if [ "$WHAT" = cli ] || [ "$WHAT" = all ]; then
     --build-arg "BASE_IMAGE=$BASE_IMAGE:$VERSION" \
     -f "$DIR/cli/Dockerfile" "$CONTEXT"
   push "$CLI_IMAGE"
+fi
+
+if [ "$WHAT" = azure-agent ] || [ "$WHAT" = all ]; then
+  # shellcheck disable=SC2046
+  docker build "${COMMON_ARGS[@]}" $(tags "$AGENT_IMAGE") \
+    --build-arg "BASE_IMAGE=$CLI_IMAGE:$VERSION" \
+    "$DIR/azure-agent"
+  push "$AGENT_IMAGE"
 fi
