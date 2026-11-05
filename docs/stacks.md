@@ -881,7 +881,7 @@ afon-cli.sh manage-stack run snowflake-reading-all
 - [ ] **Domain names** purchased via your domain registrar, one per cloud (e.g. `polaris.yourdomain.com`)
 - [ ] **DNS zones** created in each target cloud (`dns-create-zones`) and delegated to (`dns-delegate` for a subdomain, or for a domain registered with Route 53 with `--route53`, else the nameservers at your domain registrar), see [DNS configuration](dns_config.md)
 - [ ] **SSL certificates** requested and validated (ACM for AWS, Let's Encrypt for others)
-- [ ] **External Polaris database** provisioned for Polaris metadata storage
+- [ ] **External Postgres database** provisioned for Polaris, KeyCloak and Guacamole. Note that this lives outside Afon and is your responsibility to provision.
 - [ ] **OIDC provider** configured OIDC provider for Jupyter access
 - [ ] **Cloud IAM roles** created via `scripts/<cloud>/create.sh`
 - [ ] **Storage buckets** created (primary, external, and forbidden for each cloud)
