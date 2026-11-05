@@ -24,13 +24,17 @@ ENV PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$NODE_HOME/bin:$GCLOUD_HOME/bin:$PATH
 RUN apt-get update && apt-get install -y \
     curl \
     less \
+    zip \
     unzip \
     jq \
     dnsutils \
     ca-certificates \
     gnupg \
     python-is-python3 \
- && rm -rf /var/lib/apt/lists/*
+    git \
+    git-lfs \
+    libicu70 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x64) \
  && curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/${ARCH}/jdk/hotspot/normal/eclipse \
