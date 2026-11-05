@@ -57,6 +57,18 @@ with the `read:packages` scope, and add to `~/.m2/settings.xml` the server `gith
 (username: your GitHub user, password: the token), and the repository
 `https://maven.pkg.github.com/emrys-health/afon`, as in the `github` profile of [settings.xml](../settings.xml).
 
+## CLI snapshot workflow
+
+The [CLI snapshot](../.github/workflows/cli-snapshot.yml) workflow publishes the latest `SNAPSHOT` build of the afon-cli
+zip, for users that do not use docker.  It builds the zip and publishes it as the asset of a rolling `snapshot`
+pre-release, which each run replaces.  Anyone can download it from the repository's releases page, without a GitHub login:
+`https://github.com/emrys-health/afon/releases/download/snapshot/afon-<version>-cli.zip`.
+
+It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`, so it needs no secrets.  Run it from the Actions
+tab (`workflow_dispatch`); the push trigger for `main` is commented out in the workflow, until the manual runs are
+proven.  It fails for a release version, as only `SNAPSHOT` versions are published: for a stable version, use the zip
+attached to the GitHub Release by the [Publish workflow](#publish-workflow).
+
 ## Release notes
 
 Before preparing the tag, `release.sh` updates [release_notes.md](../release_notes.md) with the closed issues of the

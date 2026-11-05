@@ -1,0 +1,78 @@
+name: CLI snapshot
+
+# Builds the afon-cli zip and publishes it as the asset of a rolling GitHub pre-release, tagged snapshot, so that users
+# that do not use docker can download the latest build of the zip without a GitHub login, from
+#   https://github.com/<owner>/<repo>/releases/download/snapshot/afon-<version>-cli.zip
+# or from the releases page of the repository.
+#
+# Each run replaces the snapshot release, and moves its tag to the built commit.  It is a pre-release, never marked
+# as the latest release.  Only SNAPSHOT versions are published: tagged releases are published, with their zip, by the
+# Publish workflow.
+#
+# Runs on demand (workflow_dispatch) to publish the zip of the chosen ref, eg main.
+#
+# Runs on a GitHub-hosted runner, with the job's own token: it needs no secrets, and no self-hosted runner
+# ever runs code from a tag or a fork.
+on:
+  # TODO: the push trigger is disabled until the manual runs are proven.  Uncomment it to publish on each push to main.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "afon-*/**"
+  #     - "scripts/**"
+  #     - "templates/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One snapshot publish at a time, and never cancel one in flight.
+concurrency:
+  group: cli-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      # To create the snapshot release and its tag.
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Before the build, to fail fast.  A release ref is never published as the snapshot: a tagged release has its own
+      # zip, attached to its GitHub Release by the Publish workflow.
+      - name: Check the version is a SNAPSHOT
+        run: |
+          set -euo pipefail
+          VERSION=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          if [[ "$VERSION" != *-SNAPSHOT ]]; then
+            echo "::error::Version $VERSION of $GITHUB_REF_NAME is not a SNAPSHOT.  Only SNAPSHOT versions are published as the snapshot release."
+            exit 1
+          fi
+          echo "Publishing the snapshot $VERSION"
+
+      - name: Build the afon-cli
+        uses: ./.github/actions/build-cli
+
+      - name: Publish the snapshot release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          ZIP="afon-distribution/target/afon-$VERSION-cli.zip"
+          [ -f "$ZIP" ] || { echo "::error::$ZIP does not exist"; exit 1; }
+          # Replace the previous snapshot release and its tag, if any.
+          gh release delete snapshot --cleanup-tag --yes || true
+          gh release create snapshot "$ZIP" \
+            --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "Snapshot $VERSION" \
+            --notes "The afon-cli zip built from commit $GITHUB_SHA (\`$VERSION\`), replaced by each build.  Use a tagged release for a stable version."
