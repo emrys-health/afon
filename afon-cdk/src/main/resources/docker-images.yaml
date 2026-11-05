@@ -14,9 +14,9 @@
 images:
   # first-party
   spark:
-    image: emryshealth/spark_jars_cp
-    tag: 4.0.1
-    digest: sha256:b81ba045e8dc185f172867cc384d7e2a18fd0d639fdfc2477276694b9376cdd4
+    image: emryshealth/spark_jars
+    tag: 4.0.1_348
+    digest: sha256:a354e9fa84bd594ad1570ee8033b3a02626986e2ee3b5c2e64369f94342c537e
     category: first-party
   pyspark-notebook:
     image: emryshealth/pyspark-notebook
