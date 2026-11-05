@@ -1,6 +1,6 @@
 # Docker images
 
-Three Docker images give a ready-made environment for running Afon, with the right version of every tool, reproduce a
+Three Docker images give a ready-made environment for running Afon, with the pinned version of every tool, reproduce a
 [local setup](local_setup.md):
 
 - `emryshealth/afon-base`: Ubuntu 22.04 with the cli tools Afon uses, at pinned versions: java, maven, node,
@@ -55,18 +55,6 @@ A SNAPSHOT tag is overwritten by each build, so use the short commit tag to pin 
 The images carry the standard `org.opencontainers.image.*` labels: the version, the commit, the source repo and
 the build time.
 
-### Helper Flags
-
-`--push` pushes every tag of the built images.  `--registry` prefixes the image names with a registry, eg to push to
-an Azure Container Registry:
-```shell
-az login
-scripts/docker/afon/build.sh --registry myacr.azurecr.io --push
-```
-which pushes `myacr.azurecr.io/emryshealth/afon-base`, `afon-cli` and `afon-azure-agent`.  For a
-registry ending in `.azurecr.io`, the script logs in with `az acr login` before building.  For any other registry,
-`docker login` to it first.
-
 ### Running
 
 The environment can invoked like so:
@@ -74,6 +62,65 @@ The environment can invoked like so:
 ```sh
 docker run -it --rm \
   -v "~/.afon/config:/home/afon/.afon/config:ro" \
-  emryshealth/afon-cli:1.0-beta-7 \
+  emryshealth/afon-cli:<version> \
   'afon-cli.sh validate-stack azure-polaris' # or `/bin/bash` for an interactive session
 ```
+
+### Publishing Images
+
+`--push` pushes every tag of the built images, to Docker Hub by default, as `emryshealth/<image>`.  `docker login`
+first, as a user who can push to the `emryshealth` organization:
+```shell
+docker login
+scripts/docker/afon/build.sh --push
+```
+
+### Publishing to Azure registry
+
+`--registry` prefixes the image names with a registry, eg an Azure Container Registry:
+```shell
+az login
+scripts/docker/afon/build.sh --registry myacr.azurecr.io --push
+```
+which pushes `myacr.azurecr.io/emryshealth/<image>` for every image.  For a registry ending in `.azurecr.io`, the
+script logs in with `az acr login` before building.  For any other registry, `docker login` to it first.
+
+### Publishing from GitHub CI
+
+The images can be published to Docker Hub from GitHub with the `Docker` workflow
+(`.github/workflows/docker.yml`), instead of from a developer's machine.
+
+#### What it does
+
+The workflow runs on a GitHub-hosted runner, so the images are built for `linux/amd64`.  It:
+
+1. checks out the chosen ref and sets up Java 17;
+2. builds the afon-cli zip, without the tests;
+3. logs in to Docker Hub;
+4. runs `scripts/docker/afon/build.sh --push`, which builds the images and pushes every tag, as in
+   [Publishing Images](#publishing-images).
+
+The version and tags are those of the chosen ref, as in [Versions and tags](#versions-and-tags): a `-SNAPSHOT`
+version from `main` overwrites the existing `-SNAPSHOT` tag, while a release version is also tagged `latest`.
+
+#### Running it
+
+The workflow is run on demand: in GitHub, open Actions > Docker > Run workflow, and choose the branch or tag to
+publish.  Only one run at a time is allowed.
+
+It can also run when `release.sh` pushes a release tag `afon-<version>`.  That trigger is in the workflow but
+commented out, until the manual runs are proven.
+
+#### Required secrets
+
+The workflow needs two repository secrets (Settings > Secrets and variables > Actions):
+
+| Secret               | Value                                                                                         |
+|----------------------|-----------------------------------------------------------------------------------------------|
+| `DOCKERHUB_USERNAME` | A Docker Hub user that is a member of the `emryshealth` organization, with permission to push |
+| `DOCKERHUB_TOKEN`    | An access token of that user, with `Read & Write` scope (never the account password)          |
+
+Prefer a dedicated account for CI over a personal one, so that publishing does not depend on an individual.  In
+Docker Hub, create the account, add it to a team of the `emryshealth` organization that can write to the repositories,
+and create the token in its Account settings > Personal access tokens.  An organization access token, where the plan
+offers it, is an alternative: use the organization name as the username.

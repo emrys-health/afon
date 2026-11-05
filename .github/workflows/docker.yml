@@ -1,0 +1,73 @@
+name: Docker
+
+# Builds the afon-cli zip, then builds the afon-base and afon-cli images and pushes them to Docker Hub
+# (emryshealth/afon-base and emryshealth/afon-cli), with scripts/docker/afon/build.sh --push.
+# See docs/docker.md for the versions and tags.  Images are linux/amd64, as the GitHub-hosted runner is.
+#
+# Runs on demand (workflow_dispatch) to publish the images of the chosen ref, eg a SNAPSHOT of main.
+# Once the tag trigger below is enabled, it also runs when release.sh pushes the release tag afon-<version>,
+# which publishes the release images, tagged latest as well.
+#
+# Runs on a GitHub-hosted runner, so no self-hosted runner ever runs code from a tag or a fork.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   - DOCKERHUB_USERNAME: the Docker Hub user that owns the access token below.  The user must be a member of the
+#                         emryshealth organization, with a role that can push to its repositories.
+#   - DOCKERHUB_TOKEN:    a Docker Hub personal access token of that user with 'Read & Write' scope
+#                         (Docker Hub > Account settings > Personal access tokens).  Never the account password.
+on:
+  # TODO: the tag trigger is disabled until the manual runs are proven.  Uncomment it to publish on release.
+  # push:
+  #   tags:
+  #     - "afon-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One docker publish at a time, and never cancel one in flight.
+concurrency:
+  group: docker
+  cancel-in-progress: false
+
+env:
+  # Same as the CLI workflow: the default heap is not enough for javac to open the spark jars.
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # The same build as the image used to run, without the tests: the templates bootstrap the afon home.
+      - name: Build the afon-cli zip
+        run: |
+          set -euo pipefail
+          AFON_BUILD_HOME="$RUNNER_TEMP/afon-build"
+          mkdir -p "$AFON_BUILD_HOME/config"
+          cp templates/config/* "$AFON_BUILD_HOME/config/"
+          ./afon.sh --home "$AFON_BUILD_HOME" -a build -bg "clean package" -bp cli,distribution \
+            -ba "-DskipTests -B -ntp"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push the images
+        run: scripts/docker/afon/build.sh --push
