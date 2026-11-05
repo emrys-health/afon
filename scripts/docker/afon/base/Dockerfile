@@ -89,8 +89,11 @@ RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
 
 RUN az aks install-cli
 
-ARG AFON_VERSION AFON_COMMIT AFON_REPO AFON_CREATED
-LABEL org.opencontainers.image.title="afon-base-image" \
+ARG AFON_VERSION
+ARG AFON_COMMIT
+ARG AFON_REPO
+ARG AFON_CREATED
+LABEL org.opencontainers.image.title="afon-base" \
       org.opencontainers.image.version="${AFON_VERSION}" \
       org.opencontainers.image.revision="${AFON_COMMIT}" \
       org.opencontainers.image.source="${AFON_REPO}" \
