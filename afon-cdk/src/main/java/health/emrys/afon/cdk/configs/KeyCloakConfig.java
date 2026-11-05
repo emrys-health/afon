@@ -198,7 +198,9 @@ public class KeyCloakConfig extends Construct {
                            .build())
             .build();
 
-        List<String> args = List.of("start");
+        List<String> args = List.of("start",
+                                    "--bootstrap-admin-username=" + properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
+                                    "--bootstrap-admin-password=" + properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD));
         // Without it the pod is behind its Service as soon as its container starts, but KeyCloak takes a minute or more
         // to serve, so whatever asks it meanwhile, eg the setup of the OIDC users or Polaris discovering its issuer, is
         // answered 502 by the ingress, or 503 "Bootstrap in progress" by KeyCloak itself.  A failing probe only keeps the
