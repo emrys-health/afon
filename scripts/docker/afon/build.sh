@@ -111,19 +111,6 @@ if [ "$WHAT" = base ] || [ "$WHAT" = all ]; then
 fi
 
 if [ "$WHAT" = cli ] || [ "$WHAT" = all ]; then
-  ZIP="${ZIP:-$AFON_ROOT/afon-distribution/target/afon-$PROJECT_VERSION-cli.zip}"
-  [ -f "$ZIP" ] || { echo "The afon-cli zip $ZIP does not exist.  Build it first, or pass --zip <zip>." >&2; exit 1; }
-fi
-
-echo "Building afon images $WHAT, version $VERSION ($SHORT_COMMIT) for $PLATFORM$($RELEASE && echo ', release')"
-
-if [ "$WHAT" = base ] || [ "$WHAT" = all ]; then
-  # shellcheck disable=SC2046
-  docker build "${COMMON_ARGS[@]}" $(tags "$BASE_IMAGE") "$DIR/base"
-  push "$BASE_IMAGE"
-fi
-
-if [ "$WHAT" = cli ] || [ "$WHAT" = all ]; then
   # The context is a dir with just the zip, as afon-cli.zip
   CONTEXT="$(mktemp -d)"
   trap 'rm -rf "$CONTEXT"' EXIT
