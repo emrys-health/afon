@@ -19,7 +19,7 @@ the three reading scenarios in a row:
 afon-cli.sh manage-stack run snowflake-reading-all
 ```
 
-## Read AWS data via AWS Polaris:**
+## Read AWS data via AWS Polaris
 
 ```shell
 afon-cli.sh manage-stack run aws-snowflake reading-aws
@@ -31,7 +31,7 @@ afon-cli.sh manage-stack run aws-snowflake reading-aws
 afon-cli.sh manage-stack run aws-snowflake reading-gcp
 ```
 
-## Read Azure data via AWS Polaris:**
+## Read Azure data via AWS Polaris
 
 ```shell
 afon-cli.sh manage-stack run aws-snowflake reading-azure
