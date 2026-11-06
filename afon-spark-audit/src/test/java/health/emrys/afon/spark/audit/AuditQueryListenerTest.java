@@ -1,7 +1,10 @@
 package health.emrys.afon.spark.audit;
 
 import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.api.java.UDF1;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +87,23 @@ class AuditQueryListenerTest {
             .contains("operation=AppendData")
             .doesNotContain("sql=")
             .doesNotContain("secret");
+    }
+
+    @Test
+    void sqlCallingAUdfIsLoggedWithoutWhatTheUdfReturned() throws Exception {
+        spark.udf().register("shout", (UDF1<String, String>) String::toUpperCase, DataTypes.StringType);
+        spark.sql("INSERT INTO polaris.ns.patients VALUES (7, 'quiet')").collect();
+        forgetRecords();
+
+        List<Row> rows = spark.sql("SELECT shout(name) FROM polaris.ns.patients WHERE id = 7").collectAsList();
+
+        assertThat(rows).extracting(row -> row.getString(0)).containsExactly("QUIET");
+        assertThat(awaitRecord())
+            .contains("user=alice")
+            .contains("tables=polaris.ns.patients")
+            .contains("status=SUCCEEDED")
+            .endsWith("sql=SELECT shout(name) FROM polaris.ns.patients WHERE id = 7")
+            .doesNotContain("QUIET");
     }
 
     @Test
