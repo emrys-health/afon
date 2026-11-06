@@ -135,8 +135,8 @@ public final class DockerImagePinner {
      * @param resolver     looks up the digests
      * @param placeholders resolves the {@code ${key}} placeholders of the tags
      * @return what was done for each image, in the order of the file
-     * @throws IllegalStateException if the file is not valid, a name is not in it, an image has a tag that is a placeholder, whose
-     *                               digest would outlive the version it stands for, or a digest cannot be looked up
+     * @throws IllegalStateException if the file is not valid, a name is not in it, or a digest cannot be looked up.  A tag that is a
+     *                               placeholder is pinned at the version it stands for now, so its digest must be updated when that changes
      */
     public static List<Change> pin(Path file, List<String> names, DigestResolver resolver, UnaryOperator<String> placeholders) {
         try {
@@ -194,11 +194,6 @@ public final class DockerImagePinner {
             Matcher tag = TAG_LINE.matcher(lines.get(i));
             if (tag.matches()) {
                 tagLine = i;
-                if (tag.group(1).contains("${")) {
-                    throw new IllegalStateException(String.format(
-                        "%s is unpinned: its tag %s follows something else, so a digest would outlive the version",
-                        image.name(), tag.group(1)));
-                }
             } else if (DIGEST_LINE.matcher(lines.get(i)).matches()) {
                 digestLine = i;
             }

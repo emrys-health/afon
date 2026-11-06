@@ -76,10 +76,10 @@ class DockerImagePinnerTest {
     }
 
     @Test
-    void doesNotPinAnImageWhoseTagFollowsSomethingElse() throws IOException {
-        assertThatThrownBy(() -> pin("polaris")).isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("polaris").hasMessageContaining("unpinned");
-        assertThat(Files.readString(file)).isEqualTo(YAML);
+    void pinsAnImageWhoseTagFollowsSomethingElseAtTheVersionItStandsForNow() throws IOException {
+        assertThat(pin("polaris")).containsExactly(new DockerImagePinner.Change("polaris", "apache/polaris:1.2.3", null, NEW));
+        assertThat(looked).containsExactly("apache/polaris:1.2.3");
+        assertThat(Files.readString(file)).isEqualTo(YAML.replace("    tag: ${polaris.version}\n", "    tag: ${polaris.version}\n    digest: " + NEW + "\n"));
     }
 
     @Test

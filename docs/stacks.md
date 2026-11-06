@@ -357,8 +357,10 @@ afon-cli.sh docker-image --verify --report verify.md     # also writes a report,
 ```
 The report is written even when the check fails, for a CI job to keep: it has the result, each image checked with its status
 (`ok`, `mismatch`, `unpinned` or `error`) and the pinned and registry digests, and the images not checked with the reason.
-The Polaris images are unpinned, as their tag is the version of Polaris the project builds against, which a pinned digest of another
-version would outlive, and so is the Trino one, only its tag being set, the image being that of the Helm chart.
+The Polaris images are pinned like the others, although their tag is the version of Polaris the project builds against (`${polaris.version}`):
+when that version is bumped, the digest must be updated with it, with `docker-image --pin polaris polaris-admin-tool`, which pins them at the version
+now, and `--verify` fails, naming them, if it was not.  They are pinned because, on a cluster that verifies image signatures, Kyverno rewrites an
+unpinned image of a signed deployment to its digest, which the plan would then keep wanting to change back.  The Trino one is unpinned, only its tag being set, the image being that of the Helm chart.
 
 To check instead that the images are signed, see `docker-image --verify --signatures` in [Image signing](#image-signing).
 

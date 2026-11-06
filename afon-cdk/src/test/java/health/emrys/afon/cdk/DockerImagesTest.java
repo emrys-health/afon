@@ -26,17 +26,17 @@ class DockerImagesTest {
         assertThat(DockerImages.POSTGRES_ALPINE_IMAGE).startsWith("postgres:16-alpine@sha256:");
         assertThat(DockerImages.TRINO_IMAGE_TAG).isEqualTo("481");
         assertThat(DockerImages.GITEA_IMAGE).startsWith("docker.gitea.com/gitea:1.27.0-rootless@sha256:");
-        assertThat(DockerImages.POLARIS_IMAGE).isEqualTo("apache/polaris:" + DockerImages.POLARIS_VERSION);
-        assertThat(DockerImages.POLARIS_ADMIN_TOOL_IMAGE).isEqualTo("apache/polaris-admin-tool:" + DockerImages.POLARIS_VERSION);
+        // the tag is the version the project builds against; the digest must be updated with it, see docker-image --pin
+        assertThat(DockerImages.POLARIS_IMAGE).startsWith("apache/polaris:" + DockerImages.POLARIS_VERSION + "@sha256:");
+        assertThat(DockerImages.POLARIS_ADMIN_TOOL_IMAGE).startsWith("apache/polaris-admin-tool:" + DockerImages.POLARIS_VERSION + "@sha256:");
     }
 
     @Test
-    void imagesThatTheirTagFollowsAreNotPinned() {
-        // polaris is the version the project builds against, which a digest of another version would silently outlive
-        assertThat(DockerImages.POLARIS_IMAGE).isEqualTo("apache/polaris:" + DockerImages.POLARIS_VERSION);
+    void onlyTheImagesOfTheChartsAreNotPinned() {
+        // polaris is pinned too: Kyverno pins the unpinned images of a signed cluster to a digest, which the plan would then differ from
         assertThat(DockerImages.all().get("trino").digest()).isNull();
         assertThat(DockerImages.all().values()).filteredOn(image -> image.digest() == null)
-            .extracting(DockerImageDefinitions.Definition::name).containsExactlyInAnyOrder("polaris", "polaris-admin-tool", "trino")
+            .extracting(DockerImageDefinitions.Definition::name).containsExactlyInAnyOrder("trino")
             .allSatisfy(name -> assertThat(DockerImages.all().get(name).unpinned()).isNotBlank());
     }
 

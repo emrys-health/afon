@@ -25,15 +25,18 @@ images:
     category: first-party
 
   # upstream
+  # The tag of the Polaris images is the version of Polaris the project builds against, so when polaris.version in the root
+  # pom changes, update their digests with: afon-cli.sh docker-image --pin polaris polaris-admin-tool
+  # (docker-image --verify fails, naming them, if the digest is not that of the tag).
   polaris:
     image: apache/polaris
     tag: ${polaris.version}
-    unpinned: its tag is the version of Polaris the project builds against, which the digest of another version would outlive
+    digest: sha256:9738b2052dea20aabf0cd42521424ff963fee41b0ee888fef9f512efb256602a
     category: upstream
   polaris-admin-tool:
     image: apache/polaris-admin-tool
     tag: ${polaris.version}
-    unpinned: its tag is the version of Polaris the project builds against, which the digest of another version would outlive
+    digest: sha256:7e2e1899dbd1e8c9f3792ebaf3faf67bbac42867ea912d49690dd8d49ff60db4
     category: upstream
   keycloak:
     image: quay.io/keycloak/keycloak

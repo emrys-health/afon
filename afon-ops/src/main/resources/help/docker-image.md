@@ -11,7 +11,8 @@ one entirely.  It never overwrites a file, so remove it first to export the bund
 network access), and writes them to the images file, leaving the rest of it as it is.  Without names, it refreshes the digest of
 each image that has one; with names, it pins those, adding the digest to an image that has none.  It pins the docker-images.yaml of
 the config dir (export the bundled one to it first with --export), else the one given with --file.  Nothing is written if a lookup fails.  An
-image whose tag is a placeholder, eg ${polaris.version}, or that has an 'unpinned' reason in the file, stays unpinned, as a digest would outlive the version.  After changing the tag
+image that has an 'unpinned' reason in the file stays unpinned.  An image whose tag is a placeholder, eg ${polaris.version}, is pinned at the version
+the placeholder stands for now, so its digest must be updated when that version changes.  After changing the tag
 of an image, run it with the name of the image to update its digest.
 
 --verify only checks that the digest of each image that has one is that its tag points to now, writing nothing, and exits with 1,
