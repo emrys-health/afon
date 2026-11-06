@@ -92,24 +92,23 @@ The images can be published to Docker Hub from GitHub with the `Docker` workflow
 
 #### What it does
 
-The workflow runs on a GitHub-hosted runner, so the images are built for `linux/amd64`.  It:
+The workflow runs on a GitHub-hosted runner, so the images are built for `linux/amd64`.  It is called by the
+[CLI Release workflow](release.md#cli-release-workflow) once the zip is released, and is not triggered otherwise.  It:
 
-1. checks out the chosen ref and sets up Java 17;
-2. builds the afon-cli zip, without the tests;
+1. checks out the ref of the release;
+2. downloads the afon-cli zip built by the CLI Release workflow, rather than building it again;
 3. logs in to Docker Hub;
 4. runs `scripts/docker/afon/build.sh --push`, which builds the images and pushes every tag, as in
    [Publishing Images](#publishing-images).
 
-The version and tags are those of the chosen ref, as in [Versions and tags](#versions-and-tags): a `-SNAPSHOT`
+The version and tags are those of the released ref, as in [Versions and tags](#versions-and-tags): a `-SNAPSHOT`
 version from `main` overwrites the existing `-SNAPSHOT` tag, while a release version is also tagged `latest`.
 
 #### Running it
 
-The workflow is run on demand: in GitHub, open Actions > Docker > Run workflow, and choose the branch or tag to
-publish.  Only one run at a time is allowed.
-
-It can also run when `release.sh` pushes a release tag `afon-<version>`.  That trigger is in the workflow but
-commented out, until the manual runs are proven.
+The workflow runs as the last job of each CLI Release run: for a push to `main` that publishes the snapshot, and for a
+release tag `afon-<version>` that creates the GitHub Release.  To publish the images of a branch or tag by hand, run the
+CLI Release workflow on it: in GitHub, open Actions > CLI Release > Run workflow.  Only one run at a time is allowed.
 
 #### Required secrets
 

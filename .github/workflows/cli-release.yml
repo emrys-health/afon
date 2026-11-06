@@ -14,6 +14,8 @@ name: CLI Release
 # Runs on each push to main that changes the modules, scripts or templates (snapshot), and on each release tag.
 # Also runs on demand (workflow_dispatch) to release the chosen ref, eg main for a snapshot, or a release tag.
 #
+# Once the zip is released, the Docker workflow publishes the afon-base and afon-cli images of the same version.
+#
 # Runs on a GitHub-hosted runner, with the job's own token: it needs no secrets, and no self-hosted runner
 # ever runs code from a tag or a fork.
 on:
@@ -87,6 +89,14 @@ jobs:
           ZIP="afon-distribution/target/afon-$VERSION-cli.zip"
           [ -f "$ZIP" ] || { echo "::error::$ZIP does not exist"; exit 1; }
 
+      - name: Upload the zip for the docker images
+        uses: actions/upload-artifact@v7
+        with:
+          name: afon-cli-zip
+          path: afon-distribution/target/afon-${{ steps.version.outputs.version }}-cli.zip
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Publish the snapshot release
         if: ${{ steps.version.outputs.kind == 'snapshot' }}
         env:
@@ -124,3 +134,11 @@ jobs:
           fi
           gh release create "$TAG" "afon-distribution/target/afon-$VERSION-cli.zip" \
             --title "$VERSION" "${NOTES[@]}" "${PRERELEASE[@]}"
+
+  # The images of the released version, built with the zip of the release job.
+  docker:
+    needs: release
+    uses: ./.github/workflows/docker.yml
+    with:
+      zip-artifact: afon-cli-zip
+    secrets: inherit

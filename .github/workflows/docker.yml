@@ -1,12 +1,12 @@
 name: Docker
 
-# Builds the afon-cli zip, then builds the afon-base and afon-cli images and pushes them to Docker Hub
-# (emryshealth/afon-base and emryshealth/afon-cli), with scripts/docker/afon/build.sh --push.
+# Builds the afon-base and afon-cli images from the released afon-cli zip and pushes them to Docker Hub
+# (repository emryshealth), with scripts/docker/afon/build.sh --push.
 # See docs/docker.md for the versions and tags.  Images are linux/amd64, as the GitHub-hosted runner is.
 #
-# Runs on demand (workflow_dispatch) to publish the images of the chosen ref, eg a SNAPSHOT of main.
-# Once the tag trigger below is enabled, it also runs when release.sh pushes the release tag afon-<version>,
-# which publishes the release images, tagged latest as well.
+# Not triggered directly: it is called by the CLI Release workflow, once the zip is released, with the zip it built.
+# The images are those of the version released: a SNAPSHOT of main for a snapshot, or the tagged release, which is
+# tagged latest as well.  To publish the images of a ref by hand, run the CLI Release workflow on it.
 #
 # Runs on a GitHub-hosted runner, so no self-hosted runner ever runs code from a tag or a fork.
 #
@@ -16,19 +16,20 @@ name: Docker
 #   - DOCKERHUB_TOKEN:    a Docker Hub personal access token of that user with 'Read & Write' scope
 #                         (Docker Hub > Account settings > Personal access tokens).  Never the account password.
 on:
-  # TODO: the tag trigger is disabled until the manual runs are proven.  Uncomment it to publish on release.
-  # push:
-  #   tags:
-  #     - "afon-*"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      zip-artifact:
+        description: The name of the artifact holding the afon-cli zip.
+        type: string
+        required: true
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
 
 permissions:
   contents: read
-
-# One docker publish at a time, and never cancel one in flight.
-concurrency:
-  group: docker
-  cancel-in-progress: false
 
 jobs:
   docker:
@@ -42,10 +43,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build the afon-cli
-        uses: ./.github/actions/build-cli
+      - name: Download the afon-cli zip
+        uses: actions/download-artifact@v8
         with:
-          skip-tests: "true"
+          name: ${{ inputs.zip-artifact }}
+          path: ${{ runner.temp }}/afon-cli-zip
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -54,4 +56,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push the images
-        run: scripts/docker/afon/build.sh --push
+        run: scripts/docker/afon/build.sh --push --zip "$(ls "$RUNNER_TEMP"/afon-cli-zip/*-cli.zip)"
