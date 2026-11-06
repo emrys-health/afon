@@ -100,6 +100,37 @@ public class DocumentingStepActions extends StepActions {
         run("afon-cli.sh", null, "validate-stack", stackId.toString());
     }
 
+    /**
+     * Documents the command storing the state, without running it: documenting must not run the script cdktf-store.
+     */
+    @Override
+    protected void pushStateToStore(StackId stackId) {
+        out.println("If the state store is enabled, store the tofu state and plan of the stack, also if the deploy failed:");
+        document("afon-cli.sh", "cdktf-store", "push", STORE_TAG, stackId.toString(), "--force", "--cloud", cloudOf(stackId));
+    }
+
+    /**
+     * Documents the command deleting the stored state, without running it: documenting must not run the script cdktf-store.
+     */
+    @Override
+    protected void deleteStateFromStore(StackId stackId) {
+        out.println("If the state store is enabled, delete the stored tofu state and plan of the stack:");
+        document("afon-cli.sh", "cdktf-store", "delete", STORE_TAG, stackId.toString(), "--cloud", cloudOf(stackId));
+    }
+
+    /** Documents the command, as {@link #run} does, which never fails here as it runs nothing. */
+    private void document(String command, String... args) {
+        try {
+            run(command, null, args);
+        } catch (ManagedProcessException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String cloudOf(StackId stackId) {
+        return stackId.cloud().toString().toLowerCase();
+    }
+
     @Override
     public void executeMainOf(Class mainClass, String[] args, Properties overrides) throws Exception {
         String cliCommand = afonCliCommand(mainClass);

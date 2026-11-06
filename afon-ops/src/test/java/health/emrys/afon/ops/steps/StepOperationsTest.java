@@ -56,12 +56,12 @@ class StepOperationsTest {
         }
 
         @Override
-        void pushStateToStore(StackId stackId) {
+        protected void pushStateToStore(StackId stackId) {
             calls.add("push state of " + stackId);
         }
 
         @Override
-        void deleteStateFromStore(StackId stackId) {
+        protected void deleteStateFromStore(StackId stackId) {
             calls.add("delete state of " + stackId);
         }
 

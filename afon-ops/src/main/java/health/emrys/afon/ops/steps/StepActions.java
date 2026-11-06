@@ -680,14 +680,14 @@ public class StepActions {
     }
 
     /** The tag of the snapshot of the state and plan of a stack in the store, see the command cdktf-store. */
-    static final String STORE_TAG = "current";
+    public static final String STORE_TAG = "current";
 
     /**
      * Stores the tofu state and plan of the stack in the object storage of its cloud, replacing what is there, as
      * {@code cdktf-store push} does.  It is only a warning if it fails, as the state is intact on this machine and can be stored
      * again with the command.  Does nothing if the stack has no tofu state.
      */
-    void pushStateToStore(StackId stackId) {
+    protected void pushStateToStore(StackId stackId) {
         if (!exists(Path.of(tfStatePath(stackId)))) {
             logger.info("No tofu state of stack {}, so nothing to store", stackId);
             return;
@@ -700,7 +700,7 @@ public class StepActions {
      * Deletes the state and plan of the stack from the store, as {@code cdktf-store delete} does, after the stack was deleted.
      * It is only a warning if it fails, eg if it was never stored.
      */
-    void deleteStateFromStore(StackId stackId) {
+    protected void deleteStateFromStore(StackId stackId) {
         storeScript("delete", STORE_TAG, stackId.toString(), "--cloud", cloudOf(stackId));
         logger.info("Deleted the state and plan of stack {} from the store", stackId);
     }
