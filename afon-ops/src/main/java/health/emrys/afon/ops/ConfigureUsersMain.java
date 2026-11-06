@@ -53,7 +53,9 @@ public class ConfigureUsersMain {
                 propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
         for (AfonUser user : userProvider.getUsers()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
-            responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
+            if (user.username().equals(propertyProvider.getValue(USER_ID))) {
+                responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
+            }
         }
         return responses;
     }
