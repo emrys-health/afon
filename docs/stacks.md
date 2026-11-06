@@ -637,10 +637,11 @@ whichever cluster your current kubectl context points at.  Creating the cluster 
 
 **NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state `$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is the legacy stack of its cloud, see [upgrading to per-stack state](#upgrading-to-per-stack-state-one-off).
 
-You can run tofu apply or destroy commands via
+You can run the tofu commands on a stack via
 ```shell
-afon-cli.sh tofu-{apply,destroy}
+afon-cli.sh tofu-{init,plan,apply,destroy,state}
 ```
+`tofu-init` initialises the stack dir, ie creates its `.terraform` dir.  `manage-stack deploy` and `delete` do it themselves, but these commands do not, so run it before them on a stack dir that lacks it, eg a plan restored with [cdktf-store](#command-cdktf-store).  Any args after the stack id go to tofu, eg `tofu-init aws-polaris -upgrade`.
 Given a stack id as first arg, eg `afon-cli.sh tofu-plan aws-polaris`, or its role in the cloud as `<cloud>-<role>`, eg `afon-cli.sh tofu-plan aws-tre`
 (looked up in `stacks.yaml` by `afon-cli.sh` and `afon.sh` alike), they run in its stack dir.  Else they run in
 the dir of the only stack deployed in the cloud given by `--cloud` (default `aws`), ie the stack dir with a Terraform
@@ -693,7 +694,7 @@ afon-cli.sh cdktf-store delete <tag> aws-keycloak -e <env>           # removes t
 ```
 The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
 
-For each stack, or just the one given, it stores `terraform.<stack-id>.tfstate` and the plan `stacks/<stack-id>/` (`cdk.tf.json` and `assets`), so that a stack can be destroyed with `tofu-destroy` after a pull on another machine.  It leaves out `.terraform` and `.terraform.lock.hcl`, which `tofu init` creates again, the kubeconfig `kube/` and the `*.backup` state backups.  The objects are named `<env>/<tag>/<file>`, eg `dev/v1/terraform.aws-keycloak.tfstate`, so stacks can be pushed to the same tag one at a time.  `<tag>` is free-form text of letters, digits and `. _ -`.
+For each stack, or just the one given, it stores `terraform.<stack-id>.tfstate` and the plan `stacks/<stack-id>/` (`cdk.tf.json` and `assets`), so that a stack can be destroyed with `tofu-destroy` after a pull on another machine.  It leaves out `.terraform` and `.terraform.lock.hcl`, which `manage-stack` creates again, or `tofu-init` if you use the `tofu-*` commands, the kubeconfig `kube/` and the `*.backup` state backups.  The objects are named `<env>/<tag>/<file>`, eg `dev/v1/terraform.aws-keycloak.tfstate`, so stacks can be pushed to the same tag one at a time.  `<tag>` is free-form text of letters, digits and `. _ -`.
 
 The store is created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned, so what a `push --force` or a `delete` replaced can be recovered from its previous versions:
 

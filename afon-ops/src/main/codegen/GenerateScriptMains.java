@@ -54,6 +54,7 @@ public class GenerateScriptMains {
 
         new ScriptEntry("tofu", "TofuApplyMain", "tofu/apply.sh"),
         new ScriptEntry("tofu", "TofuDestroyMain", "tofu/destroy.sh"),
+        new ScriptEntry("tofu", "TofuInitMain", "tofu/init.sh"),
         new ScriptEntry("tofu", "TofuPlanMain", "tofu/plan.sh"),
         new ScriptEntry("tofu", "TofuStateMain", "tofu/state.sh"),
 
