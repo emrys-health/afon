@@ -143,15 +143,16 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
       val keyCloakProvider = new KeyCloakProvider("localhost", UserName, UserPassword)
       assert(keyCloakProvider.getToken(KEYCLOAK_REALM) != null)
 
-      val userProperties: AfonPropertyProvider = new OpsPropertyProvider()
-      userProperties.setValue(OIDC_DOMAIN_NAME, ContainerHelper.KEYCLOAK_HOSTNAME)
-      userProperties.setValue(POLARIS_ENDPOINT, properties.getValue(POLARIS_ENDPOINT))
-      userProperties.setValue(POLARIS_ID, UserName)
-      userProperties.setValue(POLARIS_SECRET, UserPassword)
-      val userCatalogManager = new PolarisCatalogManager(userProperties)
-      And(s"user '$UserName' can see the table when they call Polaris")
-      val response = userCatalogManager.getTable(catalog.catalogName(), namespace, tableName)
-      assert(response.getCode / 100 == 2)
+      // UserX no longer has a client associated with it
+//      val userProperties: AfonPropertyProvider = new OpsPropertyProvider()
+//      userProperties.setValue(OIDC_DOMAIN_NAME, ContainerHelper.KEYCLOAK_HOSTNAME)
+//      userProperties.setValue(POLARIS_ENDPOINT, properties.getValue(POLARIS_ENDPOINT))
+//      userProperties.setValue(POLARIS_ID, UserName)
+//      userProperties.setValue(POLARIS_SECRET, UserPassword)
+//      val userCatalogManager = new PolarisCatalogManager(userProperties)
+//      And(s"user '$UserName' can see the table when they call Polaris")
+//      val response = userCatalogManager.getTable(catalog.catalogName(), namespace, tableName)
+//      assert(response.getCode / 100 == 2)
     }
   }
 
