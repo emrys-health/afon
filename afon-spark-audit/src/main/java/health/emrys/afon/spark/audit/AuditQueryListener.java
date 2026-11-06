@@ -46,7 +46,7 @@ public class AuditQueryListener implements QueryExecutionListener {
 
     static final String ICEBERG_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
 
-    private static final Logger logger = LoggerFactory.getLogger(AUDIT_LOGGER);
+    private static final Logger       logger = LoggerFactory.getLogger(AUDIT_LOGGER);
     private static final ObjectMapper mapper = new ObjectMapper();
 
     @Override
@@ -75,10 +75,10 @@ public class AuditQueryListener implements QueryExecutionListener {
      * @return the audit record of the query, or nothing when it touches no Iceberg table
      */
     Optional<String> record(String funcName, QueryExecution qe, String outcome) {
-        SQLConf conf = qe.sparkSession().sessionState().conf();
-        LogicalPlan plan = plan(qe);
+        SQLConf     conf   = qe.sparkSession().sessionState().conf();
+        LogicalPlan plan   = plan(qe);
         Set<String> tables = new TreeSet<>();
-        Set<String> users = new TreeSet<>();
+        Set<String> users  = new TreeSet<>();
         plan.foreachWithSubqueries(node -> {
             table(node)
                 .filter(table -> ICEBERG_CATALOG.equals(conf.getConfString("spark.sql.catalog." + table.catalog, null)))
@@ -101,7 +101,9 @@ public class AuditQueryListener implements QueryExecutionListener {
         return Optional.of(record.toString());
     }
 
-    /** The analyzed plan names the tables, but a query that failed analysis only has its parsed plan. */
+    /**
+     * The analyzed plan names the tables, but a query that failed analysis only has its parsed plan.
+     */
     private static LogicalPlan plan(QueryExecution qe) {
         try {
             return qe.analyzed();
@@ -163,7 +165,7 @@ public class AuditQueryListener implements QueryExecutionListener {
             return "unreadable-token";
         }
         try {
-            JsonNode claims = mapper.readTree(new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8));
+            JsonNode claims   = mapper.readTree(new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8));
             JsonNode username = claims.hasNonNull("preferred_username") ? claims.get("preferred_username") : claims.get("sub");
             return username == null ? "unreadable-token" : username.asText();
         } catch (Exception e) {

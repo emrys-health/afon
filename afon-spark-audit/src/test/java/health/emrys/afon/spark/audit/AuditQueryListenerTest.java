@@ -20,7 +20,9 @@ import static org.awaitility.Awaitility.await;
 
 class AuditQueryListenerTest {
 
-    /** Registered by class name, as on the cluster, so it shares what it logs statically. */
+    /**
+     * Registered by class name, as on the cluster, so it shares what it logs statically.
+     */
     public static class RecordingListener extends AuditQueryListener {
         static final Queue<String> records = new ConcurrentLinkedQueue<>();
 

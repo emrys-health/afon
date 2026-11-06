@@ -43,7 +43,6 @@ public class SparkWorkloads {
      * the fallback to the name it was then given.
      */
     static final String EXISTING_CLUSTER = "${try(self.triggers." + CLUSTER_NAME_TRIGGER + ", \"" + SparkNames.LEGACY_CLUSTER_NAME + "\")}";
-    public static final String MASTER = "emrys-master";
     /** Logs the user and SQL of each query against an Iceberg table; it is in the Spark image, not on this classpath. */
     static final String AUDIT_LISTENER = "health.emrys.afon.spark.audit.AuditQueryListener";
     /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */

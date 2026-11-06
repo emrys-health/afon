@@ -31,9 +31,6 @@
 - **Polaris database user is now configurable ([#340](https://github.com/emrys-health/afon/issues/340)):**
   - It was hard coded; it is now the required property `POLARIS_DB_USERNAME` in `secret.properties`, next to `POLARIS_DB_PASSWORD`.
   - `afon-cli.sh config-updates` adds it, as `postgres` (the default of the template), before `POLARIS_DB_PASSWORD`: change it if the Polaris database uses another user, then run `config-validate`.
-- **Spark audits queries against Iceberg tables:**
-  - The Spark Connect driver logs the user (from the session's OIDC token), the tables and, for SQL, the statement of each query against a Polaris table, to the logger `health.emrys.afon.spark.audit`: `kubectl logs spark-connector-0-driver | grep health.emrys.afon.spark.audit`.
-  - The listener that does it is baked into the Spark image, which must be rebuilt (see `scripts/docker/spark-connect/Dockerfile`) and its digest re-pinned in `docker-images.yaml` before deploying: without it the Spark Connect sessions fail with `ClassNotFoundException`.
 
 ## 1.0-beta-8
 
