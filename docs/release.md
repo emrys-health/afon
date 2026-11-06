@@ -38,8 +38,9 @@ For example, to prepare, perform and upload a stable release locally:
 ./release.sh --perform --upload 1.0 1.1-SNAPSHOT
 ```
 
-**NOTE:** The `deploy` stage of `release.sh` itself is disabled (`maven.deploy.skip`): the Maven artifacts are not
-published.  Only the CLI zip is released, as a GitHub Release by the [CLI Release workflow](#cli-release-workflow).
+**NOTE:** The `deploy` stage of `release.sh` itself is disabled (`maven.deploy.skip`).  The CLI zip is released as a
+GitHub Release by the [CLI Release workflow](#cli-release-workflow), and the Maven artifacts are deployed to GitHub
+Packages by the [Maven Release workflow](#maven-release-workflow).
 
 ## CLI Release workflow
 
@@ -61,6 +62,29 @@ pushed tag, which creates the GitHub Release.
 
 It can also be run from the Actions tab (`workflow_dispatch`) on a branch, eg `main` for a snapshot, or on a release tag.
 A release version can only be released from its tag.
+
+## Maven Release workflow
+
+The [Maven Release](../.github/workflows/maven-release.yml) workflow mirrors the CLI Release workflow, but deploys the
+Maven artifacts (module jars/poms) to [GitHub Packages](https://github.com/emrys-health/afon/packages) instead of
+creating a GitHub Release.  It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`, so it needs no secrets.
+It builds with the unit tests, using the `github`, `distribution`, `bin` and `src` profiles and
+`-Dmaven.deploy.skip=false`: it leaves out the `cli` profile, whose zip is released by the CLI Release workflow, and the
+acceptance tests, which need cloud credentials.  It handles both kinds of version:
+
+- **Snapshot version**: deploys the `SNAPSHOT` artifacts, replacing the previous ones of that version.
+- **Release version**: only from the tag `afon-<version>`, which must match the project version.  A release version
+  cannot be deployed twice: GitHub Packages rejects the second deploy.
+
+**NOTE:** The push triggers (`main` for snapshots, `afon-*` tags for releases) are disabled for now (commented out in the
+workflow): run it from the Actions tab (`workflow_dispatch`), choosing `main` or a release tag.
+
+### Consuming the artifacts
+
+GitHub Packages requires authentication to download, even from a public repository.  Create a personal access token
+with the `read:packages` scope, and add to `~/.m2/settings.xml` the server `github-maven-packages`
+(username: your GitHub user, password: the token), and the repository
+`https://maven.pkg.github.com/emrys-health/afon`, as in the `github` profile of [settings.xml](../settings.xml).
 
 ## Release notes
 

@@ -1,0 +1,97 @@
+name: Maven Release
+
+# Deploys the Maven artifacts (module jars/poms) to GitHub Packages.  The CLI zip is released by the CLI Release
+# workflow, which this one mirrors: both handle SNAPSHOT and release versions.
+#
+# - SNAPSHOT version: the SNAPSHOT artifacts are deployed, replacing the previous ones of that version.
+# - Release version: the run must be for the release tag afon-<version>, pushed by release.sh.  A release version
+#   cannot be deployed twice: GitHub Packages rejects the second deploy.
+#
+# Runs on demand (workflow_dispatch) to deploy the chosen ref, eg main for a snapshot, or a release tag.
+#
+# Runs on a GitHub-hosted runner, with the job's own token: it needs no secrets, and no self-hosted runner
+# ever runs code from a tag or a fork.
+on:
+  # TODO: the push triggers are disabled until the manual runs are proven.  Uncomment them to deploy on each push to
+  # main (snapshot) and on each release tag.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "afon-*/**"
+  #     - "pom.xml"
+  #   tags:
+  #     - "afon-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One maven release at a time, and never cancel one in flight.
+concurrency:
+  group: maven-release
+  cancel-in-progress: false
+
+env:
+  # The default heap is not enough for javac to open the spark jars.
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      # To publish to GitHub Packages.
+      packages: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # Before the build, to fail fast.
+      - name: Determine version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/afon-') }}
+        run: |
+          set -euo pipefail
+          VERSION=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            KIND=snapshot
+          else
+            KIND=release
+            if [ "$IS_TAG" != "true" ]; then
+              echo "::error::Version $VERSION of $REF_NAME is not a SNAPSHOT: a release version is only deployed from its tag afon-$VERSION."
+              exit 1
+            fi
+            if [ "${REF_NAME#afon-}" != "$VERSION" ]; then
+              echo "::error::Tag $REF_NAME does not match the project version $VERSION"
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "Deploying $VERSION ($KIND)"
+
+      # Profiles as in release.sh, plus github for the distribution management, minus cli, whose zip the CLI
+      # Release workflow releases, and acceptance, which needs cloud credentials.  The distribution is the bin and src
+      # ones.  The deploy is skipped by default in the pom until released: -Dmaven.deploy.skip=false.
+      # afon.sh runs mvn with the settings.xml of the repository, which reads GITHUB_USERNAME and GITHUB_TOKEN.
+      - name: Build, test and deploy to GitHub Packages
+        env:
+          GITHUB_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ./afon.sh -a build -bp github,distribution,bin,src,-acceptance -bg "clean deploy" -ba "-B -ntp -Dmaven.deploy.skip=false"

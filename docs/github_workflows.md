@@ -49,6 +49,13 @@ modules, scripts or templates, and by the release tag `afon-<version>` pushed by
 for a branch or tag.
 See [CLI Release workflow](release.md#cli-release-workflow).
 
+## Maven Release workflow
+
+The [Maven Release](../.github/workflows/maven-release.yml) workflow deploys the Maven artifacts to GitHub Packages,
+for a `SNAPSHOT` version of `main` or for a release tag.  Like CLI Release, it runs on a GitHub-hosted runner and needs
+no secrets.  Its push triggers are disabled for now: it is run by hand for `main` or a tag.
+See [Maven Release workflow](release.md#maven-release-workflow).
+
 ## Slack notifications
 
 The [Acceptance Tests (Linux)](../.github/workflows/acceptance-tests-linux.yml),
