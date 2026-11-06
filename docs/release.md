@@ -7,7 +7,8 @@ The Maven release is performed by executing the script:
 ./release.sh
 ```
 It uses the [maven-release-plugin](https://maven.apache.org/maven-release/maven-release-plugin/) to 
-create a git tag `afon-<version>` with a fixed release version and build the released components off of the tag.
+create a git tag `afon-<version>` with a fixed release version, and to commit the next SNAPSHOT version.
+The zip is then released by the [CLI Release workflow](#cli-release-workflow), triggered by the pushes.
 
 It takes two inputs:
 ```shell
@@ -25,49 +26,41 @@ To release a stable version and move to the next SNAPSHOT version:
 ./release.sh 1.0 1.1-SNAPSHOT
 ```
 
-The release commits and tag are pushed upon successful release.
+By default the script only prepares the release: it updates the release notes, creates the git tag, pushes the
+commits and the tag, and reports the next SNAPSHOT version.  Two flags enable the remaining steps, which are usually
+done by the CLI Release workflow instead (both default to false):
+```shell
+--perform   invoke release:perform, to build the released components off of the tag
+--upload    invoke ./upload.sh, to upload the distribution zip to the "Afon Distribution" share drive
+```
+For example, to prepare, perform and upload a stable release locally:
+```shell
+./release.sh --perform --upload 1.0 1.1-SNAPSHOT
+```
 
-**NOTE:** The `deploy` stage of `release.sh` itself is disabled (`maven.deploy.skip`), and only the distribution CLI
-is uploaded to the "Afon Distribution" share drive.  Publishing to GitHub Packages and creating the GitHub Release are
-done by the [Publish workflow](#publish-workflow), triggered by the pushed tag.
+**NOTE:** The `deploy` stage of `release.sh` itself is disabled (`maven.deploy.skip`): the Maven artifacts are not
+published.  Only the CLI zip is released, as a GitHub Release by the [CLI Release workflow](#cli-release-workflow).
 
-## Publish workflow
+## CLI Release workflow
 
-**NOTE:** The tag trigger is disabled for now (commented out in the workflow): run the workflow by hand from the
-Actions tab.  The rest of this section describes the run for a tag.
+The [CLI Release](../.github/workflows/cli-release.yml) workflow builds the afon-cli zip and releases it on GitHub.  Only the
+zip is released, not the Maven module jars/poms.  It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`,
+so it needs no secrets, and handles both kinds of version:
 
-Pushing the tag `afon-<version>` triggers the [Publish](../.github/workflows/publish.yml) workflow, on a GitHub-hosted
-runner and with the job's own `GITHUB_TOKEN`, so it needs no secrets.  It:
+- **Release version**: pushing the tag `afon-<version>` checks that the tag matches the project version, builds the zip
+  (with the unit tests) and creates the GitHub Release `<version>`, with the section of `release_notes.md` for that
+  version (or generated notes if there is none) and the zip attached.  A version with a qualifier, eg `1.0-beta-1`, is
+  marked as a pre-release.  A release version is only released from its tag.
+- **Snapshot version**: a push to `main` that changes `afon-*/**`, `scripts/**` or `templates/**` builds the zip and
+  publishes it as the asset of a rolling `snapshot` pre-release, which each run replaces.  Anyone can download it from the repository's releases page, without a GitHub
+  login: `https://github.com/emrys-health/afon/releases/download/snapshot/afon-<version>-cli.zip`.
 
-1. checks that the tag matches the project version;
-2. builds with the unit tests (not the acceptance tests, which need cloud credentials) and deploys the artifacts to
-   [GitHub Packages](https://github.com/emrys-health/afon/packages), using the `github` profile and
-   `-Dmaven.deploy.skip=false`;
-3. creates the GitHub Release `<version>`, with the section of `release_notes.md` for that version (or generated notes
-   if there is none) and the CLI distribution zip attached.  A version with a qualifier, eg `1.0-beta-1`, is marked as
-   a pre-release.
+Running `release.sh` therefore triggers two runs of the workflow, one after the other (they share a concurrency
+group): one for the push of `main`, which publishes the next SNAPSHOT version as the `snapshot` release, and one for the
+pushed tag, which creates the GitHub Release.
 
-It can also be run from the Actions tab (`workflow_dispatch`) on a branch, eg to publish a `SNAPSHOT` of `main`; no
-GitHub Release is created then.  A release version cannot be published twice: GitHub Packages rejects the second deploy.
-
-### Consuming the artifacts
-
-GitHub Packages requires authentication to download, even from a public repository.  Create a personal access token
-with the `read:packages` scope, and add to `~/.m2/settings.xml` the server `github-maven-packages`
-(username: your GitHub user, password: the token), and the repository
-`https://maven.pkg.github.com/emrys-health/afon`, as in the `github` profile of [settings.xml](../settings.xml).
-
-## CLI snapshot workflow
-
-The [CLI snapshot](../.github/workflows/cli-snapshot.yml) workflow publishes the latest `SNAPSHOT` build of the afon-cli
-zip, for users that do not use docker.  It builds the zip and publishes it as the asset of a rolling `snapshot`
-pre-release, which each run replaces.  Anyone can download it from the repository's releases page, without a GitHub login:
-`https://github.com/emrys-health/afon/releases/download/snapshot/afon-<version>-cli.zip`.
-
-It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`, so it needs no secrets.  Run it from the Actions
-tab (`workflow_dispatch`); the push trigger for `main` is commented out in the workflow, until the manual runs are
-proven.  It fails for a release version, as only `SNAPSHOT` versions are published: for a stable version, use the zip
-attached to the GitHub Release by the [Publish workflow](#publish-workflow).
+It can also be run from the Actions tab (`workflow_dispatch`) on a branch, eg `main` for a snapshot, or on a release tag.
+A release version can only be released from its tag.
 
 ## Release notes
 

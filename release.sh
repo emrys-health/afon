@@ -2,16 +2,35 @@
 set -e
 
 usage(){
-  echo "usage:  $0 <version> [<next>]"
+  echo "usage:  $0 [--perform] [--upload] <version> [<next>]"
   echo "version:    release version (semver)"
   echo "next:       next snapshot version"
+  echo "options:"
+  echo "  --perform   invoke release:perform (default false)"
+  echo "  --upload    invoke ./upload.sh on the distribution zip (default false)"
+  echo "Without options, the release is only prepared: the git tag is created and pushed, and the next snapshot version is returned."
   echo "examples:"
   echo "  $0  1.0 1.1-SNAPSHOT"
+  echo "  $0  --perform --upload 1.0 1.1-SNAPSHOT"
   echo "  $0  1.0-beta-1 [1.0-SNAPSHOT]"
 }
 
-VERSION=$1
-NEXT=$2
+PERFORM=false
+UPLOAD=false
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --perform) PERFORM=true ;;
+    --upload) UPLOAD=true ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "unknown option $1"; usage; exit 1 ;;
+    *) ARGS+=("$1") ;;
+  esac
+  shift
+done
+
+VERSION=${ARGS[0]}
+NEXT=${ARGS[1]}
 
 if [ -z "$VERSION" ]; then
   usage;
@@ -36,20 +55,30 @@ fi
 
 TAG="$NAME-$VERSION"
 echo "Preparing release $TAG."
+echo "Next snapshot version is $NEXT"
 
 $MVN --batch-mode release:prepare -P$PROFILES -DreleaseVersion=$VERSION -Dtag=$TAG -DdevelopmentVersion=$NEXT
-$MVN release:perform -P$PROFILES
+echo "Release $TAG prepared."
 
-echo "Release $TAG completed."
+if [ "$PERFORM" == "true" ]; then
+  # release:perform is usually done in GitHub's release workflow
+  echo "Performing release $TAG."
+  $MVN release:perform -P$PROFILES
+  MAVEN_DEPLOY_SKIP=$(mvn help:evaluate -Dexpression=maven.deploy.skip -q -DforceStdout)
+  if [ "$MAVEN_DEPLOY_SKIP" == "true" ]; then
+    echo "Maven deploy has been skipped"
+  fi
+fi
+
+echo "Pushing git refs"
 git push origin main
 git push origin $TAG
 
-MAVEN_DEPLOY_SKIP=$(mvn help:evaluate -Dexpression=maven.deploy.skip -q -DforceStdout)
-if [ "$MAVEN_DEPLOY_SKIP" == "true" ]; then
-  echo "Maven deploy has been skipped"
+if [ "$UPLOAD" == "true" ]; then
+  # the upload is usually done by GitHub's release workflow
+  DISTRIBUTION_ZIP="$CWD/afon-distribution/target/afon-$VERSION-cli.zip"
+  echo "Uploading $DISTRIBUTION_ZIP"
+  $CWD/upload.sh $DISTRIBUTION_ZIP
 fi
 
-DISTRIBUTION_ZIP="$CWD/afon-distribution/target/afon-$VERSION-cli.zip"
-echo "Uploading $DISTRIBUTION_ZIP"
-$CWD/upload.sh $DISTRIBUTION_ZIP
 

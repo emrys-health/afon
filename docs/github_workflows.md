@@ -40,12 +40,14 @@ which is wiped out at each checkout.   On the runner, the `$AFON_HOME` points to
 The region comes from `AWS_REGION` in `afon-aws.properties`, and the run's log is uploaded as the
 `afon-stack-aws-logs-<run id>` artifact.
 
-## Publish workflow
+## CLI Release workflow
 
-The [Publish](../.github/workflows/publish.yml) workflow publishes the Maven artifacts to GitHub Packages and creates
-the GitHub Release.  Unlike the others it runs on a GitHub-hosted runner and needs no secrets: it is run by hand for a
-branch, and is to be triggered by the release tag `afon-<version>` pushed by `release.sh` (disabled for now).  See
-[Publish workflow](release.md#publish-workflow).
+The [CLI Release](../.github/workflows/cli-release.yml) workflow releases the afon-cli zip (not the Maven jars/poms) as a GitHub
+Release: the rolling `snapshot` pre-release for a `SNAPSHOT` version, or the release `<version>` for a release tag.
+Unlike the others it runs on a GitHub-hosted runner and needs no secrets: it is triggered by pushes to `main` that change the
+modules, scripts or templates, and by the release tag `afon-<version>` pushed by `release.sh`.  It can also be run by hand
+for a branch or tag.
+See [CLI Release workflow](release.md#cli-release-workflow).
 
 ## Slack notifications
 

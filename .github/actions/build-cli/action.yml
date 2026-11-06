@@ -1,7 +1,13 @@
 name: Build CLI
 description: >
-  Builds the afon-cli distribution, ie afon-distribution/target/afon-<version>-cli.zip, without the tests.
-  The repository must be checked out first.  Sets up Java 17 and runs on any runner with bash.
+  Builds the afon-cli distribution, ie afon-distribution/target/afon-<version>-cli.zip, running the unit tests
+  unless skip-tests is true.  The repository must be checked out first.  Sets up Java 17 and runs on any runner with bash.
+
+inputs:
+  skip-tests:
+    description: Set to true to skip the unit tests.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -19,10 +25,15 @@ runs:
       env:
         # The default heap is not enough for javac to open the spark jars.
         MAVEN_OPTS: -Xmx3g
+        SKIP_TESTS: ${{ inputs.skip-tests }}
       run: |
         set -euo pipefail
         AFON_BUILD_HOME="$RUNNER_TEMP/afon-build"
         mkdir -p "$AFON_BUILD_HOME/config"
         cp templates/config/* "$AFON_BUILD_HOME/config/"
+        MVN_ARGS="-B -ntp"
+        if [ "$SKIP_TESTS" == "true" ]; then
+          MVN_ARGS="-DskipTests $MVN_ARGS"
+        fi
         ./afon.sh --home "$AFON_BUILD_HOME" -a build -bg "clean package" -bp cli,distribution \
-          -ba "-DskipTests -B -ntp"
+          -ba "$MVN_ARGS"

@@ -1,0 +1,126 @@
+name: CLI Release
+
+# Builds the afon-cli zip and releases it as a GitHub Release asset.  Only the zip is released, not the Maven
+# module jars/poms.
+#
+# - Snapshot version: the zip is the asset of a rolling GitHub pre-release tagged snapshot, replaced by each run,
+#   which moves its tag to the built commit.  It is never marked as the latest release.  Download it, without a
+#   GitHub login, from
+#     https://github.com/<owner>/<repo>/releases/download/snapshot/afon-<version>-cli.zip
+# - Release version: the run must be for the release tag afon-<version>, pushed by release.sh.  The zip is the asset
+#   of the GitHub Release <version>, with the notes of release_notes.md.  A version with a qualifier, eg 1.0-beta-1,
+#   is a pre-release.
+#
+# Runs on each push to main that changes the modules, scripts or templates (snapshot), and on each release tag.
+# Also runs on demand (workflow_dispatch) to release the chosen ref, eg main for a snapshot, or a release tag.
+#
+# Runs on a GitHub-hosted runner, with the job's own token: it needs no secrets, and no self-hosted runner
+# ever runs code from a tag or a fork.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "afon-*/**"
+      - "scripts/**"
+      - "templates/**"
+    tags:
+      - "afon-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One release at a time, and never cancel one in flight.
+concurrency:
+  group: cli-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      # To create the GitHub Release and its tag.
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Before the build, to fail fast.
+      - name: Determine version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/afon-') }}
+        run: |
+          set -euo pipefail
+          VERSION=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            KIND=snapshot
+          else
+            KIND=release
+            if [ "$IS_TAG" != "true" ]; then
+              echo "::error::Version $VERSION of $REF_NAME is not a SNAPSHOT: a release version is only released from its tag afon-$VERSION."
+              exit 1
+            fi
+            if [ "${REF_NAME#afon-}" != "$VERSION" ]; then
+              echo "::error::Tag $REF_NAME does not match the project version $VERSION"
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "Releasing $VERSION ($KIND)"
+
+      - name: Build the afon-cli
+        uses: ./.github/actions/build-cli
+
+      - name: Check the zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ZIP="afon-distribution/target/afon-$VERSION-cli.zip"
+          [ -f "$ZIP" ] || { echo "::error::$ZIP does not exist"; exit 1; }
+
+      - name: Publish the snapshot release
+        if: ${{ steps.version.outputs.kind == 'snapshot' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Replace the previous snapshot release and its tag, if any.
+          gh release delete snapshot --cleanup-tag --yes || true
+          gh release create snapshot "afon-distribution/target/afon-$VERSION-cli.zip" \
+            --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "Snapshot $VERSION" \
+            --notes "The afon-cli zip built from commit $GITHUB_SHA (\`$VERSION\`), replaced by each build.  Use a tagged release for a stable version."
+
+      - name: Publish the tagged release
+        if: ${{ steps.version.outputs.kind == 'release' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The section of this version in release_notes.md, up to the next version.
+          awk -v v="## $VERSION" '$0 == v {found=1; next} found && /^## / {exit} found' release_notes.md > "$RUNNER_TEMP/notes.md"
+          NOTES=(--notes-file "$RUNNER_TEMP/notes.md")
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::warning::No section for $VERSION in release_notes.md, generating the notes"
+            NOTES=(--generate-notes)
+          fi
+          # A version with a qualifier, eg 1.0-beta-1, is a pre-release.
+          PRERELEASE=()
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=(--prerelease)
+          fi
+          gh release create "$TAG" "afon-distribution/target/afon-$VERSION-cli.zip" \
+            --title "$VERSION" "${NOTES[@]}" "${PRERELEASE[@]}"
