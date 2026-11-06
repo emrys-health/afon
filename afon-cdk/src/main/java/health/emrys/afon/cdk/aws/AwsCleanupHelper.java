@@ -79,21 +79,35 @@ public class AwsCleanupHelper extends CleanupHelper {
             listVPCsCommand(), componentNames.getVpcId());
     }
 
+    /**
+     * Destroy-time cleanup that deletes the non-default security groups of every VPC named after the stack, so that
+     * they do not block the VPC delete with a {@code DependencyViolation}.
+     * <p>
+     * A failed prior destroy can leave several VPCs sharing the same Name tag, so it iterates over all of them,
+     * rather than putting the multi-value result in a single {@code --filters} argument, which the CLI rejects.
+     * Security groups can reference each other, so it makes several passes until none is left.
+     */
     public @NonNull String deleteSecurityGroupsCommand() {
-        String command = String.format(
-                """
-                        echo "Destroying security-groups"
-                        for SG_ID in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=%s --region %s --query 'SecurityGroups[*].[GroupId]' --output text --no-cli-pager); do { 
-                          echo $SG_ID ;  
-                          aws ec2 delete-security-group --group-id $SG_ID || true 
-                        } done""", "$VPC", componentNames.getRegion());
         return format(
                 """
-                export VPC=$(%s)
-                %s
+                VPCS=$(%s)
+                if [ -z "$VPCS" ]; then
+                  echo "deleteSecurityGroups: could NOT resolve any VPC with Name tag '%s' - skipping" >&2
+                  exit 0
+                fi
+                for VPC in $VPCS ; do
+                  echo "Destroying security-groups of $VPC"
+                  for PASS in 1 2 3 ; do
+                    SGS=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" --region %s --query "SecurityGroups[?GroupName!='default'].GroupId" --output text --no-cli-pager)
+                    [ -z "$SGS" ] && break
+                    for SG_ID in $SGS ; do
+                      echo "Deleting security group $SG_ID"
+                      aws ec2 delete-security-group --group-id "$SG_ID" --region %s || true
+                    done
+                  done
+                done
                 """,
-                listVPCsCommand(),
-                command);
+                listVPCsCommand(), componentNames.getVpcId(), componentNames.getRegion(), componentNames.getRegion());
     }
 
     private @NonNull String deleteClusterCommand() {

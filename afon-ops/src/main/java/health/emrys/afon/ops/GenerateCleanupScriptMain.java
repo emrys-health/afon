@@ -8,6 +8,7 @@ import health.emrys.afon.cdk.gcp.GcpCleanupHelper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
+import health.emrys.afon.ops.help.CommandHelp;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 
@@ -57,14 +58,19 @@ public class GenerateCleanupScriptMain {
     }
 
 
+    /**
+     * @return what is said when the stack is not given: the help of the command, which names the stack to give
+     */
+    static String missingStackMessage() {
+        String help = CommandHelp.find("generate-cleanup-script").orElse("Usage: generate-cleanup-script <stack-id>, eg aws-keycloak");
+        return "Missing argument: <stack-id>\n\n" + help;
+    }
+
     public static final void main(String[] args) {
         if (args.length == 0) {
-            String usage = String.format("""
-                                        
-                    Invalid arguments: '%s'
-                    usage:  %s requires argument: <stack-id>, eg aws-keycloak
-                    """, String.join(" ", args), GenerateCleanupScriptMain.class.getSimpleName());
-            logger.warn(usage);
+            // to the console, as the log is not seen by the user, and with a failing exit code
+            System.err.println(missingStackMessage());
+            System.exit(1);
             return;
         }
         StackId stackId = StackDefinitions.resolve(StackId.parse(args[0]));

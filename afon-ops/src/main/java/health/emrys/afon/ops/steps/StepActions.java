@@ -17,6 +17,7 @@ import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.spark.SparkRunner;
+import health.emrys.afon.ops.synth.PlanGuards;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -56,6 +57,9 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class StepActions {
 
     private static final Logger logger = getLogger(StepActions.class);
+
+    /** The checks of the synthesised plan of a stack, before it is deployed. */
+    protected PlanGuards planGuards = new PlanGuards();
 
     /**
      * Deletes the stacks in the cloud selected by the filter, allowing for a single attempt.
@@ -418,6 +422,9 @@ public class StepActions {
             logAzureDeployer();
         }
         Path stackDir = stackDir(stackId);
+        if (stackId.cloud() == AfonCloud.AWS) {
+            planGuards.checkNoOrphanAwsVpc(stackDir, Path.of(tfStatePath(stackId)));
+        }
         tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts, outputStream);
     }
 
