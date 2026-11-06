@@ -333,25 +333,30 @@ store_create(){
   esac
 }
 
-# Prints the keys of the objects with the prefix.
-store_keys(){
+# Prints the objects with the prefix, one per line: their key, a tab and the time they last changed.
+store_objects(){
   local PREFIX="$1"
   case "$STORE_CLOUD" in
     aws)
-      aws s3api list-objects-v2 --bucket "$BUCKET" --prefix "$PREFIX" --query 'Contents[].Key' --output json \
-        | jq -r '.[]?' ;;
+      aws s3api list-objects-v2 --bucket "$BUCKET" --prefix "$PREFIX" --query 'Contents[].[Key,LastModified]' --output json \
+        | jq -r '.[]? | @tsv' ;;
     azure)
       az storage blob list --account-name "$ACCOUNT" --container-name "$BUCKET" --prefix "$PREFIX" \
-        --auth-mode login --query '[].name' -o json | jq -r '.[]' ;;
+        --auth-mode login --query '[].[name,properties.lastModified]' -o json | jq -r '.[] | @tsv' ;;
     gcp)
-      # Nothing matching is not an error, whereas a refused access is.
+      # Nothing matching is not an error, whereas a refused access is.  The lines of the objects are: size, time, url.
       local OUT
-      if ! OUT=$(gcloud storage ls --recursive "gs://$BUCKET/$PREFIX" --project "$STORE_PROJECT" 2>"$WORK_DIR/ls.err"); then
+      if ! OUT=$(gcloud storage ls --long --recursive "gs://$BUCKET/$PREFIX" --project "$STORE_PROJECT" 2>"$WORK_DIR/ls.err"); then
         grep -qiE "matched no objects|not found|404" "$WORK_DIR/ls.err" || { cat "$WORK_DIR/ls.err" >&2; return 1; }
         OUT=
       fi
-      printf '%s\n' "$OUT" | grep -v ':$' | grep -v '/$' | sed "s|^gs://$BUCKET/||" | grep . || true ;;
+      printf '%s\n' "$OUT" | awk -v b="gs://$BUCKET/" '$1 ~ /^[0-9]+$/ && index($3, b) == 1 { print substr($3, length(b) + 1) "\t" $2 }' ;;
   esac
+}
+
+# Prints the keys of the objects with the prefix.
+store_keys(){
+  store_objects "$1" | cut -f1
 }
 
 # Uploads the file to the key.
@@ -520,18 +525,24 @@ list(){
     return
   fi
   echo "Snapshots of env $STORE_ENV"
-  # Each key is <env>/<tag>/<file>: the tag, and the stack of the file, are printed one per line, then grouped by tag.
-  local ALL_KEYS
-  ALL_KEYS=$(store_keys "$STORE_ENV/") || { access_hint read; exit 1; }
-  printf '%s\n' "$ALL_KEYS" | sed "s|^$STORE_ENV/||" | while IFS= read -r KEY ; do {
+  # Each key is <env>/<tag>/<file>.  The tag, the stack of the file and the time it changed are printed one per line,
+  # then grouped by tag, whose time is that of its latest change.
+  local OBJECTS
+  OBJECTS=$(store_objects "$STORE_ENV/") || { access_hint read; exit 1; }
+  printf '%s\n' "$OBJECTS" | sed "s|^$STORE_ENV/||" | while IFS=$'\t' read -r KEY CHANGED ; do {
+    [ -z "$KEY" ] && continue
     local TAG_PART="${KEY%%/*}" REL="${KEY#*/}"
     if [[ "$REL" =~ ^terraform\.(.+)\.tfstate$ ]]; then
-      echo "$TAG_PART ${BASH_REMATCH[1]}"
+      echo "$TAG_PART ${BASH_REMATCH[1]} $CHANGED"
     elif [[ "$REL" =~ ^stacks/([^/]+)/ ]]; then
-      echo "$TAG_PART ${BASH_REMATCH[1]}"
+      echo "$TAG_PART ${BASH_REMATCH[1]} $CHANGED"
     fi
-  } done | sort -u | { [ -z "$STACK" ] && cat || grep -E " $STACK$" || true; } \
-    | awk '{ stacks[$1] = stacks[$1] " " $2 } END { for (t in stacks) print t "\tstacks:" stacks[t] }' | sort
+  } done | { [ -z "$STACK" ] && cat || grep -E " $STACK " || true; } | sort \
+    | awk -v p="$STORE_NAME" -v e="$STORE_ENV" '{
+        if (!(($1, $2) in seen)) { seen[$1, $2] = 1; stacks[$1] = stacks[$1] " " $2 }
+        if ($3 > changed[$1]) changed[$1] = $3
+      } END { for (t in stacks) print p "/" e "/" t "\ttag " t "\tchanged " changed[t] "\tstacks:" stacks[t] }' \
+    | sort -t$'\t' -k3,3r
 }
 
 delete(){
