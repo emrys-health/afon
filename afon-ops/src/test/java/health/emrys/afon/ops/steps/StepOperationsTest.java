@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,6 +36,8 @@ class StepOperationsTest {
 
     private RuntimeException synthesisFailure;
 
+    private RuntimeException startFailure;
+
     private final StepActions actions = new StepActions() {
         @Override
         protected void synthesiseStack(StackId stackId, AfonPropertyProvider config, AfonUserProvider users) {
@@ -47,6 +50,26 @@ class StepOperationsTest {
         @Override
         void startStack(StackId stackId, OutputStream outputStream) {
             calls.add("start " + stackId);
+            if (startFailure != null) {
+                throw startFailure;
+            }
+        }
+
+        @Override
+        void pushStateToStore(StackId stackId) {
+            calls.add("push state of " + stackId);
+        }
+
+        @Override
+        void deleteStateFromStore(StackId stackId) {
+            calls.add("delete state of " + stackId);
+        }
+
+        @Override
+        void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream, Consumer<StackId> beforeDeleting,
+                            Consumer<StackId> afterDeleting) {
+            calls.add("delete stacks in " + cloud);
+            afterDeleting.accept(StackId.parse("aws-polaris"));
         }
 
         @Override
@@ -73,6 +96,41 @@ class StepOperationsTest {
     };
 
     private final StepOperations operations = new StepOperations(actions, properties, new FileUserProvider());
+
+    @Test
+    void doesNotStoreTheStateByDefault() throws Exception {
+        operations.deployStack(StackId.parse("aws-polaris")).getFunction().run();
+        operations.deleteStacksIn(StackId.parse("aws-polaris"), "delete", StackFilter.ALL).getFunction().run();
+
+        assertThat(calls).noneMatch(call -> call.contains("state of"));
+    }
+
+    @Test
+    void storesTheStateAfterADeployAndDeletesItAfterADeleteWhenEnabled() throws Exception {
+        properties.setValue(AfonProperty.CDKTF_STORE_ENABLED, "true");
+
+        operations.deployStack(StackId.parse("aws-polaris")).getFunction().run();
+        assertThat(calls).containsExactly("synthesise aws-polaris with the config of the operations", "start aws-polaris", "push state of aws-polaris");
+
+        calls.clear();
+        operations.deleteStacksIn(StackId.parse("aws-polaris"), "delete", StackFilter.ALL).getFunction().run();
+        assertThat(calls).containsExactly("delete stacks in aws", "delete state of aws-polaris");
+    }
+
+    @Test
+    void storesTheStateOfADeployThatFailedButNotOfOneThatFailedToSynthesise() {
+        properties.setValue(AfonProperty.CDKTF_STORE_ENABLED, "true");
+
+        startFailure = new IllegalStateException("apply failed");
+        assertThatThrownBy(() -> operations.deployStack(StackId.parse("aws-polaris")).getFunction().run()).hasMessage("apply failed");
+        assertThat(calls).last().isEqualTo("push state of aws-polaris");
+
+        calls.clear();
+        startFailure = null;
+        synthesisFailure = new IllegalStateException("bad config");
+        assertThatThrownBy(() -> operations.deployStack(StackId.parse("aws-polaris")).getFunction().run()).hasMessage("bad config");
+        assertThat(calls).noneMatch(call -> call.contains("state of"));
+    }
 
     @Test
     void stepsCallingPolarisFromThisMachineGoThroughItsDomainNameOrAPortForwardAsConfigured() throws Throwable {

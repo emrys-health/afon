@@ -84,7 +84,7 @@ public class StepOperations {
         return new Step(stepName,
                 format("delete %s in %s", filter.description(), cloud),
                 () -> timed(deleteDurations, stackId, () -> actions.deleteStacksIn(
-                    cloud, filter, tofuOutput(), this::validatePlanBeforeDeleting)));
+                    cloud, filter, tofuOutput(), this::validatePlanBeforeDeleting, this::afterDeleting)));
     }
 
     /**
@@ -147,8 +147,31 @@ public class StepOperations {
     private void startStack(StackId stackId) throws Exception {
         timed(deployDurations, stackId, () -> {
             actions.synthesiseStack(stackId, properties, users);
-            actions.startStack(stackId, tofuOutput());
+            try {
+                actions.startStack(stackId, tofuOutput());
+            } finally {
+                // also after a failed or partial apply, as that is when the state is most needed
+                if (storeEnabled()) {
+                    actions.pushStateToStore(stackId);
+                }
+            }
         });
+    }
+
+    /**
+     * Deletes the stored state of the stack, if it is stored, after the stack was deleted.
+     */
+    private void afterDeleting(StackId stackId) {
+        if (storeEnabled()) {
+            actions.deleteStateFromStore(stackId);
+        }
+    }
+
+    /**
+     * @return whether the state of a stack is stored after a deploy and deleted after a delete, see {@link AfonProperty#CDKTF_STORE_ENABLED}
+     */
+    private boolean storeEnabled() {
+        return Boolean.parseBoolean(properties.getValue(CDKTF_STORE_ENABLED, "false"));
     }
 
     /**

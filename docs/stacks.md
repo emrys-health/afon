@@ -712,6 +712,13 @@ Before it does anything, `cdktf-store` checks that the CLI is logged in (else it
 
 **NOTE:** the state and the plans hold secrets in plain text (passwords, tokens), so restrict who can read the store.
 
+To keep the store up to date without running the command, set `CDKTF_STORE_ENABLED=true` in `afon.properties` (off when empty).  Then `manage-stack` stores each stack it deploys, as `cdktf-store push current <stack-id> --force` would, in the store of the cloud of the stack, and removes it after it deletes the stack, as `cdktf-store delete current <stack-id>` would:
+- The tag is always `current`, so there is one snapshot per env and stack, replaced by each deploy.  On `aws` and `gcp` the bucket is versioned, so the earlier ones can be recovered.
+- It is pushed after every deploy, **whether or not it succeeds**, as the state of a partly applied stack is what is most needed to recover or clean it up.  It is not pushed if the plan failed to synthesise, nor for a stack with no state.
+- A failure to push or delete, eg the CLI is not logged in or the permissions are missing, is **only a warning**, saying that the stored state is out of date and the command to run by hand: the deploy or the delete keeps its own result.  Deleting what was never stored also warns.
+- It needs the same as the command: the CLI of the cloud logged in with access to the store, which is created on the first push, and a cdktf env, ie the `cdktf` symlink of `cdktf-switch` or `--env`.  Without one, it warns.
+- Legacy stacks, shared by a whole cloud (`terraform.<cloud>.tfstate`), are not stored.
+
 ## Stack teardown 
 
 The stack can be brought down using tofu, which will use the locally stored tfstate.

@@ -15,6 +15,11 @@ public enum AfonProperty {
     DNS_WAIT_TIMEOUT("DNS_WAIT_TIMEOUT"),
     /** Where the tofu output goes, one of "console" (logged and System.out) or "logger" (only logged). Defaults to "logger". */
     TOFU_OUTPUT("TOFU_OUTPUT"),
+    /**
+     * Whether manage-stack stores the tofu state and plan of a stack in the object storage of its cloud, see the command
+     * cdktf-store: pushed after each deploy, successful or not, and deleted after each delete.  Defaults to false.
+     */
+    CDKTF_STORE_ENABLED("CDKTF_STORE_ENABLED"),
 
     /**
      * Name of the {@code SparkCluster}, from which the Spark operator names the master and the workers, {@code <name>-master} and

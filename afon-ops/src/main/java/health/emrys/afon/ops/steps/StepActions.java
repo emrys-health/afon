@@ -4,6 +4,7 @@ import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
 import health.emrys.afon.ops.scripts.ProcessLogLevels;
+import health.emrys.afon.ops.scripts.ScriptMain;
 import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -70,7 +71,18 @@ public class StepActions {
      */
     void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream,
                         Consumer<StackId> beforeDeleting) throws IOException {
-        deleteStacksIn(cloud, filter, 1, outputStream, beforeDeleting);
+        deleteStacksIn(cloud, filter, 1, outputStream, beforeDeleting, stackId -> { });
+    }
+
+    /**
+     * Deletes the stacks in the cloud selected by the filter, allowing for a single attempt.
+     * @param beforeDeleting called with each stack, just before it is deleted
+     * @param afterDeleting called with each stack with a stack id, just after it was deleted, eg to delete its stored state,
+     *                      see {@link #deleteStateFromStore}
+     */
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, OutputStream outputStream,
+                        Consumer<StackId> beforeDeleting, Consumer<StackId> afterDeleting) throws IOException {
+        deleteStacksIn(cloud, filter, 1, outputStream, beforeDeleting, afterDeleting);
     }
 
     /**
@@ -83,6 +95,14 @@ public class StepActions {
      */
     void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream,
                         Consumer<StackId> beforeDeleting) throws IOException {
+        deleteStacksIn(cloud, filter, maxAttempts, outputStream, beforeDeleting, stackId -> { });
+    }
+
+    /**
+     * As above, calling {@code afterDeleting} with each stack with a stack id, just after it was deleted.
+     */
+    void deleteStacksIn(AfonCloud cloud, StackFilter filter, int maxAttempts, OutputStream outputStream,
+                        Consumer<StackId> beforeDeleting, Consumer<StackId> afterDeleting) throws IOException {
         checkNotBrokenSymlink(Path.of(ConfigUtils.afonCkdtf()));
         List<String> stackNames = stackNamesIn(cloud, filter);
         // only a deployed stack, ie with a tofu state, may need keeping: a stack dir without one is just deleted
@@ -100,6 +120,7 @@ public class StepActions {
                 deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
                 // the kubeconfig of the stack's cluster, which is now gone
                 deletePath(Path.of(kubeConfigPath(stackId)));
+                afterDeleting.accept(stackId);
             }
         }
     }
@@ -656,6 +677,58 @@ public class StepActions {
             throw new IllegalStateException("Could not read " + config + " for what outlives the stack", e);
         }
         return exclusions;
+    }
+
+    /** The tag of the snapshot of the state and plan of a stack in the store, see the command cdktf-store. */
+    static final String STORE_TAG = "current";
+
+    /**
+     * Stores the tofu state and plan of the stack in the object storage of its cloud, replacing what is there, as
+     * {@code cdktf-store push} does.  It is only a warning if it fails, as the state is intact on this machine and can be stored
+     * again with the command.  Does nothing if the stack has no tofu state.
+     */
+    void pushStateToStore(StackId stackId) {
+        if (!exists(Path.of(tfStatePath(stackId)))) {
+            logger.info("No tofu state of stack {}, so nothing to store", stackId);
+            return;
+        }
+        storeScript("push", STORE_TAG, stackId.toString(), "--force", "--cloud", cloudOf(stackId));
+        logger.info("Stored the state and plan of stack {} as {}", stackId, STORE_TAG);
+    }
+
+    /**
+     * Deletes the state and plan of the stack from the store, as {@code cdktf-store delete} does, after the stack was deleted.
+     * It is only a warning if it fails, eg if it was never stored.
+     */
+    void deleteStateFromStore(StackId stackId) {
+        storeScript("delete", STORE_TAG, stackId.toString(), "--cloud", cloudOf(stackId));
+        logger.info("Deleted the state and plan of stack {} from the store", stackId);
+    }
+
+    private static String cloudOf(StackId stackId) {
+        return stackId.cloud().toString().toLowerCase();
+    }
+
+    /**
+     * Runs the script cdktf-store with the args, as a warning, not a failure, if it fails.
+     */
+    private void storeScript(String... args) {
+        try {
+            runStoreScript(args);
+        } catch (RuntimeException e) {
+            String message = String.format("Could not run cdktf-store %s: the stored state is out of date.  "
+                                           + "Fix the cause, eg log in to the cloud, and run it by hand: afon-cli.sh cdktf-store %s",
+                                           args[0], String.join(" ", args));
+            logger.warn(message, e);
+            System.err.println("WARNING: " + message);
+        }
+    }
+
+    /**
+     * Runs the script cdktf-store, which stops with an exception if it fails.
+     */
+    protected void runStoreScript(String... args) {
+        new ScriptMain("cdktf/store.sh").run(args);
     }
 
     public int run(String command, Path path, String... commands) throws ManagedProcessException {
