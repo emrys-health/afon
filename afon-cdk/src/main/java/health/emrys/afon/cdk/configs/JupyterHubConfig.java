@@ -623,6 +623,12 @@ public class JupyterHubConfig {
                c.KubeSpawner.port = %6$d
                c.KubeSpawner.start_timeout = 300
                c.KubeSpawner.http_timeout = 120
+               # The create-pod call is answered only once the admission webhooks have answered: Kyverno checks the image's signature
+               # and digest with its registry, which takes seconds, and longer when the registry limits the pulls (Docker Hub's
+               # TOOMANYREQUESTS).  KubeSpawner gives each call 3 seconds, and the retries 30 in all, by default, so the spawn failed
+               # with "Could not create pod" although the pod would have been admitted.
+               c.KubeSpawner.k8s_api_request_timeout = 30
+               c.KubeSpawner.k8s_api_request_retry_timeout = 120
                # One in-pod VNC session per single-user server (see start-vnc.sh in the image). Its
                # password, JUPYTER_VNC_PASSWORD, is the user's own, so is set by the auth_state hook below.
                c.KubeSpawner.environment = {'JUPYTER_VNC_SESSIONS': '1'}
