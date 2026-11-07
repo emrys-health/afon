@@ -7,7 +7,7 @@ set -euo pipefail
 usage(){
   echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
   echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
-  echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--debug] [--lenient]"
+  echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--logging-file|-lf <file-name>] [--debug] [--lenient]"
   echo "          <command> [args...]"
   echo "options, settable via the flags above or the equivalent AFON_* env var (a flag wins over its env var):"
   echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
@@ -19,6 +19,7 @@ usage(){
   echo "                                            the AFON_ENV env var only overrides their env vars, not their flags."
   echo "  --logging / AFON_LOGGING:                 the file logging level.  Defaults to 'INFO'.  The file logs are found in 'AFON_HOME/logs'."
   echo "  --logging-console / AFON_LOGGING_CONSOLE: the console logging level.  Defaults to 'OFF'."
+  echo "  --logging-file / AFON_LOGGING_FILE:       the name of the log file in 'AFON_HOME/logs', never a path.  Defaults to 'afon.log'."
   echo "  --debug / AFON_DEBUG=true:                explains why a command failed: sets the console logging to DEBUG (unless given), traces"
   echo "                                            this script, and for the script commands traces each command run and reports"
   echo "                                            the failing command, its exit code and the call stack."
@@ -47,6 +48,7 @@ AFON_CDKTF="${AFON_CDKTF:-}"
 AFON_CLOUD="${AFON_CLOUD:-}"
 AFON_LOGGING="${AFON_LOGGING:-}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
+AFON_LOGGING_FILE="${AFON_LOGGING_FILE:-}"
 AFON_CONFIG_ENV="${AFON_CONFIG_ENV:-}"
 AFON_CDKTF_ENV="${AFON_CDKTF_ENV:-}"
 AFON_ENV="${AFON_ENV:-}"
@@ -78,6 +80,8 @@ while [[ $# -gt 0 ]]; do
       AFON_LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
       AFON_LOGGING_CONSOLE="$2"; shift 2 ;;
+    --logging-file|-lf)
+      AFON_LOGGING_FILE="$2"; shift 2 ;;
     --debug)
       AFON_DEBUG=true; shift ;;
     --lenient)
@@ -133,6 +137,12 @@ if [ "$AFON_DEBUG" == "true" ]; then
   fi
 fi
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
+AFON_LOGGING_FILE="${AFON_LOGGING_FILE:-afon.log}"
+case "$AFON_LOGGING_FILE" in
+  */*|.|..) echo "Invalid logging file '$AFON_LOGGING_FILE': it is a file name in AFON_HOME/logs, never a path" >&2; exit 1 ;;
+esac
+# exported so that the commands this one starts log to the same file
+export AFON_LOGGING_FILE
 
 # CONFIG_ENV/CDKTF_ENV are global: if set, apply the switch commands upstream via afon-cli-scripts.sh
 # so it applies to all commands, not just for the config-*/cdktf-* commands.
@@ -168,6 +178,7 @@ exec java $AFON_JVM_FLAGS \
     -Dafon.cloud="$AFON_CLOUD" \
     -Dafon.logging="$AFON_LOGGING" \
     -Dafon.logging.console="$AFON_LOGGING_CONSOLE" \
+    -Dafon.logging.file="$AFON_LOGGING_FILE" \
     -Dslf4j.provider=ch.qos.logback.classic.spi.LogbackServiceProvider \
     -Dslf4j.internal.verbosity=WARN \
     -jar "$JAR" "$@"

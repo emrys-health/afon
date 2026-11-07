@@ -629,11 +629,37 @@ Each stack has its own cdktf plan and Terraform state, named by its stack id `<c
 the cdktf plan is written to `$AFON_CDKTF/stacks/<stack-id>` and the cdktf dir also holds the Terraform state files
 `$AFON_CDKTF/terraform.<stack-id>.tfstate`.
 
-Each AWS stack also has its own kubeconfig `$AFON_CDKTF/kube/<stack-id>.config`, eg `kube/aws-keycloak.config`,
-written when its EKS cluster is created and deleted with the stack.  All the kubectl and helm commands the stack runs,
-eg the cleanups when it is destroyed, use it via `KUBECONFIG`, so they only ever act on the stack's own cluster,
-whichever cluster your current kubectl context points at.  Creating the cluster also points your current kubectl context
-(`~/.kube/config`) at it, as `afon-cli.sh aws-update-kube-config <stack-id|role>` does, eg for the smoke tests.
+Each stack, on every cloud, also has its own kubeconfig `$AFON_CDKTF/kube/<stack-id>.config`, eg `kube/aws-keycloak.config`,
+written when its cluster is created and deleted with the stack.  It is the only place the stack's credentials are written:
+`~/.kube/config` is neither written nor read by the stacks or by the ops tools (smoke tests, notebooks).  All the kubectl and
+helm commands the stack runs, eg the cleanups when it is destroyed, use it via `KUBECONFIG`, so they only ever act on the
+stack's own cluster, whichever cluster your current kubectl context points at.  So stacks of different clouds can be deployed
+and destroyed concurrently.  Give each concurrent run a log file of its own, see [Concurrent runs](#concurrent-runs).
+
+To reach a stack's cluster with `kubectl` or `helm`, point `KUBECONFIG` at its kubeconfig. It must be that single file: a list of paths, as `kubectl` accepts, is not supported by the ops tools, which refuse it:
+
+```shell
+export KUBECONFIG=$AFON_CDKTF/kube/aws-full.config
+kubectl get pods
+```
+
+`afon-cli.sh <cloud>-update-kube-config <stack-id|role>` writes it again, eg after the cluster was recreated, and prints
+the `export`.  `$AFON_CDKTF/kube/current.config` is a link to the kubeconfig of the stack deployed last, so that
+`export KUBECONFIG=$AFON_CDKTF/kube/current.config` reaches it; nothing depends on it, and it is removed with that stack.
+The ops tools act on the cluster of `KUBECONFIG`, else of the stack given by `AFON_STACK`, eg `AFON_STACK=aws-full`.
+
+#### Concurrent runs
+
+Stacks can be deployed concurrently from the same `AFON_HOME`, as each has its own plan, state and kubeconfig.  All runs
+append to `$AFON_HOME/logs/afon.log` unless given a log file name of their own, so that their output is not interleaved:
+
+```shell
+afon-cli.sh --logging-file aws-full.log manage-stack create aws-full
+afon-cli.sh --logging-file gcp-full.log manage-stack create gcp-full
+```
+
+The name is also settable with `AFON_LOGGING_FILE`, and is a file name in `$AFON_HOME/logs`, never a path.  The commands a run
+starts log to the run's file.  Anything else the runs share, eg the `cdktf-store` push and pull, is not made safe by this.
 
 **NOTE:** Before each stack had its own, the stacks of a cloud shared the plan `$AFON_CDKTF/stacks/<cloud>` and state `$AFON_CDKTF/terraform.<cloud>.tfstate`, where `<cloud>={aws,azure,gcp}`.  A stack still deployed with these is the legacy stack of its cloud, see [upgrading to per-stack state](#upgrading-to-per-stack-state-one-off).
 

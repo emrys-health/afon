@@ -33,6 +33,9 @@ public class ConfigUtils {
     /**
      * System property selecting Afon logging console level
      */
+    public static final String AFON_LOGGING_FILE_ENV = "AFON_LOGGING_FILE";
+    public static final String AFON_LOGGING_FILE_PROPERTY = "afon.logging.file";
+    public static final String DEFAULT_LOG_FILE = "afon.log";
     public static final String AFON_LOGGING_CONSOLE_ENV = "AFON_LOGGING_CONSOLE";
     public static final String AFON_LOGGING_CONSOLE_PROPERTY = "afon.logging.console";
 
@@ -96,6 +99,29 @@ public class ConfigUtils {
     }
 
     /**
+     * Returns the name of the log file, in {@code $AFON_HOME/logs}, specified by env {@link #AFON_LOGGING_FILE_ENV} or by
+     * system property {@link #AFON_LOGGING_FILE_PROPERTY}, defaulting to {@link #DEFAULT_LOG_FILE}.
+     *
+     * @return the log file name
+     * @throws IllegalArgumentException if it is not a file name, ie it has a directory in it
+     */
+    public static @NonNull String loggingFile() {
+        String name = envOrProperty(getenv(AFON_LOGGING_FILE_ENV), getProperty(AFON_LOGGING_FILE_PROPERTY, DEFAULT_LOG_FILE));
+        return requireLogFileName(name.isBlank() ? DEFAULT_LOG_FILE : name);
+    }
+
+    /**
+     * @return the name if it is a file name, never a path
+     * @throws IllegalArgumentException if it has a directory in it, or is {@code .} or {@code ..}
+     */
+    public static @NonNull String requireLogFileName(@NonNull String name) {
+        if (name.contains("/") || name.contains("\\") || name.equals(".") || name.equals("..")) {
+            throw new IllegalArgumentException(format("Log file '%s' is not a file name: it is a file in %s/logs, never a path", name, afonHome()));
+        }
+        return name;
+    }
+
+    /**
      * Returns the logging level specified by env {@link #AFON_LOGGING_CONSOLE_ENV} or by system property  {@link #AFON_LOGGING_CONSOLE_PROPERTY}.
      * If none found, it defaults to OFF.
      *
@@ -154,6 +180,68 @@ public class ConfigUtils {
      */
     public static @NonNull String kubeConfigPath(StackId stackId) {
         return format("%s/kube/%s.config", afonCkdtf(), stackId);
+    }
+
+    public static final String AFON_STACK_ENV      = "AFON_STACK";
+    public static final String AFON_STACK_PROPERTY = "afon.stack";
+
+    /**
+     * Returns the kubeconfig that the ops tools (smoke tests, notebooks) act through: the file of {@code KUBECONFIG} if
+     * it is set, which must be a single path, as the stacks write one kubeconfig each and the tools do not merge several,
+     * as kubectl does, else that of the stack given by env {@link #AFON_STACK_ENV} or system property {@link #AFON_STACK_PROPERTY},
+     * ie {@link #kubeConfigPath(StackId)}.  The default {@code ~/.kube/config} is never used, as it may name any cluster.
+     *
+     * @throws IllegalStateException    if neither is set
+     * @throws IllegalArgumentException if {@code KUBECONFIG} is a list of paths
+     */
+    public static @NonNull String opsKubeConfigPath() {
+        String kubeConfig = getenv("KUBECONFIG");
+        if (kubeConfig != null && !kubeConfig.isBlank()) {
+            return requireSingleKubeConfig(kubeConfig);
+        }
+        String stack = envOrProperty(getenv(AFON_STACK_ENV), getProperty(AFON_STACK_PROPERTY, ""));
+        if (stack == null || stack.isBlank()) {
+            throw new IllegalStateException(format(
+                "No cluster to act on: set KUBECONFIG, or %s to the id of the stack, eg aws-tre, whose kubeconfig is %s/kube/<stack-id>.config",
+                AFON_STACK_ENV, afonCkdtf()));
+        }
+        return kubeConfigPath(StackId.parse(stack.trim()));
+    }
+
+    /**
+     * @return the value of {@code KUBECONFIG} if it is a single path
+     * @throws IllegalArgumentException if it is a list of paths, ie has a {@link java.io.File#pathSeparator}, which is not
+     *                                  supported: set it to the one kubeconfig of the stack
+     */
+    public static @NonNull String requireSingleKubeConfig(@NonNull String kubeConfig) {
+        if (kubeConfig.contains(java.io.File.pathSeparator)) {
+            throw new IllegalArgumentException(format(
+                "KUBECONFIG '%s' is a list of paths: only a single kubeconfig is supported, set it to that of the stack, eg %s/kube/<stack-id>.config",
+                kubeConfig, afonCkdtf()));
+        }
+        return kubeConfig.trim();
+    }
+
+    /**
+     * Makes the stack the one whose cluster the ops tools of this JVM act on, ie sets system property
+     * {@link #AFON_STACK_PROPERTY}, as a run of {@code manage-stack} acts on its stack's cluster, whichever cluster any
+     * other kubeconfig names.  {@code KUBECONFIG} and {@link #AFON_STACK_ENV}, if set, still win.  Does nothing for
+     * {@code <cloud>-all}, which is no stack.
+     */
+    public static void useStack(@NonNull StackId stackId) {
+        if (!stackId.isAll()) {
+            System.setProperty(AFON_STACK_PROPERTY, stackId.toString());
+        }
+    }
+
+    /**
+     * Returns the path of the symlink to the kubeconfig of the stack deployed last, for the convenience of users, ie
+     * {@code export KUBECONFIG=$AFON_CDKTF/kube/current.config}.  Nothing depends on it.
+     *
+     * @return the path of the current kubeconfig link
+     */
+    public static @NonNull String currentKubeConfigPath() {
+        return format("%s/kube/current.config", afonCkdtf());
     }
 
     /**

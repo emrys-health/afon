@@ -43,6 +43,10 @@ import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
+import java.nio.file.Path;
+import com.hashicorp.cdktf.Aspects;
+import health.emrys.afon.cdk.KubeConfigAspect;
+import health.emrys.afon.config.ConfigUtils;
 import org.slf4j.Logger;
 import software.constructs.Construct;
 
@@ -113,7 +117,11 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     public static GcpCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties,
                                              boolean pinnedEgressIp) {
         NullProvider.Builder.create(stack, "null").build();
-        return new GcpCloudProvider(stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
+        GcpCloudProvider cloudProvider = new GcpCloudProvider(
+            stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
+        // every kubectl and helm command of the stack uses its own kubeconfig, never the default one
+        Aspects.of(stack).add(new KubeConfigAspect(ConfigUtils.kubeConfigPath(stackId)));
+        return cloudProvider;
     }
 
     /**
@@ -223,10 +231,14 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         }
         ComputeRouterNat nat = new ComputeRouterNat(this, "nat", natConfig.build());
 
+        // Writes the credentials to the stack's own kubeconfig only, never to ~/.kube/config, so that stacks
+        // deployed concurrently do not switch each other's current context
+        String kubeConfigPath = ConfigUtils.kubeConfigPath(stackId);
         String gcloudCommand = format(
-            "gcloud container clusters get-credentials %s --region %s --project %s",
-            clusterName, gcpRegion, projectId);
-        // This refreshes your local K8s config
+            "mkdir -p %s && KUBECONFIG=%s gcloud container clusters get-credentials %s --region %s --project %s" +
+                " && ln -sfn %s %s",
+            Path.of(kubeConfigPath).getParent(), kubeConfigPath, clusterName, gcpRegion, projectId,
+            kubeConfigPath, ConfigUtils.currentKubeConfigPath());
         LocalExecProvisioner refreshCredentials = LocalExecProvisioner
             .builder()
             .command(gcloudCommand)

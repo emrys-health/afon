@@ -30,7 +30,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ## Requirements
 
-- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and a `kubectl` context pointing at its cluster.
+- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and its kubeconfig, `$AFON_CDKTF/kube/<stack-id>.config`, given by `KUBECONFIG` (or by `AFON_STACK=<stack-id>`). `~/.kube/config` is not used. `afon-cli.sh <cloud>-update-kube-config tre` writes it and prints the `export`.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
   `<CLOUD>_OIDC_DOMAIN_NAME` or else `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
@@ -78,7 +78,7 @@ The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  
 1. reads `<CLOUD>_POLARIS_DOMAIN_NAME` and `<CLOUD>_OIDC_DOMAIN_NAME` (else `OIDC_DOMAIN_NAME`) from `$AFON_HOME/config/*.properties`, for the notebook;
 2. checks that OIDC provider is serving requests, with `./afon.sh -a check-oidc <cloud>`, failing fast if it is not;
 3. gets the OIDC access token of `USER_ID` from OIDC provider, with `./afon.sh -a check-oidc <cloud> --token user`;
-4. port-forwards `pod/spark-connector-0-driver` on port 15002, via the current `kubectl` context;
+4. port-forwards `pod/spark-connector-0-driver` (port 15002) to a free local port that `kubectl` picks, via `KUBECONFIG`, so that notebook runs for different clouds can run at the same time;
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
 6. stops the port-forward, whether the run passed or failed.
 
@@ -122,7 +122,7 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 ## Troubleshooting
 
 - **`kubectl` fails with `Unauthorized`, or the port-forward cannot start**: check `kubectl config current-context`
-  points at the stack's cluster. Do not source the secrets files into your shell before running: they also export
+  with `KUBECONFIG` set points at the stack's cluster. Do not source the secrets files into your shell before running: they also export
   cloud credentials, which change the identity `kubectl` uses.
 - **Check 1 fails**: the test user is not authorised for `AFON_CATALOG`, or the table does not exist.  With
   `TABLE_OR_VIEW_NOT_FOUND` for ``test_catalog`.`namespaceph`.`test_table` `` the notebook is reading another catalog than
@@ -149,8 +149,7 @@ afon-cli.sh smoke-test [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--
 ```
 
 runs the tests listed in a suite file, by default [scripts/smoke/tests-full.csv](../scripts/smoke/tests-full.csv), in
-order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, `azure` or `gcp`: it sets the kubectl
-context to the cluster of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with `TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
+order, each as an afon command, against the full stack of the `<cloud>`, `aws` by default, `azure` or `gcp`: it sets `KUBECONFIG` to the kubeconfig of that stack, with the afon command `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, and runs the tests with `TRE_CLOUD=<cloud>`, as the cloud of the stack hosting the TRE, whatever the config says.  The tests are not specific to a
 cloud, so the same file serves all of them:
 
 ```shell
@@ -187,10 +186,11 @@ independently of the source tree, and a test whose command is unknown fails.
   the env switch re-points the shared `$AFON_HOME/config` and `$AFON_HOME/cdktf` symlinks, do not run another afon
   command on a different env while the suite runs. Without `--env`, the suite uses the env of the current config.
 - `--setup` sets up, ie deploys and configures, the comma-separated stacks first, in order, with the afon command
-  `manage-stack setup <stack>`, eg `--setup aws-full,azure-polaris,gcp-polaris`. The tests are not run if a setup
+  `manage-stack setup <stack>`, eg `--setup aws-full,azure-polaris,gcp-polaris`, each logging to the file
+  `<stack-id>.log` in `$AFON_HOME/logs`, whatever `--logging-file` says. The tests are not run if a setup
   fails. The stacks, including one whose setup failed part way, are left up, and the commands deleting them are
   printed on exit, unless `--teardown` is given.
-- `--teardown` tears down the set up stacks on exit, in reverse order, with the afon command
+- `--teardown` tears down the set up stacks on exit, logging to the `<stack-id>.log` of their setup, in reverse order, with the afon command
   `manage-stack delete <stack>`, whether the tests passed or failed, or a setup failed. The suite fails if a teardown
   fails, naming the stack to delete. The stacks are never torn down if the suite is interrupted, eg with Ctrl-C: that
   may stop a setup part way, with its tofu state still locked, so the commands deleting them are printed instead.
@@ -205,8 +205,8 @@ The tests run against the full stack's cluster of the `<cloud>`: the Spark Conne
 through its Spark Connect server, so they also need the Polaris stacks of the other clouds. On every run, after any
 setups, and whether `--env` is given or not, the suite:
 
-1. makes the env's full stack cluster of the `<cloud>` the current `kubectl` context, with the afon command
-   `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, leaving it so after the suite;
+1. points `KUBECONFIG` at the kubeconfig of the env's full stack cluster of the `<cloud>`, with the afon command
+   `<cloud>-update-kube-config tre`, ie of the stack with the role `tre`, for the suite only;
 2. if a selected test is the network smoke test, checks, without changing the cluster, that the Polaris ingress of that cluster is
    restricted, ie has the annotation `alb.ingress.kubernetes.io/inbound-cidrs` (AWS) or
    `nginx.ingress.kubernetes.io/whitelist-source-range` (Azure and GCP), which there only works with `externalTrafficPolicy: Local` on the
@@ -266,10 +266,10 @@ stack is deployed. So the test passes on either cloud whatever the other clouds'
 changed fails it until it is redeployed, as its network policies hold the old list.
 
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
-`$AFON_HOME/logs/afon.log`, and to the console as set by `--logging-console`. The script ends with a summary, and
+`$AFON_HOME/logs/<cloud>-full.log`, the log of the stack they run against (or the file named by `--logging-file`), so that runs for different clouds at the same time each have a log of their own, and to the console as set by `--logging-console`. The script ends with a summary, and
 exits non-zero if any test failed.
 
-The results of each run are also written to `$AFON_HOME/smoke/tests/results-<yyyymmdd-hhmmss>.txt`, without any
+The results of each run are also written to `$AFON_HOME/smoke/tests/results-<stack-id>-<yyyymmdd-hhmmss>.txt`, without any
 logging, so that they can be read even when the console is swamped, eg with `--logging-console INFO`, or a teardown
 following the tests: the run's settings, then the times and outcomes of its stack setups, tests and teardowns, and its
 summary, and the time the whole run took, including any setup and teardown. The suite prints the file's path as its

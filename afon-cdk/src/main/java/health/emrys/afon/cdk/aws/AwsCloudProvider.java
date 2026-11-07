@@ -468,17 +468,16 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
 
         // Writes the stack's own kubeconfig, which its kubectl and helm commands use (see KubeConfigAspect), and
-        // also updates the default kubeconfig, so that kubectl points at the newly deployed cluster, as for the
-        // smoke tools.  Given explicitly, as the KUBECONFIG set by KubeConfigAspect would otherwise take over.
+        // points current.config at it.  The default kubeconfig is not touched.
         List<LocalExecProvisioner> updateKubeConfig = List.of(
             LocalExecProvisioner
                 .builder()
                 .when("create") // Run only when the resource is created
                 .command(format(
                              "mkdir -p %s && aws eks update-kubeconfig --name %s --region %s --kubeconfig %s" +
-                                 " && aws eks update-kubeconfig --name %s --region %s --kubeconfig $HOME/.kube/config",
+                                 " && ln -sfn %s %s",
                              Path.of(kubeConfigPath).getParent(), clusterName, region, kubeConfigPath,
-                             clusterName, region)
+                             kubeConfigPath, ConfigUtils.currentKubeConfigPath())
                         )
                 .type("local-exec")
                 .build()

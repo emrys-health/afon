@@ -3,7 +3,7 @@
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
 # usage: scripts/smoke/test.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
-#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--list|-l] [--help|-h] [<cloud>]
+#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--logging-file|-lf <file-name>] [--list|-l] [--help|-h] [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws, azure or gcp (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
@@ -17,10 +17,11 @@
 #             $AFON_HOME/cdktf.  Exported as AFON_ENV, so that every afon command uses it.
 #   --setup   the comma-separated stacks to set up, ie deploy and configure, before the tests, in order, eg
 #             aws-full,azure-polaris,gcp-polaris, each with the afon command 'manage-stack setup <stack>'.  The tests
-#             are not run if a setup fails.  The stacks, including one whose setup failed, are left up, the commands
+#             are not run if a setup fails.  Each stack is set up logging to the file <stack-id>.log in $AFON_HOME/logs,
+#             whatever --logging-file says.  The stacks, including one whose setup failed, are left up, the commands
 #             deleting them being printed on exit, unless --teardown is given.
 #   --teardown
-#             tears down the set up stacks on exit, in reverse order, each with the afon command
+#             tears down the set up stacks on exit, logging to the <stack-id>.log of their setup, in reverse order, each with the afon command
 #             'manage-stack delete <stack>', whether the tests passed or failed, or a setup failed.  Never done if
 #             the script is interrupted, eg with Ctrl-C, which may stop a setup part way: the commands deleting the
 #             stacks are printed instead.
@@ -29,6 +30,10 @@
 #   --logging-console
 #             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
 #             afon.sh, INFO, or of afon-cli.sh, OFF).  Exported as AFON_LOGGING_CONSOLE, which it overrides.
+#   --logging-file
+#             the name of the afon log file in $AFON_HOME/logs, never a path, of the tests and of the commands they run
+#             (default: <cloud>-full.log, the log of the stack they run against).  Exported as AFON_LOGGING_FILE, which it
+#             overrides.  The stacks set up are not affected, see --setup.
 #   --list    lists the tests and exits
 #
 # The tests are read from the suite file, run in its order.  Its first line is the header 'name|command|args', and
@@ -40,10 +45,10 @@
 # Fields are separated by '|', so that args may contain commas. Blank lines and lines starting with '#' are ignored.
 #
 # Each test is run as an afon command, and passes if it exits zero.  All the tests are run, even if some fail.
-# Their logging goes to the afon log file, $AFON_HOME/logs/afon.log, and to the console as set by
+# Their logging goes to the afon log file, $AFON_HOME/logs/<cloud>-full.log (or the --logging-file), and to the console as set by
 # --logging-console.  The script exits non-zero if any test fails.  The results of each run, ie its settings, the
 # times and outcomes of its stack setups, tests and teardowns, and its summary, are also written, without any
-# logging, to $AFON_HOME/smoke/tests/results-<yyyymmdd-hhmmss>.txt.
+# logging, to $AFON_HOME/smoke/tests/results-<stack-id>-<yyyymmdd-hhmmss>.txt.
 #
 # The tests run against the full stack's cluster of the <cloud>: the Spark Connect tests read the catalogs of the
 # clouds through its Spark Connect server.  After any setups, the current kubectl context is set to the full stack
@@ -68,7 +73,7 @@ SCRIPT_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SO
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFAULT_SUITE_FILE="$AFON_ROOT/scripts/smoke/tests-full.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
-# The dir of the results files, one per run, eg results-<yyyymmdd-hhmmss>.txt.
+# The dir of the results files, one per run, eg results-<stack-id>-<yyyymmdd-hhmmss>.txt.
 RESULTS_DIR="${AFON_HOME:-$HOME/.afon}/smoke/tests"
 # Turns off the Maven loggers of afon.sh reporting a test's non-zero exit, as the exec plugin's stack trace and
 # Maven's failure summary, the test's own output being what tells why it failed.
@@ -119,7 +124,7 @@ error() {
 # --logging-console INFO.
 start_results() {
   mkdir -p "$RESULTS_DIR"
-  RESULTS_FILE="$RESULTS_DIR/results-$(date +%Y%m%d-%H%M%S).txt"
+  RESULTS_FILE="$RESULTS_DIR/results-$CLOUD-full-$(date +%Y%m%d-%H%M%S).txt"
   {
     echo "Regression suite run of $(date '+%Y-%m-%d %H:%M:%S')"
     echo "env: $(current_env)"
@@ -168,7 +173,7 @@ record() {
 
 # Prints the afon log file, which logback.xml writes to in afon home.
 afon_log_file() {
-  echo "${AFON_HOME:-$HOME/.afon}/logs/afon.log"
+  echo "${AFON_HOME:-$HOME/.afon}/logs/${AFON_LOGGING_FILE:-afon.log}"
 }
 
 # Whether the script runs from a cli distribution, ie its parent dir has afon-cli.sh, but no afon.sh, as the
@@ -343,13 +348,24 @@ current_env() {
   esac
 }
 
-# Makes the full stack cluster of the $CLOUD of the current env the current kubectl context, exiting if it fails.
+# Points KUBECONFIG, which kubectl and the tests run act through, at the kubeconfig of the full stack cluster of the $CLOUD
+# of the current env, exiting if it fails.  The default ~/.kube/config is neither written nor read.
 update_kube_config() {
-  banner "Updating the kubectl context to the $CLOUD full stack cluster of env $(current_env)"
-  if ! run_afon "$CLOUD-update-kube-config" tre; then
-    error "Failed to update the kubectl context for env $(current_env): not running the tests"
+  banner "Pointing KUBECONFIG at the $CLOUD full stack cluster of env $(current_env)"
+  local output kube_config
+  output=$(mktemp)
+  if ! run_afon "$CLOUD-update-kube-config" tre | tee "$output"; then
+    rm -f "$output"
+    error "Failed to get the kubeconfig for env $(current_env): not running the tests"
     exit 1
   fi
+  kube_config=$(sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' "$output" | tail -1)
+  rm -f "$output"
+  if [ -z "$kube_config" ] || [ ! -s "$kube_config" ]; then
+    error "No kubeconfig for env $(current_env): not running the tests"
+    exit 1
+  fi
+  export KUBECONFIG="$kube_config"
 }
 
 # The reading of the Polaris ingress, and the CIDRs to restrict it to, shared with kube/polaris-whitelist.sh
@@ -394,7 +410,7 @@ check_polaris_ingress() {
           warning "the ingress controller does not keep the callers' IPs (externalTrafficPolicy '${policy:-unknown}'," \
                   "not Local): its restriction is not effective, so the network smoke test is expected to fail"
           echo "Set it with:"
-          echo "  kubectl --context $context patch ${controller:-<the ingress-nginx controller service>}" \
+          echo "  KUBECONFIG=$KUBECONFIG kubectl --context $context patch ${controller:-<the ingress-nginx controller service>}" \
                "-n ingress-nginx --type merge -p '{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}'"
         fi
       fi
@@ -418,6 +434,12 @@ ingress_controller_in_cluster() {
   [ "$CLOUD" = "azure" ] || [ "$CLOUD" = "gcp" ]
 }
 
+# Prints the name of the log file of the stack $1, <stack-id>.log, that its setup and its teardown, which needs a setup,
+# both log to.
+stack_log_name() {
+  echo "$1.log"
+}
+
 # Sets up the comma-separated stacks $1, in order, exiting if any fails.  Each stack is recorded in SETUP_STACKS
 # before being set up, so that a stack whose setup failed part way is also handled by finish_stacks, which is run
 # on exit, however the script exits.
@@ -430,13 +452,15 @@ setup_stacks() {
     SETUP_STACKS+=("$stack")
     banner "Setting up stack $stack"
     start=$SECONDS
-    if ! run_afon manage-stack setup "$stack"; then
-      result="stack $stack failed to set up in $(elapsed_since $start)"
+    # each stack logs to a file of its own, <stack-id>.log, so that stacks set up at the same time, eg by other runs,
+    # have their output apart; the environment applies to this command only
+    if ! AFON_LOGGING_FILE="$(stack_log_name "$stack")" run_afon manage-stack setup "$stack"; then
+      result="stack $stack failed to set up in $(elapsed_since $start): see $(AFON_LOGGING_FILE="$(stack_log_name "$stack")" afon_log_file)"
       record "$result: tests not run"
       error "Stack ${result#stack }: not running the tests"
       exit 1
     fi
-    result="stack $stack set up in $(elapsed_since $start)"
+    result="stack $stack set up in $(elapsed_since $start) (log in $(AFON_LOGGING_FILE="$(stack_log_name "$stack")" afon_log_file))"
     record "$result"
     success "Stack ${result#stack }"
   done
@@ -467,7 +491,8 @@ teardown_stacks() {
   for stack in $(reversed_setup_stacks); do
     banner "Tearing down stack $stack"
     start=$SECONDS
-    if run_afon manage-stack delete "$stack"; then
+    # to the log of its setup, <stack-id>.log
+    if AFON_LOGGING_FILE="$(stack_log_name "$stack")" run_afon manage-stack delete "$stack"; then
       result="stack $stack torn down in $(elapsed_since $start)"
       record "$result"
       success "Stack ${result#stack }"
@@ -519,6 +544,7 @@ TEARDOWN=
 ENV=
 LIST=
 LOGGING_CONSOLE=
+LOGGING_FILE=
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
 CLOUD=aws
@@ -540,6 +566,8 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; SELECTED="$2"; shift 2 ;;
     --logging-console|-lc)
       require_value "$1" "${2:-}"; LOGGING_CONSOLE="$2"; shift 2 ;;
+    --logging-file|-lf)
+      require_value "$1" "${2:-}"; LOGGING_FILE="$2"; shift 2 ;;
     --list|-l)
       LIST=true; shift ;;
     --help|-h)
@@ -602,6 +630,17 @@ fi
 if [ -n "$LOGGING_CONSOLE" ]; then
   export AFON_LOGGING_CONSOLE="$LOGGING_CONSOLE"
 fi
+
+# The log of the tests is that of the stack they run against, <stack-id>.log, so that runs at the same time, eg for different
+# clouds, each have a log of their own, unless given another with --logging-file or AFON_LOGGING_FILE.
+if [ -n "$LOGGING_FILE" ]; then
+  export AFON_LOGGING_FILE="$LOGGING_FILE"
+elif [ -z "${AFON_LOGGING_FILE:-}" ]; then
+  export AFON_LOGGING_FILE="$(stack_log_name "$CLOUD-full")"
+fi
+case "${AFON_LOGGING_FILE:-}" in
+  */*|.|..) error "Invalid logging file '$AFON_LOGGING_FILE': it is a file name in the logs dir, never a path"; exit 1 ;;
+esac
 
 cd "$AFON_ROOT"
 

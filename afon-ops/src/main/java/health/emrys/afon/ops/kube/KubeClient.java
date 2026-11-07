@@ -2,6 +2,7 @@ package health.emrys.afon.ops.kube;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import io.kubernetes.client.Exec;
 import io.kubernetes.client.PortForward;
 import io.kubernetes.client.openapi.ApiClient;
@@ -56,7 +57,7 @@ public class KubeClient implements AutoCloseable {
     }
 
     protected ApiClient buildClient(AfonPropertyProvider properties) {
-        String kubeConfigPath = System.getProperty("user.home") + "/.kube/config";
+        String kubeConfigPath = ConfigUtils.opsKubeConfigPath();
         try {
             FileReader reader = new FileReader(kubeConfigPath);
             return ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(reader)).build();
@@ -84,17 +85,17 @@ public class KubeClient implements AutoCloseable {
         switch (cloud) {
             case AWS -> {
                 if (!eks) {
-                    throw wrongContext(context, "is not an EKS cluster", "the AWS one, eg with 'afon-cli.sh aws-update-kube-config tre'");
+                    throw wrongContext(context, "is not an EKS cluster", "the AWS one, eg 'afon-cli.sh aws-update-kube-config tre' prints the KUBECONFIG to export");
                 }
             }
             case GCP -> {
                 if (!gke) {
-                    throw wrongContext(context, "is not a GKE cluster", "the GCP one, eg with 'afon-cli.sh gcp-update-kube-config tre'");
+                    throw wrongContext(context, "is not a GKE cluster", "the GCP one, eg 'afon-cli.sh gcp-update-kube-config tre' prints the KUBECONFIG to export");
                 }
             }
             case AZURE -> {
                 if (eks || gke) {
-                    throw wrongContext(context, "is not an AKS cluster", "the Azure one, eg with 'afon-cli.sh azure-update-kube-config tre'");
+                    throw wrongContext(context, "is not an AKS cluster", "the Azure one, eg 'afon-cli.sh azure-update-kube-config tre' prints the KUBECONFIG to export");
                 }
             }
         }
@@ -118,7 +119,7 @@ public class KubeClient implements AutoCloseable {
      * @return the name of the current context of the kube config, ie that of the cluster that kubectl, and this client, act on
      */
     public String getContext() {
-        String kubeConfigPath = System.getProperty("user.home") + "/.kube/config";
+        String kubeConfigPath = ConfigUtils.opsKubeConfigPath();
         try (FileReader reader = new FileReader(kubeConfigPath)) {
             return KubeConfig.loadKubeConfig(reader).getCurrentContext();
         } catch (IOException e) {

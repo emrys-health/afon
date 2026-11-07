@@ -52,6 +52,9 @@ import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
+import java.nio.file.Path;
+import health.emrys.afon.cdk.KubeConfigAspect;
+import health.emrys.afon.config.ConfigUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import software.constructs.Construct;
@@ -102,6 +105,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private              DataAzurermResourceGroup resourceGroupLookup;
     private              UserAssignedIdentity    clusterIdentity;
     /** The stack's {@code import} blocks, of the disks {@link #retainedVolumeClaim} adopts if they exist. */
+    private final        String                    kubeConfigPath;
     private final        List<Map<String, String>> retainedVolumeImports = new ArrayList<>();
 
     /**
@@ -116,6 +120,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         super(scope, id);
         this.properties          = properties;
         stackType                = stackId.type();
+        kubeConfigPath           = ConfigUtils.kubeConfigPath(stackId);
         clusterName              = clusterName(properties.getValue(AfonProperty.CLUSTER_NAME), stackId);
         resourceGroup            = properties.getValue(AZURE_RESOURCE_GROUP);
         subscriptionId           = properties.getValue(AZURE_SUBSCRIPTION);
@@ -135,7 +140,11 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
 
     public static AzureCloudProvider bootstrap(TerraformStack stack, StackId stackId, AfonPropertyProvider properties,
                                                boolean pinnedEgressIp) {
-        return new AzureCloudProvider(stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
+        AzureCloudProvider cloudProvider = new AzureCloudProvider(
+            stack, stackId.cloud().toString(), stackId, properties, pinnedEgressIp);
+        // every kubectl and helm command of the stack uses its own kubeconfig, never the default one
+        Aspects.of(stack).add(new KubeConfigAspect(ConfigUtils.kubeConfigPath(stackId)));
+        return cloudProvider;
     }
 
     /**
@@ -195,14 +204,14 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .when("create")
             .type("local-exec")
             .command(format(
-                "az aks get-credentials --resource-group %s --name %s --overwrite-existing && " +
+                "mkdir -p %s && az aks get-credentials --resource-group %s --name %s --file %s --overwrite-existing && " +
                     "for i in $(seq 1 30); do " +
                     "kubelogin convert-kubeconfig -l azurecli >/dev/null 2>&1; " +
                     "kubectl auth can-i create deployments -n default >/dev/null 2>&1 && exit 0; " +
                     "sleep 10; " +
                     "done; " +
                     "echo 'Cluster Admin RBAC did not propagate within 5 minutes' >&2; exit 1",
-                resourceGroup, clusterName))
+                Path.of(kubeConfigPath).getParent(), resourceGroup, clusterName, kubeConfigPath))
             .build();
 
         clusterAdminAssignment = new RoleAssignment(
@@ -527,9 +536,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .builder()
             .when("create")
             .command(format(
-                "az aks get-credentials --resource-group %s " +
-                    "--name %s --overwrite-existing",
-                resourceGroup.getName(), clusterName))
+                "mkdir -p %s && az aks get-credentials --resource-group %s --name %s --file %s --overwrite-existing" +
+                    " && ln -sfn %s %s",
+                Path.of(kubeConfigPath).getParent(), resourceGroup.getName(), clusterName, kubeConfigPath,
+                kubeConfigPath, ConfigUtils.currentKubeConfigPath()))
             .type("local-exec")
             .build();
 

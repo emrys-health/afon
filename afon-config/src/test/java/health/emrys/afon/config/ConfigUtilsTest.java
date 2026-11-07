@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static health.emrys.afon.config.ConfigUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ConfigUtilsTest {
 
@@ -132,4 +133,46 @@ public class ConfigUtilsTest {
         assertThat(envOrProperty(null, "property")).isEqualTo("property");
     }
 
+
+    @Test
+    public void logFileDefaultsToAfonLog() {
+        if (System.getenv(AFON_LOGGING_FILE_ENV) == null) {
+            System.clearProperty(AFON_LOGGING_FILE_PROPERTY);
+            assertThat(loggingFile()).isEqualTo("afon.log");
+        }
+    }
+
+    @Test
+    public void logFileIsSetByProperty() {
+        if (System.getenv(AFON_LOGGING_FILE_ENV) == null) {
+            System.setProperty(AFON_LOGGING_FILE_PROPERTY, "aws-full.log");
+            try {
+                assertThat(loggingFile()).isEqualTo("aws-full.log");
+            } finally {
+                System.clearProperty(AFON_LOGGING_FILE_PROPERTY);
+            }
+        }
+    }
+
+    @Test
+    public void logFileWithDirectoryIsRefused() {
+        for (String name : new String[]{"dir/a.log", "../a.log", "/tmp/a.log", "a\\b.log", ".", ".."}) {
+            assertThatThrownBy(() -> requireLogFileName(name)).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(requireLogFileName("gcp-full.log")).isEqualTo("gcp-full.log");
+    }
+
+    @Test
+    public void kubeConfigIsPerStackAndCurrentIsALink() {
+        assertThat(kubeConfigPath(StackId.parse("gcp-full"))).isEqualTo(afonCkdtf() + "/kube/gcp-full.config");
+        assertThat(currentKubeConfigPath()).isEqualTo(afonCkdtf() + "/kube/current.config");
+    }
+
+    @Test
+    public void onlyASingleKubeConfigIsSupported() {
+        assertThat(requireSingleKubeConfig("/cdktf/kube/aws-full.config")).isEqualTo("/cdktf/kube/aws-full.config");
+        String list = "/a.config" + java.io.File.pathSeparator + "/b.config";
+        assertThatThrownBy(() -> requireSingleKubeConfig(list))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only a single kubeconfig is supported");
+    }
 }

@@ -120,6 +120,7 @@ public class StepActions {
                 deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
                 // the kubeconfig of the stack's cluster, which is now gone
                 deletePath(Path.of(kubeConfigPath(stackId)));
+                removeCurrentKubeConfigIfNamed(stackId);
                 afterDeleting.accept(stackId);
             }
         }
@@ -381,6 +382,22 @@ public class StepActions {
         tofuWithRetry(tofuDir, outputStream, maxAttempts, args);
     }
 
+    /**
+     * Removes the {@code current.config} link if it names the kubeconfig of the stack, now gone, so that it does not dangle.
+     * A link to another stack's kubeconfig is left alone.
+     */
+    protected void removeCurrentKubeConfigIfNamed(StackId stackId) {
+        Path current = Path.of(currentKubeConfigPath());
+        try {
+            if (Files.isSymbolicLink(current) && Files.readSymbolicLink(current).equals(Path.of(kubeConfigPath(stackId)))) {
+                logger.info("Removing {}, as it named the kubeconfig of the deleted stack {}", current, stackId);
+                Files.delete(current);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     protected void deletePath(Path path) {
         if (!exists(path)) {
             return;
@@ -488,7 +505,6 @@ public class StepActions {
     }
 
     private void tofuApply(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws IOException {
-        ensureKubeConfigExists();
         if (tofuInit(tofuDir, outputStream) != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
         }
@@ -543,24 +559,6 @@ public class StepActions {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * The kubernetes/helm providers' {@code config_path} must exist before tofu can even plan the
-     * second, full apply above — but the resource that writes real content there only runs inside
-     * that same apply, once the cluster it depends on exists; {@code -target} on the cluster alone
-     * does not pull in that resource, since it is a dependent, not a dependency. On a workstation
-     * this is invisible because {@code ~/.kube/config} already exists from prior manual use —
-     * stale content is fine, since it gets overwritten once the updater resource runs.
-     * A machine that has never run either (a fresh CI runner) has no such file, and the
-     * providers fail outright with "no such file or directory". An empty file is enough.
-     */
-    private void ensureKubeConfigExists() throws IOException {
-        Path kubeConfig = Path.of(System.getProperty("user.home"), ".kube", "config");
-        if (!Files.exists(kubeConfig)) {
-            Files.createDirectories(kubeConfig.getParent());
-            Files.createFile(kubeConfig);
         }
     }
 

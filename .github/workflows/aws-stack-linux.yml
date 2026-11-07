@@ -192,13 +192,10 @@ jobs:
             echo "AWS_DEPLOY_* secrets not set: using the runner's own credentials"
           fi
 
-          # The tofu kubernetes and helm providers read KUBE_CONFIG_PATH (see the deployment
-          # checklist in README.md). It has to stay at the default path: the kubeconfig is written
-          # by `aws eks update-kubeconfig` in a local-exec provisioner that passes no --kubeconfig,
-          # and GenericK8sClient reads ~/.kube/config directly, so pointing KUBECONFIG elsewhere
-          # would split the two apart.
-          mkdir -p "$HOME/.kube"
-          echo "KUBE_CONFIG_PATH=$HOME/.kube/config" >> "$GITHUB_ENV"
+          # No kubeconfig is set up here: the tofu kubernetes and helm providers reach the cluster by its
+          # endpoint and `aws eks get-token`, each stack writes its own kubeconfig,
+          # $AFON_CDKTF/kube/<stack-id>.config, which its kubectl and helm steps use via KUBECONFIG, and
+          # ~/.kube/config is neither written nor read.
 
       - name: Check the AWS credentials
         run: |
@@ -276,8 +273,10 @@ jobs:
           fi
           for STACK in $STACKS; do
             ./afon.sh -a aws-cluster "$STACK"
+            # the stack's own kubeconfig, which the command prints, as ~/.kube/config is not used
+            KUBE_CONFIG_FILE=$(./afon.sh -a aws-update-kube-config "$STACK" | sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' | tail -1)
+            KUBECONFIG="$KUBE_CONFIG_FILE" kubectl get pods -A
           done
-          kubectl get pods -A
 
       - name: Upload stack logs
         if: always()

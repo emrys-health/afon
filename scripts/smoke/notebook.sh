@@ -124,6 +124,7 @@ for name in "${NAMES[@]}"; do
   fi
   NOTEBOOKS+=("$notebook")
 done
+# the port that the Spark Connect driver listens on, in its pod
 SPARK_CONNECT_PORT=15002
 
 # Runs the afon command $1 with the args $2...: with afon.sh, if the script runs from the source tree, else with the
@@ -189,7 +190,6 @@ unset TOKEN_OUTPUT
 echo "Got an access token for user '$USER_ID' from $OIDC_HOST"
 
 export OIDC_TOKEN
-export SPARK_REMOTE="sc://localhost:$SPARK_CONNECT_PORT"
 export POLARIS_DOMAIN_NAME="$POLARIS_HOST"
 export OIDC_DOMAIN_NAME="$OIDC_HOST"
 # The catalogs of the cloud, named <cloud> and <cloud>_forbidden, as the notebook defaults to those of AWS, which the
@@ -197,14 +197,30 @@ export OIDC_DOMAIN_NAME="$OIDC_HOST"
 export AFON_CATALOG="${AFON_CATALOG:-$(echo "$CLOUD" | tr '[:upper:]' '[:lower:]')}"
 export AFON_FORBIDDEN_CATALOG="${AFON_FORBIDDEN_CATALOG:-${AFON_CATALOG%%_*}_forbidden}"
 
-kubectl port-forward pod/spark-connector-0-driver "$SPARK_CONNECT_PORT:$SPARK_CONNECT_PORT" >/dev/null &
-PORT_FORWARD_PID=$!
-trap 'kill $PORT_FORWARD_PID 2>/dev/null || true' EXIT
-sleep 4
-if ! kill -0 "$PORT_FORWARD_PID" 2>/dev/null; then
-  echo "Could not port-forward pod/spark-connector-0-driver with kubectl context $(kubectl config current-context)" >&2
+if [ -z "${KUBECONFIG:-}" ]; then
+  echo "KUBECONFIG is not set: point it at the kubeconfig of the stack, eg with the afon command '<cloud>-update-kube-config tre', which prints it" >&2
   exit 1
 fi
+# Forwards the driver's port to a free local port, which kubectl picks and reports, so that runs at the same time, eg for
+# different clouds, do not compete for one.
+PORT_FORWARD_LOG=$(mktemp)
+kubectl port-forward pod/spark-connector-0-driver ":$SPARK_CONNECT_PORT" >"$PORT_FORWARD_LOG" 2>&1 &
+PORT_FORWARD_PID=$!
+trap 'kill $PORT_FORWARD_PID 2>/dev/null || true; rm -f "$PORT_FORWARD_LOG"' EXIT
+LOCAL_PORT=
+for _ in $(seq 1 30); do
+  LOCAL_PORT=$(sed -n 's/^Forwarding from 127\.0\.0\.1:\([0-9][0-9]*\) -> .*/\1/p' "$PORT_FORWARD_LOG" | head -1)
+  if [ -n "$LOCAL_PORT" ] || ! kill -0 "$PORT_FORWARD_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
+if [ -z "$LOCAL_PORT" ]; then
+  echo "Could not port-forward pod/spark-connector-0-driver with KUBECONFIG $KUBECONFIG:" >&2
+  cat "$PORT_FORWARD_LOG" >&2
+  exit 1
+fi
+export SPARK_REMOTE="sc://localhost:$LOCAL_PORT"
 
 cd "$AFON_ROOT"
 FAILED=()

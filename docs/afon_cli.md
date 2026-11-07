@@ -68,6 +68,7 @@ The script accepts the following options, either as a `--flag` or as the equival
 - `--env`/`-e` / `AFON_ENV`: sets both `--cdktf-env` and `--config-env`.  The `--env` flag overrides both of them; the `AFON_ENV` env var only overrides their env vars, not their flags.
 - `--logging`/`-l` / `AFON_LOGGING`: the file logging level, defaulting to `INFO`.   The file logs are found the `$AFON_HOME/logs`.
 - `--logging-console`/`-lc` / `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to `OFF`.
+- `--logging-file`/`-lf` / `AFON_LOGGING_FILE`: the name of the log file in `$AFON_HOME/logs`, defaulting to `afon.log`. It is a file name, never a path. Give concurrent runs a file each, eg `-lf aws-full.log`, so that their output is not interleaved. The commands a run starts log to the same file.
 - `AFON_ENVS` (env only): the `NAME=VALUE` pairs of system properties passed to the CLI java process.  Can be used to override  file-based properties in config dir.
 
 ## Script commands
@@ -126,7 +127,7 @@ For example, to run command with console logging:
 afon-cli.sh -lc INFO <command>
 ```
 
-**NOTE:** The options `--logging`/`-l` and `--logging-console`/`-lc` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a logging level, so those two are only recognised before the command name, configuring this JVM's own logging — after the command name they're not recognised at all and get forwarded as plain args to the script.
+**NOTE:** The options `--logging`/`-l`, `--logging-console`/`-lc` and `--logging-file`/`-lf` are not supported by `afon-cli-scripts.sh` as the scripts it runs have no use for a logging level, so those two are only recognised before the command name, configuring this JVM's own logging — after the command name they're not recognised at all and get forwarded as plain args to the script.
 
 ## Smoke tests
 

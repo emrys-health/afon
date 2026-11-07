@@ -261,6 +261,8 @@ public class ManageStackMain {
             System.out.println(warning);
             logger.warn(warning);
         }
+        // the steps acting on its cluster use the kubeconfig of the stack, not whichever the machine's current context names
+        ConfigUtils.useStack(stackId);
         logger.info("Running {} on stack {}{}", action, stackId, replace ? ", replacing the conflicting stacks" : "");
         new StepRunner(users).runUsing(stepsProvider, Arrays.copyOfRange(args, 2, args.length));
     }
@@ -354,6 +356,7 @@ public class ManageStackMain {
             System.exit(1);
             return;
         }
+        ConfigUtils.useStack(parseStackId(args[1]));
         logger.info("Running scenario {} on stack {}", args[2], args[1]);
         new StepRunner(users).runUsing(stepsProvider, Arrays.copyOfRange(args, 3, args.length));
     }

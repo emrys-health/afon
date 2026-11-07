@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.flow;
 
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.ops.steps.Cleanups;
 import org.slf4j.Logger;
 
@@ -44,6 +45,8 @@ public class FlowRunner {
         for (int i = start; i < steps.size(); i++) {
             FlowStep step = steps.get(i);
             logger.info("Running step {} of item {}", step.qualifiedName(), step.item());
+            // the steps acting on a cluster use the kubeconfig of the stack of the item
+            ConfigUtils.useStack(step.item().stackId());
             try {
                 cleanups.started(step.step());
                 step.step().getFunction().run();

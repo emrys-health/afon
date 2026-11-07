@@ -21,6 +21,7 @@ usage (){
   echo "          [--config-env <config-env>] [--config-zip <zip>]"
   echo "          [--cloud|-c <cloud>]"
   echo "          [--logging|-l <logging>] [--logging-console|-lc <console>]"
+  echo "          [--logging-file|-lf <file-name>]"
   echo "          [--bash-quiet] [--mvn-quiet] [--quiet|-q] [--debug] [--lenient]"
   echo "          [--ansible-playbook|-ap <playbook>] [--ansible-args|-aa <args>]"
   echo "          [--build-args|-ba <args>] [--build-goals|-bg <goals>] [--build-profiles|-bp <profiles>]"
@@ -57,6 +58,8 @@ usage (){
   echo "                  Also settable via env variable 'AFON_LOGGING' (the flag wins over the env variable)."
   echo "logging-console:  the logging console level.  One of OFF|DEBUG|INFO|WARN|ERROR.  Defaults to logback configuration."
   echo "                  Also settable via env variable 'AFON_LOGGING_CONSOLE' (the flag wins over the env variable)."
+  echo "logging-file:     the name of the log file in '<afon-home>/logs', never a path.  Defaults to 'afon.log'."
+  echo "                  Also settable via env variable 'AFON_LOGGING_FILE' (the flag wins over the env variable)."
   echo "bash-quiet:       the flag to hush the messages of afon.sh itself, eg 'Using home dir ...', but not its errors,"
   echo "                  nor the output of the scripts and mvn commands it runs."
   echo "mvn-quiet:        the flag to hush the mvn output"
@@ -243,6 +246,9 @@ mvn_envs(){
   if [ -n "$LOGGING_CONSOLE" ]; then
     MVN_ENVS="$MVN_ENVS -Dafon.logging.console=$LOGGING_CONSOLE"
   fi
+  if [ -n "$LOGGING_FILE" ]; then
+    MVN_ENVS="$MVN_ENVS -Dafon.logging.file=$LOGGING_FILE"
+  fi
 }
 
 exec_mvn() {
@@ -335,6 +341,7 @@ HOME_DIR=
 LENIENT=
 LOGGING=
 LOGGING_CONSOLE=
+LOGGING_FILE=
 MVN_PROFILES=
 MVN_GOALS=
 MVN_ARGS=
@@ -392,6 +399,8 @@ while [[ $# -gt 0 ]]; do
       LOGGING="$2"; shift 2 ;;
     --logging-console|-lc)
       LOGGING_CONSOLE="$2"; shift 2 ;;
+    --logging-file|-lf)
+      LOGGING_FILE="$2"; shift 2 ;;
     --bash-quiet)
       BASH_QUIET=true; shift ;;
     --mvn-quiet)
@@ -527,6 +536,20 @@ fi
 
 if [ -n "$LOGGING_CONSOLE" ]; then
   info "Using logging console level: $LOGGING_CONSOLE"
+fi
+
+AFON_LOGGING_FILE="${AFON_LOGGING_FILE:-}"
+if [ -z "$LOGGING_FILE" ] && [ -n "$AFON_LOGGING_FILE" ]; then
+  LOGGING_FILE="$AFON_LOGGING_FILE"
+fi
+
+if [ -n "$LOGGING_FILE" ]; then
+  case "$LOGGING_FILE" in
+    */*|.|..) echo "Invalid logging file '$LOGGING_FILE': it is a file name in <afon-home>/logs, never a path" >&2; exit 1 ;;
+  esac
+  info "Using log file: $LOGGING_FILE"
+  # exported so that the afon commands that this one starts log to the same file
+  export AFON_LOGGING_FILE="$LOGGING_FILE"
 fi
 
 if [ "$HELP" == "true" ]; then

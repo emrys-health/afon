@@ -77,6 +77,7 @@ The logging levels can be set via the `--logging` and `--logging-console` option
 
 - `AFON_LOGGING`: the file logging level, defaulting to INFO.
 - `AFON_LOGGING_CONSOLE`: the console logging level, defaulting to OFF.
+- `AFON_LOGGING_FILE` (`--logging-file`): the name of the log file in `<afon-home>/logs`, defaulting to `afon.log`; a file name, never a path. Use one per concurrent run, eg `<stack-id>.log`.
 
 ### Generated docs
 
