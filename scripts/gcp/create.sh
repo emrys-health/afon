@@ -227,9 +227,27 @@ configured_hmac_access_id() {
   done | tail -1 | cut -d= -f2- | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//'
 }
 
+# Sets the property in the properties file, in place of its line if it has one, else at the end, creating the file if need be.  The
+# value is passed in the environment, not as an arg, so that it is not in the process list, nor interpreted by awk; the file is
+# rewritten in place, so that it keeps its permissions.
+set_property() {
+  local FILE="$1" KEY="$2" TMP
+  [ -f "$FILE" ] || { (umask 077 && : > "$FILE") || return 1; }
+  TMP="$(mktemp)" || return 1
+  VALUE="$3" awk -v key="$KEY" '
+    BEGIN { done = 0 }
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" { if (!done) print key "=" ENVIRON["VALUE"]; done = 1; next }
+    { print }
+    END { if (!done) print key "=" ENVIRON["VALUE"] }
+  ' "$FILE" > "$TMP" && cat "$TMP" > "$FILE"
+  local STATUS=$?
+  rm -f "$TMP"
+  return $STATUS
+}
+
 if has_component Git || { has_component Logging && [ -n "${GCP_POLARIS_LOG_BUCKET:-}" ]; }; then
-  # The secret of an HMAC key is only shown when it is created, so a key is only created if none is configured, and then it is
-  # for the user to set it, in secret-gcp.properties.
+  # The secret of an HMAC key is only shown when it is created, so a key is only created if none is configured, and then its id and
+  # secret are set in secret-gcp.properties.
   HMAC_ACCESS_ID="$(configured_hmac_access_id)"
   if [ -n "$HMAC_ACCESS_ID" ]; then
     if gcloud storage hmac describe "$HMAC_ACCESS_ID" --project=$PROJECT_ID >/dev/null 2>&1; then
@@ -240,8 +258,25 @@ if has_component Git || { has_component Logging && [ -n "${GCP_POLARIS_LOG_BUCKE
     fi
   else
     echo "- Creating an HMAC key for $GCP_SERVICE_ACCOUNT"
-    gcloud storage hmac create "$GCP_SERVICE_ACCOUNT" --project=$PROJECT_ID || exit 1
-    echo "-- Set GCP_HMAC_ACCESS_ID and GCP_HMAC_SECRET in secret-gcp.properties, from the accessId and secret above: the secret is not shown again"
+    # The secret is not shown, as the output of this script is logged, and so would be the secret: it is only shown by GCP when the
+    # key is created, so it is written to secret-gcp.properties here, where the access id goes too.
+    HMAC_KEY="$(gcloud storage hmac create "$GCP_SERVICE_ACCOUNT" --project=$PROJECT_ID --format='value(metadata.accessId,secret)')" || exit 1
+    HMAC_ACCESS_ID="$(printf '%s' "$HMAC_KEY" | cut -f1)"
+    HMAC_SECRET="$(printf '%s' "$HMAC_KEY" | cut -f2)"
+    HMAC_KEY=""
+    SECRET_FILE="$AFON_HOME/config/secret-gcp.properties"
+    if [ -n "$HMAC_ACCESS_ID" ] && [ -n "$HMAC_SECRET" ] \
+       && set_property "$SECRET_FILE" GCP_HMAC_ACCESS_ID "$HMAC_ACCESS_ID" && set_property "$SECRET_FILE" GCP_HMAC_SECRET "$HMAC_SECRET"; then
+      echo "-- Set GCP_HMAC_ACCESS_ID to $HMAC_ACCESS_ID, and GCP_HMAC_SECRET, in $SECRET_FILE"
+    else
+      echo "-- Could not set the HMAC key in $SECRET_FILE: deleting the key, as its secret cannot be shown again, so run this again"
+      if [ -n "$HMAC_ACCESS_ID" ]; then
+        gcloud storage hmac update "$HMAC_ACCESS_ID" --deactivate --project=$PROJECT_ID >/dev/null 2>&1 \
+          && gcloud storage hmac delete "$HMAC_ACCESS_ID" --project=$PROJECT_ID >/dev/null 2>&1
+      fi
+      exit 1
+    fi
+    HMAC_SECRET=""
   fi
 fi
 

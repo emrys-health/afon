@@ -12,7 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import static health.emrys.afon.config.ConfigUtils.AFON_CDKTF_PROPERTY;
 import static health.emrys.afon.config.ConfigUtils.AFON_HOME_PROPERTY;
@@ -59,6 +61,34 @@ public class SynthesisSupport {
                    "DefaultEndpointsProtocol=https;AccountName=goldenafonstorage;AccountKey=golden-azure-account-key;"
                    + "EndpointSuffix=core.windows.net");
         return values;
+    }
+
+    /**
+     * @return the names of the config properties that are secrets, read from the secret properties files of the template config,
+     * ie those that are passwords, secrets, keys, tokens or credentials.  Only the names are read, the template leaves the values
+     * blank: see {@link #mockValueOf(String)}.
+     */
+    public static Set<String> secretPropertyNames() throws IOException {
+        Set<String> names = new TreeSet<>();
+        try (var files = Files.list(Path.of(TEMPLATES_CONFIG_DIR))) {
+            for (Path file : files.filter(f -> f.getFileName().toString().matches("secret.*\\.properties")).toList()) {
+                for (String line : Files.readAllLines(file)) {
+                    String name = line.contains("=") && !line.startsWith("#") ? line.substring(0, line.indexOf('=')).trim() : "";
+                    if (name.matches(".*(PASSWORD|SECRET|TOKEN|CREDENTIALS|CONNECTION_STRING|(^|_)KEY(_|$)).*")) {
+                        names.add(name);
+                    }
+                }
+            }
+        }
+        return names;
+    }
+
+    /**
+     * @return the value that the stacks are synthesised with for the property, as set on top of the config, which is distinct for
+     * each property so that it is recognised in a plan
+     */
+    public static String mockValueOf(String name) {
+        return FIXED_VALUES.getOrDefault(name, "golden-secret-" + name.toLowerCase().replace('_', '-'));
     }
 
     /**

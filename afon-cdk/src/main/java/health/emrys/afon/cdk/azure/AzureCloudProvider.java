@@ -736,9 +736,9 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
               admin: %1$s
             azure:
               accountName: %2$s
-              connectionString: "%3$s"
+              connectionString: ${LOKI_AZURE_CONNECTION_STRING}
               useManagedIdentity: false
-            """, container, storageAccount, connectionString));
+            """, container, storageAccount), "", Map.of("LOKI_AZURE_CONNECTION_STRING", connectionString));
     }
 
     @Override

@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
@@ -70,10 +71,25 @@ public class SparkWarehouseConfig {
         configureWith(sparkConf, sparkConfigStatics());
     }
 
+    /**
+     * The settings whose values are credentials, eg {@code spark.sql.catalog.gcp.credential}, which is the user and password of the
+     * catalog, or a storage account key: not to be logged.
+     */
+    private static final Pattern SECRET_SETTING = Pattern.compile("(?i).*(credential|password|secret|token|account\\.key|access\\.key).*");
+
+    public static final String REDACTED = "<redacted>";
+
+    /**
+     * @return the settings as they are logged: one to a line, with the values of the credentials redacted
+     */
+    static String loggable(Map<String, String> config) {
+        StringBuilder sb = new StringBuilder();
+        config.forEach((key, value) -> sb.append(format("\n%-80s %50s", key, SECRET_SETTING.matcher(key).matches() ? REDACTED : value)));
+        return sb.toString();
+    }
+
     public static void configureWith(SparkConf sparkConf, Map<String, String> config) {
-        StringBuffer sb = new StringBuffer();
-        config.entrySet().forEach(x -> sb.append(format("\n%-80s %50s", x.getKey(), x.getValue())));
-        logger.info(sb.toString());
+        logger.info(loggable(config));
         config.entrySet().stream().forEach(entry -> {
             sparkConf.set(entry.getKey(), entry.getValue());
         });

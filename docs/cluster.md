@@ -408,8 +408,8 @@ The volume is bound statically: its PersistentVolume has the reclaim policy `Ret
 On GCP the stack does not create the disk, as the Google provider cannot list disks to import one that exists: `gcp-create`, run with a stack
 that has Git, creates the Persistent Disk `gitea-<stack type>-<CLUSTER_NAME>` in `<GCP_REGION>-a`, with its bucket (`GCP_GITEA_BUCKET`) and its
 HMAC key, and the stack only looks it up, so it fails to plan if there is none.  So deleting the stack never deletes it, and nothing needs
-excluding from `tofu destroy`; `gcp-destroy` deletes the disks, the bucket and the key.  If it creates the HMAC key, it shows the access id and secret once,
-for you to set as `GCP_HMAC_ACCESS_ID` and `GCP_HMAC_SECRET` in `secret-gcp.properties`.
+excluding from `tofu destroy`; `gcp-destroy` deletes the disks, the bucket and the key.  If it creates the HMAC key, it sets its access id and secret as `GCP_HMAC_ACCESS_ID` and
+`GCP_HMAC_SECRET` in `secret-gcp.properties`, as GCP shows the secret only once, and the output of the script is logged, which must not have it.
 
 ### AWS
 

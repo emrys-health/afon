@@ -43,22 +43,24 @@ public class DbSmokeMain {
 
     private List<String> checkPolarisDbAccess() {
         List<String> errors = new ArrayList<>();
+        // what is logged, and reported as an error, has no password: the url has it, and must not be logged
+        String target = format("jdbc:postgresql://%s/", properties.getValue(POLARIS_DB_HOST));
         String url = format(
-            "jdbc:postgresql://%s/?user=%s&password=%s",
-            properties.getValue(POLARIS_DB_HOST),
+            "%s?user=%s&password=%s",
+            target,
             properties.getValue(POLARIS_DB_USERNAME),
             properties.getValue(POLARIS_DB_PASSWORD)
         );
-        logger.info("Connecting to {}", url);
+        logger.info("Connecting to {}", target);
         try {
             Connection connection = DriverManager.getConnection(url);
             ResultSet  resultSet  = connection.createStatement().executeQuery("SELECT 1");
             while (resultSet.next()) {
                 logger.info("{} ", resultSet.getString(1));
             }
-            errors.add(format("Was not blocked from talking to %s", url));
+            errors.add(format("Was not blocked from talking to %s", target));
         } catch (SQLException e) {
-            logger.info("Cannot connect to {}", url);
+            logger.info("Cannot connect to {}", target);
         }
         return errors;
     }

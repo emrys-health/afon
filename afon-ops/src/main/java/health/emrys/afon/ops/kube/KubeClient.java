@@ -181,7 +181,7 @@ public class KubeClient implements AutoCloseable {
      */
     public ExecResult exec(String namespace, String pod, String container, Duration timeout, String... command)
     throws ApiException, IOException, InterruptedException, TimeoutException {
-        logger.info("Executing\n{}\nin {}/{}{}", String.join(" ", command), namespace, pod,
+        logger.info("Executing\n{}\nin {}/{}{}", Credentials.redact(String.join(" ", command)), namespace, pod,
                     container == null ? "" : " (container " + container + ")");
         Process process = new Exec(execApiClient())
             .newExecutionBuilder(namespace, pod, command)
@@ -195,7 +195,7 @@ public class KubeClient implements AutoCloseable {
             CompletableFuture<String> stdout = readAsync(process.getInputStream());
             CompletableFuture<String> stderr = readAsync(process.getErrorStream());
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                throw new TimeoutException("Command '" + String.join(" ", command) + "' in " + namespace + "/" + pod
+                throw new TimeoutException("Command '" + Credentials.redact(String.join(" ", command)) + "' in " + namespace + "/" + pod
                                                + " did not complete within " + timeout);
             }
             int exitCode = process.exitValue();
@@ -203,9 +203,10 @@ public class KubeClient implements AutoCloseable {
                 // The client discards the status channel's message unless it carries an exit code, so a
                 // command that never started (eg executable not found) leaves stdout and stderr empty.
                 logger.warn("Command {} in {}/{} did not run (eg executable not found). Each argument must be a"
-                        + " separate element of the command array", Arrays.toString(command), namespace, pod);
+                        + " separate element of the command array", Credentials.redact(Arrays.toString(command)), namespace, pod);
             }
-            return new ExecResult(exitCode, stdout.join(), stderr.join(), String.join(" ", command), pod);
+            // the command is kept for reporting only, so without its credentials
+            return new ExecResult(exitCode, stdout.join(), stderr.join(), Credentials.redact(String.join(" ", command)), pod);
         } finally {
             process.destroy();
         }

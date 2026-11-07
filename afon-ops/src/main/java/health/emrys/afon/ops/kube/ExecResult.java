@@ -20,6 +20,16 @@ public record ExecResult(int exitCode, String stdout, String stderr, String comm
         return total;
     }
 
+    /**
+     * The record's own text, but with the credentials that the command and its output echo redacted, as a result is logged and
+     * reported in error messages.
+     */
+    @Override
+    public String toString() {
+        return "ExecResult[exitCode=" + exitCode + ", stdout=" + Credentials.redact(stdout) + ", stderr=" + Credentials.redact(stderr)
+               + ", command=" + Credentials.redact(command) + ", host=" + host + "]";
+    }
+
     public boolean isSuccess() {
         return exitCode == 0;
     }

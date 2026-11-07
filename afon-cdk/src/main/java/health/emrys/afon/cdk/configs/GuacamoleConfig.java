@@ -8,6 +8,8 @@ import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.*;
 import com.hashicorp.cdktf.providers.kubernetes.network_policy.*;
+import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
+import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -26,7 +28,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.envFromSecret;
 import static health.emrys.afon.cdk.CdkHelper.envVar;
+import static health.emrys.afon.cdk.CdkHelper.jobEnvFromSecret;
 import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
 
 /**
@@ -69,6 +73,10 @@ public class GuacamoleConfig {
 
     /** The labels of the Guacamole pod, which {@link JupyterHubConfig} lets reach the notebooks' VNC servers. */
     static final Map<String, String> LABELS = Map.of("app", "guacamole");
+
+    /** The secret of the DB password, which is not a plain env value, as tofu would print that in clear. */
+    private static final String DB_SECRET_NAME = "guacamole-db-secret";
+    private static final String DB_PASSWORD_KEY = "password";
 
     /**
      * One Guacamole login → one in-pod VNC port → one independent X session.
@@ -316,8 +324,16 @@ public class GuacamoleConfig {
             .data(Map.of("provision.sql", buildProvisioningSql(hostResolver, sessions)))
             .build();
 
+        Secret dbSecret = Secret.Builder
+            .create(scope, "guacamoleDbSecret")
+            .metadata(SecretMetadata.builder().name(DB_SECRET_NAME).namespace("default").build())
+            .data(Map.of(DB_PASSWORD_KEY, db.password()))
+            .type("Opaque")
+            .build();
+
         List<ITerraformDependable> jobDeps = new ArrayList<>(dependsOn);
         jobDeps.add(provisionCm);
+        jobDeps.add(dbSecret);
         JobV1 dbInit = buildDbInitJob(scope, jobDeps, db);
 
         ConfigMap themeCm = buildThemeConfigMap(scope, theme);
@@ -369,7 +385,7 @@ public class GuacamoleConfig {
                 envVar("POSTGRESQL_PORT", String.valueOf(db.port())),
                 envVar("POSTGRESQL_DATABASE", db.database()),
                 envVar("POSTGRESQL_USER", db.user()),
-                envVar("POSTGRESQL_PASSWORD", db.password()),
+                envFromSecret("POSTGRESQL_PASSWORD", DB_SECRET_NAME, DB_PASSWORD_KEY),
                 // We pre-provision every user, so don't auto-create (permission-less) accounts.
                 envVar("POSTGRESQL_AUTO_CREATE_ACCOUNTS", "false"),
                 envVar("HEADER_ENABLED", "true"),
@@ -501,7 +517,7 @@ public class GuacamoleConfig {
                 jobEnv("PGHOST", db.host()),
                 jobEnv("PGPORT", String.valueOf(db.port())),
                 jobEnv("PGUSER", db.user()),
-                jobEnv("PGPASSWORD", db.password()),
+                jobEnvFromSecret("PGPASSWORD", DB_SECRET_NAME, DB_PASSWORD_KEY),
                 jobEnv("GUAC_DB", db.database())))
             .volumeMount(List.of(
                 JobV1SpecTemplateSpecContainerVolumeMount.builder()

@@ -29,7 +29,8 @@ public class Redacter {
                 content = content.replace(value, format("<%s>", key.toLowerCase()));
             }
             if (!original.equals(content)) {
-                logger.info("Redacted in {} property value {} of key {}", source, value, key);
+                // the key only: the value is the secret, which the log would keep in clear
+                logger.info("Redacted in {} the value of key {}", source, key);
             }
         }
         return content;

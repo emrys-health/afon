@@ -31,8 +31,6 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProvider;
 import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.CdkUtils;
@@ -419,8 +417,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             throw new IllegalArgumentException(
                 "GOOGLE_APPLICATION_CREDENTIALS is not set, which the monitoring needs for Loki to write its logs to the bucket");
         }
-        // a JSON string is a YAML double-quoted scalar, so the key is not parsed as YAML
-        String serviceAccount = quoted(credentials);
+        // the key is a string for Loki, not YAML, which its config would take it for, as it expands it as text: see LogStorage
         return new LogStorage("GCS", "gcs", format("""
             type: gcs
             bucketNames:
@@ -436,14 +433,14 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
               storage_config:
                 gcs:
                   bucket_name: %1$s
-                  service_account: %2$s
+                  service_account: ${LOKI_GCS_SERVICE_ACCOUNT}
               rulerConfig:
                 storage:
                   type: gcs
                   gcs:
                     bucket_name: %1$s
-                    service_account: %2$s
-            """, bucket, serviceAccount));
+                    service_account: ${LOKI_GCS_SERVICE_ACCOUNT}
+            """, bucket), Map.of("LOKI_GCS_SERVICE_ACCOUNT", credentials));
     }
 
     /**
@@ -467,14 +464,6 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     /** @return the zone of the disks, which {@code gcp-create} creates them in too, ie {@code <GCP_REGION>-a} */
     static String diskZone(AfonPropertyProvider properties) {
         return properties.getValue(AfonProperty.GCP_REGION) + "-a";
-    }
-
-    private static String quoted(String value) {
-        try {
-            return new ObjectMapper().writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Cannot quote the credentials", e);
-        }
     }
 
     @Override

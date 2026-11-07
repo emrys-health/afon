@@ -41,6 +41,8 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.initJobEnvFromSecret;
+import static health.emrys.afon.cdk.CdkHelper.jobEnvFromSecret;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.polaris.PolarisConstants.*;
 import static java.lang.String.format;
@@ -51,6 +53,8 @@ public class PolarisConfig extends Construct {
     private static final String REALM                = "POLARIS";
     private static final String SECRETS_DIR          = "/etc/app-secrets";
     private static final String SECRET_NAME          = "polaris-secret";
+    private static final String DB_PASSWORD_KEY       = "db-password";
+    private static final String PRINCIPAL_SECRET_KEY = "polaris-secret";
     private static final String SECRET_VOLUME        = "secret-volume";
     private static final String POLARIS_ENV_FILE     = "polaris_env.sh";
     private static final String GCP_CREDENTIALS_FILE = "service-account.json";
@@ -87,7 +91,11 @@ public class PolarisConfig extends Construct {
         if (!gcpCredentials.isBlank()) {
             secretData.put(GCP_CREDENTIALS_FILE, gcpCredentials);
         }
-        Secret.Builder
+        // the DB password and the root principal's secret, for the env of the db init job, which is not plain values,
+        // as tofu would print those in clear
+        secretData.put(DB_PASSWORD_KEY, properties.getValue(POLARIS_DB_PASSWORD));
+        secretData.put(PRINCIPAL_SECRET_KEY, properties.getValue(POLARIS_SECRET));
+        Secret polarisSecretResource = Secret.Builder
             .create(this, "polarisSecret")
             .dependsOn(cloudProvider.getDependables())
             .metadata(SecretMetadata.builder().name(SECRET_NAME).build())
@@ -100,12 +108,10 @@ public class PolarisConfig extends Construct {
         // polaris-db-init job creates/bootstraps these if absent before Polaris starts.
         polarisDbInitJob = buildDbInitJob(
             this,
-            new ArrayList<>(cloudProvider.getDependables()),
+            withSecret(cloudProvider.getDependables(), polarisSecretResource),
             properties.getValue(POLARIS_DB_HOST),
-            properties.getValue(POLARIS_DB_PASSWORD),
             polarisDbName(properties, cloudProvider.getId()),
             properties.getValue(POLARIS_ID),
-            properties.getValue(POLARIS_SECRET),
             properties.getValue(POLARIS_DB_USERNAME));
 
         polarisSpecPort           = ServiceSpecPort.builder()
@@ -155,10 +161,8 @@ public class PolarisConfig extends Construct {
     private static JobV1 buildDbInitJob(Construct scope,
                                         List<ITerraformDependable> dependsOn,
                                         String host,
-                                        String password,
                                         String dbName,
                                         String polarisId,
-                                        String polarisSecret,
                                         String dbUser
     ) {
         String stateDir      = "/state";
@@ -185,7 +189,7 @@ public class PolarisConfig extends Construct {
                 initJobEnv("PGHOST", host),
                 initJobEnv("PGPORT", String.valueOf(DB_PORT)),
                 initJobEnv("PGUSER", dbUser),
-                initJobEnv("PGPASSWORD", password),
+                initJobEnvFromSecret("PGPASSWORD", SECRET_NAME, DB_PASSWORD_KEY),
                 initJobEnv("POLARIS_DB", dbName)))
             .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
                                                                               .name("state")
@@ -216,9 +220,9 @@ public class PolarisConfig extends Construct {
                     "QUARKUS_DATASOURCE_JDBC_URL",
                     format("jdbc:postgresql://%s:%d/%s", host, DB_PORT, dbName)),
                 jobEnv("QUARKUS_DATASOURCE_USERNAME", dbUser),
-                jobEnv("QUARKUS_DATASOURCE_PASSWORD", password),
+                jobEnvFromSecret("QUARKUS_DATASOURCE_PASSWORD", SECRET_NAME, DB_PASSWORD_KEY),
                 jobEnv("POLARIS_ID", polarisId),
-                jobEnv("POLARIS_SECRET", polarisSecret)))
+                jobEnvFromSecret("POLARIS_SECRET", SECRET_NAME, PRINCIPAL_SECRET_KEY)))
             .volumeMount(List.of(JobV1SpecTemplateSpecContainerVolumeMount.builder()
                                                                           .name("state")
                                                                           .mountPath(stateDir)
@@ -250,6 +254,12 @@ public class PolarisConfig extends Construct {
                                                                       .build())
                                            .build())
                             .build();
+    }
+
+    private static List<ITerraformDependable> withSecret(List<? extends ITerraformDependable> dependsOn, Secret secret) {
+        List<ITerraformDependable> all = new ArrayList<>(dependsOn);
+        all.add(secret);
+        return all;
     }
 
     private static JobV1SpecTemplateSpecContainerEnv jobEnv(String name, String value) {

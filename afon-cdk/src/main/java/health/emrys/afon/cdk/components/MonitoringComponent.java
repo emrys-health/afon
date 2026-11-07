@@ -4,6 +4,8 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.TerraformStack;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
+import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
+import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.cdk.StackComponent;
@@ -12,6 +14,8 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 
@@ -24,6 +28,9 @@ import static health.emrys.afon.cdk.CdkUtils.vendoredChart;
 public class MonitoringComponent implements StackComponent {
 
     public static final String MONITORING_NAMESPACE = "default";
+
+    /** The secret of the credentials of Loki's object storage, see {@link LogStorage#secrets()} */
+    static final String LOKI_STORAGE_SECRET = "loki-storage-secret";
 
     @Override
     public List<Class<? extends StackComponent>> requires() {
@@ -165,16 +172,27 @@ public class MonitoringComponent implements StackComponent {
      * {@link #grafanaLokiDatasourceValues(String)}.
      */
     private Release deployLoki(TerraformStack stack, List<@NonNull ITerraformDependable> dependsOn, LogStorage logStorage) {
+        List<ITerraformDependable> deps = new ArrayList<>(dependsOn);
+        if (!logStorage.secrets().isEmpty()) {
+            // The credentials are not in the Helm values, which tofu prints in clear, but in a secret, whose data it prints as
+            // sensitive; Loki gets them as env vars, and expands them in its config.
+            deps.add(Secret.Builder
+                         .create(stack, "lokiStorageSecret")
+                         .metadata(SecretMetadata.builder().name(LOKI_STORAGE_SECRET).namespace(MONITORING_NAMESPACE).build())
+                         .data(yamlStrings(logStorage.secrets()))
+                         .type("Opaque")
+                         .build());
+        }
         return Release.Builder
             .create(stack, "lokiRelease")
             .name("loki")
             .chart(vendoredChart(stack, "lokiChart", "loki-6.16.0.tgz"))
             .namespace(MONITORING_NAMESPACE)
-            .values(lokiValuesOf(logStorage))
+            .values(lokiValuesOf(logStorage).stream().map(MonitoringComponent::escapedForTerraform).toList())
             .timeout(600)
             .atomic(true)
             .forceUpdate(true)
-            .dependsOn(dependsOn)
+            .dependsOn(deps)
             .build();
     }
 
@@ -206,9 +224,43 @@ public class MonitoringComponent implements StackComponent {
      * which Helm merges over them
      */
     static List<String> lokiValuesOf(LogStorage storage) {
-        return storage.extraValuesYaml().isBlank()
-               ? List.of(lokiValues(storage))
-               : List.of(lokiValues(storage), storage.extraValuesYaml());
+        List<String> values = new ArrayList<>(List.of(lokiValues(storage)));
+        if (!storage.extraValuesYaml().isBlank()) {
+            values.add(storage.extraValuesYaml());
+        }
+        if (!storage.secrets().isEmpty()) {
+            values.add(lokiSecretValues());
+        }
+        return values;
+    }
+
+    /**
+     * Terraform interpolates a dollar sign followed by a brace in every string of the plan, so the references that Loki expands in
+     * its config, eg {@code LOKI_S3_SECRET_ACCESS_KEY} in braces, are escaped with a second dollar sign, which it renders as the
+     * literal.
+     */
+    static Map<String, String> yamlStrings(Map<String, String> secrets) {
+        Map<String, String> quoted = new TreeMap<>();
+        secrets.forEach((name, value) -> quoted.put(name, LogStorage.yamlString(value)));
+        return quoted;
+    }
+
+    static String escapedForTerraform(String values) {
+        return values.replace("$" + "{", "$$" + "{");
+    }
+
+    /**
+     * @return the values that give Loki the env vars of {@link LogStorage#secrets()}, and have it expand them in its config
+     */
+    static String lokiSecretValues() {
+        return String.format("""
+            singleBinary:
+              extraArgs:
+                - -config.expand-env=true
+              extraEnvFrom:
+                - secretRef:
+                    name: %s
+            """, LOKI_STORAGE_SECRET);
     }
 
     /**
@@ -233,9 +285,9 @@ public class MonitoringComponent implements StackComponent {
                 replication_factor: 1
               # All long-term data (chunks, index, ruler rules) is shipped to
               # %2$s. Credentials come from afon.properties / secret.properties via
-              # AfonProperty — the rendered values land in the local tofu
-              # state and the synthesized stack dir under $AFON_HOME/cdktf
-              # (both gitignored), not in git history.
+              # AfonProperty, but are kept out of these values, which tofu prints in
+              # clear: they are in a Kubernetes secret, which Loki gets as env vars
+              # and expands in this config (see lokiSecretValues).
               storage:
             %1$s
               schemaConfig:

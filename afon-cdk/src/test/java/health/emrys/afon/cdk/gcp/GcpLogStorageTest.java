@@ -54,15 +54,34 @@ class GcpLogStorageTest {
     }
 
     @Test
-    void theChunkStoreAndTheRulerAreGivenTheServiceAccount(@TempDir Path dir) throws Exception {
+    void theChunkStoreAndTheRulerExpandTheServiceAccountFromTheEnv(@TempDir Path dir) throws Exception {
         List<Map<String, Object>> values = lokiValues(dir, Map.of("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS));
 
-        assertThat(values).hasSize(2);
-        // exactly as it is configured, newlines of the key included, as it is a YAML string and not YAML
-        assertThat(at(values.get(1), "loki", "storage_config", "gcs", "service_account")).isEqualTo(CREDENTIALS);
+        // the credentials are not in the values, which tofu prints in clear, but expanded by Loki from its env; the reference has a
+        // second dollar sign in the plan, which is tofu's escape of the one that it would interpolate
+        String reference = "$$" + "{LOKI_GCS_SERVICE_ACCOUNT}";
+        assertThat(values).hasSize(3);
+        assertThat(at(values.get(1), "loki", "storage_config", "gcs", "service_account")).isEqualTo(reference);
         assertThat(at(values.get(1), "loki", "storage_config", "gcs", "bucket_name")).isEqualTo("golden-afon-bucket");
-        assertThat(at(values.get(1), "loki", "rulerConfig", "storage", "gcs", "service_account")).isEqualTo(CREDENTIALS);
+        assertThat(at(values.get(1), "loki", "rulerConfig", "storage", "gcs", "service_account")).isEqualTo(reference);
         assertThat(at(values.get(1), "loki", "rulerConfig", "storage", "type")).isEqualTo("gcs");
+        assertThat(at(values.get(2), "singleBinary", "extraArgs")).isEqualTo(List.of("-config.expand-env=true"));
+    }
+
+    @Test
+    void theServiceAccountIsInASecretNotInTheValues(@TempDir Path dir) throws Exception {
+        JsonNode plan = JSON.readTree(SynthesisSupport.synthesise(StackId.parse("gcp-full"), dir,
+                                                                  Map.of("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS)));
+
+        String secret = plan.path("resource").path("kubernetes_secret").path("lokiStorageSecret").path("data")
+                            .path("LOKI_GCS_SERVICE_ACCOUNT").asText();
+
+        // Loki expands the reference as text, then parses the config: the key, which is JSON, must then be a string, not a mapping,
+        // whatever quotes the chart leaves the reference in, so the secret is a quoted string
+        Object parsed = ((Map<?, ?>) new Yaml().load("service_account: " + secret)).get("service_account");
+        assertThat(parsed).isEqualTo(CREDENTIALS);
+        assertThat(plan.path("resource").path("helm_release").path("lokiRelease").path("values").toString())
+            .doesNotContain("PRIVATE KEY");
     }
 
     @Test

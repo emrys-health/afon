@@ -10,6 +10,12 @@ import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplat
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFrom;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.DeploymentSpecTemplateSpecContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.*;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainerEnvValueFrom;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecContainerEnvValueFromSecretKeyRef;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainerEnv;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainerEnvValueFrom;
+import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1SpecTemplateSpecInitContainerEnvValueFromSecretKeyRef;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
@@ -164,6 +170,37 @@ public class CdkHelper {
                                    .toList());
         }
         return builder.build();
+    }
+
+    /**
+     * @return the env var of a Job's container whose value is the key of a Kubernetes secret, so that tofu prints it as
+     * {@code (sensitive value)}, unlike a plain value
+     */
+    public static JobV1SpecTemplateSpecContainerEnv jobEnvFromSecret(String envName, String secretName, String secretKey) {
+        return JobV1SpecTemplateSpecContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(JobV1SpecTemplateSpecContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(JobV1SpecTemplateSpecContainerEnvValueFromSecretKeyRef
+                                             .builder().name(secretName).key(secretKey).build())
+                           .build())
+            .build();
+    }
+
+    /**
+     * @return the same for an init container of a Job
+     */
+    public static JobV1SpecTemplateSpecInitContainerEnv initJobEnvFromSecret(String envName, String secretName, String secretKey) {
+        return JobV1SpecTemplateSpecInitContainerEnv
+            .builder()
+            .name(envName)
+            .valueFrom(JobV1SpecTemplateSpecInitContainerEnvValueFrom
+                           .builder()
+                           .secretKeyRef(JobV1SpecTemplateSpecInitContainerEnvValueFromSecretKeyRef
+                                             .builder().name(secretName).key(secretKey).build())
+                           .build())
+            .build();
     }
 
     public static DeploymentSpecTemplateSpecContainerEnv envFromSecret(

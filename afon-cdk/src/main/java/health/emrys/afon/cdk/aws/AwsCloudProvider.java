@@ -1179,12 +1179,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             s3:
               region: %2$s
               endpoint: ""
-              accessKeyId: %3$s
-              secretAccessKey: %4$s
+              accessKeyId: ${LOKI_S3_ACCESS_KEY_ID}
+              secretAccessKey: ${LOKI_S3_SECRET_ACCESS_KEY}
               s3ForcePathStyle: false
               insecure: false
-            """, bucket, region, properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID),
-                                                       properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY)));
+            """, bucket, region), "", Map.of(
+            "LOKI_S3_ACCESS_KEY_ID", properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID),
+            "LOKI_S3_SECRET_ACCESS_KEY", properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY)));
     }
 
     /**

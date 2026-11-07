@@ -2,6 +2,7 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.ops.kube.Credentials;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.PodCommand;
@@ -88,7 +89,7 @@ public class GitSmokeMain {
         ExecResult lsRemote = client.exec(jupyterPod, "git", "ls-remote", repoUrl);
         if (!lsRemote.isSuccess()) {
             if (!lsRemote.stderr().contains("Repository not found")) {
-                errors.add(format("Could not reach %s: %s", TEST_REPO, lsRemote.stderr()));
+                errors.add(format("Could not reach %s: %s", TEST_REPO, Credentials.redact(lsRemote.stderr())));
                 return errors;
             }
             logger.info("{} does not exist for {}, so creating it", TEST_REPO, user);
@@ -100,7 +101,8 @@ public class GitSmokeMain {
                                              format("http://%s/api/v1/user/repos", GITEA));
             if (!created.isSuccess()) {
                 errors.add(format("Could not create %s:\nerror=%s\nstdout=%s\ncommand=%s\nhost=%s",
-                                  TEST_REPO, created.stderr(), created.stdout(), created.command(), created.host()));
+                                  TEST_REPO, Credentials.redact(created.stderr()), Credentials.redact(created.stdout()),
+                                  Credentials.redact(created.command()), created.host()));
                 return errors;
             }
         }
@@ -110,7 +112,7 @@ public class GitSmokeMain {
             ? client.exec(jupyterPod, "git", "-C", TEST_REPO, "pull", repoUrl)
             : client.exec(jupyterPod, "git", "clone", repoUrl, TEST_REPO);
         if (!pulled.isSuccess()) {
-            errors.add(format("Could not pull %s: %s", TEST_REPO, pulled.stderr()));
+            errors.add(format("Could not pull %s: %s", TEST_REPO, Credentials.redact(pulled.stderr())));
         }
         return errors;
     }
