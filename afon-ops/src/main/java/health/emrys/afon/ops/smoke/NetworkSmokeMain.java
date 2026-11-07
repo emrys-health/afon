@@ -73,9 +73,14 @@ public class NetworkSmokeMain {
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
         results.addAll(checkGuacamoleOnlyReachableFromOauth2Proxy());
+        // Only the driver and the workers call what the ingress exposes, so only they may reach the ingress controller, when it is in
+        // the cluster: the master is allowed the other domains, but not those, so it is not checked for the domains
         results.addAll(checkNetworkWithPods(
-            sparkPods(), List.of(
+            sparkPods(pod -> !isSparkMaster(pod)), List.of(
                 this::checkCanSeeAllowedDomains,
+                this::checkCannotSeeOtherBuckets)));
+        results.addAll(checkNetworkWithPods(
+            sparkPods(this::isSparkMaster), List.of(
                 this::checkCannotSeeOtherBuckets)));
         results.addAll(checkNetworkWithPods(jupyterPods(), List.of(
             this::checkCannotSeeOtherBuckets,
@@ -297,13 +302,21 @@ public class NetworkSmokeMain {
     }
 
     protected List<String> sparkPods() throws Exception {
+        return sparkPods(pod -> true);
+    }
+
+    private List<String> sparkPods(Predicate<String> which) throws Exception {
         SparkNames sparkNames = SparkNames.from(properties);
         List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
-            return name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) || 
+            return name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) ||
                 name.contains(SPARK_CONNECTOR_NAME);
-        }).toList();
+        }).filter(which).toList();
         logger.info("Checking Spark pods: {}", pods);
         return pods;
+    }
+
+    private boolean isSparkMaster(String pod) {
+        return pod.contains(SparkNames.from(properties).master());
     }
 
     protected List<String> jupyterPods() throws Exception {
@@ -324,7 +337,9 @@ public class NetworkSmokeMain {
             GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT
             };
         for (String provider : providers) {
-            CurlCommand command = new CurlCommand(client, pod, provider, false);
+            // the domains over HTTPS, as a user reaches them; Guacamole is a service of the cluster, over plain HTTP
+            CurlCommand command = provider.contains(":") ? new CurlCommand(client, pod, provider, false)
+                                                         : CurlCommand.https(client, pod, provider, false);
             results.addAll(command.run());
         }
         return results;
@@ -403,10 +418,14 @@ public class NetworkSmokeMain {
             0, format("The VNC password of %s is not JUPYTER_VNC_PASSWORD", read.host()), "", command, read.host());
     }
 
+    /**
+     * Over HTTPS, as a user reaches a domain: not over HTTP, which only redirects to HTTPS, and which a cluster may not allow
+     * to an ingress controller in the cluster.
+     */
     private List<ExecResult> checkCanSeeAllowedDomains(String pod) throws Exception {
         List<ExecResult> results = new ArrayList<>();
         for (String domain : new SmokeConfig(properties).allowedDomains()) {
-            CurlCommand command = new CurlCommand(client, pod, domain, true);
+            CurlCommand command = CurlCommand.https(client, pod, domain, true);
             results.addAll(leavingOutDownDomain(domain, command.run(), NetworkSmokeMain::resolvesHere));
         }
         return results;

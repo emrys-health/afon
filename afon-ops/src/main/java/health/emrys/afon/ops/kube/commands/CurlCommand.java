@@ -12,12 +12,30 @@ public class CurlCommand extends CliCommand {
     private final String     pod;
     private final boolean    expectHttp;
 
+    /**
+     * Over plain HTTP, as for a service in the cluster.
+     */
     public CurlCommand(KubeClient client, String pod, String domain, boolean expectHttp) {
-        super(client, "curl -L -I --connect-timeout 3 --max-time 3 http://" + domain);
+        this(client, pod, "http", domain, expectHttp);
+    }
+
+    /**
+     * @param scheme {@code http} or {@code https}
+     */
+    private CurlCommand(KubeClient client, String pod, String scheme, String domain, boolean expectHttp) {
+        super(client, "curl -L -I --connect-timeout 3 --max-time 3 " + scheme + "://" + domain);
         this.client     = client;
         this.pod        = pod;
         this.expectHttp = expectHttp;
         logger.info("Checking domain {}", domain);
+    }
+
+    /**
+     * Over HTTPS, as a user reaches a domain, ie without depending on port 80, which a cluster may not allow, eg where the
+     * ingress controller is in the cluster and only its HTTPS port is allowed.
+     */
+    public static CurlCommand https(KubeClient client, String pod, String domain, boolean expectHttp) {
+        return new CurlCommand(client, pod, "https", domain, expectHttp);
     }
 
     /**
