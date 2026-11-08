@@ -37,16 +37,15 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [<stack-id>] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [<stack-id>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]"
   echo "actions:  push   :  writes the state and plan of the stack, or of all the stacks, to the snapshot of the tag.  Refuses"
   echo "                    to replace files that the snapshot already has without --force"
   echo "          pull   :  writes the files held in the snapshot of the tag back into the cdktf dir, if they differ."
   echo "                    Refuses to overwrite the files that differ without --force"
   echo "          list   :  lists the snapshots of the env, and the stacks that they hold"
   echo "          delete :  removes the snapshot of the tag, or just the files of the stack"
-  echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage)."
-  echo "            It is the global one, given by -c or --cloud, or AFON_CLOUD.  Defaults to aws,"
-  echo "            also if it is ALL."
+  echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage), given by -c or --cloud"
+  echo "            (or AFON_CLOUD).  Without it, that of the stack-id, if one is given, else aws, which it says."
   echo "tag:        the tag of the snapshot, of letters, digits and . _ -.  Required by push, pull and delete."
   echo "stack-id:   the stack, eg aws-keycloak, to push, pull or delete on its own.  Defaults to all the stacks."
   echo "region:     the AWS region or GCP location of the bucket created on first push.  Defaults to the one of the aws CLI,"
@@ -66,10 +65,6 @@ shift || true
 
 TAG=
 STACK=
-STORE_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
-if [ -z "$STORE_CLOUD" ] || [ "$STORE_CLOUD" == "all" ]; then
-  STORE_CLOUD=aws
-fi
 REGION=
 ACCOUNT=
 STORE_PROJECT=
@@ -111,14 +106,10 @@ done
 source "$AFON_ROOT/scripts/store/object-store-source.sh"
 check_store_options
 resolve_store_env
-echo "Using env $STORE_ENV"
-echo "Using cdktf dir $CDKTF_STORE_DIR"
-echo "Using cloud $STORE_CLOUD"
 
 if [ -n "$STACK" ] && [[ ! "$STACK" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
   echo "Invalid stack id $STACK, eg aws-keycloak" >&2; exit 1
 fi
-[ -n "$STACK" ] && echo "Using stack $STACK"
 
 # What follows is independent of the cloud.  The files are named by their path relative to the cdktf dir.
 
@@ -314,13 +305,13 @@ case "$ACTION" in
     check_tools
     check_tag
     set_store "$STORE_NAME"
-    echo "Running $ACTION of $STORE_ENV/$TAG${STACK:+ (stack $STACK)} in $BUCKET"
+    echo "Running $ACTION of $STORE_ENV/$TAG${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
     $ACTION
     ;;
   list)
     check_tools
     set_store "$STORE_NAME"
-    echo "Running list of $STORE_ENV${STACK:+ (stack $STACK)} in $BUCKET"
+    echo "Running list of $STORE_ENV${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
     list
     ;;
   *)

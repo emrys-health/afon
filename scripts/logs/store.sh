@@ -21,13 +21,12 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {push|pull <label>|list} [--region <region>] [--account <name>] [--project <id>] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|pull <label>|list} [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--dry-run]"
   echo "actions:  push  :  stores the log files of AFON_HOME/logs, gzipped, as <env>/<label>"
   echo "          list  :  lists the labels of the logs stored for the env"
   echo "          pull  :  writes the logs stored as the label, unzipped, to AFON_HOME/logs/<label>"
-  echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage)."
-  echo "            It is the global one, given by -c or --cloud, or AFON_CLOUD.  Defaults to aws,"
-  echo "            also if it is ALL."
+  echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage), given by -c or --cloud"
+  echo "            (or AFON_CLOUD).  Without it, aws, which it says."
   echo "label:      the label of the logs, of letters, digits and . _ -.  Required by push and pull."
   echo "region:     the AWS region or GCP location of the bucket created on first push.  Only for aws and gcp."
   echo "account:    the Azure storage account.  Defaults to AZURE_STORAGE_ACCOUNT of afon-azure.properties.  Only for azure."
@@ -43,10 +42,6 @@ ACTION="${1:-}"
 shift || true
 
 TAG=
-STORE_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
-if [ -z "$STORE_CLOUD" ] || [ "$STORE_CLOUD" == "all" ]; then
-  STORE_CLOUD=aws
-fi
 REGION=
 ACCOUNT=
 STORE_PROJECT=
@@ -82,8 +77,6 @@ done
 source "$AFON_ROOT/scripts/store/object-store-source.sh"
 check_store_options
 resolve_store_env
-echo "Using env $STORE_ENV"
-echo "Using cloud $STORE_CLOUD"
 
 LOGS_DIR="$AFON_HOME/logs"
 
@@ -147,13 +140,13 @@ case "$ACTION" in
     check_tools
     check_tag
     set_store "$STORE_NAME"
-    echo "Running $ACTION of $STORE_ENV/$TAG in $BUCKET"
+    echo "Running $ACTION of $STORE_ENV/$TAG on $STORE_CLOUD in $BUCKET"
     $ACTION
     ;;
   list)
     check_tools
     set_store "$STORE_NAME"
-    echo "Running list of $STORE_ENV in $BUCKET"
+    echo "Running list of $STORE_ENV on $STORE_CLOUD in $BUCKET"
     list
     ;;
   *)

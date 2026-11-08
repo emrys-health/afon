@@ -7,7 +7,8 @@
 # 'setup' is idempotent, and:
 #   1. creates the environment smoke-tests-<cloud>, or updates it: deployments limited to the branch (main by default, --branch), admins
 #      not able to bypass that, and the required reviewers if --reviewer is given (not changed if it is not);
-#   2. sets the variables of the cloud on the environment (below), and fails, setting nothing, if any is missing;
+#   2. sets the variables of the cloud on the environment (below), and fails, setting nothing, if any is missing: the identifiers of the
+#      account as secrets, so that GitHub masks them in the log, which is public, and the region as a variable;
 #   3. sets the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG if --config-env and --config-tag are given;
 #   4. prints the subject that the trust rule of the cloud must be limited to, repo:<owner/repo>:environment:smoke-tests-<cloud>.
 # It does not touch the cloud: the role, app registration or workload identity pool are created cloud-side, see docs/github_workflows.md,
@@ -197,12 +198,31 @@ put_branch_policy(){
   fi
 }
 
+# The identifiers of the account, which GitHub masks, from the first step of a job, in a log that is public, only if they are secrets.
+# The region is a plain variable.
+SECRET_NAMES=" AWS_ROLE_ARN AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_KEY_VAULT_NAME GCP_PROJECT_ID GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT "
+
 set_variables(){
-  local ENTRY
+  local ENTRY NAME SECRETS_SET=false
   for ENTRY in "${VARIABLES[@]}"; do
-    write gh variable set "${ENTRY%%=*}" --repo "$REPO" --env "$ENV_NAME" --body "${ENTRY#*=}"
-    [ "$DRY_RUN" == "true" ] || echo "Set ${ENTRY%%=*} = ${ENTRY#*=}"
+    NAME="${ENTRY%%=*}"
+    if [[ "$SECRET_NAMES" == *" $NAME "* ]]; then
+      if [ "$DRY_RUN" == "true" ]; then
+        echo "would run: gh secret set $NAME --repo $REPO --env $ENV_NAME"
+      else
+        gh secret set "$NAME" --repo "$REPO" --env "$ENV_NAME" --body "${ENTRY#*=}"
+        echo "Set the secret $NAME"
+      fi
+      SECRETS_SET=true
+    else
+      write gh variable set "$NAME" --repo "$REPO" --env "$ENV_NAME" --body "${ENTRY#*=}"
+      [ "$DRY_RUN" == "true" ] || echo "Set $NAME = ${ENTRY#*=}"
+    fi
   done
+  if [ "$SECRETS_SET" == "true" ] && [ "$DRY_RUN" != "true" ]; then
+    echo "The workflows read a secret before a variable of the same name: delete the variables of an earlier setup, once a run has used the secrets:"
+    echo "    gh variable list --repo $REPO --env $ENV_NAME    then    gh variable delete <name> --repo $REPO --env $ENV_NAME"
+  fi
   if [ -n "$CONFIG_ENV" ]; then
     write gh variable set SMOKE_TESTS_CONFIG_ENV --repo "$REPO" --body "$CONFIG_ENV"
     write gh variable set SMOKE_TESTS_CONFIG_TAG --repo "$REPO" --body "$CONFIG_TAG"
@@ -249,6 +269,8 @@ do_show(){
   gh api "repos/$REPO/environments/$ENV_NAME/deployment-branch-policies" --jq '.branch_policies[] | "  \(.name) (\(.type))"'
   echo "Reviewers:"
   gh api "repos/$REPO/environments/$ENV_NAME" --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]? | "  \(.reviewer.login // .reviewer.slug)"] | if length == 0 then ["  none"] else . end | .[]'
+  echo "Secrets of the environment (the identifiers of the account, whose values GitHub does not show):"
+  gh secret list --repo "$REPO" --env "$ENV_NAME"
   echo "Variables of the environment:"
   gh variable list --repo "$REPO" --env "$ENV_NAME"
   echo "Repository variables of the workflows:"

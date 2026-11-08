@@ -718,7 +718,7 @@ afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env>             # just the 
 afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env> -- --force  # also overwrites the files that differ
 afon-cli.sh cdktf-store delete <tag> aws-keycloak -e <env>           # removes the files of the stack from the snapshot
 ```
-The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
+The cloud of the store is the global `-c`/`--cloud` (or `AFON_CLOUD`); without it, the cloud of the stack id given, eg `azure` for `azure-full`, else `aws`, which the command says.  The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
 
 For each stack, or just the one given, it stores `terraform.<stack-id>.tfstate` and the plan `stacks/<stack-id>/` (`cdk.tf.json` and `assets`), so that a stack can be destroyed with `tofu-destroy` after a pull on another machine.  It leaves out `.terraform` and `.terraform.lock.hcl`, which `manage-stack` creates again, or `tofu-init` if you use the `tofu-*` commands, the kubeconfig `kube/` and the `*.backup` state backups.  The objects are named `<env>/<tag>/<file>`, eg `dev/v1/terraform.aws-keycloak.tfstate`, so stacks can be pushed to the same tag one at a time.  `<tag>` is free-form text of letters, digits and `. _ -`.
 
@@ -756,7 +756,7 @@ afon-cli.sh logs-store pull <label> -e <env>    # writes the logs of the label, 
 ```
 The store is the S3 bucket `afon-logs-<account-id>`, the Azure container `afon-logs` of the storage account `AZURE_STORAGE_ACCOUNT` (`--account`), or the Cloud Storage bucket `afon-logs-<project-id>`
 (`--project`), created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned.  The label is letters, digits and `. _ -`: the workflows use the run id and attempt, eg `42483427579-1`.
-The env is the global one, as for `cdktf-store`.  Both commands share the code of the cloud, `scripts/store/object-store-source.sh`.
+The env is the global one, as for `cdktf-store`, and so is the cloud, `-c`/`--cloud` (or `AFON_CLOUD`), else `aws`, which the command says.  Both commands share the code of the cloud, `scripts/store/object-store-source.sh`.
 
 ## Stack teardown 
 

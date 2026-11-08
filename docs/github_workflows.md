@@ -208,7 +208,7 @@ What `setup` creates on each cloud:
 | Reads the config vault | inline policy: `GetSecretValue` on `afon/<env>/*` (`--config-env`, else `afon/*/*`) and `ListSecrets`, which cannot be limited to a resource | Key Vault Secrets User on the Key Vault `AZURE_KEY_VAULT_NAME` (the Key Vault must use Azure RBAC) | `roles/secretmanager.secretAccessor` to read and `roles/secretmanager.viewer` to find a snapshot by its tag |
 | Uses the cdktf store | inline policy: the objects of the bucket `afon-cdktf-<account-id>` | Storage Blob Data Contributor on the storage account `AZURE_STORAGE_ACCOUNT` (the data role, which Owner and Contributor do not include), which covers the containers `afon-cdktf` and `afon-logs` | `roles/storage.objectAdmin` on the bucket `afon-cdktf-<project-id>`, if it exists |
 | Writes its logs | inline policy: `PutObject` (and `ListBucket` to find the bucket) on `afon-logs-<account-id>` | as above | `roles/storage.objectCreator` and `roles/storage.legacyBucketReader` on the bucket `afon-logs-<project-id>`, if it exists |
-| Variables for GitHub | `AWS_ROLE_ARN`, `AWS_REGION` | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_KEY_VAULT_NAME` | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID` |
+| Secrets for GitHub (and the variable `AWS_REGION`) | `AWS_ROLE_ARN` | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_KEY_VAULT_NAME` | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID` |
 
 The cdktf store is created by a first `cdktf-store push` (see [Command cdktf-store](stacks.md#command-cdktf-store)), by an admin who may create buckets.  On GCP, if its bucket does
 not exist when `setup` runs, the permission on it is skipped with a message, so run `setup` again once it does; on Azure, without a Key Vault or a storage account, from the config or the options, the
@@ -227,7 +227,12 @@ To set up the environment of a cloud:
 afon-cli.sh github-cloud-env setup <cloud>
 ```
 As for the cloud side, the variables are read from the active config or found by the name of the identity, not given as options: on AWS the region (`AWS_REGION`) and the role `afon-smoke-tests` of the account (`AWS_ACCOUNT_ID`), on Azure the app registration `afon-smoke-tests`, the tenant (`AZURE_TENANT_ID`), the subscription of the az login and the Key Vault (`AZURE_KEY_VAULT_NAME`), on GCP the project (`GCP_PROJECT_ID`) and the service account and workload identity provider that follow from it.  `--name` is the name of the identity if it was set up under another one, and the GCP `--pool` and `--provider` if they are not `github`.  If any is missing nothing is set.
-To delete it, with its variables, when no longer required:
+The identifiers of the account (the role ARN, the client, tenant and subscription ids, the Key Vault, the project and the service account) are set as
+**secrets of the environment**, only the region as a variable: GitHub masks the value of a secret from the first step of a job, in a log that is public,
+whereas a variable is printed as it is, eg in the `env:` block of each step.  The workflow reads a secret before a variable of the same name, so after a setup
+of an environment that had variables, delete those once a run has used the secrets (`gh variable delete <name> --env smoke-tests-<cloud>`).
+
+To delete it, with its variables and secrets, when no longer required:
 ```shell
 afon-cli.sh github-cloud-env delete <cloud> --force
 ```

@@ -107,15 +107,16 @@ jobs:
       CONFIG_TAG: ${{ inputs.config_tag }}
       # For azure-login-oidc, which cdktf-store and logs-store run to log in to Azure again before they use their store: the token of the first login
       # lasts 5 minutes, see docs/github_workflows.md.
-      AZURE_OIDC_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-      AZURE_OIDC_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-      AZURE_OIDC_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_OIDC_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+      AZURE_OIDC_TENANT_ID: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+      AZURE_OIDC_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
       # In the container, so the config, the cdktf dir (with the tofu state and the kubeconfigs) and the logs go with it.
       AFON_HOME: /tmp/afon
-      # The environment's variables of the login, see docs/github_workflows.md.
+      # The environment's variables of the login, see docs/github_workflows.md.  The identifiers of the account are secrets of the environment,
+      # so that GitHub masks them from the first step on, in a log that is public; the variables are for the environments set up before.
       AWS_REGION: ${{ vars.AWS_REGION }}
-      AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME || vars.AZURE_KEY_VAULT_NAME }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID }}
 
     steps:
       - name: Check the environment
@@ -138,7 +139,7 @@ jobs:
         if: ${{ inputs.cloud == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           role-duration-seconds: 7200
 
@@ -146,17 +147,17 @@ jobs:
         if: ${{ inputs.cloud == 'azure' }}
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Authenticate to GCP
         if: ${{ inputs.cloud == 'gcp' }}
         id: gcp-auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT || vars.GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
 
       - name: Log in to the gcloud cli

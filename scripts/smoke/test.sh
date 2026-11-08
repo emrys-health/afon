@@ -397,8 +397,9 @@ check_polaris_ingress() {
       record "Polaris ingress: none found"
       return 0 ;;
     present:?*)
-      banner "The Polaris ingress is restricted to ${state#present:}"
-      record "Polaris ingress restricted to ${state#present:}"
+      # The count, not the ranges: the output and the results of a run on GitHub are public.
+      banner "The Polaris ingress is restricted to $(awk -F, '{ print NF }' <<< "${state#present:}") address ranges"
+      record "Polaris ingress restricted to $(awk -F, '{ print NF }' <<< "${state#present:}") address ranges"
       if ingress_controller_in_cluster; then
         controller=$(controller_service "$context")
         policy=

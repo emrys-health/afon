@@ -4,12 +4,17 @@ if [ -z "$CDKTF_ENV" ]; then
   usage; exit 0
 fi
 CDKTF_ENV_DIR="$CDKTF_DIR-$CDKTF_ENV"
-if [ -L "$CDKTF_DIR" ]; then
-  rm $CDKTF_DIR
-elif [ -d "$CDKTF_DIR" ]; then
-  echo "$CDKTF_DIR is not a symlink. Moving $CDKTF_DIR to $CDKTF_ENV_DIR"
-  echo "NOTE:  You may have used option --env instead of narrower --cdktf-env."
-  mv $CDKTF_DIR $CDKTF_ENV_DIR
+# Nothing is said, nor done, if the cdktf dir is already that of the env, as when the commands run by a command do not switch again.
+if [ -L "$CDKTF_DIR" ] && [ "$(readlink "$CDKTF_DIR")" == "$CDKTF_ENV_DIR" ]; then
+  :
+else
+  if [ -L "$CDKTF_DIR" ]; then
+    rm $CDKTF_DIR
+  elif [ -d "$CDKTF_DIR" ]; then
+    echo "$CDKTF_DIR is not a symlink. Moving $CDKTF_DIR to $CDKTF_ENV_DIR"
+    echo "NOTE:  You may have used option --env instead of narrower --cdktf-env."
+    mv $CDKTF_DIR $CDKTF_ENV_DIR
+  fi
+  ln -s $CDKTF_ENV_DIR $CDKTF_DIR
+  echo "Switched to cdktf env $CDKTF_ENV"
 fi
-ln -s $CDKTF_ENV_DIR $CDKTF_DIR
-echo "Switched to cdktf env $CDKTF_ENV"

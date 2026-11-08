@@ -3,16 +3,30 @@
 # the files, ie on what is stored.  The stores are private, encrypted and versioned: AWS S3 (the default), Azure Blob Storage or GCP
 # Cloud Storage.  A store is a bucket (a container in Azure) named for what it holds and where it is, eg afon-cdktf-<account-id>.
 #
-# The sourcing script sets, before it uses the functions: ACTION, TAG (for check_tag), STORE_CLOUD (aws, azure or gcp), and REGION, ACCOUNT
+# The sourcing script sets, before it uses the functions: ACTION, TAG (for check_tag), and REGION, ACCOUNT
 # and STORE_PROJECT, as given by its options or empty.  Then:
-#   check_store_options    stops if an option is not for the cloud; sets CLI, the command line tool of the cloud
+#   check_store_options    sets STORE_CLOUD, the cloud (aws, azure or gcp) and CLI, its command line tool; stops if an option is not for it
 #   resolve_store_env      sets STORE_ENV, the env of the objects, and AFON_HOME and CDKTF_STORE_DIR
 #   check_tools, check_tag, set_store <name> (sets BUCKET), store_exists, store_create, store_objects, store_keys, store_put,
 #   store_get and store_delete, which act on the objects named by KEY, relative to the bucket
 # and WORK_DIR is a private temporary dir, removed when the script ends.
 
-# Stops if an option is not for the cloud of the store, and sets CLI.
+# Sets the cloud of the store, STORE_CLOUD, and stops if an option is not for it, and sets CLI.  The cloud is the global one, given by -c or
+# --cloud, or AFON_CLOUD; else that of the stack, if a stack id is given, eg azure-full; else aws, which it says, as it is by default only.
 check_store_options(){
+  local OF_STACK=""
+  case "${STACK:-}" in aws-*|azure-*|gcp-*) OF_STACK="${STACK%%-*}" ;; esac
+  STORE_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
+  if [ -z "$STORE_CLOUD" ] || [ "$STORE_CLOUD" == "all" ]; then
+    if [ -n "$OF_STACK" ]; then
+      STORE_CLOUD="$OF_STACK"
+    else
+      STORE_CLOUD=aws
+      echo "No cloud given: using aws.  Give -c or --cloud {aws|azure|gcp} for another."
+    fi
+  elif [ -n "$OF_STACK" ] && [ "$OF_STACK" != "$STORE_CLOUD" ]; then
+    echo "Stack $STACK is of the cloud $OF_STACK, but the cloud given is $STORE_CLOUD" >&2; exit 1
+  fi
   case "$STORE_CLOUD" in
     aws)   CLI=aws ;;
     azure) CLI=az ;;
@@ -119,7 +133,6 @@ check_tag(){
     echo "Invalid tag $TAG: it must be letters, digits and . _ -" >&2
     exit 1
   fi
-  echo "Using tag $TAG"
 }
 
 # Removes the work dir, which holds secrets, and stops.
@@ -157,8 +170,7 @@ set_store(){
         || fail "Failed to get the AWS account: is the aws CLI logged in?"
       BUCKET="$NAME-$ACCOUNT_ID"
       [ -z "$REGION" ] && REGION=$(aws configure get region 2>/dev/null || true)
-      [ -n "$REGION" ] && echo "Using region $REGION"
-      echo "Using bucket $BUCKET" ;;
+      ;;
     azure)
       if [ -z "$ACCOUNT" ]; then
         ACCOUNT=$(config_property AZURE_STORAGE_ACCOUNT azure)
@@ -168,7 +180,7 @@ set_store(){
         echo "No AZURE_STORAGE_ACCOUNT in the config of env $STORE_ENV: using the default $ACCOUNT, or give --account"
       fi
       BUCKET="$NAME"
-      echo "Using storage account $ACCOUNT, container $BUCKET" ;;
+      ;;
     gcp)
       if [ -z "$STORE_PROJECT" ]; then
         STORE_PROJECT=$(config_property GCP_PROJECT_ID gcp)
@@ -180,8 +192,9 @@ set_store(){
       [ -z "$STORE_PROJECT" ] && fail "No GCP project: give --project, set GCP_PROJECT_ID in afon-gcp.properties, or set one in gcloud"
       [ -z "$REGION" ] && REGION=$(config_property GCP_REGION gcp)
       BUCKET="$NAME-$STORE_PROJECT"
-      echo "Using project $STORE_PROJECT, bucket $BUCKET" ;;
+      ;;
   esac
+  return 0
 }
 
 # What follows is the part that depends on the cloud.  The objects are named by KEY, relative to the bucket.
