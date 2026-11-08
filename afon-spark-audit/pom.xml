@@ -12,6 +12,11 @@
          that Spark does not already ship: everything here is provided or test scoped. -->
     <artifactId>afon-spark-audit</artifactId>
 
+    <properties>
+        <!-- Spark logs through log4j2 (see src/test/resources/log4j2.properties), not the logback used elsewhere. -->
+        <afon.slf4j></afon.slf4j>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.spark</groupId>
