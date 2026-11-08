@@ -41,10 +41,6 @@ on:
         description: "The afon-cli image, without its tag"
         type: string
         default: emryshealth/afon-cli
-      logging_console:
-        description: "The console logging level of the stack setup and teardown, OFF|ERROR|WARN|INFO|DEBUG.  The logs of a public repo are public"
-        type: string
-        default: "OFF"
     secrets:
       SLACK_WEBHOOK_URL:
         required: false
@@ -109,6 +105,11 @@ jobs:
       CLOUD: ${{ inputs.cloud }}
       CONFIG_ENV: ${{ inputs.config_env }}
       CONFIG_TAG: ${{ inputs.config_tag }}
+      # For azure-login-oidc, which cdktf-store and logs-store run to log in to Azure again before they use their store: the token of the first login
+      # lasts 5 minutes, see docs/github_workflows.md.
+      AZURE_OIDC_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_OIDC_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_OIDC_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       # In the container, so the config, the cdktf dir (with the tofu state and the kubeconfigs) and the logs go with it.
       AFON_HOME: /tmp/afon
       # The environment's variables of the login, see docs/github_workflows.md.
@@ -231,14 +232,10 @@ jobs:
       - name: Run the smoke tests
         # Shorter than the job's limit, so that the next step has time to bring the stack down.
         timeout-minutes: 60
-        env:
-          # The stack is set up logging to <cloud>-full.log in $AFON_HOME/logs, as the tests and the teardown are, and to the console
-          # at this level.  It is the env var, not the option --logging-console of afon-cli.sh: that applies to the java process only,
-          # whereas the smoke-test script, and the commands it starts, take the env var.  The log file is lost with the container, so
-          # a level above OFF is what lets a run this long be followed in the Actions log, which is public.
-          AFON_LOGGING_CONSOLE: ${{ inputs.logging_console }}
         run: |
           set -euo pipefail
+          # The stack is set up logging to <cloud>-full.log in $AFON_HOME/logs, as the tests and the teardown are, and not to the console:
+          # the Actions log of a public repo is public.  The log file is lost with the container, so the last step stores it.
           afon-cli.sh --env "$CONFIG_ENV" smoke-test "$CLOUD" --setup "$CLOUD-full" --teardown
 
       # Runs also when the step above is stopped (its timeout, or a cancel), when the stack may still be up.  --teardown has already
@@ -246,8 +243,6 @@ jobs:
       - name: Bring down the stack if it is left up
         if: ${{ always() }}
         timeout-minutes: 30
-        env:
-          AFON_LOGGING_CONSOLE: ${{ inputs.logging_console }}
         run: |
           set -euo pipefail
           STATE="$AFON_HOME/cdktf/terraform.$CLOUD-full.tfstate"
@@ -257,6 +252,18 @@ jobs:
           else
             echo "No stack left up"
           fi
+
+      # The logs of the run, whatever its result, in the logs store of the cloud, which is private, as the container and its logs
+      # are lost when the job ends.  Read them with `logs-store list` and `logs-store pull <run id>-<attempt>`.  Before the config is
+      # removed, which the store needs.  It cannot fail the job, but warns, eg if the cloud login has expired.
+      - name: Store the logs in the logs store
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          afon-cli.sh --env "$CONFIG_ENV" logs-store push "${{ github.run_id }}-${{ github.run_attempt }}" --cloud "$CLOUD" \
+            || echo "::warning::The logs could not be stored in the logs store: they are lost with the container"
 
       # Only the results: the logs carry config values, and the artifacts of a public repo are public.
       - name: Upload the results

@@ -14,8 +14,7 @@ name: Smoke Tests Azure (Linux)
 # The config is the snapshot pulled from the vault of the cloud with `config-vault pull <tag> --force`, for the config env.  When
 # triggered by a build, the env and the tag are the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG; with
 # workflow_dispatch, the inputs config_env and config_tag, which take precedence.  Run by hand, image_tag is the tag of the afon-cli
-# image to test, blank for the project version of the ref run.  The console logging level of the stack setup and teardown is OFF, unless
-# the input logging_console, or when triggered by a build the repository variable SMOKE_TESTS_LOGGING_CONSOLE, says otherwise.
+# image to test, blank for the project version of the ref run.
 on:
   workflow_dispatch:
     inputs:
@@ -31,11 +30,6 @@ on:
         description: "Tag of the afon-cli image to test, eg 1.0-SNAPSHOT (blank for the project version of the ref)"
         type: string
         default: ""
-      logging_console:
-        description: "Console logging level of the stack setup and teardown.  Above OFF the Actions log shows the deploy, and is public"
-        type: choice
-        options: [OFF, ERROR, WARN, INFO, DEBUG]
-        default: OFF
   # DEACTIVATED until the env to test on is set up: uncomment to run on every new build of the cli.
   # workflow_run:
   #   workflows: ["CLI Release"]
@@ -57,5 +51,4 @@ jobs:
       config_env: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV }}
       config_tag: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG }}
       image_tag: ${{ inputs.image_tag }}
-      logging_console: ${{ inputs.logging_console || vars.SMOKE_TESTS_LOGGING_CONSOLE || 'OFF' }}
     secrets: inherit

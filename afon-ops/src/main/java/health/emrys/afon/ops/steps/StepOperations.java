@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.ops.scripts.ProcessLogLevels;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
@@ -303,7 +304,8 @@ public class StepOperations {
     /**
      * Resolves the stream to which the tofu output is written from {@link AfonProperty#TOFU_OUTPUT}:
      * "logger" (the default, also when blank) to leave it only to the {@code ch.vorburger.exec.ManagedProcess}
-     * logger, which always logs it, or "console" to also write it to {@code System.out}.
+     * logger, which always logs it, or "console" to also write it to {@code System.out}, unless the console already logs it, ie unless the
+     * console logging level is INFO or below, see {@link ProcessLogLevels#consoleLogsOutput()}: each line would then show twice.
      */
     OutputStream tofuOutput() {
         String defaultValue = "logger";
@@ -313,7 +315,7 @@ public class StepOperations {
         }
         switch (value.trim().toLowerCase()) {
             case "console":
-                return System.out;
+                return ProcessLogLevels.consoleLogsOutput() ? OutputStream.nullOutputStream() : System.out;
             case "logger":
                 return OutputStream.nullOutputStream();
             default:

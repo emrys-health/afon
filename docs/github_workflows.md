@@ -107,10 +107,13 @@ repository variables `SMOKE_TESTS_CONFIG_ENV` and `SMOKE_TESTS_CONFIG_TAG`.
   its secrets.
 - **Artifacts** are only the results file of the run (`results-<cloud>-full-<time>.txt`): the logs of a public repo are public, and so
   are its artifacts, so the log file is not uploaded.
-- **Console logging** of the stack setup and teardown is `OFF` by default, so the deploy output is not in the Actions log, and the log file
-  `logs/<cloud>-full.log` is lost with the container.  To follow a run in the Actions page, give the input `logging_console` of the
-  workflow, eg `INFO` (for runs started by a build, the repository variable `SMOKE_TESTS_LOGGING_CONSOLE`).  The log of a public repo is public:
-  only the values of the secret and catalog files, and the cloud credentials, are masked, so look at a log before keeping it on.
+- **The logs of the run** are stored, whatever its result, by the last step (`logs-store push <run id>-<attempt>`), gzipped, as `<env>/<run id>-<attempt>/`
+  in a store of their own, the bucket or container `afon-logs`, apart from the state (`afon-cdktf`), as they need different access: the job only
+  writes to it, and an admin reads it.  The log file of the container is lost with it, and the Actions log only has the console output.  From a machine logged in to
+  the cloud, `afon-cli.sh logs-store list -e <env>` lists the runs and `afon-cli.sh logs-store pull <run id>-<attempt> -e <env>` writes them to
+  `~/.afon/logs/<run id>-<attempt>/`.  The store is created by a first `logs-store push` of an admin who may create buckets (the job's identity may not), and then
+  `github-cloud-identity setup` is run again on GCP.  If the cloud login has expired by then, the step only warns.
+- **Console logging is off**, so the deploy output is not in the Actions log, which is public.  The logs are in the logs store, see above.
 
 ### If the job is stopped
 
@@ -203,7 +206,8 @@ What `setup` creates on each cloud:
 | Trust | the IAM OIDC provider of GitHub (once per account), and the role's trust policy: `sts:AssumeRoleWithWebIdentity` for audience `sts.amazonaws.com` and the subject | a federated credential for issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange` and the subject | the APIs enabled; a workload identity pool and provider `github` with the attribute condition `assertion.sub == <subject>`; that subject may impersonate the service account |
 | Deploys | the managed policies of `--deploy-role` | the roles of `--deploy-role` on the subscription | the roles of `--deploy-role` on the project |
 | Reads the config vault | inline policy: `GetSecretValue` on `afon/<env>/*` (`--config-env`, else `afon/*/*`) and `ListSecrets`, which cannot be limited to a resource | Key Vault Secrets User on the Key Vault `AZURE_KEY_VAULT_NAME` (the Key Vault must use Azure RBAC) | `roles/secretmanager.secretAccessor` to read and `roles/secretmanager.viewer` to find a snapshot by its tag |
-| Uses the cdktf store | inline policy: the objects of the bucket `afon-cdktf-<account-id>` | Storage Blob Data Contributor on the storage account `AZURE_STORAGE_ACCOUNT` (the data role, which Owner and Contributor do not include) | `roles/storage.objectAdmin` on the bucket `afon-cdktf-<project-id>`, if it exists |
+| Uses the cdktf store | inline policy: the objects of the bucket `afon-cdktf-<account-id>` | Storage Blob Data Contributor on the storage account `AZURE_STORAGE_ACCOUNT` (the data role, which Owner and Contributor do not include), which covers the containers `afon-cdktf` and `afon-logs` | `roles/storage.objectAdmin` on the bucket `afon-cdktf-<project-id>`, if it exists |
+| Writes its logs | inline policy: `PutObject` (and `ListBucket` to find the bucket) on `afon-logs-<account-id>` | as above | `roles/storage.objectCreator` and `roles/storage.legacyBucketReader` on the bucket `afon-logs-<project-id>`, if it exists |
 | Variables for GitHub | `AWS_ROLE_ARN`, `AWS_REGION` | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_KEY_VAULT_NAME` | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID` |
 
 The cdktf store is created by a first `cdktf-store push` (see [Command cdktf-store](stacks.md#command-cdktf-store)), by an admin who may create buckets.  On GCP, if its bucket does
@@ -242,6 +246,11 @@ The error is nearly always that the token's `sub` does not match the rule.  Chec
 - Azure: `AADSTS70021: No matching federated identity record found`: the subject, issuer or audience of the federated credential.
 - GCP: `unauthorized_client` or a rejected attribute condition: the `--attribute-condition` of the provider, or the `principal://` member of the binding.
 - `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`: the job lacks `id-token: write`, eg the caller workflow does not grant it.
+- Azure, late in a run: `AADSTS700024: Client assertion is not within its valid time range`.  The token that `azure/login` logs in with lasts 5 minutes, and
+  `az` presents it again to get the token of a resource it has not been asked for yet, eg the storage of the cdktf store at the end of the run.  So `cdktf-store`
+  logs in again with a fresh token (`azure-login-oidc`) before it uses the store, in a job of GitHub Actions (it needs the job env variables `AZURE_OIDC_*`).  If another
+  step fails the same way late in a run, run `afon-cli.sh azure-login-oidc` before it.  AWS (a 2-hour session) and GCP (the credentials file reads a new
+  token from the runner) are not affected.
 
 To see the claims of a job's token, print them in a throw-away workflow step (`curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=<aud>"`,
 then decode the JWT payload): the token is not a secret to the job that holds it, but do not leave it in a log.

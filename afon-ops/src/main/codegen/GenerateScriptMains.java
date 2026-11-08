@@ -93,6 +93,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureKeyvaultMain", "azure/keyvault.sh"),
         new ScriptEntry("azure", "AzureLoginAppMain", "azure/login-app.sh"),
         new ScriptEntry("azure", "AzureLoginMain", "azure/login.sh"),
+        new ScriptEntry("azure", "AzureLoginOidcMain", "azure/login-oidc.sh"),
         new ScriptEntry("azure", "AzurePolarisMain", "azure/polaris.sh", "azure", "Polaris"),
         new ScriptEntry("azure", "AzureEgressIpMain", "azure/egress-ip.sh"),
         new ScriptEntry("azure", "AzureRbacMain", "azure/rbac.sh"),
@@ -121,6 +122,8 @@ public class GenerateScriptMains {
         new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
+
+        new ScriptEntry("logs", "LogsStoreMain", "logs/store.sh"),
 
         new ScriptEntry("data", "DataSyntheticEhrMain", "data/synthetic-ehr.sh"),
 

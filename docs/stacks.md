@@ -746,6 +746,18 @@ To keep the store up to date without running the command, set `CDKTF_STORE_ENABL
 - It needs the same as the command: the CLI of the cloud logged in with access to the store, which is created on the first push, and a cdktf env, ie the `cdktf` symlink of `cdktf-switch` or `--env`.  Without one, it warns.
 - Legacy stacks, shared by a whole cloud (`terraform.<cloud>.tfstate`), are not stored.
 
+#### Command logs-store
+
+The log files of a run that is lost with its machine, eg a job of a [workflow](github_workflows.md#smoke-tests-workflows), are kept in a store of their own, apart from the state of `cdktf-store`, as they need other access (the job only writes to it, and an admin reads it):
+```shell
+afon-cli.sh logs-store push <label> -e <env>    # stores the files *.log of ~/.afon/logs, gzipped, as <env>/<label>
+afon-cli.sh logs-store list -e <env>            # lists the labels of the env, with their files and the time they were stored
+afon-cli.sh logs-store pull <label> -e <env>    # writes the logs of the label, unzipped, to ~/.afon/logs/<label>
+```
+The store is the S3 bucket `afon-logs-<account-id>`, the Azure container `afon-logs` of the storage account `AZURE_STORAGE_ACCOUNT` (`--account`), or the Cloud Storage bucket `afon-logs-<project-id>`
+(`--project`), created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned.  The label is letters, digits and `. _ -`: the workflows use the run id and attempt, eg `42483427579-1`.
+The env is the global one, as for `cdktf-store`.  Both commands share the code of the cloud, `scripts/store/object-store-source.sh`.
+
 ## Stack teardown 
 
 The stack can be brought down using tofu, which will use the locally stored tfstate.

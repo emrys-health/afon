@@ -9,13 +9,13 @@
 # never a production one.  'setup' is idempotent:
 #   aws    the IAM OIDC provider of GitHub (once per account); the role <name> trusted by the token with the subject below, with a 2-hour
 #          maximum session; the managed policies of --deploy-role attached; and an inline policy to read the config vault (Secrets Manager
-#          afon/*) and use the cdktf store (the S3 bucket afon-cdktf-<account-id>)
+#          afon/*), use the cdktf store (the S3 bucket afon-cdktf-<account-id>) and write to the logs store (afon-logs-<account-id>)
 #   azure  the app registration <name> and its service principal; the federated credential for the subject; the role assignments of
 #          --deploy-role on the subscription; Key Vault Secrets User on the Key Vault AZURE_KEY_VAULT_NAME; Storage Blob Data Contributor on
 #          the storage account AZURE_STORAGE_ACCOUNT
 #   gcp    the APIs; the workload identity pool and GitHub provider, limited to the subject by an attribute condition; the service account
 #          <name>, which that subject may impersonate; the roles of --deploy-role on the project; Secret Manager access on the project; and
-#          Storage Object Admin on the bucket afon-cdktf-<project-id>, if it exists
+#          Storage Object Admin on the bucket afon-cdktf-<project-id>, and Storage Object Creator on afon-logs-<project-id>, if they exist
 # The subject is repo:<owner/repo>:environment:smoke-tests-<cloud> (with the ids of the owner and repo, if the repo uses them, which gh
 # tells), the token claim that the trust rule is limited to.  At the end it
 # prints the github-cloud-env command with the identifiers to set on the GitHub environment.
@@ -147,7 +147,7 @@ aws_account(){
 }
 
 aws_setup(){
-  local ACCOUNT PROVIDER_ARN TRUST ACCESS POLICY SECRET_SCOPE BUCKET
+  local ACCOUNT PROVIDER_ARN TRUST ACCESS POLICY SECRET_SCOPE BUCKET LOGS_BUCKET
   ACCOUNT="$(aws_account)"
   PROVIDER_ARN="arn:aws:iam::$ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
   echo "AWS account $ACCOUNT"
@@ -185,16 +185,21 @@ aws_setup(){
 
   SECRET_SCOPE="afon/${CONFIG_ENV:-*}/*"
   BUCKET="afon-cdktf-$ACCOUNT"
-  # ListSecrets cannot be limited to a resource, and config-vault pull finds the snapshot by its tag with it.
-  ACCESS="$(jq -n --arg secrets "arn:aws:secretsmanager:*:$ACCOUNT:secret:$SECRET_SCOPE" --arg bucket "arn:aws:s3:::$BUCKET" '{
+  LOGS_BUCKET="afon-logs-$ACCOUNT"
+  # ListSecrets cannot be limited to a resource, and config-vault pull finds the snapshot by its tag with it.  The logs bucket is only
+  # written to: the job stores its logs there, and an admin reads them.
+  ACCESS="$(jq -n --arg secrets "arn:aws:secretsmanager:*:$ACCOUNT:secret:$SECRET_SCOPE" --arg bucket "arn:aws:s3:::$BUCKET" \
+              --arg logs "arn:aws:s3:::$LOGS_BUCKET" '{
     Version: "2012-10-17",
     Statement: [
       {Effect: "Allow", Action: ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"], Resource: $secrets},
       {Effect: "Allow", Action: "secretsmanager:ListSecrets", Resource: "*"},
       {Effect: "Allow", Action: ["s3:ListBucket", "s3:GetBucketLocation"], Resource: $bucket},
-      {Effect: "Allow", Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource: ($bucket + "/*")}]}')"
+      {Effect: "Allow", Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource: ($bucket + "/*")},
+      {Effect: "Allow", Action: ["s3:ListBucket", "s3:GetBucketLocation"], Resource: $logs},
+      {Effect: "Allow", Action: "s3:PutObject", Resource: ($logs + "/*")}]}')"
   write aws iam put-role-policy --role-name "$NAME" --policy-name "$NAME-access" --policy-document "$ACCESS"
-  say "Set the inline policy $NAME-access: the vault ($SECRET_SCOPE) and the cdktf store ($BUCKET)"
+  say "Set the inline policy $NAME-access: the vault ($SECRET_SCOPE), the cdktf store ($BUCKET) and the logs ($LOGS_BUCKET, write only)"
 
   echo ""
   echo "Next, set the GitHub environment:"
@@ -371,7 +376,7 @@ gcp_bind(){
 }
 
 gcp_setup(){
-  local ROLE BUCKET
+  local ROLE BUCKET LOGS_BUCKET
   gcp_project
   echo "GCP project $PROJECT_ID ($PROJECT_NUMBER)"
 
@@ -415,6 +420,17 @@ gcp_setup(){
     say "Granted roles/storage.objectAdmin on gs://$BUCKET"
   else
     echo "The cdktf store gs://$BUCKET does not exist yet: create it with a first cdktf-store push, then run this again"
+  fi
+
+  # The logs are only written to: the job stores its logs there, and an admin reads them.  legacyBucketReader is to find the bucket.
+  LOGS_BUCKET="afon-logs-$PROJECT_ID"
+  if gcloud storage buckets describe "gs://$LOGS_BUCKET" > /dev/null 2>&1; then
+    for ROLE in roles/storage.objectCreator roles/storage.legacyBucketReader; do
+      write gcloud storage buckets add-iam-policy-binding "gs://$LOGS_BUCKET" --member "serviceAccount:$SA_EMAIL" --role "$ROLE" > /dev/null
+      say "Granted $ROLE on gs://$LOGS_BUCKET"
+    done
+  else
+    echo "The logs store gs://$LOGS_BUCKET does not exist yet: create it with a first logs-store push, then run this again"
   fi
 
   echo ""

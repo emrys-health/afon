@@ -98,6 +98,29 @@ class StepOperationsTest {
     private final StepOperations operations = new StepOperations(actions, properties, new FileUserProvider());
 
     @Test
+    void tofuOutputIsOnlyLoggedByDefault() {
+        assertThat(operations.tofuOutput()).isNotSameAs(System.out);
+    }
+
+    @Test
+    void tofuOutputToTheConsoleIsNotDuplicatedByTheLoggerOnTheConsole() {
+        properties.setValue(AfonProperty.TOFU_OUTPUT, "console");
+        String before = System.getProperty("afon.logging.console");
+        try {
+            System.setProperty("afon.logging.console", "INFO");
+            assertThat(operations.tofuOutput()).isNotSameAs(System.out);
+            System.setProperty("afon.logging.console", "OFF");
+            assertThat(operations.tofuOutput()).isSameAs(System.out);
+        } finally {
+            if (before == null) {
+                System.clearProperty("afon.logging.console");
+            } else {
+                System.setProperty("afon.logging.console", before);
+            }
+        }
+    }
+
+    @Test
     void doesNotStoreTheStateByDefault() throws Exception {
         operations.deployStack(StackId.parse("aws-polaris")).getFunction().run();
         operations.deleteStacksIn(StackId.parse("aws-polaris"), "delete", StackFilter.ALL).getFunction().run();

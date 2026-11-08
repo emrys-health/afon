@@ -137,6 +137,11 @@ if [ "$AFON_DEBUG" == "true" ]; then
   fi
 fi
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-OFF}"
+# Any other level is taken by logback as DEBUG, the most verbose, so a typo, or a YAML false for OFF, would log everything.
+case "$(echo "$AFON_LOGGING_CONSOLE" | tr '[:lower:]' '[:upper:]')" in
+  OFF|ERROR|WARN|INFO|DEBUG|TRACE|ALL) ;;
+  *) echo "Invalid console logging level '$AFON_LOGGING_CONSOLE': it must be one of OFF, ERROR, WARN, INFO, DEBUG, TRACE, ALL" >&2; exit 1 ;;
+esac
 AFON_LOGGING_FILE="${AFON_LOGGING_FILE:-afon.log}"
 case "$AFON_LOGGING_FILE" in
   */*|.|..) echo "Invalid logging file '$AFON_LOGGING_FILE': it is a file name in AFON_HOME/logs, never a path" >&2; exit 1 ;;
