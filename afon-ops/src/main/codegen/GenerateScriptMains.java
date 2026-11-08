@@ -115,6 +115,9 @@ public class GenerateScriptMains {
         new ScriptEntry("gcp", "GcpSecretsMain", "gcp/secrets.sh"),
         new ScriptEntry("gcp", "GcpUpdateKubeConfigMain", "gcp/update-kube-config.sh", "gcp"),
 
+        new ScriptEntry("github", "GithubCloudEnvMain", "github/cloud-env.sh"),
+        new ScriptEntry("github", "GithubCloudIdentityMain", "github/cloud-identity.sh"),
+        new ScriptEntry("github", "GithubCloudResourcesMain", "github/cloud-resources.sh"),
         new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),

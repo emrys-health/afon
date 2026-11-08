@@ -1,0 +1,294 @@
+name: Smoke Tests (Linux)
+
+# Reusable workflow, called by the smoke-tests-<cloud>-linux workflows, which only give the cloud: runs
+# `afon-cli.sh smoke-test <cloud> --setup <cloud>-full --teardown` in the afon-cli Docker image, on a GitHub-hosted runner.
+#
+# WHY A HOSTED RUNNER AND THE IMAGE.  The repo is public, so no self-hosted runner may run its workflows, and the config and the
+# tofu state hold secrets.  A GitHub-hosted runner is a fresh VM for each job, destroyed after it, and the image
+# (emryshealth/afon-cli, see docs/docker.md) carries the tools and the afon-cli, so nothing is installed, downloaded or
+# kept on a machine of ours.  Several jobs run at the same time, so the three clouds run concurrently.
+#
+# WHERE THE SECRETS ARE.
+#   - Cloud credentials: none are stored.  The job logs in to its cloud with OIDC (short-lived token), as the identity that
+#     the GitHub environment smoke-tests-<cloud> is trusted for, see docs/github_workflows.md.
+#   - Config: pulled from the vault of the cloud with `config-vault pull <tag> --force`, into the container, and masked in the log.
+#   - Tofu state: kept in the container, and stored in the cdktf store of the cloud after each deploy by manage-stack, as
+#     the config sets CDKTF_STORE_ENABLED=true (checked below), so that it survives a job that is killed.
+#   - Artifacts: only the results file of the smoke tests.  The logs of a public repo are public, and so are its artifacts.
+#
+# The config snapshot to pull must therefore be pushed to the vault of the cloud, with CDKTF_STORE_ENABLED=true in afon.properties, for a
+# dedicated testing cloud account (account, project or subscription).
+on:
+  workflow_call:
+    inputs:
+      cloud:
+        description: "The cloud to test: aws, azure or gcp"
+        type: string
+        required: true
+      config_env:
+        description: "The config env, ie the env of the snapshot in the vault"
+        type: string
+        required: true
+      config_tag:
+        description: "The tag of the config snapshot in the vault"
+        type: string
+        required: true
+      image_tag:
+        description: "The tag of the afon-cli image, eg 1.0-SNAPSHOT (blank for the project version of the ref)"
+        type: string
+        default: ""
+      image:
+        description: "The afon-cli image, without its tag"
+        type: string
+        default: emryshealth/afon-cli
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: false
+
+permissions:
+  contents: read
+
+# One run per cloud at a time, and never cancel one in flight: it holds a stack in the cloud.  The clouds run concurrently.
+concurrency:
+  group: smoke-tests-${{ inputs.cloud }}
+  cancel-in-progress: false
+
+jobs:
+  # The tag of the image: the project version, which the Docker workflow tags the images of the build with.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        if: ${{ inputs.image_tag == '' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          sparse-checkout: pom.xml
+          sparse-checkout-cone-mode: false
+
+      - name: Determine the image tag
+        id: tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          fi
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Testing the image ${{ inputs.image }}:$IMAGE_TAG"
+
+  smoke-tests:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # The environment holds the variables of the cloud's login (and its branch rule), and is the subject that the cloud's OIDC
+    # trust is limited to, one for each cloud.
+    environment: smoke-tests-${{ inputs.cloud }}
+    # setup, tests and teardown take about 45 minutes.  The tests step has its own, shorter limit, to leave the time to bring the
+    # stack down below if it is stopped.
+    timeout-minutes: 100
+    permissions:
+      contents: read
+      # For the OIDC token that the cloud login exchanges.
+      id-token: write
+    # The runner starts it with its own entrypoint, as root, so the image's entrypoint (which makes the afon user) is not run.
+    container:
+      image: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      CLOUD: ${{ inputs.cloud }}
+      CONFIG_ENV: ${{ inputs.config_env }}
+      CONFIG_TAG: ${{ inputs.config_tag }}
+      # In the container, so the config, the cdktf dir (with the tofu state and the kubeconfigs) and the logs go with it.
+      AFON_HOME: /tmp/afon
+      # The environment's variables of the login, see docs/github_workflows.md.
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+
+    steps:
+      - name: Check the environment
+        run: |
+          set -euo pipefail
+          case "$CLOUD" in
+            aws|azure|gcp) ;;
+            *) echo "::error::Unknown cloud $CLOUD: it must be aws, azure or gcp"; exit 1 ;;
+          esac
+          if [ -z "$CONFIG_ENV" ] || [ -z "$CONFIG_TAG" ]; then
+            echo "::error::The config to pull is not given: set the config env and the config tag (inputs, else the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG)"
+            exit 1
+          fi
+          for TOOL in afon-cli.sh jq tofu kubectl; do command -v "$TOOL" > /dev/null || { echo "::error::$TOOL is not in the image"; exit 1; }; done
+          df -h /tmp; free -h
+
+      # Each login is OIDC: a short-lived token for the identity that smoke-tests-<cloud> is trusted for.  It lasts for the role's session
+      # (AWS), or about an hour (Azure, GCP), so a run that outlasts it fails its last steps: see docs/github_workflows.md.
+      - name: Log in to AWS
+        if: ${{ inputs.cloud == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Log in to Azure
+        if: ${{ inputs.cloud == 'azure' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to GCP
+        if: ${{ inputs.cloud == 'gcp' }}
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Log in to the gcloud cli
+        if: ${{ inputs.cloud == 'gcp' }}
+        run: |
+          set -euo pipefail
+          gcloud auth login --cred-file="${{ steps.gcp-auth.outputs.credentials_file_path }}" --quiet
+          gcloud config set project "$GCP_PROJECT_ID"
+
+      - name: Check the cloud login
+        run: |
+          set -euo pipefail
+          case "$CLOUD" in
+            aws)   aws sts get-caller-identity ;;
+            azure) az account show --output none ;;
+            gcp)   gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q . ;;
+          esac
+
+      # The config is a snapshot kept in the secret store of the cloud under a tag (AWS Secrets Manager, Azure Key Vault or GCP Secret
+      # Manager), see docs/configuration.md.  The container is new, so the env can switch both the config and the cdktf dir: the cdktf dir
+      # is where the tofu state is, and it must be an env's for the cdktf store, which keeps the state per env.
+      - name: Pull the config from the vault
+        run: |
+          set -euo pipefail
+          ARGS=()
+          case "$CLOUD" in
+            aws)   ARGS=(--region "$AWS_REGION") ;;
+            azure) [ -z "$AZURE_KEY_VAULT_NAME" ] || ARGS=(--vault "$AZURE_KEY_VAULT_NAME") ;;
+            gcp)   ARGS=(--project "$GCP_PROJECT_ID") ;;
+          esac
+          mkdir -p "$AFON_HOME"
+          afon-cli.sh --cloud "$CLOUD" --env "$CONFIG_ENV" config-vault pull "$CONFIG_TAG" --force "${ARGS[@]}"
+          chmod -R go-rwx "$AFON_HOME"
+
+      # GitHub masks the secrets it knows of, and these are unknown to it: without this, a value the CLI prints (or tofu, or kubectl) is
+      # in the public log.  A safety net, not the protection: the values in the log are also kept out by the CLI itself.
+      - name: Mask the secrets of the config
+        run: |
+          set -euo pipefail
+          mask() {
+            local value="$1"
+            value="${value%$'\r'}"; value="${value#\"}"; value="${value%\"}"
+            # Short values (true, a port) would mask the log into unreadability.
+            if [ "${#value}" -ge 8 ]; then echo "::add-mask::$value"; fi
+          }
+          for FILE in "$AFON_HOME"/config/secret*.properties "$AFON_HOME"/config/catalogs*.properties; do
+            [ -f "$FILE" ] || continue
+            # The whole line as well as its value, as a multi-line value (a private key) goes on in lines of its own.
+            while IFS= read -r LINE || [ -n "$LINE" ]; do
+              case "$LINE" in \#*|"") continue ;; esac
+              mask "${LINE#*=}"
+              mask "$LINE"
+            done < "$FILE"
+          done
+
+      - name: Validate afon config
+        run: afon-cli.sh --env "$CONFIG_ENV" config-validate
+
+      # The --env above only links $AFON_HOME/cdktf to cdktf-<env>: the dir, where the tofu state and the kubeconfigs go, is created here.
+      - name: Create the cdktf dir
+        run: afon-cli.sh --env "$CONFIG_ENV" cdktf-init
+
+      # Without the cdktf store, the state is lost with the container if the job is killed, and the stack is left in the cloud with
+      # nothing to bring it down.  So refuse to deploy.
+      - name: Check that the tofu state is stored
+        run: |
+          set -euo pipefail
+          if ! grep -Eqs '^[[:space:]]*CDKTF_STORE_ENABLED[[:space:]]*=[[:space:]]*true' "$AFON_HOME"/config/afon*.properties; then
+            echo "::error::CDKTF_STORE_ENABLED=true is not set in the config (afon.properties) of env $CONFIG_ENV: the state of the stack would be lost if the job is stopped"
+            exit 1
+          fi
+
+      - name: Run the smoke tests
+        # Shorter than the job's limit, so that the next step has time to bring the stack down.
+        timeout-minutes: 60
+        run: |
+          set -euo pipefail
+          # The stack is set up logging to <cloud>-full.log in $AFON_HOME/logs, as the tests and the teardown are.
+          # --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
+          afon-cli.sh --env "$CONFIG_ENV" --logging-console INFO smoke-test "$CLOUD" --setup "$CLOUD-full" --teardown
+
+      # Runs also when the step above is stopped (its timeout, or a cancel), when the stack may still be up.  --teardown has already
+      # brought it down otherwise, and then the state holds no resources, and nothing is done.
+      - name: Bring down the stack if it is left up
+        if: ${{ always() }}
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          STATE="$AFON_HOME/cdktf/terraform.$CLOUD-full.tfstate"
+          if [ -f "$STATE" ] && jq -e '(.resources // []) | length > 0' "$STATE" > /dev/null; then
+            echo "::warning::The stack $CLOUD-full is still up: bringing it down"
+            afon-cli.sh --env "$CONFIG_ENV" --logging-console INFO manage-stack delete "$CLOUD-full"
+          else
+            echo "No stack left up"
+          fi
+
+      # Only the results: the logs carry config values, and the artifacts of a public repo are public.
+      - name: Upload the results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: afon-smoke-tests-${{ inputs.cloud }}-results-${{ github.run_id }}
+          path: /tmp/afon/smoke/tests/results-*.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove afon config
+        if: ${{ always() }}
+        run: rm -rf "$AFON_HOME"/config "$AFON_HOME"/config-*
+
+  # Posts to the Slack channel #afon-ci when the run fails, and when it passes again after a failure, see scripts/github/slack.sh.
+  # In a job of its own, as the container does not hold the repo, and the webhook is all that it needs.  The workflow is the
+  # caller's, ie that of the cloud.
+  notify:
+    needs: smoke-tests
+    if: ${{ always() && (needs.smoke-tests.result == 'success' || needs.smoke-tests.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # To read the previous runs, for the recovery notification.
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/github
+
+      - name: Notify Slack on failure
+        if: ${{ needs.smoke-tests.result == 'failure' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: scripts/github/slack.sh failure
+
+      - name: Notify Slack on recovery
+        if: ${{ needs.smoke-tests.result == 'success' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/github/slack.sh recovery

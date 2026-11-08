@@ -1,0 +1,54 @@
+name: Smoke Tests Azure (Linux)
+
+# Runs the smoke tests of the Azure full stack, ie `afon-cli.sh smoke-test azure --setup azure-full --teardown`, in the afon-cli
+# Docker image on a GitHub-hosted runner, by calling the Smoke Tests (Linux) workflow, which holds the steps that are the same for
+# every cloud, see it, and docs/github_workflows.md for what to set up.
+#
+# Triggered by a new build of afon-cli, ie when the CLI Release workflow completes successfully on main, which has published the
+# images of the build too, so that the three smoke-tests-<cloud>-linux workflows run downstream of it, concurrently, each testing
+# the image of that build.
+#
+# THE TRIGGER IS DEACTIVATED until the env to test on is set up: uncomment `workflow_run` below to activate it, and set the
+# repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG.  Until then, run it with workflow_dispatch.
+#
+# The config is the snapshot pulled from the vault of the cloud with `config-vault pull <tag> --force`, for the config env.  When
+# triggered by a build, the env and the tag are the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG; with
+# workflow_dispatch, the inputs config_env and config_tag, which take precedence.  Run by hand, image_tag is the tag of the afon-cli
+# image to test, blank for the project version of the ref run.
+on:
+  workflow_dispatch:
+    inputs:
+      config_env:
+        description: "Config env (blank for the repository variable SMOKE_TESTS_CONFIG_ENV)"
+        type: string
+        default: ""
+      config_tag:
+        description: "Tag of the config snapshot in the vault (blank for the repository variable SMOKE_TESTS_CONFIG_TAG)"
+        type: string
+        default: ""
+      image_tag:
+        description: "Tag of the afon-cli image to test, eg 1.0-SNAPSHOT (blank for the project version of the ref)"
+        type: string
+        default: ""
+  # DEACTIVATED until the env to test on is set up: uncomment to run on every new build of the cli.
+  # workflow_run:
+  #   workflows: ["CLI Release"]
+  #   types: [completed]
+  #   branches: [main]
+
+jobs:
+  smoke-tests:
+    # Only after a successful release of the cli and its images, when triggered by it.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # The most that the called workflow may use: the OIDC token for the cloud login, and the previous runs for Slack.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/smoke-tests-linux.yml
+    with:
+      cloud: azure
+      config_env: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV }}
+      config_tag: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG }}
+      image_tag: ${{ inputs.image_tag }}
+    secrets: inherit
