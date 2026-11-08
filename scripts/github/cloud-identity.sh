@@ -3,10 +3,10 @@
 # smoke-tests-<cloud> logs in as, with the trust rule that only that environment's token may use it, and the permissions to deploy the
 # stack, read the config vault and use the cdktf store.  The GitHub side (the environment and its variables) is github-cloud-env.
 #
-# github-cloud-identity {setup|show|delete} <aws|azure|gcp> [--repo <owner/repo>] [--name <name>] [--dry-run] [--force] [cloud options]
+# github-cloud-identity {create|show|delete} <aws|azure|gcp> [--repo <owner/repo>] [--name <name>] [--dry-run] [--force] [cloud options]
 #
 # Run it after <cloud>-login, as an admin of the TESTING cloud account (AWS account, Azure subscription or GCP project) that the stacks of the smoke tests are deployed to,
-# never a production one.  'setup' is idempotent:
+# never a production one.  'create' is idempotent:
 #   aws    the IAM OIDC provider of GitHub (once per account); the role <name> trusted by the token with the subject below, with a 2-hour
 #          maximum session; the managed policies of --deploy-role attached; and an inline policy to read the config vault (Secrets Manager
 #          afon/*), use the cdktf store (the S3 bucket afon-cdktf-<account-id>) and write to the logs store (afon-logs-<account-id>)
@@ -46,9 +46,9 @@ GITHUB_ISSUER="https://token.actions.githubusercontent.com"
 DOCS="docs/github_workflows.md#github-as-the-identity-provider"
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {setup|show|delete} {aws|azure|gcp} [--repo <owner/repo>] [--name <name>] [--config-env <env>]"
+  echo "Usage: ${BASH_SOURCE[0]} {create|show|delete} {aws|azure|gcp} [--repo <owner/repo>] [--name <name>] [--config-env <env>]"
   echo "          [--deploy-role <role>]... [--dry-run] [--force] [cloud options]"
-  echo "actions:  setup  :  creates or updates the identity, its trust for ${ENV_PREFIX}<cloud> and its permissions"
+  echo "actions:  create :  creates or updates the identity, its trust for ${ENV_PREFIX}<cloud> and its permissions"
   echo "          show   :  reports the identity and its trust"
   echo "          delete :  removes the identity.  Needs --force"
   echo "repo:         the GitHub repo whose environment is trusted.  Defaults to env variable GH_REPO, else $DEFAULT_REPO."
@@ -106,7 +106,7 @@ config_property(){
   )
 }
 
-# The options of github-cloud-env that differ from its defaults (none, usually), for the command that the setup prints.
+# The options of github-cloud-env that differ from its defaults (none, usually), for the command that the create prints.
 next_options(){
   [ "$REPO" == "${GH_REPO:-$DEFAULT_REPO}" ] || echo -n " --repo $REPO"
   [ "$NAME" == "$DEFAULT_NAME" ] || echo -n " --name $NAME"
@@ -146,7 +146,7 @@ aws_account(){
   echo "$ACCOUNT"
 }
 
-aws_setup(){
+aws_create(){
   local ACCOUNT PROVIDER_ARN TRUST ACCESS POLICY SECRET_SCOPE BUCKET LOGS_BUCKET
   ACCOUNT="$(aws_account)"
   PROVIDER_ARN="arn:aws:iam::$ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
@@ -203,7 +203,7 @@ aws_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    github-cloud-env setup aws$(next_options)"
+  echo "    github-cloud-env create aws$(next_options)"
 }
 
 aws_show(){
@@ -252,7 +252,7 @@ azure_assign(){
   fi
 }
 
-azure_setup(){
+azure_create(){
   local TENANT APP_ID SP_ID PARAMS CRED ROLE SCOPE
   az account show > /dev/null 2>&1 || die "az is not logged in: run az login"
   SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
@@ -311,7 +311,7 @@ azure_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    github-cloud-env setup azure$(next_options)"
+  echo "    github-cloud-env create azure$(next_options)"
 }
 
 azure_show(){
@@ -375,7 +375,7 @@ gcp_bind(){
   say "Granted $ROLE on the project"
 }
 
-gcp_setup(){
+gcp_create(){
   local ROLE BUCKET LOGS_BUCKET
   gcp_project
   echo "GCP project $PROJECT_ID ($PROJECT_NUMBER)"
@@ -435,7 +435,7 @@ gcp_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    github-cloud-env setup gcp$(next_options)"
+  echo "    github-cloud-env create gcp$(next_options)"
 }
 
 gcp_show(){
@@ -466,9 +466,9 @@ gcp_delete(){
 
 ACTION=
 case "${1:-}" in
-  setup|show|delete) ACTION="$1"; shift ;;
+  create|show|delete) ACTION="$1"; shift ;;
   -h|--help|"") usage; exit 0 ;;
-  *) usage >&2; die "Unknown action '$1': it must be setup, show or delete" ;;
+  *) usage >&2; die "Unknown action '$1': it must be create, show or delete" ;;
 esac
 CLOUD="${1:-}"
 case "$CLOUD" in

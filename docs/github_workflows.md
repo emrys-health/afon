@@ -112,7 +112,7 @@ repository variables `SMOKE_TESTS_CONFIG_ENV` and `SMOKE_TESTS_CONFIG_TAG`.
   writes to it, and an admin reads it.  The log file of the container is lost with it, and the Actions log only has the console output.  From a machine logged in to
   the cloud, `afon-cli.sh logs-store list -e <env>` lists the runs and `afon-cli.sh logs-store pull <run id>-<attempt> -e <env>` writes them to
   `~/.afon/logs/<run id>-<attempt>/`.  The store is created by a first `logs-store push` of an admin who may create buckets (the job's identity may not), and then
-  `github-cloud-identity setup` is run again on GCP.  If the cloud login has expired by then, the step only warns.
+  `github-cloud-identity create` is run again on GCP.  If the cloud login has expired by then, the step only warns.
 - **Console logging is off**, so the deploy output is not in the Actions log, which is public.  The logs are in the logs store, see above.
 
 ### If the job is stopped
@@ -174,7 +174,7 @@ Neither script calls the other, and the trust is only checked when a job logs in
 - Azure: the app registration, whose client id is set on the environment, is only there once it is created, so the cloud side must come first.
 - GCP: the names follow from the project, so either order works.
 
-`github-cloud-identity setup` ends by printing the `github-cloud-env setup` command with those identifiers, so running the two in turn needs nothing to be copied by hand.
+`github-cloud-identity create` ends by printing the `github-cloud-env create` command with those identifiers, so running the two in turn needs nothing to be copied by hand.
 
 Both sides must be in place before the first run of a workflow: without the GitHub side the login step has empty variables, and without the cloud side the cloud refuses the token.  See [If the login fails](#if-the-login-fails).
 
@@ -186,19 +186,19 @@ Log in first with `afon-cli.sh <cloud>-login` (`<cloud>={aws,azure,gcp}`), as an
 
 To set up the identity of a cloud:
 ```shell
-afon-cli.sh github-cloud-identity setup <cloud>
+afon-cli.sh github-cloud-identity create <cloud>
 ```
 It acts on the account or subscription of the login, and reads the rest from the active config: on Azure the Key Vault (`AZURE_KEY_VAULT_NAME`) and the storage account (`AZURE_STORAGE_ACCOUNT`), on GCP the project (`GCP_PROJECT_ID`).  To set up another one, switch the env (`afon-cli.sh --env <env>`) and log in again; on AWS the login is checked against `AWS_ACCOUNT_ID`.
 To delete it, when no longer required (the shared OIDC provider of AWS and workload identity pool of GCP are left):
 ```shell
 afon-cli.sh github-cloud-identity delete <cloud> --force
 ```
-`setup` can be repeated, `--dry-run` reports what it would write (the checks that read the cloud still run) and `show <cloud>` reports the identity and its trust.  The trust is limited to the subject
+`create` can be repeated, `--dry-run` reports what it would write (the checks that read the cloud still run) and `show <cloud>` reports the identity and its trust.  The trust is limited to the subject
 `repo:<owner>/afon:environment:smoke-tests-<cloud>`, or with the ids of the owner and repo if the repo uses them (`--repo` for another repo; `gh` must be logged in, to read it), and it ends by printing the [`github-cloud-env`](#github-side) command with the identifiers to set on the GitHub environment.  The identity is called `afon-smoke-tests` (`--name`).
 
 **The deploy permissions are broad by default**, as the full stacks create networks, clusters and IAM: `AdministratorAccess` on AWS, `Contributor` and `User Access Administrator` on Azure (the stack creates role assignments) and `roles/owner` on GCP.  `--deploy-role` (repeatable) replaces them with narrower ones.
 
-What `setup` creates on each cloud:
+What `create` creates on each cloud:
 
 | | `aws` | `azure` | `gcp` |
 |---|---|---|---|
@@ -211,7 +211,7 @@ What `setup` creates on each cloud:
 | Secrets for GitHub (and the variable `AWS_REGION`) | `AWS_ROLE_ARN` | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_KEY_VAULT_NAME` | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID` |
 
 The cdktf store is created by a first `cdktf-store push` (see [Command cdktf-store](stacks.md#command-cdktf-store)), by an admin who may create buckets.  On GCP, if its bucket does
-not exist when `setup` runs, the permission on it is skipped with a message, so run `setup` again once it does; on Azure, without a Key Vault or a storage account, from the config or the options, the
+not exist when `create` runs, the permission on it is skipped with a message, so run `create` again once it does; on Azure, without a Key Vault or a storage account, from the config or the options, the
 corresponding permission is skipped likewise.
 
 To do the same without the script, create these in the console or CLI of the cloud; `--dry-run` prints the commands it would run.
@@ -220,24 +220,24 @@ To do the same without the script, create these in the console or CLI of the clo
 
 [github-cloud-env](../scripts/github/cloud-env.sh) creates the environment `smoke-tests-<cloud>` (limited to deployments from `main`) and sets the variables of the [table above](#where-the-secrets-are).  
 
-Run it as an admin of the repo, with `gh` logged in; `github-cloud-identity setup` prints the command to run.
+Run it as an admin of the repo, with `gh` logged in; `github-cloud-identity create` prints the command to run.
 
 To set up the environment of a cloud:
 ```shell
-afon-cli.sh github-cloud-env setup <cloud>
+afon-cli.sh github-cloud-env create <cloud>
 ```
 As for the cloud side, the variables are read from the active config or found by the name of the identity, not given as options: on AWS the region (`AWS_REGION`) and the role `afon-smoke-tests` of the account (`AWS_ACCOUNT_ID`), on Azure the app registration `afon-smoke-tests`, the tenant (`AZURE_TENANT_ID`), the subscription of the az login and the Key Vault (`AZURE_KEY_VAULT_NAME`), on GCP the project (`GCP_PROJECT_ID`) and the service account and workload identity provider that follow from it.  `--name` is the name of the identity if it was set up under another one, and the GCP `--pool` and `--provider` if they are not `github`.  If any is missing nothing is set.
 The identifiers of the account (the role ARN, the client, tenant and subscription ids, the Key Vault, the project and the service account) are set as
 **secrets of the environment**, only the region as a variable: GitHub masks the value of a secret from the first step of a job, in a log that is public,
-whereas a variable is printed as it is, eg in the `env:` block of each step.  The workflow reads a secret before a variable of the same name, so after a setup
+whereas a variable is printed as it is, eg in the `env:` block of each step.  The workflow reads a secret before a variable of the same name, so after running `create` again
 of an environment that had variables, delete those once a run has used the secrets (`gh variable delete <name> --env smoke-tests-<cloud>`).
 
 To delete it, with its variables and secrets, when no longer required:
 ```shell
 afon-cli.sh github-cloud-env delete <cloud> --force
 ```
-`setup` can be repeated.  It sets the variables from the options, and from what the cloud CLI knows for those not given (the AWS region, the Azure tenant and subscription, the GCP project and
-its number); if a required one is still missing it fails without setting anything.  It prints the subject that the cloud-side trust must be limited to.
+`create` can be repeated.  It takes the values from the active config, and from what the cloud CLI knows (the Azure subscription, the GCP project number): the account identifiers
+are set as secrets of the environment and the region as a variable; if a required one is missing it fails without setting anything.  It prints the subject that the cloud-side trust must be limited to.
 The environment allows deployments from `main` only (`--branch` to change it), and admins cannot bypass that; `--reviewer <login>` (repeatable) requires approval of each run.
 `--config-env <env> --config-tag <tag>` also set the repository variables `SMOKE_TESTS_CONFIG_ENV` and `SMOKE_TESTS_CONFIG_TAG` that the workflows use when triggered by a build.
 `--dry-run` reports what would be done, and `show <cloud>` reports the environment, its branch rules, reviewers and variables.  Nothing is done in the cloud: that is [github-cloud-identity](#cloud-side).

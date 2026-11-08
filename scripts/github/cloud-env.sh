@@ -2,9 +2,9 @@
 # Sets up the GitHub side of the OIDC login of the smoke tests workflows to a cloud: the GitHub environment smoke-tests-<cloud>
 # that the cloud's trust is limited to, its deployment branches, and the variables that the workflows log in with.
 #
-# github-cloud-env {setup|show|delete} <aws|azure|gcp> [--repo <owner/repo>] [--branch <branch>] [--reviewer <login>]... [--name <name>] [--dry-run] [--force]
+# github-cloud-env {create|show|delete} <aws|azure|gcp> [--repo <owner/repo>] [--branch <branch>] [--reviewer <login>]... [--name <name>] [--dry-run] [--force]
 #
-# 'setup' is idempotent, and:
+# 'create' is idempotent, and:
 #   1. creates the environment smoke-tests-<cloud>, or updates it: deployments limited to the branch (main by default, --branch), admins
 #      not able to bypass that, and the required reviewers if --reviewer is given (not changed if it is not);
 #   2. sets the variables of the cloud on the environment (below), and fails, setting nothing, if any is missing: the identifiers of the
@@ -39,9 +39,9 @@ ENV_PREFIX="smoke-tests-"
 DOCS="docs/github_workflows.md#github-as-the-identity-provider"
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {setup|show|delete} {aws|azure|gcp} [--repo <owner/repo>] [--branch <branch>] [--reviewer <login>]..."
+  echo "Usage: ${BASH_SOURCE[0]} {create|show|delete} {aws|azure|gcp} [--repo <owner/repo>] [--branch <branch>] [--reviewer <login>]..."
   echo "          [--config-env <env> --config-tag <tag>] [--name <name>] [--dry-run] [--force]"
-  echo "actions:  setup  :  creates or updates the environment ${ENV_PREFIX}<cloud> and sets its variables"
+  echo "actions:  create :  creates or updates the environment ${ENV_PREFIX}<cloud> and sets its variables"
   echo "          show   :  reports the environment, its branch rules and variables"
   echo "          delete :  removes the environment and its variables.  Needs --force"
   echo "repo:       the target repo.  Defaults to env variable GH_REPO, if set, else to $DEFAULT_REPO."
@@ -129,7 +129,7 @@ collect_variables(){
       TENANT_ID="$(config_property AZURE_TENANT_ID azure)"
       KEY_VAULT_NAME="$(config_property AZURE_KEY_VAULT_NAME azure)"
       SUBSCRIPTION_ID="$(try az account show --query id -o tsv)"
-      [ -n "$CLIENT_ID" ] || MISSING+=("the app registration $NAME (run github-cloud-identity setup azure, logged in with azure-login)")
+      [ -n "$CLIENT_ID" ] || MISSING+=("the app registration $NAME (run github-cloud-identity create azure, logged in with azure-login)")
       [ -n "$TENANT_ID" ] || MISSING+=("AZURE_TENANT_ID")
       [ -n "$SUBSCRIPTION_ID" ] || MISSING+=("the subscription of the az login (run azure-login)")
       add_variable AZURE_CLIENT_ID "$CLIENT_ID"
@@ -220,7 +220,7 @@ set_variables(){
     fi
   done
   if [ "$SECRETS_SET" == "true" ] && [ "$DRY_RUN" != "true" ]; then
-    echo "The workflows read a secret before a variable of the same name: delete the variables of an earlier setup, once a run has used the secrets:"
+    echo "The workflows read a secret before a variable of the same name: delete the variables of an earlier create, once a run has used the secrets:"
     echo "    gh variable list --repo $REPO --env $ENV_NAME    then    gh variable delete <name> --repo $REPO --env $ENV_NAME"
   fi
   if [ -n "$CONFIG_ENV" ]; then
@@ -254,7 +254,7 @@ print_subject(){
   echo "See $DOCS for the cloud side."
 }
 
-do_setup(){
+do_create(){
   collect_variables
   put_environment
   put_branch_policy
@@ -286,9 +286,9 @@ do_delete(){
 
 ACTION=
 case "${1:-}" in
-  setup|show|delete) ACTION="$1"; shift ;;
+  create|show|delete) ACTION="$1"; shift ;;
   -h|--help|"") usage; exit 0 ;;
-  *) usage >&2; die "Unknown action '$1': it must be setup, show or delete" ;;
+  *) usage >&2; die "Unknown action '$1': it must be create, show or delete" ;;
 esac
 CLOUD="${1:-}"
 case "$CLOUD" in
@@ -341,7 +341,7 @@ fi
 check_tools
 echo "Repo $REPO, environment $ENV_NAME"
 case "$ACTION" in
-  setup) do_setup ;;
+  create) do_create ;;
   show) do_show ;;
   delete) do_delete ;;
 esac
