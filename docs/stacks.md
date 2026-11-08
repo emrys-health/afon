@@ -750,12 +750,13 @@ To keep the store up to date without running the command, set `CDKTF_STORE_ENABL
 
 The log files of a run that is lost with its machine, eg a job of a [workflow](github_workflows.md#smoke-tests-workflows), are kept in a store of their own, apart from the state of `cdktf-store`, as they need other access (the job only writes to it, and an admin reads it):
 ```shell
-afon-cli.sh logs-store push <label> -e <env>    # stores the files *.log of ~/.afon/logs, gzipped, as <env>/<label>
-afon-cli.sh logs-store list -e <env>            # lists the labels of the env, with their files and the time they were stored
-afon-cli.sh logs-store pull <label> -e <env>    # writes the logs of the label, unzipped, to ~/.afon/logs/<label>
+afon-cli.sh logs-store push <tag> -e <env>    # stores the files *.log of ~/.afon/logs, gzipped, as <env>/<tag>
+afon-cli.sh logs-store list -e <env>            # lists the tags of the env, with their files and the time they were stored
+afon-cli.sh logs-store pull <tag> -e <env>    # writes the logs of the tag, unzipped, to ~/.afon/logs/<tag>
+afon-cli.sh logs-store delete <tag> -e <env>  # removes the logs of the tag (on aws and gcp the earlier versions of the files can be recovered)
 ```
 The store is the S3 bucket `afon-logs-<account-id>`, the Azure container `afon-logs` of the storage account `AZURE_STORAGE_ACCOUNT` (`--account`), or the Cloud Storage bucket `afon-logs-<project-id>`
-(`--project`), created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned.  The label is letters, digits and `. _ -`: the workflows use the run id and attempt, eg `42483427579-1`.
+(`--project`), created on the first `push`, private, encrypted and (on `aws` and `gcp`) versioned.  The tag is letters, digits and `. _ -`: the workflows use the run id and attempt, eg `42483427579-1`.
 The env is the global one, as for `cdktf-store`, and so is the cloud, `-c`/`--cloud` (or `AFON_CLOUD`), else `aws`, which the command says.  Both commands share the code of the cloud, `scripts/store/object-store-source.sh`.
 
 ## Stack teardown 
