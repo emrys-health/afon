@@ -210,10 +210,27 @@ set_variables(){
   fi
 }
 
+# Prints the start of the sub claim of the tokens of the repo's jobs.  It is repo:<owner>/<repo> by default, but a repo can use the immutable
+# ids of its owner and name instead, eg repo:<owner>@<owner-id>/<repo>@<repo-id>, as new repos do: the trust must be limited to what
+# the token has, which GitHub tells.
+subject_prefix(){
+  local TEMPLATE
+  command -v gh > /dev/null 2>&1 || die "Requires gh on the PATH, to read the subject claim of the repo"
+  TEMPLATE="$(gh api "repos/$REPO/actions/oidc/customization/sub" 2> /dev/null)" \
+    || die "Cannot read the OIDC subject template of $REPO: is gh logged in, as an admin of the repo?"
+  if [ "$(jq -r '.use_default // true' <<< "$TEMPLATE")" != "true" ]; then
+    die "$REPO customizes the claims of its OIDC subject (include_claim_keys): not supported, as the trust would not match its tokens"
+  elif [ "$(jq -r '.use_immutable_subject // false' <<< "$TEMPLATE")" == "true" ]; then
+    jq -r '.sub_claim_prefix' <<< "$TEMPLATE"
+  else
+    echo "repo:$REPO"
+  fi
+}
+
 print_subject(){
   echo ""
   echo "The trust rule of the $CLOUD identity must be limited to this subject (the GitHub token's sub claim):"
-  echo "    repo:$REPO:environment:$ENV_NAME"
+  echo "    $(subject_prefix):environment:$ENV_NAME"
   echo "See $DOCS for the cloud side."
 }
 

@@ -16,7 +16,8 @@
 #   gcp    the APIs; the workload identity pool and GitHub provider, limited to the subject by an attribute condition; the service account
 #          <name>, which that subject may impersonate; the roles of --deploy-role on the project; Secret Manager access on the project; and
 #          Storage Object Admin on the bucket afon-cdktf-<project-id>, if it exists
-# The subject is repo:<owner/repo>:environment:smoke-tests-<cloud>, the token claim that the trust rule is limited to.  At the end it
+# The subject is repo:<owner/repo>:environment:smoke-tests-<cloud> (with the ids of the owner and repo, if the repo uses them, which gh
+# tells), the token claim that the trust rule is limited to.  At the end it
 # prints the github-cloud-env command with the identifiers to set on the GitHub environment.
 #
 # 'show' reports the identity and its trust.  'delete' removes the identity (not the shared OIDC provider or workload identity pool) and
@@ -114,6 +115,23 @@ next_options(){
     [ "$PROVIDER" == "github" ] || echo -n " --provider $PROVIDER"
   fi
   echo
+}
+
+# Prints the start of the sub claim of the tokens of the repo's jobs.  It is repo:<owner>/<repo> by default, but a repo can use the immutable
+# ids of its owner and name instead, eg repo:<owner>@<owner-id>/<repo>@<repo-id>, as new repos do: the trust must be limited to what
+# the token has, which GitHub tells.
+subject_prefix(){
+  local TEMPLATE
+  command -v gh > /dev/null 2>&1 || die "Requires gh on the PATH, to read the subject claim of the repo"
+  TEMPLATE="$(gh api "repos/$REPO/actions/oidc/customization/sub" 2> /dev/null)" \
+    || die "Cannot read the OIDC subject template of $REPO: is gh logged in, as an admin of the repo?"
+  if [ "$(jq -r '.use_default // true' <<< "$TEMPLATE")" != "true" ]; then
+    die "$REPO customizes the claims of its OIDC subject (include_claim_keys): not supported, as the trust would not match its tokens"
+  elif [ "$(jq -r '.use_immutable_subject // false' <<< "$TEMPLATE")" == "true" ]; then
+    jq -r '.sub_claim_prefix' <<< "$TEMPLATE"
+  else
+    echo "repo:$REPO"
+  fi
 }
 
 # --- AWS ---------------------------------------------------------------------------------------------------------------------------
@@ -467,7 +485,7 @@ done
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "Invalid repo $REPO: expected <owner>/<repo>"
 [[ "$NAME" =~ ^[A-Za-z0-9_+=,.@-]+$ ]] || die "Invalid name $NAME"
 ENV_NAME="$ENV_PREFIX$CLOUD"
-SUBJECT="repo:$REPO:environment:$ENV_NAME"
+SUBJECT="$(subject_prefix):environment:$ENV_NAME"
 
 if [ ${#DEPLOY_ROLES[@]} -eq 0 ]; then
   case "$CLOUD" in

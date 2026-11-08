@@ -143,7 +143,7 @@ The [smoke tests workflows](#smoke-tests-workflows) log in to the clouds without
    | `sub` | `repo:<owner>/afon:environment:smoke-tests-aws` |
    | `repository`, `ref`, `environment`, `workflow`, `job_workflow_ref` | `<owner>/afon`, `refs/heads/main`, `smoke-tests-aws`, ... |
 
-   The `sub` is `repo:<owner>/afon:environment:<name>` for a job that runs in a GitHub environment, which these jobs do (`smoke-tests-<cloud>`), else `repo:<owner>/afon:ref:refs/heads/<branch>`.  The environment name is case-sensitive.
+   The `sub` is `repo:<owner>/afon:environment:<name>` for a job that runs in a GitHub environment, which these jobs do (`smoke-tests-<cloud>`), else `repo:<owner>/afon:ref:refs/heads/<branch>`.  The environment name is case-sensitive.  A repo can instead have the immutable ids of its owner and name in the `sub`, as new repos do, eg `repo:<owner>@<owner-id>/afon@<repo-id>:environment:smoke-tests-aws`: `github-cloud-identity` reads what the repo uses with `gh` (`gh api repos/<owner>/afon/actions/oidc/customization/sub`) and limits the trust to that.
 3. The action sends the token to the token service of the cloud, which checks GitHub's signature with GitHub's public keys, and the `iss`, `aud` and `sub` against the rule that you configured.  If they match, it returns **short-lived credentials** for the identity of the rule (a role, an app registration or a service account), and the job uses them like any login: nothing is stored in GitHub, only the identifiers of the identity, as variables of the environment.
 
 So the identity is the role, app or service account that you create, in the testing cloud account.  The security rests on **who can produce the
@@ -187,7 +187,7 @@ To delete it, when no longer required (the shared OIDC provider of AWS and workl
 afon-cli.sh github-cloud-identity delete <cloud> --force
 ```
 `setup` can be repeated, `--dry-run` reports what it would write (the checks that read the cloud still run) and `show <cloud>` reports the identity and its trust.  The trust is limited to the subject
-`repo:<owner>/afon:environment:smoke-tests-<cloud>` (`--repo` for another repo), and it ends by printing the [`github-cloud-env`](#github-side) command with the identifiers to set on the GitHub environment.  The identity is called `afon-smoke-tests` (`--name`).
+`repo:<owner>/afon:environment:smoke-tests-<cloud>`, or with the ids of the owner and repo if the repo uses them (`--repo` for another repo; `gh` must be logged in, to read it), and it ends by printing the [`github-cloud-env`](#github-side) command with the identifiers to set on the GitHub environment.  The identity is called `afon-smoke-tests` (`--name`).
 
 **The deploy permissions are broad by default**, as the full stacks create networks, clusters and IAM: `AdministratorAccess` on AWS, `Contributor` and `User Access Administrator` on Azure (the stack creates role assignments) and `roles/owner` on GCP.  `--deploy-role` (repeatable) replaces them with narrower ones.
 
