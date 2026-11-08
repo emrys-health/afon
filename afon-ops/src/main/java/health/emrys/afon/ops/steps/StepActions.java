@@ -115,14 +115,29 @@ public class StepActions {
             if (stackName.equals(cloud.toString())) {
                 deleteStack(Path.of(legacyStackDir(cloud)), Path.of(legacyTfStatePath(cloud)), maxAttempts, outputStream);
             } else {
-                StackId stackId = StackId.parse(stackName);
-                beforeDeleting.accept(stackId);
-                deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
-                // the kubeconfig of the stack's cluster, which is now gone
-                deletePath(Path.of(kubeConfigPath(stackId)));
-                removeCurrentKubeConfigIfNamed(stackId);
-                afterDeleting.accept(stackId);
+                deleteStackAndItsStore(StackId.parse(stackName), maxAttempts, outputStream, beforeDeleting, afterDeleting);
             }
+        }
+    }
+
+    /**
+     * Deletes the stack, then calls {@code afterDeleting} with it if it had a tofu state, ie if it was deployed from here.  A stack without
+     * one, eg whose plan was only synthesised by a run that stopped before deploying, has nothing to delete in the store either: what is
+     * stored, if anything, is the state of a deployment made from elsewhere, which this delete did not touch, and which is the only record
+     * of what to destroy.
+     */
+    void deleteStackAndItsStore(StackId stackId, int maxAttempts, OutputStream outputStream, Consumer<StackId> beforeDeleting,
+                                Consumer<StackId> afterDeleting) throws IOException {
+        beforeDeleting.accept(stackId);
+        boolean deployed = exists(Path.of(tfStatePath(stackId)));
+        deleteStack(Path.of(ConfigUtils.stackDir(stackId)), Path.of(tfStatePath(stackId)), maxAttempts, outputStream);
+        // the kubeconfig of the stack's cluster, which is now gone
+        deletePath(Path.of(kubeConfigPath(stackId)));
+        removeCurrentKubeConfigIfNamed(stackId);
+        if (deployed) {
+            afterDeleting.accept(stackId);
+        } else {
+            logger.info("Stack {} had no tofu state, so its stored state, if any, is left", stackId);
         }
     }
 

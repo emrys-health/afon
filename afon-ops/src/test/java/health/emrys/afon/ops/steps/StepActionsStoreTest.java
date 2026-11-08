@@ -60,6 +60,48 @@ class StepActionsStoreTest {
     }
 
     @Test
+    void deletesTheStoredStateOfAStackDeployedFromHere() throws Exception {
+        List<String> deleted = new ArrayList<>();
+
+        deletingActions().deleteStackAndItsStore(StackId.parse("aws-full"), 1, System.out, id -> { }, id -> deleted.add(id.toString()));
+
+        assertThat(deleted).containsExactly("aws-full");
+    }
+
+    @Test
+    void leavesTheStoredStateOfAStackWithoutStateHere() throws Exception {
+        hasState = false;
+        List<String> deleted = new ArrayList<>();
+
+        deletingActions().deleteStackAndItsStore(StackId.parse("aws-full"), 1, System.out, id -> { }, id -> deleted.add(id.toString()));
+
+        assertThat(deleted).isEmpty();
+    }
+
+    /** Actions that delete nothing for real, with the state of the stack here or not as {@code hasState}. */
+    private StepActions deletingActions() {
+        return new StepActions() {
+            @Override
+            protected boolean exists(Path path) {
+                return hasState;
+            }
+
+            @Override
+            void deleteStack(Path stackDir, Path tfState, int maxAttempts, java.io.OutputStream outputStream) {
+                hasState = false;
+            }
+
+            @Override
+            protected void deletePath(Path path) {
+            }
+
+            @Override
+            protected void removeCurrentKubeConfigIfNamed(StackId stackId) {
+            }
+        };
+    }
+
+    @Test
     void aFailureToStoreIsOnlyAWarning() {
         failure = new RuntimeException("Failed to run script cdktf/store.sh");
 
