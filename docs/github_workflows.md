@@ -107,6 +107,10 @@ repository variables `SMOKE_TESTS_CONFIG_ENV` and `SMOKE_TESTS_CONFIG_TAG`.
   its secrets.
 - **Artifacts** are only the results file of the run (`results-<cloud>-full-<time>.txt`): the logs of a public repo are public, and so
   are its artifacts, so the log file is not uploaded.
+- **Console logging** of the stack setup and teardown is `OFF` by default, so the deploy output is not in the Actions log, and the log file
+  `logs/<cloud>-full.log` is lost with the container.  To follow a run in the Actions page, give the input `logging_console` of the
+  workflow, eg `INFO` (for runs started by a build, the repository variable `SMOKE_TESTS_LOGGING_CONSOLE`).  The log of a public repo is public:
+  only the values of the secret and catalog files, and the cloud credentials, are masked, so look at a log before keeping it on.
 
 ### If the job is stopped
 

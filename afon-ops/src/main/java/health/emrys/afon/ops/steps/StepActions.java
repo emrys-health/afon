@@ -745,7 +745,7 @@ public class StepActions {
     }
 
     public int run(String command, Path path, String... commands) throws ManagedProcessException {
-        return run(command, path, System.out, commands);
+        return run(command, path, ProcessLogLevels.consoleLogsOutput() ? OutputStream.nullOutputStream() : System.out, commands);
     }
 
     public int run(String command, Path path, OutputStream stdOut, String... commands) throws ManagedProcessException {
@@ -759,7 +759,7 @@ public class StepActions {
         pb.setOutputStreamLogDispatcher(new ProcessLogLevels());
         pb.setDestroyOnShutdown(true)
           .addStdOut(stdOut)
-          .addStdErr(System.err)
+          .addStdErr(ProcessLogLevels.consoleLogsOutput() ? OutputStream.nullOutputStream() : System.err)
           .setConsoleBufferMaxLines(7000);
         ManagedProcess p = pb.build();
         p.start();

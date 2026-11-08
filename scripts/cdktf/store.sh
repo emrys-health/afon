@@ -426,6 +426,20 @@ remote_files(){
   } done || true
 }
 
+# Prints the units of the paths on stdin, each once, in order: the state file as it is, and the plan of a stack, its many assets,
+# as stacks/<stack-id>.  They are what is reported, rather than each file.
+units(){
+  awk '{ u = $0; if (match($0, /^stacks\/[^\/]+\//)) u = substr($0, 1, RLENGTH - 1); if (!(u in seen)) { seen[u] = 1; print u } }'
+}
+
+# Prints a line for each unit of the paths given, ending with the text, eg "stored".
+report_units(){
+  local TEXT="$1"
+  shift
+  [ $# -gt 0 ] || return 0
+  printf '%s\n' "$@" | units | sed "s|\$|: $TEXT|"
+}
+
 scope(){
   if [ -n "$STACK" ]; then echo "stack $STACK"; else echo "all the stacks"; fi
 }
@@ -439,7 +453,7 @@ push(){
   fi
   if [ "$DRY_RUN" == "true" ]; then
     echo "$STORE_ENV/$TAG: would store $COUNT files of $(scope) from $CDKTF_STORE_DIR"
-    printf '%s\n' "$FILES" | sed 's/^/  /'
+    printf '%s\n' "$FILES" | units | sed 's/^/  /'
     return
   fi
   if ! store_exists; then
@@ -454,13 +468,13 @@ push(){
     fi
   } done
   if [ ${#EXISTING[@]} -gt 0 ] && [ "$FORCE" != "true" ]; then
-    printf '%s\n' "${EXISTING[@]}" | sed 's/^/  /' >&2
+    printf '%s\n' "${EXISTING[@]}" | units | sed 's/^/  /' >&2
     fail "$STORE_ENV/$TAG already has ${#EXISTING[@]} of these files.  Use --force to replace them, or delete them first."
   fi
   for REL in $FILES ; do {
     store_put "$CDKTF_STORE_DIR/$REL" "$STORE_ENV/$TAG/$REL" || { access_hint write; fail "Failed to store $REL"; }
-    echo "$REL: stored"
   } done
+  printf '%s\n' "$FILES" | units | sed 's|$|: stored|'
   echo "$STORE_ENV/$TAG: stored $COUNT files of $(scope) in $BUCKET"
 }
 
@@ -495,8 +509,8 @@ pull(){
       CHANGED+=("$REL")
     fi
   } done
-  for REL in ${CHANGED[@]+"${CHANGED[@]}"} ; do echo "$REL: differs from $STORE_ENV/$TAG" ; done
-  for REL in ${ADDED[@]+"${ADDED[@]}"} ; do echo "$REL: missing from $CDKTF_STORE_DIR" ; done
+  report_units "differs from $STORE_ENV/$TAG" ${CHANGED[@]+"${CHANGED[@]}"}
+  report_units "missing from $CDKTF_STORE_DIR" ${ADDED[@]+"${ADDED[@]}"}
   echo "$UNCHANGED files unchanged, ${#CHANGED[@]} changed and ${#ADDED[@]} missing in $CDKTF_STORE_DIR"
 
   if [ ${#CHANGED[@]} -eq 0 ] && [ ${#ADDED[@]} -eq 0 ]; then
@@ -514,8 +528,8 @@ pull(){
     mkdir -p "$CDKTF_STORE_DIR/$(dirname "$REL")"
     cp "$WORK_DIR/pull/$REL" "$CDKTF_STORE_DIR/$REL"
     chmod 600 "$CDKTF_STORE_DIR/$REL"
-    echo "$REL: written to $CDKTF_STORE_DIR"
   } done
+  report_units "written to $CDKTF_STORE_DIR" ${CHANGED[@]+"${CHANGED[@]}"} ${ADDED[@]+"${ADDED[@]}"}
   echo "Pulled $((${#CHANGED[@]} + ${#ADDED[@]})) files from $STORE_ENV/$TAG to $CDKTF_STORE_DIR"
 }
 
@@ -557,13 +571,13 @@ delete(){
   fi
   if [ "$DRY_RUN" == "true" ]; then
     echo "$STORE_ENV/$TAG: would delete $COUNT files of $(scope)"
-    printf '%s\n' "$FILES" | sed 's/^/  /'
+    printf '%s\n' "$FILES" | units | sed 's/^/  /'
     return
   fi
   for REL in $FILES ; do {
     store_delete "$STORE_ENV/$TAG/$REL" || { access_hint write; fail "Failed to delete $REL"; }
-    echo "$REL: deleted"
   } done
+  printf '%s\n' "$FILES" | units | sed 's|$|: deleted|'
   echo "$STORE_ENV/$TAG: deleted $COUNT files of $(scope) from $BUCKET"
 }
 

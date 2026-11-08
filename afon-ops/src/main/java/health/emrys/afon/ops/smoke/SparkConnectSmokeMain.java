@@ -32,8 +32,8 @@ import static java.lang.String.format;
  * <p>
  * ./afon.sh -a exec -ec ops.smoke.SparkConnectSmokeMain -ea "aws" -lc INFO
  * <p>
- * Using {@code spark.sql("SELECT * FROM tableFQN").show()}
- * instead of {@code spark.read().table(tableFQN).show()}
+ * Using {@code spark.sql("SELECT * FROM tableFQN")}
+ * instead of {@code spark.read().table(tableFQN)}
  * so that we can show the actual query in Spark Connect's log:
  * kubectl logs -f  spark-connector-0-driver | grep SELECT
  * Otherwise, we'd need to grep "scan-report"
@@ -62,20 +62,28 @@ public class SparkConnectSmokeMain {
         String       tableFQN  = format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", tableFQN));
-        dataset.show(false);
-        checkUsersHaveBeenRecorded(dataset, tableFQN);
+        // the table is not shown, as its rows hold details that the test does not need: it checks that the query returns them
+        Object[] rows = (Object[]) dataset.collect();
+        checkQueryReturnsRows(rows, tableFQN);
+        checkUsersHaveBeenRecorded(rows, tableFQN);
         return spark;
     }
 
-    private static void checkUsersHaveBeenRecorded(Dataset<Row> dataset, String tableFQN) {
-        Object[] rows = (Object[]) dataset.collect();
+    private static void checkQueryReturnsRows(Object[] rows, String tableFQN) {
+        if (rows.length == 0) {
+            throw new IllegalStateException(format("The query of %s returned no rows", tableFQN));
+        }
         logger.info("{} has {} rows", tableFQN, rows.length);
-        Row row = Arrays.stream(rows)
-                        .map(r -> (Row) r)
-                        .filter(r -> r.getAs(LOG_COLUMN_NAME).toString().contains(CONFIGURED_USERS_KEY))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN)));
-        logger.info(format("Users defined as: %s", row));
+    }
+
+    private static void checkUsersHaveBeenRecorded(Object[] rows, String tableFQN) {
+        boolean recorded = Arrays.stream(rows)
+                                 .map(r -> (Row) r)
+                                 .anyMatch(r -> r.getAs(LOG_COLUMN_NAME).toString().contains(CONFIGURED_USERS_KEY));
+        if (!recorded) {
+            throw new IllegalStateException(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN));
+        }
+        logger.info("{} records the configured users", tableFQN);
     }
 
     private void callSparkConnectorInCluster() throws Exception {

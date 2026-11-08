@@ -41,6 +41,10 @@ on:
         description: "The afon-cli image, without its tag"
         type: string
         default: emryshealth/afon-cli
+      logging_console:
+        description: "The console logging level of the stack setup and teardown, OFF|ERROR|WARN|INFO|DEBUG.  The logs of a public repo are public"
+        type: string
+        default: "OFF"
     secrets:
       SLACK_WEBHOOK_URL:
         required: false
@@ -227,23 +231,29 @@ jobs:
       - name: Run the smoke tests
         # Shorter than the job's limit, so that the next step has time to bring the stack down.
         timeout-minutes: 60
+        env:
+          # The stack is set up logging to <cloud>-full.log in $AFON_HOME/logs, as the tests and the teardown are, and to the console
+          # at this level.  It is the env var, not the option --logging-console of afon-cli.sh: that applies to the java process only,
+          # whereas the smoke-test script, and the commands it starts, take the env var.  The log file is lost with the container, so
+          # a level above OFF is what lets a run this long be followed in the Actions log, which is public.
+          AFON_LOGGING_CONSOLE: ${{ inputs.logging_console }}
         run: |
           set -euo pipefail
-          # The stack is set up logging to <cloud>-full.log in $AFON_HOME/logs, as the tests and the teardown are.
-          # --logging-console INFO because a run this long is unreadable in the Actions log otherwise.
-          afon-cli.sh --env "$CONFIG_ENV" --logging-console INFO smoke-test "$CLOUD" --setup "$CLOUD-full" --teardown
+          afon-cli.sh --env "$CONFIG_ENV" smoke-test "$CLOUD" --setup "$CLOUD-full" --teardown
 
       # Runs also when the step above is stopped (its timeout, or a cancel), when the stack may still be up.  --teardown has already
       # brought it down otherwise, and then the state holds no resources, and nothing is done.
       - name: Bring down the stack if it is left up
         if: ${{ always() }}
         timeout-minutes: 30
+        env:
+          AFON_LOGGING_CONSOLE: ${{ inputs.logging_console }}
         run: |
           set -euo pipefail
           STATE="$AFON_HOME/cdktf/terraform.$CLOUD-full.tfstate"
           if [ -f "$STATE" ] && jq -e '(.resources // []) | length > 0' "$STATE" > /dev/null; then
             echo "::warning::The stack $CLOUD-full is still up: bringing it down"
-            afon-cli.sh --env "$CONFIG_ENV" --logging-console INFO manage-stack delete "$CLOUD-full"
+            afon-cli.sh --env "$CONFIG_ENV" manage-stack delete "$CLOUD-full"
           else
             echo "No stack left up"
           fi

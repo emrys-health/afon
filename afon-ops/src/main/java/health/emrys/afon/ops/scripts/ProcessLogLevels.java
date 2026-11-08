@@ -18,6 +18,27 @@ public class ProcessLogLevels extends OutputStreamLogDispatcher {
                                                           Pattern.CASE_INSENSITIVE);
     private static final Pattern WARNING = Pattern.compile("\\bwarn(ing)?\\b", Pattern.CASE_INSENSITIVE);
 
+    /**
+     * @return whether the console shows the output lines of the processes that we run, as the logger logs them at INFO or above, so that
+     * they need not also be written to the console as they are, which would show each twice.  The level is that of
+     * {@code afon.logging.console}, as logback is configured with it, else the env var {@code AFON_LOGGING_CONSOLE}, else INFO, which
+     * is logback's default.  At WARN or ERROR, or OFF, the lines are not all shown by the logger, so they are written as they are.
+     */
+    public static boolean consoleLogsOutput() {
+        return consoleLogsOutput(System.getProperty("afon.logging.console"), System.getenv("AFON_LOGGING_CONSOLE"));
+    }
+
+    static boolean consoleLogsOutput(String property, String env) {
+        String level = property != null && !property.isBlank() ? property : env;
+        if (level == null || level.isBlank()) {
+            return true;
+        }
+        return switch (level.trim().toUpperCase()) {
+            case "INFO", "DEBUG", "TRACE", "ALL" -> true;
+            default -> false;
+        };
+    }
+
     @Override
     public Level dispatch(OutputStreamType type, String line) {
         if (type == OutputStreamType.STDOUT) {

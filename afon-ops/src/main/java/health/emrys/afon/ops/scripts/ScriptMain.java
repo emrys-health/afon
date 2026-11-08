@@ -8,6 +8,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 
 import java.io.File;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -134,9 +135,12 @@ public class ScriptMain {
             }
             pb.getEnvironment().putAll(env);
             pb.setOutputStreamLogDispatcher(new ProcessLogLevels());
+            // The output of the script is logged by ManagedProcess, and is on the console if that logs it there: it is not also written
+            // there as it is, as each line would then show twice.
+            boolean logged = ProcessLogLevels.consoleLogsOutput();
             pb.setDestroyOnShutdown(true)
-              .addStdOut(System.out)
-              .addStdErr(System.err)
+              .addStdOut(logged ? OutputStream.nullOutputStream() : System.out)
+              .addStdErr(logged ? OutputStream.nullOutputStream() : System.err)
               .setConsoleBufferMaxLines(7000);
             ManagedProcess p = pb.build();
             p.start();
