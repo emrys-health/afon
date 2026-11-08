@@ -1,18 +1,35 @@
 # linux/amd64 or linux/arm64: TARGETARCH is amd64 or arm64, mapped to each download's own arch name where it differs
+# The tools that are static binaries are copied from their official images, rather than downloaded from the release pages of GitHub,
+# which answer with gateway errors at times.  They are the tags of the images: the versions without the leading v.  The image of eksctl
+# is for amd64 only, so that tool is not usable in an arm64 image.  OpenTofu has no image on Docker Hub: its own, from ghcr.io, is the
+# -minimal one, as the default one cannot be a build stage.
+ARG JAVA_VERSION=17
+ARG TOFU_VERSION=1.13.2
+ARG EKSCTL_VERSION=v0.215.0
+ARG YQ_VERSION=4.54.1
+ARG KUBELOGIN_VERSION=v0.2.22
+ARG EKSCTL_PLATFORM=linux/amd64
+
+FROM eclipse-temurin:${JAVA_VERSION}-jdk-jammy AS jdk
+FROM ghcr.io/opentofu/opentofu:${TOFU_VERSION}-minimal AS tofu
+FROM --platform=${EKSCTL_PLATFORM} weaveworks/eksctl:${EKSCTL_VERSION} AS eksctl
+FROM mikefarah/yq:${YQ_VERSION} AS yq
+FROM ghcr.io/azure/kubelogin:${KUBELOGIN_VERSION} AS kubelogin
+
 FROM ubuntu:22.04
 
 ARG TARGETARCH
 
-ARG TOFU_VERSION=1.13.2
+# The options of every download: fail on an HTTP error, rather than save its body as the file, and retry the transient failures
+ARG CURL_OPTS="-fsSL --retry 5 --retry-delay 10 --retry-all-errors"
+
 ARG AWS_CLI_VERSION=2.30.1
 ARG NODE_VERSION=22.23.4
 ARG AZ_CLI_VERSION=2.90.0
 ARG GCLOUD_VERSION=565.0.0
-ARG EKSCTL_VERSION=v0.215.0
 ARG HELM_VERSION=v4.3.1
-ARG YQ_VERSION=v4.54.1
+ARG KUBECTL_VERSION=v1.37.2
 
-ARG JAVA_VERSION=17
 ARG MAVEN_VERSION=3.9.16
 
 ENV JAVA_HOME=/opt/java
@@ -36,54 +53,45 @@ RUN apt-get update && apt-get install -y \
     libicu70 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x64) \
- && curl -L https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/${ARCH}/jdk/hotspot/normal/eclipse \
-    -o openjdk.tar.gz \
- && mkdir -p $JAVA_HOME \
- && tar -xzf openjdk.tar.gz -C $JAVA_HOME --strip-components=1 \
- && rm openjdk.tar.gz
+# The JDK is the Temurin one of the official image, which is the Adoptium build, rather than a download from the Adoptium API,
+# which answers with gateway errors at times.  The image has a variant for each architecture.
+COPY --from=jdk /opt/java/openjdk $JAVA_HOME
 
-RUN curl -L https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
+RUN curl $CURL_OPTS https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
     -o maven.tar.gz \
  && mkdir -p $MAVEN_HOME \
  && tar -xzf maven.tar.gz -C $MAVEN_HOME --strip-components=1 \
  && rm maven.tar.gz
 
-RUN curl -L https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.zip -o tofu.zip \
- && unzip -q tofu.zip tofu \
- && install -m 0755 tofu /usr/local/bin/tofu \
- && rm tofu tofu.zip
+COPY --from=tofu /usr/local/bin/tofu /usr/local/bin/tofu
 
 RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x86_64) \
- && curl "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
+ && curl $CURL_OPTS "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}-${AWS_CLI_VERSION}.zip" -o "awscliv2.zip" \
  && unzip -q awscliv2.zip \
  && ./aws/install \
  && rm -rf aws awscliv2.zip
 
-RUN curl -L "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_${TARGETARCH}.tar.gz" -o eksctl.tar.gz \
- && tar -xzf eksctl.tar.gz -C /usr/local/bin eksctl \
- && chmod +x /usr/local/bin/eksctl \
- && rm eksctl.tar.gz
+COPY --from=eksctl /eksctl /usr/local/bin/eksctl
 
-RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
-    | tar -xz -C /usr/local/bin --strip-components=1 linux-${TARGETARCH}/helm \
- && curl -fsSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${TARGETARCH}" \
- && chmod 0755 /usr/local/bin/yq
+RUN curl $CURL_OPTS "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 linux-${TARGETARCH}/helm
+
+COPY --from=yq /usr/bin/yq /usr/local/bin/yq
 
 RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo arm64 || echo x64) \
- && curl -L https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz -o node.tar.gz \
+ && curl $CURL_OPTS https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz -o node.tar.gz \
  && mkdir -p /opt/node \
  && tar -xzf node.tar.gz -C /opt/node --strip-components=1 \
  && rm node.tar.gz
 
 RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo arm || echo x86_64) \
- && curl -L https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${ARCH}.tar.gz -o gcloud.tar.gz \
+ && curl $CURL_OPTS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${ARCH}.tar.gz -o gcloud.tar.gz \
  && tar -xzf gcloud.tar.gz -C /opt \
  && /opt/google-cloud-sdk/install.sh --quiet --usage-reporting=false --path-update=false \
  && rm gcloud.tar.gz
 
 # Add Microsoft signing key + repo and install exact version
-RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
+RUN curl $CURL_OPTS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
     | install -o root -g root -m 644 /dev/stdin /usr/share/keyrings/microsoft.gpg \
  && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ jammy main" \
     > /etc/apt/sources.list.d/azure-cli.list \
@@ -91,7 +99,11 @@ RUN curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
  && apt-get install -y azure-cli=${AZ_CLI_VERSION}-1~jammy \
  && rm -rf /var/lib/apt/lists/*
 
-RUN az aks install-cli
+# kubectl, from the Kubernetes release server, and kubelogin from its image, instead of 'az aks install-cli', which downloads the latest
+# of both and kubelogin from the release pages of GitHub
+RUN curl $CURL_OPTS https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl -o /usr/local/bin/kubectl \
+ && chmod 0755 /usr/local/bin/kubectl
+COPY --from=kubelogin /usr/local/bin/kubelogin /usr/local/bin/kubelogin
 
 ARG AFON_VERSION
 ARG AFON_COMMIT
