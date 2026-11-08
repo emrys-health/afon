@@ -3,11 +3,9 @@
 # AWS S3 (the default), Azure Blob Storage or GCP Cloud Storage.  Unlike config-vault, which keeps the small config
 # files in the secret store of the cloud, the objects have no size limit, so the state files and the plans fit.
 #
-# ./afon.sh -a cdktf-store {push|pull|delete <tag>|list} [<stack-id>] [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [-- [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]]
-# afon-cli.sh cdktf-store {push|pull|delete <tag>|list} [<stack-id>] [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]
-# (the -- is needed by afon.sh before the script's own options, eg: ./afon.sh -a cdktf-store push v1 -e dev -- --force)
+# cdktf-store {push|pull|delete <tag>|list} [<stack-id>] [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]
 #
-# The env and the cdktf dir are the global ones of afon.sh and afon-cli.sh (--env, --cdktf-env, AFON_ENV, AFON_CDKTF_ENV,
+# The env and the cdktf dir are the global ones (--env, --cdktf-env, AFON_ENV, AFON_CDKTF_ENV,
 # --cdktf, AFON_CDKTF).  Without a global env, the env is the one that the <afon-home>/cdktf symlink points to.
 #
 # What is stored, for each stack of the cdktf dir, or just for the <stack-id> given, eg aws-keycloak:
@@ -47,7 +45,7 @@ usage(){
   echo "          list   :  lists the snapshots of the env, and the stacks that they hold"
   echo "          delete :  removes the snapshot of the tag, or just the files of the stack"
   echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage)."
-  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Defaults to aws,"
+  echo "            It is the global one, given by -c or --cloud, or AFON_CLOUD.  Defaults to aws,"
   echo "            also if it is ALL."
   echo "tag:        the tag of the snapshot, of letters, digits and . _ -.  Required by push, pull and delete."
   echo "stack-id:   the stack, eg aws-keycloak, to push, pull or delete on its own.  Defaults to all the stacks."
@@ -57,7 +55,7 @@ usage(){
   echo "project:    the GCP project.  Defaults to GCP_PROJECT_ID of afon-gcp.properties.  Only for gcp."
   echo "force:      the flag to let push replace files of the snapshot, and pull overwrite the files that differ."
   echo "dry-run:    the flag to report what would be done, without writing anything."
-  echo "The env is the global one, given by --env or --cdktf-env of afon.sh or afon-cli.sh, else the one that"
+  echo "The env is the global one, given by --env or --cdktf-env, else the one that"
   echo "<afon-home>/cdktf points to.  The cdktf dir is the global one (--cdktf, AFON_CDKTF)."
 }
 
@@ -93,7 +91,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       usage; exit 0 ;;
     --)
-      # Passed on by afon-cli.sh, which, unlike afon.sh, does not need it.
+      # Separates the options of the script, which the command may pass on.
       shift ;;
     -*)
       echo "Unknown option: $1" >&2; usage; exit 1 ;;

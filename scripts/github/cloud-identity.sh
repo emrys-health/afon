@@ -33,7 +33,7 @@
 #
 # It acts on the account or subscription that <cloud>-login logged in to (aws checks it against AWS_ACCOUNT_ID of the active config), and
 # reads the rest from the active config: GCP_PROJECT_ID, and on Azure AZURE_KEY_VAULT_NAME and AZURE_STORAGE_ACCOUNT.  To target others,
-# switch the env (afon-cli.sh --env <env>) and log in again.
+# switch the env (--env <env>) and log in again.
 #
 # The repo is --repo, else env variable GH_REPO, else emrys-health/afon.  See docs/github_workflows.md, section GitHub as the identity
 # provider, for what each step is.
@@ -142,7 +142,7 @@ aws_account(){
   ACCOUNT="$(aws sts get-caller-identity --query Account --output text 2> /dev/null)" || die "aws is not logged in: no usable credentials"
   CONFIGURED="$(config_property AWS_ACCOUNT_ID aws)"
   [ -z "$CONFIGURED" ] || [ "$CONFIGURED" == "$ACCOUNT" ] \
-    || die "The aws login is of the account $ACCOUNT, but the config is of $CONFIGURED: run afon-cli.sh aws-login"
+    || die "The aws login is of the account $ACCOUNT, but the config is of $CONFIGURED: run aws-login"
   echo "$ACCOUNT"
 }
 
@@ -203,7 +203,7 @@ aws_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    afon-cli.sh github-cloud-env setup aws$(next_options)"
+  echo "    github-cloud-env setup aws$(next_options)"
 }
 
 aws_show(){
@@ -311,7 +311,7 @@ azure_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    afon-cli.sh github-cloud-env setup azure$(next_options)"
+  echo "    github-cloud-env setup azure$(next_options)"
 }
 
 azure_show(){
@@ -342,7 +342,7 @@ azure_delete(){
 # --- GCP ---------------------------------------------------------------------------------------------------------------------------
 
 gcp_project(){
-  [ -n "$PROJECT_ID" ] || die "No GCP_PROJECT_ID in the config: switch to the env of the project (afon-cli.sh --env <env>)"
+  [ -n "$PROJECT_ID" ] || die "No GCP_PROJECT_ID in the config: switch to the env of the project (--env <env>)"
   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)' 2> /dev/null)" \
     || die "Cannot read the project $PROJECT_ID: is gcloud logged in?"
   SA_EMAIL="$NAME@$PROJECT_ID.iam.gserviceaccount.com"
@@ -435,7 +435,7 @@ gcp_setup(){
 
   echo ""
   echo "Next, set the GitHub environment:"
-  echo "    afon-cli.sh github-cloud-env setup gcp$(next_options)"
+  echo "    github-cloud-env setup gcp$(next_options)"
 }
 
 gcp_show(){

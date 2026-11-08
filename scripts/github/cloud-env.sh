@@ -16,7 +16,7 @@
 # 'show' reports the environment, its branch rules, reviewers and variables, and the repository variables of the workflows.
 # 'delete' removes the environment and its variables, and needs --force.
 #
-# The variables of the environment are not given as options: they are read from the active config (afon-cli.sh --env <env> to switch), or
+# The variables of the environment are not given as options: they are read from the active config (--env <env> to switch it), or
 # found by the name of the identity of github-cloud-identity (--name, default afon-smoke-tests):
 #   aws    AWS_ROLE_ARN   the role --name in the account AWS_ACCOUNT_ID of the config
 #          AWS_REGION     AWS_REGION of the config
@@ -153,7 +153,7 @@ collect_variables(){
       ;;
   esac
   if [ ${#MISSING[@]} -gt 0 ]; then
-    die "Missing for $CLOUD: ${MISSING[*]}.  They come from the active config (afon-cli.sh --env <env>) or the login; nothing was set."
+    die "Missing for $CLOUD: ${MISSING[*]}.  They come from the active config (--env <env>) or the login; nothing was set."
   fi
 }
 

@@ -32,7 +32,7 @@ check_store_options(){
 
 # Sets the env of the objects: the global one, given by --env or --cdktf-env, else the one that the cdktf symlink points to.
 resolve_store_env(){
-  # The env and the cdktf dir are set by afon.sh and afon-cli.sh, which have already switched the cdktf symlink to
+  # The env and the cdktf dir are set by the command, which has already switched the cdktf symlink to
   # cdktf-<env> when given an env.
   AFON_HOME="${AFON_HOME:-$HOME/.afon}"
   CDKTF_STORE_DIR="${CDKTF_DIR:-$AFON_HOME/cdktf}"
@@ -46,7 +46,7 @@ resolve_store_env(){
     fi
   fi
   if [ -z "$STORE_ENV" ] || [[ ! "$STORE_ENV" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-    echo "No env: give --env or --cdktf-env to afon.sh or afon-cli.sh, or switch to one with cdktf-switch" >&2
+    echo "No env: give --env or --cdktf-env, or switch to one with cdktf-switch" >&2
     exit 1
   fi
 }

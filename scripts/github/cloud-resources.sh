@@ -14,7 +14,7 @@
 #
 # Options: --stack-type (default full, as in the stack id <cloud>-full of the smoke tests), --older-than <hours> (default 3: leaves out
 #          the resources created in the last hours).  The cluster name (CLUSTER_NAME) and the region, resource group or project are those of
-#          the active config: to search another, switch the env (afon-cli.sh --env <env>).
+#          the active config: to search another, switch the env (--env <env>).
 #
 # Delete what it lists by hand, or with the state of the last deploy if the cdktf store has it (cdktf-store pull current <stack-id>,
 # tofu-init, tofu-destroy).  Exits with 0 if it found nothing, 1 if it found resources, 2 on an error.

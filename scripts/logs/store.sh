@@ -4,8 +4,7 @@
 # Cloud Storage.  The store is apart from that of the cdktf state and plans (cdktf-store), as the logs need other access: the job only
 # writes to it, and an admin reads it.  It is private, encrypted and versioned, as that is.
 #
-# ./afon.sh -a logs-store {push|pull <label>|list} [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [-- [--region <region>] [--account <name>] [--project <id>] [--dry-run]]
-# afon-cli.sh logs-store {push|pull <label>|list} [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--dry-run]
+# logs-store {push|pull <label>|list} [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--dry-run]
 #
 # What is stored are the files *.log of <afon-home>/logs, gzipped, as <env>/<label>/<file>.gz, in the store of the cloud:
 #   aws    the S3 bucket afon-logs-<account-id>, created on first push in the region of --region, else of the aws CLI
@@ -27,14 +26,14 @@ usage(){
   echo "          list  :  lists the labels of the logs stored for the env"
   echo "          pull  :  writes the logs stored as the label, unzipped, to AFON_HOME/logs/<label>"
   echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage)."
-  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Defaults to aws,"
+  echo "            It is the global one, given by -c or --cloud, or AFON_CLOUD.  Defaults to aws,"
   echo "            also if it is ALL."
   echo "label:      the label of the logs, of letters, digits and . _ -.  Required by push and pull."
   echo "region:     the AWS region or GCP location of the bucket created on first push.  Only for aws and gcp."
   echo "account:    the Azure storage account.  Defaults to AZURE_STORAGE_ACCOUNT of afon-azure.properties.  Only for azure."
   echo "project:    the GCP project.  Defaults to GCP_PROJECT_ID of afon-gcp.properties.  Only for gcp."
   echo "dry-run:    the flag to report what would be done, without writing anything."
-  echo "The env is the global one, given by --env or --cdktf-env of afon.sh or afon-cli.sh, else the one that"
+  echo "The env is the global one, given by --env or --cdktf-env, else the one that"
   echo "<afon-home>/cdktf points to."
 }
 
@@ -66,7 +65,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       usage; exit 0 ;;
     --)
-      # Passed on by afon-cli.sh, which, unlike afon.sh, does not need it.
+      # Separates the options of the script, which the command may pass on.
       shift ;;
     -*)
       echo "Unknown option: $1" >&2; usage; exit 1 ;;
