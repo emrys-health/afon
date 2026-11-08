@@ -2,13 +2,21 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} [acme]"
+  echo "Usage: ${BASH_SOURCE[0]} [--check] [acme]"
+  echo "With --check, issues nothing: reports whether the cert of each domain name is cached in Secret Manager, and succeeds only if all are."
+  echo "A stack restores the cert from there, rather than asking Let's Encrypt anew on each deploy, which allows only 5 certs a week of"
+  echo "the same names."
   echo "Issue and stores in GCP Secret Manager the cert of each domain name that is configured, ie not blank, of"
   echo "GCP_POLARIS_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME and OIDC_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free - default)"
 }
 
+CHECK=false
+if [ "${1:-}" == "--check" ]; then
+  CHECK=true
+  shift
+fi
 ISSUER="${1:-acme}"
 
 PROJECT_ID="${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set in afon-gcp.properties}"
@@ -29,6 +37,30 @@ for DOMAIN_PROPERTY in GCP_POLARIS_DOMAIN_NAME GCP_JUPYTER_DOMAIN_NAME OIDC_DOMA
     esac
   fi
 done
+# Reports whether the cert of each domain name is cached in Secret Manager, under the secret names the restore step of the stack reads.
+# Succeeds if all are, or if the secrets are not enabled, GCP_SECRETS_ENABLED, as then the certs are not cached by design.
+check_cached_certs() {
+  local DOMAIN KEBAB MISSING=0
+  if [ "${GCP_SECRETS_ENABLED:-}" != "true" ]; then
+    echo "- GCP_SECRETS_ENABLED is not true: the certs are not cached, each deploy asks Let's Encrypt for them"
+    return 0
+  fi
+  for DOMAIN in $DOMAIN_NAMES; do
+    KEBAB="${DOMAIN//./-}"
+    if gcloud secrets describe "${KEBAB}-tls-crt" --project="$PROJECT_ID" > /dev/null 2>&1 \
+         && gcloud secrets describe "${KEBAB}-tls-key" --project="$PROJECT_ID" > /dev/null 2>&1; then
+      echo "- $DOMAIN: cert cached in Secret Manager of $PROJECT_ID (${KEBAB}-tls-crt)"
+    else
+      echo "- $DOMAIN: cert NOT cached in Secret Manager of $PROJECT_ID"
+      MISSING=1
+    fi
+  done
+  if [ $MISSING -ne 0 ]; then
+    echo "- Issue and cache the missing certs with: gcp-issue-cert acme  (Let's Encrypt allows 5 certs a week of the same names)"
+  fi
+  return $MISSING
+}
+
 require_domain_names() {
   if [ -z "$DOMAIN_NAMES" ]; then
     echo "- No domain name is configured, nothing to issue: set them in afon-gcp.properties before caching a cert"
@@ -85,6 +117,10 @@ issue_via_acme() {
 }
 
 require_domain_names
+
+if [ "$CHECK" == "true" ]; then
+  if check_cached_certs; then exit 0; else exit 1; fi
+fi
 
 case "$ISSUER" in
   acme)

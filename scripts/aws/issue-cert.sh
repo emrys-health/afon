@@ -2,7 +2,7 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris] [--force]"
+  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris] [--force|--check]"
   echo "Requests a new ACM certificate (DNS validation) for the given stack's domain,"
   echo "creates the validation CNAME in the Route53 hosted zone named after the domain,"
   echo "and waits for ACM to issue it. The domains come from afon.properties/afon-aws.properties,"
@@ -11,15 +11,19 @@ usage(){
   echo "A domain that already has an ISSUED certificate is skipped, so that this is safe to repeat, unless --force"
   echo "requests a new one. ACM renews the certificates in use by itself, as long as their validation record stays."
   echo ""
+  echo "With --check, requests nothing: reports whether each domain has an ISSUED certificate, and succeeds only if all do."
+  echo ""
   echo "Nothing needs to be configured with the result: the stacks look up the latest issued"
   echo "certificate of their domain in ACM, and its hosted zone in Route53, when they are deployed."
 }
 
 NAME="all"
 FORCE=false
+CHECK=false
 for ARG in "$@"; do
   case "$ARG" in
     --force) FORCE=true ;;
+    --check) CHECK=true ;;
     *)       NAME="$ARG" ;;
   esac
 done
@@ -110,8 +114,36 @@ issue_cert() {
   RESULTS+=("$name=$cert_arn")
 }
 
+# Reports whether the domain has an ISSUED certificate in ACM, as the stacks look it up when they are deployed.
+check_cert() {
+  local domain="$1" name="$2" existing
+  existing=$(aws acm list-certificates --certificate-statuses ISSUED --region "$AWS_REGION" \
+    --query "CertificateSummaryList[?DomainName=='$domain'].CertificateArn | [0]" --output text) || return 1
+  if [ -n "$existing" ] && [ "$existing" != "None" ]; then
+    # the id of the certificate, ie the last part of its ARN, as the ARN has the account id in it
+    echo "- $name: $domain has a Route53 issued cert (${existing##*/})"
+  else
+    echo "- $name: $domain has NO Route53 issued cert: issue it with aws-issue-cert $name"
+    return 1
+  fi
+}
+
 RESULTS=()
 FAILED=()
+
+if [ "$CHECK" == "true" ]; then
+  MISSING=()
+  case "$NAME" in
+    all|keycloak) check_cert "$OIDC_DOMAIN_NAME" keycloak || MISSING+=(keycloak) ;;
+  esac
+  case "$NAME" in
+    all|jupyter) check_cert "$AWS_JUPYTER_DOMAIN_NAME" jupyter || MISSING+=(jupyter) ;;
+  esac
+  case "$NAME" in
+    all|polaris) check_cert "$AWS_POLARIS_DOMAIN_NAME" polaris || MISSING+=(polaris) ;;
+  esac
+  if [ ${#MISSING[@]} -gt 0 ]; then exit 1; else exit 0; fi
+fi
 
 case "$NAME" in
   all)

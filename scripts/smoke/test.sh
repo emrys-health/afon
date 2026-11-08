@@ -517,6 +517,32 @@ print_delete_commands() {
   done
 }
 
+# Checks, before the stacks are set up, that the certs of the domain names of their clouds are available (always: it takes seconds, and a
+# missing cert fails the setup after 35 minutes), with the afon command
+# '<cloud>-issue-cert --check' of each cloud once, so that a missing cert stops the run at once, and not after the time that the setup
+# waits for the cert, ie 20 minutes after the deploy, after being refused by Let's Encrypt, which allows 5 certs a week of the same names.
+check_certs() {
+  local stack cloud checked=" " failed=0
+  for stack in ${1//,/ }; do
+    cloud="${stack%%-*}"
+    case "$cloud" in
+      aws|azure|gcp) ;;
+      *) continue ;;
+    esac
+    case "$checked" in *" $cloud "*) continue ;; esac
+    checked="$checked$cloud "
+    banner "Checking the certs of $cloud"
+    if ! run_afon "$cloud-issue-cert" --check; then
+      failed=1
+    fi
+  done
+  if [ $failed -ne 0 ]; then
+    record "certs missing: stacks not set up, tests not run"
+    error "Certs are missing, see above: not setting up the stacks"
+    exit 1
+  fi
+}
+
 # Tears down the stacks of SETUP_STACKS, in reverse order, with the afon command 'manage-stack delete <stack>',
 # trying all of them, and returning non-zero if any fails.
 teardown_stacks() {
@@ -686,6 +712,7 @@ start_results
 trap finish_stacks EXIT
 trap 'INTERRUPTED=true; exit 130' INT
 trap 'INTERRUPTED=true; exit 143' TERM
+check_certs "$SETUP"
 setup_stacks "$SETUP"
 
 update_kube_config

@@ -147,6 +147,15 @@ afon-cli.sh azure-issue-cert acme
 ```
 This is a one-off operation but can be repeated (idempotently) to renew the cert.
 
+To see, without issuing anything, whether the certs are cached:
+```shell
+afon-cli.sh azure-issue-cert --check
+```
+It succeeds only if the cert of each configured domain name is in the key vault.  Without them each deploy asks Let's Encrypt for new certs, which
+allows only 5 certs a week of the same names: a deploy that is refused waits 20 minutes for the cert and fails (`PKIX path building failed`).  The
+smoke tests run it before they set up a stack, and stop if a cert is missing.  `gcp-issue-cert --check` does the same for Secret Manager (if `GCP_SECRETS_ENABLED=true`),
+and `aws-issue-cert --check` for the ISSUED certs in ACM.
+
 Optionally, Azure has its own CA which supports two issuers:
 ```shell
 afon-cli.sh azure-issue-cert {digicert|globalsign}

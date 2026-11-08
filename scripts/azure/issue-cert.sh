@@ -3,7 +3,10 @@ source $AFON_ROOT/scripts/config/afon-source.sh azure
 source $AFON_ROOT/scripts/config/secret-source.sh azure
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} <issuer>"
+  echo "Usage: ${BASH_SOURCE[0]} [--check] <issuer>"
+  echo "With --check, issues nothing: reports whether the cert of each domain name is cached in the Key Vault, and succeeds only if all are."
+  echo "A stack restores the cert from there, rather than asking Let's Encrypt anew on each deploy, which allows only 5 certs a week of"
+  echo "the same names."
   echo "Issue and stores in Azure Key Vault the cert of each domain name that is configured, ie not blank, of"
   echo "AZURE_POLARIS_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME and OIDC_DOMAIN_NAME."
   echo "The supported issuers are:"
@@ -11,6 +14,11 @@ usage(){
   echo " - digicert|globalsign via Key Vault CA (paying service)"
 }
 
+CHECK=false
+if [ "${1:-}" == "--check" ]; then
+  CHECK=true
+  shift
+fi
 ISSUER="${1:-acme}"
 
 ACME_HOME="${ACME_HOME:-$AFON_HOME/acme}"
@@ -34,6 +42,30 @@ if [ -z "$DOMAIN_NAMES" ]; then
   echo "- No domain name is configured, nothing to issue"
   exit 1
 fi
+
+# Reports whether the cert of each domain name is cached in the Key Vault, under the secret names the restore step of the stack reads.
+# Succeeds if all are, or if there is no Key Vault configured, as then the certs are not cached by design.
+check_cached_certs() {
+  local DOMAIN KEBAB MISSING=0
+  if [ -z "$AZURE_KEY_VAULT_NAME" ]; then
+    echo "- AZURE_KEY_VAULT_NAME is blank: the certs are not cached, each deploy asks Let's Encrypt for them"
+    return 0
+  fi
+  for DOMAIN in $DOMAIN_NAMES; do
+    KEBAB="${DOMAIN//./-}"
+    if az keyvault secret show --vault-name "$AZURE_KEY_VAULT_NAME" --name "${KEBAB}-tls-crt" -o none 2> /dev/null \
+         && az keyvault secret show --vault-name "$AZURE_KEY_VAULT_NAME" --name "${KEBAB}-tls-key" -o none 2> /dev/null; then
+      echo "- $DOMAIN: cert cached in $AZURE_KEY_VAULT_NAME (${KEBAB}-tls-crt)"
+    else
+      echo "- $DOMAIN: cert NOT cached in $AZURE_KEY_VAULT_NAME"
+      MISSING=1
+    fi
+  done
+  if [ $MISSING -ne 0 ]; then
+    echo "- Issue and cache the missing certs with: azure-issue-cert acme  (Let's Encrypt allows 5 certs a week of the same names)"
+  fi
+  return $MISSING
+}
 
 require_key_vault() {
   if [ -z "$AZURE_KEY_VAULT_NAME" ]; then
@@ -315,6 +347,10 @@ EOF
   store_cert "$DOMAIN_NAME" "$TMP/cert.pem" "$TMP/key.pem"
   rm -rf "$TMP"
 }
+
+if [ "$CHECK" == "true" ]; then
+  if check_cached_certs; then exit 0; else exit 1; fi
+fi
 
 case "$ISSUER" in
   acme|digicert|globalsign) ;;
