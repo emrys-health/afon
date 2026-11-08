@@ -3,7 +3,8 @@
 # Runs a regression suite of the ops.smoke tests against the deployed stacks, optionally setting them up first.
 #
 # usage: scripts/smoke/test.sh [--cli] [--env|-e <env>] [--setup <stacks> [--teardown]] [--suite|-s <file>]
-#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--logging-file|-lf <file-name>] [--list|-l] [--help|-h] [<cloud>]
+#                                      [--tests|-t <tests>] [--logging-console|-lc <level>] [--logging-file|-lf <file-name>] [--progress|-p <seconds>]
+#                                      [--list|-l] [--help|-h] [<cloud>]
 #   <cloud>   the cloud of the full stack to run the tests against, aws, azure or gcp (default: aws), ie <cloud>-full.  The
 #             kubectl context is set to the cluster of that stack, with the afon command '<cloud>-update-kube-config
 #             tre', and the tests are run with TRE_CLOUD=<cloud>, as the cloud of the stack hosting the TRE.
@@ -34,6 +35,9 @@
 #             the name of the afon log file in $AFON_HOME/logs, never a path, of the tests and of the commands they run
 #             (default: <cloud>-full.log, the log of the stack they run against).  Exported as AFON_LOGGING_FILE, which it
 #             overrides.  The stacks set up are not affected, see --setup.
+#   --progress
+#             the seconds between the lines "=== Still <doing>, <time> elapsed" that say that a long step, ie the setup or the
+#             teardown of a stack, or a test, is still running, since its output may be none (default: 60; 0 for none).
 #   --list    lists the tests and exits
 #
 # The tests are read from the suite file, run in its order.  Its first line is the header 'name|command|args', and
@@ -150,6 +154,34 @@ elapsed_since() {
     printf '%02d:' $((elapsed / 3600))
   fi
   printf '%02d:%02d' $((elapsed % 3600 / 60)) $((elapsed % 60))
+}
+
+# Runs the command, and every PROGRESS seconds says that $1, eg "setting up stack aws-full", is still being done and for how long,
+# so that a step that prints nothing for minutes, as a deploy does when the console logging is off, is not taken for a hang.
+# Returns the exit value of the command.
+with_progress() {
+  local what="$1" start=$SECONDS ticker=0 status
+  shift
+  if [ "$PROGRESS" -gt 0 ]; then
+    (
+      sleeper=
+      # on TERM, stops the sleep too, so that none is left holding the output open
+      trap '[ -z "$sleeper" ] || kill "$sleeper" 2> /dev/null; exit 0' TERM
+      while true; do
+        sleep "$PROGRESS" &
+        sleeper=$!
+        wait "$sleeper" || true
+        banner "Still $what, $(elapsed_since $start) elapsed"
+      done
+    ) &
+    ticker=$!
+  fi
+  "$@" && status=0 || status=$?
+  if [ "$ticker" -ne 0 ]; then
+    kill "$ticker" 2> /dev/null || true
+    wait "$ticker" 2> /dev/null || true
+  fi
+  return $status
 }
 
 # Records and prints the time the whole run took, from the start of the script, including any setup and teardown:
@@ -455,7 +487,7 @@ setup_stacks() {
     start=$SECONDS
     # each stack logs to a file of its own, <stack-id>.log, so that stacks set up at the same time, eg by other runs,
     # have their output apart; the environment applies to this command only
-    if ! AFON_LOGGING_FILE="$(stack_log_name "$stack")" run_afon manage-stack setup "$stack"; then
+    if ! AFON_LOGGING_FILE="$(stack_log_name "$stack")" with_progress "setting up stack $stack" run_afon manage-stack setup "$stack"; then
       result="stack $stack failed to set up in $(elapsed_since $start): see $(AFON_LOGGING_FILE="$(stack_log_name "$stack")" afon_log_file)"
       record "$result: tests not run"
       error "Stack ${result#stack }: not running the tests"
@@ -493,7 +525,7 @@ teardown_stacks() {
     banner "Tearing down stack $stack"
     start=$SECONDS
     # to the log of its setup, <stack-id>.log
-    if AFON_LOGGING_FILE="$(stack_log_name "$stack")" run_afon manage-stack delete "$stack"; then
+    if AFON_LOGGING_FILE="$(stack_log_name "$stack")" with_progress "tearing down stack $stack" run_afon manage-stack delete "$stack"; then
       result="stack $stack torn down in $(elapsed_since $start)"
       record "$result"
       success "Stack ${result#stack }"
@@ -546,6 +578,7 @@ ENV=
 LIST=
 LOGGING_CONSOLE=
 LOGGING_FILE=
+PROGRESS=60
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
 CLOUD=aws
@@ -569,6 +602,8 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"; LOGGING_CONSOLE="$2"; shift 2 ;;
     --logging-file|-lf)
       require_value "$1" "${2:-}"; LOGGING_FILE="$2"; shift 2 ;;
+    --progress|-p)
+      require_value "$1" "${2:-}"; PROGRESS="$2"; shift 2 ;;
     --list|-l)
       LIST=true; shift ;;
     --help|-h)
@@ -581,6 +616,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$PROGRESS" in ''|*[!0-9]*) error "--progress must be a number of seconds, 0 for none"; exit 1 ;; esac
 if [ -z "$CLOUD_GIVEN" ] && [ -z "$LIST" ]; then
   echo "No cloud given, defaulting to $CLOUD"
 fi
@@ -669,7 +705,7 @@ for test_line in "${TESTS[@]}"; do
   banner "Running test $name: $(afon_command_line "$command" $args)"
   start=$SECONDS
   # The args are left unquoted, to split them on spaces.
-  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" run_afon "$command" $args; then
+  if MAVEN_OPTS="${MAVEN_OPTS:-} $QUIET_MAVEN_OPTS" with_progress "running test $name" run_afon "$command" $args; then
     result="test $name passed in $(elapsed_since $start)"
     PASSED+=("$result")
     record "$result"

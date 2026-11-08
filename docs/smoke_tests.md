@@ -145,7 +145,7 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 
 ```shell
 afon-cli.sh smoke-test [--cli] [--env <env>] [--setup <stacks> [--teardown]] [--suite <file>]
-                          [--tests <tests>] [--logging-console <level>] [--list] [<cloud>]
+                          [--tests <tests>] [--logging-console <level>] [--progress <seconds>] [--list] [<cloud>]
 ```
 
 runs the tests listed in a suite file, by default [scripts/smoke/tests-full.csv](../scripts/smoke/tests-full.csv), in
@@ -199,6 +199,8 @@ independently of the source tree, and a test whose command is unknown fails.
 - `--logging-console` sets the logging console level, one of `OFF|DEBUG|INFO|WARN|ERROR`, of every afon command the
   suite runs, by exporting `AFON_LOGGING_CONSOLE`. It defaults to that of `afon.sh`, `INFO`, or of `afon-cli.sh`,
   `OFF`.
+- `--progress` sets the seconds between the lines `=== Still setting up stack aws-full, 03:00 so far` (likewise for tearing down a stack and for a
+  test) that say that a long step is still running, as a deploy prints nothing for minutes when the console logging is off. It defaults to 60; 0 for none.
 - `--list` lists the tests.
 
 The tests run against the full stack's cluster of the `<cloud>`: the Spark Connect tests read the catalogs of the clouds
