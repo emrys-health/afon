@@ -11,8 +11,7 @@ Two reasons:
   can run to megabytes (Cilium's is ~1.7MB, Grafana's ~4MB). One reset mid-read fails the
   whole apply with the Helm provider's misleading "not a valid chart repository" error.
 - **Reproducibility.** The bytes are pinned, which a version constraint alone does not
-  guarantee. CI (`.github/workflows/aws-stack-linux.yml`) has no helm CLI and no populated
-  helm cache, so it could not rely on one anyway.
+  guarantee. CI has no populated helm cache, so it could not rely on one anyway.
 
 Subchart dependencies are bundled inside these tarballs (kube-prometheus-stack carries
 grafana, kube-state-metrics and the exporters; loki carries minio and the operators), so

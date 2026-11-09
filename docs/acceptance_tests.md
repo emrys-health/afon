@@ -222,8 +222,7 @@ The secrets keep the names in the table above.  The env can also be given by the
 
 The workflows have a `config_env` input, which runs the job in the GitHub environment of that name.  Its
 secrets take precedence over the repository ones of the same name, so anything not published to the environment
-(eg the `AWS_DEPLOY_*` credentials) falls back to the repository secret.  Left blank, as on `push` triggers,
-the job uses the repository secrets, as before.  The AWS stack workflow keeps a separate tofu state per env.
+falls back to the repository secret.  Left blank, as on `push` triggers, the job uses the repository secrets, as before.
 
 #### Retrieving the config
 
@@ -236,5 +235,4 @@ included, in the secret store of a cloud under a tag, and restores them by it:
 ./afon.sh -a config-vault pull <tag> -e <env> -c <cloud>
 ```
 
-The smoke tests pull their config the same way.  `github-secrets` used to also keep an encrypted bundle in the variable `AFON_CONFIG_BUNDLE`, for a `pull`,
-which has been removed: `github-secrets delete` removes that variable where an earlier push set it.
+The smoke tests pull their config the same way.
