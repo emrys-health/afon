@@ -282,7 +282,8 @@ users and the Spark step, reach it in one of two ways, as `POLARIS_ACCESS` in `a
   the step and closed after it, so the call comes from inside the cluster and needs no access through the ingress, however it is
   restricted. The kubectl context must be the cluster of the stack: the step fails, before calling anything, if it is not of the kind of the
   cloud (EKS, AKS or GKE) or is not named `CLUSTER_NAME` or `<stack>-CLUSTER_NAME`, so point it at the right one first, eg
-  `afon-cli.sh azure-update-kube-config tre`. Keycloak is still reached through its public domain name, which is not restricted.
+  `afon-cli.sh azure-update-kube-config tre`. Keycloak is still reached through its public domain name, so if it is restricted, see
+  [Restricting who can reach KeyCloak](#restricting-who-can-reach-keycloak), this machine must be among its allowed addresses.
 - `https`: through the public domain name of Polaris, as before. If its ingress is restricted, see the sections below, this machine must
   be among the allowed addresses while the steps run, so the setup admits it: `whitelist_polaris_for_<cloud>_with_caller` runs after
   `deploy_complete_for_<stack>`, adds the IPv4 address of this machine to the CIDRs, and waits (up to 2 minutes) until Polaris answers it,
@@ -388,6 +389,36 @@ afon-cli.sh gcp-update-kube-config tre
 afon-cli.sh kube-polaris-whitelist gcp show
 afon-cli.sh kube-polaris-whitelist gcp remove
 afon-cli.sh kube-polaris-whitelist gcp set
+```
+
+### Restricting who can reach KeyCloak
+
+Set `AWS_KEYCLOAK_ALLOWED_CIDRS`, `AZURE_KEYCLOAK_ALLOWED_CIDRS` or `GCP_KEYCLOAK_ALLOWED_CIDRS`, in the properties file of the cloud,
+to a comma-separated list of IP addresses or CIDRs, eg `203.0.113.7,198.51.100.0/24`, to only admit those callers to the KeyCloak
+that the stacks of that cloud deploy. An address without a `/` is taken as the CIDR of that address alone (`/32`, or `/128` for IPv6).
+Left empty, the default, there are no restraints.
+
+It is applied as the restriction of Polaris is, to the ingress of KeyCloak: as the `alb.ingress.kubernetes.io/inbound-cidrs` of its ALB
+on AWS, and as the `nginx.ingress.kubernetes.io/whitelist-source-range` of its nginx ingress on Azure and GCP, where the controller's
+service then gets `externalTrafficPolicy: Local`. The cluster's own addresses are added automatically, as for Polaris, since its pods
+call KeyCloak by its public domain name, eg Polaris fetching the keys that sign the tokens, or oauth2-proxy and JupyterHub exchanging a
+login for a token: the egress IP on AWS, the pod CIDR and pinned `AZURE_EGRESS_IP` on Azure, and the pod range, node subnet and pinned
+`GCP_EGRESS_IP` on GCP.
+
+Every other caller must be listed, or KeyCloak refuses it with a 403:
+
+- the **browsers of the users** who log in, eg to Jupyter, as oauth2-proxy redirects them to KeyCloak's login page;
+- the **machine running the setup**, `afon-cli.sh manage-stack setup`, which calls the KeyCloak admin API through its public domain
+  name to create the realm, clients and users and to configure MFA, whatever `POLARIS_ACCESS` is. Unlike for Polaris, the setup does
+  not admit this machine for the time it runs;
+- the **clusters of the other stacks** that use this KeyCloak, eg with `<CLOUD>_KEYCLOAK_EXTERNAL=true`, or the Polaris of another
+  cloud trusting it: list their egress IPs.
+
+Unlike Polaris, there is no `kube-…-whitelist` command for KeyCloak: change the property and redeploy. You can also restrict a deployed
+cluster by hand, which a redeploy undoes, eg on Azure:
+
+```shell
+kubectl annotate ingress keycloak-ingress -n default --overwrite nginx.ingress.kubernetes.io/whitelist-source-range="203.0.113.7/32,10.244.0.0/16"
 ```
 
 ## Volumes that outlive the cluster

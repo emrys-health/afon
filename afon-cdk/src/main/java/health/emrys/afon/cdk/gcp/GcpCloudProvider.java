@@ -32,6 +32,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
+import health.emrys.afon.cdk.AllowedCidrs;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.HttpsRoute;
@@ -51,7 +52,6 @@ import org.slf4j.Logger;
 import software.constructs.Construct;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -480,7 +480,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
 
     @Override
     protected Map<String, String> nginxAnnotations() {
-        if (allowedCidrs("polaris").isEmpty()) {
+        if (!AllowedCidrs.anyRestricted(properties, GCP)) {
             return null;
         }
         // else the load balancer hides the callers behind a node's IP, and the ingress cannot tell them apart
@@ -517,15 +517,13 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         return all;
     }
 
+    /** The allow-list of the component, eg {@code GCP_POLARIS_ALLOWED_CIDRS}, empty, ie open to all, for the others. */
     private List<String> allowedCidrs(String component) {
-        // only Polaris has an allow-list; the other components are open to all
-        return component.equals("polaris")
-               ? parseCidrs(properties.getCloudValue(GCP, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
-               : List.of();
+        return AllowedCidrs.of(properties, GCP, component);
     }
 
     static List<String> parseCidrs(String csv) {
-        return Arrays.stream(csv.split(",")).map(String::trim).filter(cidr -> !cidr.isEmpty()).toList();
+        return AllowedCidrs.parse(csv);
     }
 
     @Override

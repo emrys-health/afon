@@ -3,6 +3,7 @@ package health.emrys.afon.cdk.aws;
 import com.hashicorp.cdktf.Aspects;
 import com.hashicorp.cdktf.Fn;
 import com.hashicorp.cdktf.TerraformStack;
+import health.emrys.afon.cdk.AllowedCidrs;
 import health.emrys.afon.cdk.RetainedVolumeClaim;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
@@ -68,7 +69,6 @@ import health.emrys.afon.cdk.HttpsExposure;
 import health.emrys.afon.cdk.LogStorage;
 import health.emrys.afon.cdk.HttpsRoute;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
@@ -847,16 +847,13 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     }
 
     /**
-     * The configured allow-list plus the cluster's own egress IP: pods that call Polaris by its
-     * public domain name leave through the NAT gateway and come back in through the ALB, so without
+     * The configured allow-list plus the cluster's own egress IP: pods that call Polaris or KeyCloak by
+     * its public domain name leave through the NAT gateway and come back in through the ALB, so without
      * it they would be locked out too. Empty (no restriction) when nothing is configured.
      */
-    public List<String> polarisInboundCidrs(String allowedCidrsCsv) {
-        List<String> cidrs = Arrays.stream(allowedCidrsCsv.split(","))
-                                   .map(String::trim)
-                                   .filter(cidr -> !cidr.isEmpty())
-                                   .collect(Collectors.toCollection(ArrayList::new));
-        if (!cidrs.isEmpty()) {
+    public List<String> inboundCidrs(List<String> allowedCidrs) {
+        List<String> cidrs = new ArrayList<>(allowedCidrs);
+        if (!cidrs.isEmpty() && !cidrs.contains(egressIp + "/32")) {
             cidrs.add(egressIp + "/32");
         }
         return cidrs;
@@ -1232,7 +1229,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             route.port(),
             route.healthCheck(),
             getSubnetIds(),
-            polarisInboundCidrs(allowedCidrs(route.component())));
+            inboundCidrs(AllowedCidrs.of(properties, AWS, route.component())));
         Route53Record dnsRecord = configureDNS(
             constructIds[1],
             zone.getZoneId(),
@@ -1241,11 +1238,6 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             ingress,
             route.ingressName());
         return new HttpsExposure(ingress, dnsRecord);
-    }
-
-    /** The allow-list of source CIDRs of the component, which only Polaris has; empty, ie open to all, for the others. */
-    private String allowedCidrs(String component) {
-        return component.equals("polaris") ? properties.getCloudValue(AWS, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, "") : "";
     }
 
     /** The class the AWS load balancer controller gives the LoadBalancer services it provisions an NLB for. */

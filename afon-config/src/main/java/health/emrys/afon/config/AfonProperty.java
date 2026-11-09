@@ -75,6 +75,11 @@ public enum AfonProperty {
     AWS_EGRESS_IP("AWS_EGRESS_IP"),
     AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
     /**
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * aws stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
+     */
+    AWS_KEYCLOAK_ALLOWED_CIDRS("AWS_KEYCLOAK_ALLOWED_CIDRS"),
+    /**
      * S3 bucket that Fluent Bit ships Polaris' console logs to, under {@code polaris/<cluster>/}, so that they
      * outlive the cluster.  Optional: no logs are shipped when unset.
      */
@@ -98,6 +103,11 @@ public enum AfonProperty {
      * all when unset.
      */
     GCP_POLARIS_ALLOWED_CIDRS("GCP_POLARIS_ALLOWED_CIDRS"),
+    /**
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * gcp stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
+     */
+    GCP_KEYCLOAK_ALLOWED_CIDRS("GCP_KEYCLOAK_ALLOWED_CIDRS"),
     /**
      * Address of a regional, external static IP created beforehand in {@link #GCP_PROJECT_ID} and {@link #GCP_REGION}, that all
      * outbound cluster traffic egresses from, through the Cloud NAT.  Optional: Google allocates the addresses when unset.
@@ -189,6 +199,11 @@ public enum AfonProperty {
     /** Domain of the KeyCloak that the AZURE stacks deploy.  Optional: {@code OIDC_DOMAIN_NAME} when blank or unset. */
     AZURE_OIDC_DOMAIN_NAME("AZURE_OIDC_DOMAIN_NAME"),
     AZURE_POLARIS_ALLOWED_CIDRS("AZURE_POLARIS_ALLOWED_CIDRS"),
+    /**
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * azure stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
+     */
+    AZURE_KEYCLOAK_ALLOWED_CIDRS("AZURE_KEYCLOAK_ALLOWED_CIDRS"),
     /**
      * Public IP address, of a Standard, static public IP created beforehand in {@link #AZURE_RESOURCE_GROUP}, that all outbound
      * cluster traffic egresses from.  Optional: Azure allocates one when unset.

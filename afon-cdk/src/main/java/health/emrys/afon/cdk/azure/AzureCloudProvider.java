@@ -43,6 +43,7 @@ import com.hashicorp.cdktf.providers.kubernetes.provider.KubernetesProviderExec;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.null_provider.provider.NullProvider;
 import health.emrys.afon.cdk.AbstractHttpsCloudProvider;
+import health.emrys.afon.cdk.AllowedCidrs;
 import health.emrys.afon.cdk.CachedTlsSecret;
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.HttpsRoute;
@@ -61,7 +62,6 @@ import software.constructs.Construct;
 import software.constructs.IConstruct;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -757,7 +757,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         values.put("controller.service.annotations.service\\.beta\\" +
                    ".kubernetes\\.io/azure-load-balancer-health-probe" +
                    "-request-path", "/healthz");
-        if (!allowedCidrs("polaris").isEmpty()) {
+        if (AllowedCidrs.anyRestricted(properties, AZURE)) {
             // else the load balancer SNATs the callers to a node's IP, and the ingress cannot tell them apart
             values.put("controller.service.externalTrafficPolicy", "Local");
         }
@@ -794,15 +794,13 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         return all;
     }
 
+    /** The allow-list of the component, eg {@code AZURE_POLARIS_ALLOWED_CIDRS}, empty, ie open to all, for the others. */
     private List<String> allowedCidrs(String component) {
-        // only Polaris has an allow-list; the other components are open to all
-        return component.equals("polaris")
-               ? parseCidrs(properties.getCloudValue(AZURE, AfonCloudProperty.POLARIS_ALLOWED_CIDRS, ""))
-               : List.of();
+        return AllowedCidrs.of(properties, AZURE, component);
     }
 
     static List<String> parseCidrs(String csv) {
-        return Arrays.stream(csv.split(",")).map(String::trim).filter(cidr -> !cidr.isEmpty()).toList();
+        return AllowedCidrs.parse(csv);
     }
 
     @Override
