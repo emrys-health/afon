@@ -114,6 +114,110 @@ afon-cli.sh config-status
 If found, it will output the content of the file `afon.md` in the config dir, which can be used to 
 provide information to the user of the config content.  It will also list the files in the config dir.
 
+### Creating an env from an existing one
+
+A new env, eg `emrys3` for the smoke tests, is quickest to make from an env that works, eg `emrys2`: copy its config dir and change what is specific to the env.  This lists what, and the setup in the clouds that goes with it.
+
+#### The config
+
+Copy the dir, and set `ENV_NAME` in `afon.properties` to the new env, which is the only change in the files if the env's values follow it:
+
+```shell
+cp -r ~/.afon/config-emrys2 ~/.afon/config-emrys3
+```
+
+Write the values that carry the env's name with [interpolation](#property-value-interpolation), so that the files of two envs differ only in
+`ENV_NAME`: `CLUSTER_NAME=${ENV_NAME}-cluster`, `AWS_POLARIS_DOMAIN_NAME=aws-polaris.${ENV_NAME}.click`,
+`AZURE_STORAGE_ACCOUNT=${ENV_NAME}afonstorage`, `AWS_BUCKET_NAME_aws=${ENV_NAME}-afon-bucket`, and so on.  A name that is not derived from
+the env's name, eg a domain registered under another name, is set by hand.  Check that nothing of the old env is left:
+`grep -rn emrys2 ~/.afon/config-emrys3`, which should show only the values listed below as having to change.
+
+**Can stay the same**, as they belong to the cloud account, the project or the people, not to the env:
+
+| Properties                                                                                     | Because                                                                   |
+|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| `AWS_ACCOUNT_ID`, `AWS_REGION`; `AZURE_SUBSCRIPTION`, `AZURE_REGION`, `AZURE_RESOURCE_GROUP`; `GCP_PROJECT_ID`, `GCP_REGION` | the envs share the cloud accounts: their resources are told apart by name |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_ROLE_ARN`, `AWS_GLUE_ROLE_ARN`            | the Polaris service user and its roles are per account                    |
+| `AZURE_TENANT_ID`, `AZURE_APP_ID`, `AZURE_APP_SECRET`, `AZURE_SP_ID`, `AZURE_CA_*`, `AZURE_DATABRICKS_TOKEN` | the app registration is per tenant                          |
+| `GOOGLE_APPLICATION_CREDENTIALS`, `GCP_SERVICE_ACCOUNT`, `GCP_HMAC_ACCESS_ID`, `GCP_HMAC_SECRET` | the service account is per project, and the HMAC key belongs to it       |
+| `POLARIS_DB_HOST`, `POLARIS_DB_*`, `GUACAMOLE_DB_*`, `GITEA_DB_*`                              | the Postgres instance may be shared: each env gets databases of its own, named after its Polaris domain (`polaris_db_<domain>`), its cluster (`guacamole-<cluster>`) and its cloud and cluster (`gitea_<cloud>_<cluster>`) |
+| `POLARIS_ID`, `POLARIS_SECRET`, `USER_ID`, `KEYCLOAK_BOOTSTRAP_ADMIN_*`, `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, `OAUTH2_COOKIE_SECRET`, `JUPYTER_VNC_PASSWORD`, `SNOWFLAKE_*` | a client or a login is created with these values by the env's own setup, or only used |
+| `<CLOUD>_COSIGN_PUBLIC_KEY`, `<CLOUD>_COSIGN_KEY`, `<CLOUD>_IMAGE_REGISTRY`                      | the images are signed once, with the key of the cloud, into its registry, whichever env deploys them: Kyverno verifies the same signatures with the same public key.  A separate key, and so a separate registry or a re-signing of the images, is only for an env that is to admit images that the others do not |
+| `users.csv`, `users-acl.csv`, `whitelist.yaml` (as it names the domains by property)          | the users of the env, and the domains it may resolve                      |
+
+**Must change**, or the new env would use, or clash with, the old one:
+
+| Properties                                                                                     | Change to                                                                  |
+|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `ENV_NAME`                                                                                     | the new env                                                                |
+| `OIDC_DOMAIN_NAME`, `<CLOUD>_OIDC_DOMAIN_NAME`, `<CLOUD>_POLARIS_DOMAIN_NAME`, `<CLOUD>_JUPYTER_DOMAIN_NAME` | domain names of the new env (`${ENV_NAME}` in them is enough)         |
+| `<CLOUD>_BUCKET_NAME_<id>` in `catalogs-<cloud>.properties`                                    | bucket names of the new env: S3 and GCS names are global, so the old ones would be the old env's buckets, and Azure storage account names too |
+| `AZURE_STORAGE_ACCOUNT`, `AZURE_KEY_VAULT_NAME`, `<CLOUD>_GITEA_BUCKET`, `<CLOUD>_POLARIS_LOG_BUCKET` | names of the new env, which `${ENV_NAME}` gives, as in the templates       |
+| `AZURE_CONNECTION_STRING` (`secret-azure.properties`)                                          | **blank** it in the copy: it has the key of the old env's storage account, so a copy would write to that account. `azure-create` then says that it is not set, which is expected on the first run, as the string is only known once the account exists.  Set it afterwards to the output of `az storage account show-connection-string`, and check it with `azure-check-storage`.  Until then, what needs it does not work: the Azure monitoring (Loki), which stops with a message that says so, Gitea's blob container and `AzureReader` |
+| `KEYCLOAK_DB_URL`                                                                              | a database of its own, `jdbc:postgresql://${POLARIS_DB_HOST}:5432/keycloak-${ENV_NAME}`: it is the one value that names the database directly, so two envs on the same Postgres would otherwise share the KeyCloak realm and its users.  The database is created when KeyCloak starts.  An env that already runs on another name, eg `keycloak-2`, keeps it, as a new name starts on an empty database: its users are created again from `users.csv` by the next setup |
+| `<CLOUD>_EGRESS_IP`                                                                            | **blank** them in the copy: one address serves one cluster's outbound traffic, so two envs deployed together on a cloud cannot both pin the same one, and left blank, the cluster gets an address of its own from the cloud (see [the egress IP of each cloud](cluster.md#egress-ip-aws)).  Give the new env an address of its own only if something allow-lists it: `<cloud>-egress-ip create <name>` |
+| `<CLOUD>_POLARIS_ALLOWED_CIDRS`                                                                | only if the new env is to be reached from other addresses                  |
+
+#### In the clouds
+
+Once the config is in place, with `--env <new env>` (or `config-switch`), and logged in to each cloud as an admin:
+
+1. **DNS:** register the domain, if it is a new one.  Create the zone of each domain name with `dns-create-zones <cloud> <stack>`, then delegate
+   them from the parent domain with `dns-delegate <cloud> <stack>` (at the registrar, or with `--route53`), and check with `<cloud>-dns-zones`.
+2. **The cloud resources:** `<cloud>-create` create the buckets, the Azure storage account and Key Vault, and the access
+   to them, eg the IAM whitelist entry of each AWS catalog bucket.  Then set `AZURE_CONNECTION_STRING` (blank in the copy), as above.
+3. **Certificates:** issue the certificate of each domain name, `<cloud>-issue-cert`; check with
+   `<cloud>-issue-cert --check`.  
+4. **Google OAuth:** add the redirect URIs of the new Jupyter domain names to the Google OAuth client `OAUTH2_CLIENT_ID`.
+5. **The config in the vaults:** `config-vault push <tag> -c <cloud>` for each cloud, so that the env can be pulled elsewhere, eg by the smoke tests. The Key Vault of Azure is new, so it holds nothing yet.
+
+#### For the CI smoke tests
+
+To run the [smoke tests](github_workflows.md#smoke-tests-workflows) on the new env:
+
+1. Push its config to the vault of each cloud under the tag the workflows pull (`current` by default).
+2. Let the cloud identity use the new env's resources: `afon-cli.sh --env <env> github-cloud-identity create <cloud>`.  On Azure it grants the identity
+   Key Vault Secrets User on the new Key Vault and access to the new storage account, so it is needed.  The AWS and GCP identities are per account and project,
+   so the command changes nothing there if those are shared with the old env.
+3. Give the GitHub environments `smoke-tests-<cloud>` the values of the new env: `afon-cli.sh --env <env> github-cloud-env create <cloud>`.  Those that
+   differ are the Key Vault (`AZURE_KEY_VAULT_NAME`) and, if the account or project differs, the others.
+4. Set the repository variable `SMOKE_TESTS_CONFIG_ENV` to the new env.
+
+#### Summary for a cloud
+
+For a `<cloud>` (`aws`, `azure` or `gcp`), a `<stack>` of it (eg `<cloud>-full`) and the new `<env>`, logged in to the cloud as an admin.  Every command takes
+`--env <env>`, so that the `config` symlink stays on the env that is active.  Steps 1 to 4 are done once per cloud, and each needs the one before it.
+
+| # | Step | Command |
+|---|------|---------|
+| 1 | Create the DNS zone of each domain name | `afon-cli.sh --env <env> dns-create-zones <cloud> <stack>` |
+| 2 | Delegate them from the parent domain, at the registrar or with `--route53` | `afon-cli.sh --env <env> dns-delegate <cloud> <stack>` |
+| 3 | Check that the delegation is in place | `afon-cli.sh --env <env> <cloud>-dns-zones` |
+| 4 | Create the cloud resources | `afon-cli.sh --env <env> <cloud>-create <stack>` |
+| 5 | Issue the certificates | `afon-cli.sh --env <env> <cloud>-issue-cert` (`aws`), or `<cloud>-issue-cert acme` (`azure`, `gcp`) |
+| 6 | Check that they are all there | `afon-cli.sh --env <env> <cloud>-issue-cert --check` |
+| 7 | Push the config to the vault of the cloud | `afon-cli.sh --env <env> config-vault push current -c <cloud>` |
+| 8 | Let the CI identity use the resources | `afon-cli.sh --env <env> github-cloud-identity create <cloud>` |
+| 9 | Give the GitHub environment the values | `afon-cli.sh --env <env> github-cloud-env create <cloud>` |
+
+Then set the repository variable `SMOKE_TESTS_CONFIG_ENV` to the env, once a run of each cloud has passed with a dispatch input `config_env=<env>`.
+
+What differs by cloud:
+
+- **`aws`:** the DNS zones are Route 53 hosted zones.  `aws-issue-cert` requests an ACM certificate with DNS validation for each domain, and takes `all`, `keycloak`,
+  `jupyter` or `polaris`.  `aws-create` adds the IAM whitelist entry of each catalog bucket.  The IAM role of the CI identity is per account.
+- **`azure`:** `azure-create` also creates the storage account and the Key Vault, and needs `AZURE_APP_ID` and `AZURE_SP_ID` in `secret-azure.properties` (the app
+  is shared, see above).  It ends by saying that `AZURE_CONNECTION_STRING` is not set, as it is blank in the copy: get the string of the new account with
+  `az storage account show-connection-string --resource-group <AZURE_RESOURCE_GROUP> --name <AZURE_STORAGE_ACCOUNT> --query connectionString -o tsv`,
+  set it in `secret-azure.properties` before step 7, and check it with `afon-cli.sh --env <env> azure-check-storage`.  The certificates are cached in the Key
+  Vault, so step 5 follows step 4.  `github-cloud-identity` grants roles on the Key Vault and the storage account, so step 8 follows step 4 too.
+- **`gcp`:** the certificates are cached in Secret Manager, which needs `GCP_SECRETS_ENABLED=true`.  The identity is per project, and it binds the cdktf and the
+  logs buckets, which must exist.
+
+Nothing else is needed from the cloud for an optional `<CLOUD>_EGRESS_IP`: left blank, the cluster gets an address of its own.  To pin one, allocate it with
+`afon-cli.sh --env <env> <cloud>-egress-ip create <name>`, with a name of its own, as the default name is that of the other env, and set it in the config before
+step 7.  The Google OAuth client of Jupyter also needs the redirect URIs of the new Jupyter domain names, in the Google console.
+
 ## Properties
 
 The properties configuration is currently file-based.

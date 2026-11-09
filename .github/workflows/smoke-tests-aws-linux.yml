@@ -8,18 +8,18 @@ name: Smoke Tests AWS (Linux)
 # images of the build too, so that the three smoke-tests-<cloud>-linux workflows run downstream of it, concurrently, each testing
 # the image of that build.
 #
-# For a build, the config env to test with is the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys2 (until the env of the smoke
-# tests is set up), and the tag of its snapshot is SMOKE_TESTS_CONFIG_TAG, else current.  It can also be run by hand, with workflow_dispatch.
+# For a build, the config env to test with is the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys3, the env of the smoke
+# tests, and the tag of its snapshot is SMOKE_TESTS_CONFIG_TAG, else current.  It can also be run by hand, with workflow_dispatch.
 #
 # The config is the snapshot pulled from the vault of the cloud with `config-vault pull <tag> --force`, for the config env.  When
-# triggered by a build, the env and the tag are the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG (default emrys2 and current); with
+# triggered by a build, the env and the tag are the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG (default emrys3 and current); with
 # workflow_dispatch, the inputs config_env and config_tag, which take precedence.  Run by hand, image_tag is the tag of the afon-cli
 # image to test, blank for the project version of the ref run.
 on:
   workflow_dispatch:
     inputs:
       config_env:
-        description: "Config env (blank for the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys2)"
+        description: "Config env (blank for the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys3)"
         type: string
         default: ""
       config_tag:
@@ -48,7 +48,7 @@ jobs:
     uses: ./.github/workflows/smoke-tests-linux.yml
     with:
       cloud: aws
-      config_env: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys2' }}
+      config_env: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys3' }}
       config_tag: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
       image_tag: ${{ inputs.image_tag }}
     secrets: inherit

@@ -31,7 +31,7 @@ public, never runs a workflow on a machine of ours.  A run of a cloud waits for 
 `smoke-tests-<cloud>`), as both use the same stack.
 
 **The trigger is active:** each workflow runs when the CLI Release workflow completes successfully on `main`, ie after it has published the
-images, with the config env of the repository variable `SMOKE_TESTS_CONFIG_ENV`, else `emrys2` for now (set the variable once the env of the smoke tests is set up), and
+images, with the config env of the repository variable `SMOKE_TESTS_CONFIG_ENV`, else `emrys3`, the env of the smoke tests, and
 the tag of its config snapshot in the vault, the variable `SMOKE_TESTS_CONFIG_TAG`, else `current`.  They can also be run by hand (`workflow_dispatch`), with the inputs `config_env`, `config_tag`
 and `image_tag`.  To deactivate the trigger, comment out the `workflow_run` block of the three callers.
 
