@@ -31,6 +31,8 @@ Of the actions, `deploy` just deploys the stack (waiting for DNS to propagate) a
 
 ### Manage a stack
 
+Every action (`deploy`, `setup` and `delete`, including `delete <cloud>-all`) starts with the step `check_<cloud>_login` (`check_aws_login`, `check_azure_login` or `check_gcp_login`), which fails in about a second, naming the command to log in, if the CLI of the stack's cloud has no valid login (`aws sts get-caller-identity`, `az account get-access-token` or `gcloud auth print-access-token`), rather than failing partway through a deploy or a destroy.  It checks the credentials only, not their permissions.  A [flow](#run-a-flow-of-stacks) checks the cloud of each of its items.  Resuming from a later step skips it.
+
 A single command manages any stack, given an action and a stack id:
 ```shell
 afon-cli.sh manage-stack <action> <stack-id> [<step>] [--replace]  # run without args to list the stack ids and their actions
@@ -488,11 +490,12 @@ afon-cli.sh manage-stack setup aws-full
 ```
 Steps executed:
 
-1. `delete_stacks_conflicting_with_aws_full` — delete the AWS stacks conflicting with it, ie any existing AWS stack
-2. `deploy_aws_full_stack` — deploy AWS full stack
-3. `wait_on_emryspolaris` — wait for DNS to propagate
-4. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
-5. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
+1. `check_aws_login` — check that you are logged in to AWS, else fail saying to run `afon-cli.sh aws-login`
+2. `delete_stacks_conflicting_with_aws_full` — delete the AWS stacks conflicting with it, ie any existing AWS stack
+3. `deploy_aws_full_stack` — deploy AWS full stack
+4. `wait_on_emryspolaris` — wait for DNS to propagate
+5. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
+6. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
 
 ### Access Polaris and Jupyter
 
@@ -511,7 +514,7 @@ runs side by side with it.
 ```shell
 afon-cli.sh manage-stack deploy aws-keycloak
 ```
-Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_aws_keycloak`
+Steps: `check_aws_login` → `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `deploy_complete_for_aws_keycloak`
 
 It requires the Keycloak properties (`OIDC_DOMAIN_NAME`, `KEYCLOAK_*`)
 and the AWS cluster properties, but none of the `AWS_POLARIS_*` properties.
@@ -525,7 +528,7 @@ their confidential clients), plus the Jupyter browser client if `AWS_JUPYTER_DOM
 ```shell
 afon-cli.sh manage-stack setup aws-keycloak
 ```
-Steps: `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_aws_keycloak`
+Steps: `check_aws_login` → `delete_stacks_conflicting_with_aws_keycloak` → `deploy_aws_keycloak_stack` → `wait_on_emrysoauth` → `configure_oidc_users_for_cloud_aws` → `setup_complete_for_aws_keycloak`
 
 ### Setup Azure full stack
 
@@ -569,14 +572,14 @@ On an existing cluster, enabling FQDN network policies needs `kubectl rollout re
 ```shell
 afon-cli.sh manage-stack setup azure-polaris
 ```
-Steps: `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_azure` → `create_all_catalogs_for_cloud_azure`
+Steps: `check_azure_login` → `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_azure` → `create_all_catalogs_for_cloud_azure`
 
 ### Setup GCP Polaris only
 
 ```shell
 afon-cli.sh manage-stack setup gcp-polaris
 ```
-Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_gcp` → `create_all_catalogs_for_cloud_gcp`
+Steps: `check_gcp_login` → `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_gcp` → `create_all_catalogs_for_cloud_gcp`
 
 ### Setup cross-cloud external catalogs (AWS + Azure)
 

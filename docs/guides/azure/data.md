@@ -37,7 +37,7 @@ If the DNS zone of `AZURE_POLARIS_DOMAIN_NAME` is not in your resource group, th
 ```shell
 afon-cli.sh manage-stack setup azure-polaris
 ```
-Steps: `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` →
+Steps: `check_azure_login` → `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` →
 `wait_on_polaris_and_keycloak_for_cloud_azure` → `create_all_catalogs_for_cloud_azure`.
 
 ```shell

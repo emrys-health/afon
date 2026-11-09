@@ -35,7 +35,7 @@ If the DNS zone of `GCP_POLARIS_DOMAIN_NAME` is not in your project, the stack c
 ```shell
 afon-cli.sh manage-stack setup gcp-polaris
 ```
-Steps: `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` →
+Steps: `check_gcp_login` → `delete_stacks_conflicting_with_gcp_polaris` → `check_keycloak_answers` → `deploy_gcp_polaris_stack` →
 `wait_on_polaris_and_keycloak_for_cloud_gcp` → `create_all_catalogs_for_cloud_gcp`.
 
 ```shell

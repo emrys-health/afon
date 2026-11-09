@@ -96,6 +96,16 @@ public class StepOperations {
     }
 
     /**
+     * Checks that the CLI of the cloud is logged in, as the first step of an operation on its stacks, so that it fails in about a
+     * second, saying how to log in, rather than partway through a deploy or a destroy.  It checks for valid credentials, not permissions.
+     */
+    public Step checkLogin(AfonCloud cloud) {
+        return new Step(format("check_%s_login", cloud.toString().toLowerCase()),
+                format("check logged in to %s", cloud),
+                () -> actions.checkLogin(cloud));
+    }
+
+    /**
      * Checks that the KeyCloak server at the OIDC domain name of the cloud, deployed by another stack,
      * answers, so that a stack using it fails fast rather than when Polaris cannot discover it.
      * It asks for the discovery document of the {@code master} realm, as it always exists, unlike the Polaris realm,

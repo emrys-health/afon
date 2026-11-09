@@ -36,7 +36,7 @@ If the Route 53 zone of `AWS_POLARIS_DOMAIN_NAME` is not in your account, the st
 ```shell
 afon-cli.sh manage-stack setup aws-polaris
 ```
-Steps: `delete_stacks_conflicting_with_aws_polaris` → `check_keycloak_answers` → `deploy_aws_polaris_stack` →
+Steps: `check_aws_login` → `delete_stacks_conflicting_with_aws_polaris` → `check_keycloak_answers` → `deploy_aws_polaris_stack` →
 `wait_on_polaris_and_keycloak_for_cloud_aws` → `create_all_catalogs_for_cloud_aws`.
 
 ```shell

@@ -233,6 +233,18 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
+    protected void checkLogin(AfonCloud cloud) {
+        out.println(format("""
+                   Check that you are logged in to %s, eg with:
+                   ```shell
+                   %s
+                   ```
+                   If it fails: log in with %s, then rerun.
+                   """, cloud, String.join(" ", loginCheck(cloud)), loginCommand(cloud)));
+        out.flush();
+    }
+
+    @Override
     protected void checkAnswers(String url, String failure, Set<Integer> codes) {
         String expected = codes.size() == 1
                           ? "with " + codes.iterator().next()

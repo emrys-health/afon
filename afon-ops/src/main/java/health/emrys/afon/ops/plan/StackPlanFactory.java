@@ -37,6 +37,7 @@ import java.util.TreeSet;
  * The stack is deployed as a whole, by {@link StepOperations#deployStack}, which applies the plan of all its components,
  * so the steps derived from the plans of each component are combined, based on the {@link StackAction}:
  * <ul>
+ *   <li>every action starts by checking the login to the cloud, {@code check_<cloud>_login};</li>
  *   <li>{@code delete}: just the stack, and the legacy stack of its cloud; or every stack of the cloud for {@code <cloud>-all};</li>
  *   <li>{@code deploy}: delete the stacks conflicting with it, check the KeyCloak it uses if it has none of its own, deploy it,
  *       wait for what its components need, then report it complete;</li>
@@ -99,7 +100,7 @@ public class StackPlanFactory {
             throw new IllegalArgumentException(String.format("Unsupported action '%s' on stack '%s'", action, stackId));
         }
         if (stackId.isAll()) {
-            return List.of(ops.deleteStackIn(stackId.cloud()), ops.deleteComplete(stackId));
+            return List.of(ops.checkLogin(stackId.cloud()), ops.deleteStackIn(stackId.cloud()), ops.deleteComplete(stackId));
         }
         List<StackComponent> components = StackDefinitions.get(stackId).componentsFor(ops.properties());
         return switch (action) {
@@ -171,6 +172,7 @@ public class StackPlanFactory {
             String.format("stack %s and the legacy stack", stackId),
             name -> name.equals(stackId.toString()) || name.equals(stackId.cloud().toString()));
         return List.of(
+            ops.checkLogin(stackId.cloud()),
             ops.deleteStacksIn(stackId, String.format("delete_%s_stack", stepName(stackId)), filter),
             ops.deleteComplete(stackId));
     }
@@ -180,6 +182,7 @@ public class StackPlanFactory {
                                    boolean setup) {
         AfonCloud cloud = stackId.cloud();
         List<Step> steps = new ArrayList<>();
+        steps.add(ops.checkLogin(cloud));
         steps.add(deleteConflicting(stackId, ops, replace));
         // the KeyCloak the stack uses is another stack's, if it has none of its own: it must answer
         if (components.stream().noneMatch(KeycloakComponent.class::isInstance)) {

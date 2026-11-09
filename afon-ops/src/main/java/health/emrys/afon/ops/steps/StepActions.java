@@ -994,6 +994,46 @@ public class StepActions {
     }
 
     /**
+     * Checks that the CLI of the cloud is logged in, ie holds valid credentials, as the Polaris status scripts do.  It does not
+     * check for permissions: a login without the rights needed still fails later.
+     *
+     * @throws IllegalStateException if not logged in, saying how to log in
+     */
+    protected void checkLogin(AfonCloud cloud) throws Exception {
+        logger.info("Checking the login to {}", cloud);
+        String[] check = loginCheck(cloud);
+        int exit;
+        try {
+            exit = run(check[0], null, OutputStream.nullOutputStream(), Arrays.copyOfRange(check, 1, check.length));
+        } catch (ManagedProcessException e) {
+            exit = -1; // eg the CLI is not installed
+            logger.warn("Cannot run {}: {}", String.join(" ", check), e.getMessage());
+        }
+        if (exit != 0) {
+            throw new IllegalStateException(format("Not logged in to %s (%s failed): log in with %s, then rerun.",
+                cloud.name(), String.join(" ", check), loginCommand(cloud)));
+        }
+    }
+
+    /** @return the command that fails unless the CLI of the cloud is logged in */
+    protected static String[] loginCheck(AfonCloud cloud) {
+        return switch (cloud) {
+            case AWS -> new String[]{"aws", "sts", "get-caller-identity"};
+            case AZURE -> new String[]{"az", "account", "get-access-token", "--output", "none"};
+            case GCP -> new String[]{"gcloud", "auth", "print-access-token"};
+        };
+    }
+
+    /** @return the afon-cli.sh commands logging in to the cloud */
+    protected static String loginCommand(AfonCloud cloud) {
+        return switch (cloud) {
+            case AWS -> "afon-cli.sh aws-login";
+            case AZURE -> "afon-cli.sh azure-login (or azure-login-app)";
+            case GCP -> "afon-cli.sh gcp-login (or gcp-login-as-service-account)";
+        };
+    }
+
+    /**
      * Checks that the URL answers a GET with 200, eg that a server another stack deploys is up.
      * @param failure what to say if it doesn't, eg what to deploy first
      * @throws IllegalStateException if it doesn't answer, or not with 200
