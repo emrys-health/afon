@@ -88,6 +88,25 @@ else
   az storage account create --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP --location $AZURE_REGION --sku Standard_LRS --kind StorageV2 --enable-hierarchical-namespace false || exit 1
 fi
 
+## Storage access of the signed-in principal
+
+# The principal that runs this needs the data role on the account to create the containers with the login, and later to use the
+# cdktf store (cdktf-store), which keeps its state in a container of this account: the roles of the subscription (Owner, Contributor) do
+# not include it.  Granted here, rather than by hand, so a new env is usable at once.
+source $AFON_ROOT/scripts/azure/rbac.sh
+source $AFON_ROOT/scripts/azure/account-principal.sh
+require_role_assignment_rights $PRINCIPAL_ID create create.sh
+STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
+CALLER_ROLE="Storage Blob Data Contributor"
+if [ -n "$(az role assignment list --assignee-object-id $PRINCIPAL_ID --role "$CALLER_ROLE" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then
+  echo "- Role '$CALLER_ROLE' already assigned to '$PRINCIPAL_ID' on '$AZURE_STORAGE_ACCOUNT', skipping"
+else
+  if az ad signed-in-user show --query id -o tsv > /dev/null 2>&1; then CALLER_TYPE=User; else CALLER_TYPE=ServicePrincipal; fi
+  echo "- Assigning role '$CALLER_ROLE' to '$PRINCIPAL_ID' on '$AZURE_STORAGE_ACCOUNT'"
+  az role assignment create --role "$CALLER_ROLE" --assignee-object-id $PRINCIPAL_ID --assignee-principal-type $CALLER_TYPE --scope "$STORAGE_ACCOUNT_SCOPE" -o none || exit 1
+  echo "- A new role may take a few minutes to apply: if the containers cannot be created yet, run this again shortly"
+fi
+
 ## Storage Buckets
 
 create_container_if_absent() {
@@ -145,9 +164,6 @@ fi
 
 echo "- Creating role assignments"
 
-source $AFON_ROOT/scripts/azure/rbac.sh
-source $AFON_ROOT/scripts/azure/account-principal.sh
-require_role_assignment_rights $PRINCIPAL_ID create create.sh
 
 echo "- Using APP_SP_ID='$APP_SP_ID' as assignee for creating role assignments"
 ASSIGNEE_ID="$APP_SP_ID"
@@ -170,7 +186,6 @@ for ID in "${CATALOG_IDS[@]}"; do
   fi
 done
 
-STORAGE_ACCOUNT_SCOPE="/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT"
 if [ -n "$(az role assignment list --assignee-object-id $ASSIGNEE_ID --role "$STORAGE_ACCOUNT_ROLE" --scope "$STORAGE_ACCOUNT_SCOPE" --query "[].id" -o tsv)" ]; then
   echo "- Role '$STORAGE_ACCOUNT_ROLE' already assigned on '$AZURE_STORAGE_ACCOUNT', skipping"
 else

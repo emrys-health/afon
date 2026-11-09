@@ -56,6 +56,13 @@ Roles granted **to the app's service principal** (`APP_SP_ID`), by the **deploye
 - **Storage Blob Delegator** - the storage account
 - **Storage Blob Data Contributor** - the storage containers
 
+Role granted **to the deployer itself**, by the **deployer** (`create.sh`):
+
+- **Storage Blob Data Contributor** - the storage account, so that the deployer can create the containers with its login and use the cdktf store
+  (`cdktf-store`), which keeps the state in a container of the account.  The roles of the subscription (Owner, Contributor) do not include the blob data
+  permissions, so without it the store is refused with a message that names this role.  Skipped if the deployer already has it; a new role may take a
+  few minutes to apply.  This is the role-assignment-granting role of the deployer at work, as above.
+
 ## Deployment of AKS cluster (`tofu apply`)
 
 Roles required for the **deployer**:

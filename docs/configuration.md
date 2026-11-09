@@ -210,7 +210,8 @@ What differs by cloud:
   is shared, see above).  It ends by saying that `AZURE_CONNECTION_STRING` is not set, as it is blank in the copy: get the string of the new account with
   `az storage account show-connection-string --resource-group <AZURE_RESOURCE_GROUP> --name <AZURE_STORAGE_ACCOUNT> --query connectionString -o tsv`,
   set it in `secret-azure.properties` before step 7, and check it with `afon-cli.sh --env <env> azure-check-storage`.  The certificates are cached in the Key
-  Vault, so step 5 follows step 4.  `github-cloud-identity` grants roles on the Key Vault and the storage account, so step 8 follows step 4 too.
+  Vault, so step 5 follows step 4.  `azure-create` also grants the user who runs it `Storage Blob Data Contributor` on the new storage account, which the cdktf
+  store needs and the subscription roles do not include (it can take a few minutes to apply).  `github-cloud-identity` grants roles on the Key Vault and the storage account, so step 8 follows step 4 too.
 - **`gcp`:** the certificates are cached in Secret Manager, which needs `GCP_SECRETS_ENABLED=true`.  The identity is per project, and it binds the cdktf and the
   logs buckets, which must exist.
 
