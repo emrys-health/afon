@@ -20,7 +20,7 @@ The `smoke-tests-<cloud>` workflows, [AWS](../.github/workflows/smoke-tests-aws.
 `afon-cli.sh smoke-test <cloud> --setup <cloud>-full --teardown` in the [afon-cli Docker image](docker.md), on a **GitHub-hosted
 runner**: they deploy and configure the full stack of the cloud, run the smoke tests against it, and tear it down, whether the tests
 passed or failed.  See [Smoke tests](smoke_tests.md).  Each is only the trigger and the cloud: they all call the reusable workflow
-[Smoke Tests](../.github/workflows/smoke-tests.yml), which holds the steps, so a change to them is made there, once.
+[smoke-tests](../.github/workflows/smoke-tests.yml), which holds the steps, so a change to them is made there, once.
 Their Slack notifications and their recovery are per workflow, ie per cloud.
 
 They are meant to run downstream of a new build of afon-cli, ie when the [CLI Release](release.md) workflow completes successfully on

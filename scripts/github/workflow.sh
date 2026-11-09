@@ -14,7 +14,7 @@
 #
 # The workflow of the action is --name (default smoke-tests) for --cloud: <name>-<cloud>.  With --cloud all the action applies to
 # the workflow of every cloud, ie <name>-aws, <name>-azure and <name>-gcp, and carries on after one fails.  The
-# actions but list need a --cloud.
+# actions but list need a --cloud, which afon-cli.sh passes on as env variable AFON_CLOUD, so that is read too.
 #
 # Requires the gh CLI, logged in (gh auth login, or GH_TOKEN) with the 'repo' scope; enabling, disabling and running need write access
 # to the repo.
@@ -35,6 +35,7 @@ usage(){
   echo "          disable :  disables the workflow, so that no run starts.  Runs in progress are not stopped"
   echo "          run     :  starts the workflow, on --ref, with the inputs given as --field"
   echo "cloud:    the cloud of the workflow, or all for the workflow of every cloud.  Needed by all actions but list."
+  echo "          afon-cli.sh takes --cloud (or -c) itself, so this is also env variable AFON_CLOUD."
   echo "name:     the workflow, as <name>-<cloud>.  Defaults to $DEFAULT_NAME."
   echo "repo:     the target repo.  Defaults to env variable GH_REPO, if set, else to $DEFAULT_REPO."
   echo "ref:      for run, the branch or tag to run the workflow on.  Defaults to the default branch of the repo."
@@ -56,6 +57,20 @@ check_tools(){
 write(){
   if [ "$DRY_RUN" == "true" ]; then
     echo "would run: $*"
+  else
+    "$@"
+  fi
+}
+
+# Runs the command, whose output is tab separated, as gh prints it when it is not a terminal, as a table with aligned columns.
+# Takes the header of the columns, if any, as the first arg, where an empty one says there is none.
+table(){
+  local HEADER="$1"
+  shift
+  if [ "$DRY_RUN" == "true" ]; then
+    echo "would run: $*"
+  elif command -v column > /dev/null 2>&1; then
+    { [ -z "$HEADER" ] || printf '%b\n' "$HEADER"; "$@"; } | column -t -s $'\t'
   else
     "$@"
   fi
@@ -88,7 +103,7 @@ esac
 
 REPO=
 NAME="$DEFAULT_NAME"
-CLOUD=
+CLOUD="${AFON_CLOUD:-}" # afon-cli.sh takes --cloud itself, and passes it on as AFON_CLOUD
 REF=
 FIELDS=()
 DRY_RUN=false
@@ -119,11 +134,12 @@ fi
 check_tools
 echo "Repo $REPO"
 if [ "$ACTION" == "list" ]; then
-  write gh workflow list --all
+  table "NAME\tSTATE\tID" gh workflow list --all
   exit 0
 fi
 
 [ -n "$CLOUD" ] || die "Give the --cloud, one of aws, azure, gcp or all"
+CLOUD="$(printf '%s' "$CLOUD" | tr '[:upper:]' '[:lower:]')"
 if [ "$CLOUD" == "all" ]; then
   TARGETS=("${CLOUDS[@]}")
 else

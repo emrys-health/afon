@@ -1,4 +1,4 @@
-name: Smoke Tests
+name: smoke-tests
 
 # Reusable workflow, called by the smoke-tests-<cloud> workflows, which only give the cloud: runs
 # `afon-cli.sh smoke-test <cloud> --setup <cloud>-full --teardown` in the afon-cli Docker image, on a GitHub-hosted runner.
