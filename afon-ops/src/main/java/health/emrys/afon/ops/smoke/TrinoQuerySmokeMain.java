@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
@@ -85,6 +86,19 @@ public class TrinoQuerySmokeMain {
         return cnxnProperties;
     }
 
+    /**
+     * The users that can get a token, ie those that have a Keycloak confidential client: only the {@code USER_ID} user has one,
+     * the others are users with no client of their own (see {@code ConfigureUsersMain#configureOidcUsers}).
+     */
+    private List<AfonUser> clientUsers() {
+        String         userId = properties.getValue(AfonProperty.USER_ID);
+        List<AfonUser> users  = userProvider.getUsers().stream().filter(u -> u.username().equals(userId)).toList();
+        if (users.isEmpty()) {
+            throw new RuntimeException("Cannot run Trino tests. USER_ID " + userId + " is not a user in users.csv.");
+        }
+        return users;
+    }
+
     public static void main(String[] args) throws Exception {
         try {
             TrinoQuerySmokeMain app    = new TrinoQuerySmokeMain();
@@ -142,7 +156,7 @@ public class TrinoQuerySmokeMain {
                 start));
         } else {
             logger.info("Polaris logs:\n{}", String.join("\n", logs));
-            for (AfonUser user : userProvider.getUsers()) {
+            for (AfonUser user : clientUsers()) {
                 boolean found = false;
                 for (String log : logs) {
                     if (log.contains("Resolving principal for credentials: PolarisCredential{principalName="
@@ -214,7 +228,7 @@ public class TrinoQuerySmokeMain {
                 principals.add(principal);
             }
         }
-        for (AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : clientUsers()) {
             if (!principals.contains(user.username())) {
                 errors.add(format("No Trino log of principal %s running '%s'", user.username(), QUERY));
             }
@@ -261,10 +275,7 @@ public class TrinoQuerySmokeMain {
 
     private List<String> tryQueriesForAllUsers(String url, String query) throws SQLException, IOException {
         List<String>   errors = new ArrayList<>();
-        List<AfonUser> users  = userProvider.getUsers();
-        if (users.isEmpty()) {
-            throw new RuntimeException("Cannot run Trino tests. No users found.");
-        }
+        List<AfonUser> users  = clientUsers();
         boolean isBadPasswordTested = false;
         for (AfonUser user : users) {
             logger.info("Checking Trino access for {}", user.username());
