@@ -7,6 +7,7 @@ import health.emrys.afon.acceptance.{AcceptanceTestConfig, ContainerHelper, Spar
 import health.emrys.afon.config.{AfonCatalog, AfonCloud, AfonPropertyProvider, AfonUser, AfonUserAcl, AfonUserProvider}
 import health.emrys.afon.ops.ConfigureUsersMain
 import health.emrys.afon.polaris.catalogs.{AwsPolarisCatalog, PolarisCatalog}
+import health.emrys.afon.security.keycloak.KeyCloakProvider
 import health.emrys.afon.spark.{CatalogWarehouse, KeyCloakSparkWarehouseConfigForTesting}
 import org.apache.hc.core5.http.HttpResponse
 import org.apache.iceberg.exceptions.{ForbiddenException, NotAuthorizedException, RESTException}
@@ -44,6 +45,9 @@ class UsersSpec extends SpecPretifier with GivenWhenThen {
       thenUserIsNotAllowedToExecute(sql, TestUsers.UserName)
     }
 
+    /**
+     * This test has been ignored as it creates a client for a user and circumvents MFA which is not a realistic flow
+     */
     "not see catalogs authorised only for other users" ignore { // ticket 225: all users shared one principal role
       val allowedCatalog = createAwsPolarisCatalog("users_spec_allowed", adminGrants = true)
       val allowedName = allowedCatalog.catalogName()
