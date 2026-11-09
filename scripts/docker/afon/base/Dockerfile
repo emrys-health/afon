@@ -88,7 +88,10 @@ RUN ARCH=$([ "$TARGETARCH" = arm64 ] && echo arm || echo x86_64) \
  && curl $CURL_OPTS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${ARCH}.tar.gz -o gcloud.tar.gz \
  && tar -xzf gcloud.tar.gz -C /opt \
  && /opt/google-cloud-sdk/install.sh --quiet --usage-reporting=false --path-update=false \
- && rm gcloud.tar.gz
+ && rm gcloud.tar.gz \
+ # the plugin the Kubernetes and Helm providers run to get a token for GKE, which the tarball does not include
+ && /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin --quiet \
+ && /opt/google-cloud-sdk/bin/gke-gcloud-auth-plugin --version
 
 # Add Microsoft signing key + repo and install exact version
 RUN curl $CURL_OPTS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
