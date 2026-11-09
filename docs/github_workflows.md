@@ -233,7 +233,7 @@ then decode the JWT payload): the token is not a secret to the job that holds it
 
 ## Slack notifications
 
-The [acceptance-tests-linux](../.github/workflows/acceptance-tests-linux.yml) and [smoke tests](#smoke-tests-workflows) workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the branch, the commit, what triggered the run and a link to it.  When a job then passes again, they post that it has recovered.  Other successful runs post nothing.
+The [acceptance-tests](../.github/workflows/acceptance-tests.yml) and [smoke tests](#smoke-tests-workflows) workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the branch, the commit, what triggered the run and a link to it.  When a job then passes again, they post that it has recovered.  Other successful runs post nothing.
 
 A job has recovered when the run before it failed: the previous attempt of the same run, when it is re-run, else the
 latest earlier run of the same workflow on the same branch, passing over skipped and cancelled runs.  The notifications are posted by

@@ -1,6 +1,6 @@
 ---
 # Installs the command-line tools required by the acceptance tests workflow
-# (.github/workflows/acceptance-tests-linux.yml) on a self-hosted Linux runner.
+# (.github/workflows/acceptance-tests.yml) on a self-hosted Linux runner.
 #
 #   ansible-playbook runner-setup.yml
 #   ansible-playbook runner-setup.yml --check --diff        # dry run

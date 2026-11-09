@@ -1,4 +1,4 @@
-name: acceptance-tests-linux
+name: acceptance-tests
 
 # Runs the acceptance tests (all of them, unless a cloud is given, see docs/acceptance_tests.md) on the self-hosted Linux runner.
 #
@@ -44,7 +44,7 @@ permissions:
 
 # The specs write to shared buckets and catalogs, so never run two of them at once.
 concurrency:
-  group: acceptance-tests-linux
+  group: acceptance-tests
   cancel-in-progress: false
 
 env:

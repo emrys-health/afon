@@ -1,7 +1,7 @@
 # Runner provisioning
 
 Ansible playbook that installs the command-line tools required by the
-[Acceptance tests (Linux)](../../.github/workflows/acceptance-tests-linux.yml) workflow on a
+[acceptance-tests](../../.github/workflows/acceptance-tests.yml) workflow on a
 self-hosted Linux runner.
 
 The runner itself is installed by the `github` role, which drives

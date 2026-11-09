@@ -19,7 +19,7 @@ github_runner_checksum: 04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535a
 github_runner_dir: "{{ github_runner_home }}/actions-runner"
 
 # The name the runner reports on GitHub, and the labels the workflow selects it
-# by — .github/workflows/acceptance-tests-linux.yml asks for [self-hosted, Linux, X64],
+# by — .github/workflows/acceptance-tests.yml asks for [self-hosted, Linux, X64],
 # all of which the runner applies itself.
 github_runner_name: "{{ inventory_hostname_short }}"
 github_runner_labels: []

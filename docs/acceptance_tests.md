@@ -96,7 +96,7 @@ alone with the profile `signing` (`./afon.sh -a build -bp acceptance,signing`).
 
 ## Continuous integration
 
-The [Acceptance tests (Linux)](../.github/workflows/acceptance-tests-linux.yml) workflow runs the same
+The [acceptance-tests](../.github/workflows/acceptance-tests.yml) workflow runs the same
 `./afon.sh -a build -bp acceptance` command on the self-hosted Linux runner. It is triggered on push and
 pull request to `main`, nightly at 03:00 UTC, and manually via `workflow_dispatch` — the manual trigger
 takes a `cloud` input (`all`, `aws`, `azure` or `gcp`) which maps to the `--cloud` flag.
