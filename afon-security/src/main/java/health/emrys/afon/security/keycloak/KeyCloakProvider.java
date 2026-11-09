@@ -654,6 +654,43 @@ public class KeyCloakProvider implements IdentityProvider {
         return response;
     }
 
+    public boolean deleteClient(String clientId) {
+        try {
+            return deleteClient(adminToken(), KEYCLOAK_REALM, clientId);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete KeyCloak client " + clientId, e);
+        }
+    }
+
+    /**
+     * Deletes a client, looking up its internal UUID by {@code clientId} (the admin API keys deletes
+     * on the UUID, not the human-readable client ID).
+     *
+     * @return true if the client was deleted, false if there was no such client
+     * @throws IOException if KeyCloak refuses the delete
+     */
+    public boolean deleteClient(String adminToken, String realm, String clientId) throws IOException {
+        String uuid = clientUuid(adminToken, realm, clientId);
+        if (uuid == null) {
+            logger.info("No KeyCloak client {} in realm {} to delete", clientId, realm);
+            return false;
+        }
+        String uri = format("/admin/realms/%s/clients/%s", realm, uuid);
+        logger.info("Calling DELETE {} for client {}", uri, clientId);
+        HttpResponse response = restClient.delete(uri, adminToken);
+        if (response.getCode() == HttpStatus.SC_NOT_FOUND) {
+            // Deleted by someone else between the lookup and the delete.
+            logger.info("KeyCloak client {} in realm {} was already deleted", clientId, realm);
+            return false;
+        }
+        if (isFailure(response)) {
+            throw new IOException(format("Could not delete KeyCloak client '%s' in realm '%s': HTTP %d",
+                                         clientId, realm, response.getCode()));
+        }
+        logger.info("Deleted KeyCloak client {} from realm {}", clientId, realm);
+        return true;
+    }
+
     /** The internal UUID KeyCloak assigns a client, or null when no such client exists. */
     private String clientUuid(String adminToken, String realm, String clientId) throws IOException {
         String uri = format("/admin/realms/%s/clients?clientId=%s",
