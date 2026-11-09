@@ -16,11 +16,11 @@ See [Maven Release workflow](release.md#maven-release-workflow).
 
 ## Smoke tests workflows
 
-The `smoke-tests-<cloud>-linux` workflows, [AWS](../.github/workflows/smoke-tests-aws-linux.yml), [Azure](../.github/workflows/smoke-tests-azure-linux.yml) and [GCP](../.github/workflows/smoke-tests-gcp-linux.yml), each run
+The `smoke-tests-<cloud>` workflows, [AWS](../.github/workflows/smoke-tests-aws.yml), [Azure](../.github/workflows/smoke-tests-azure.yml) and [GCP](../.github/workflows/smoke-tests-gcp.yml), each run
 `afon-cli.sh smoke-test <cloud> --setup <cloud>-full --teardown` in the [afon-cli Docker image](docker.md), on a **GitHub-hosted
 runner**: they deploy and configure the full stack of the cloud, run the smoke tests against it, and tear it down, whether the tests
 passed or failed.  See [Smoke tests](smoke_tests.md).  Each is only the trigger and the cloud: they all call the reusable workflow
-[Smoke Tests (Linux)](../.github/workflows/smoke-tests-linux.yml), which holds the steps, so a change to them is made there, once.
+[Smoke Tests](../.github/workflows/smoke-tests.yml), which holds the steps, so a change to them is made there, once.
 Their Slack notifications and their recovery are per workflow, ie per cloud.
 
 They are meant to run downstream of a new build of afon-cli, ie when the [CLI Release](release.md) workflow completes successfully on
@@ -92,6 +92,18 @@ afon-cli.sh github-cloud-resources <cloud>
 ```
 It lists, without deleting, the resources that the stack `<cloud>-full` names after its cluster (`full-<CLUSTER_NAME>`): by default those older than 3 hours, `--older-than <hours>` changes it; the cluster name (`CLUSTER_NAME`) and the region, resource group or project are those of the active config.  It exits with 1 if it found any, so that it can also run as a scheduled check.  Delete what it lists by hand.  A scheduled job that deletes them would close the gap, as would a remote tofu backend, which writes the state as it goes; neither exists yet.
 
+### Pause, resume or start the smoke tests
+
+[github-workflow](../scripts/github/workflow.sh) wraps the `gh workflow` commands for the `<name>-<cloud>` workflows, `--name` being `smoke-tests` by default, and `--cloud all` applying to the workflows of every cloud, in the repo `emrys-health/afon` unless `--repo` (or `GH_REPO`) says otherwise:
+```shell
+afon-cli.sh github-workflow list                                   # all the workflows, and whether they are disabled
+afon-cli.sh github-workflow disable --cloud all                    # pause: no run starts, by a build or by hand
+afon-cli.sh github-workflow enable --cloud all                     # resume
+afon-cli.sh github-workflow view --cloud azure                     # the workflow and its recent runs
+afon-cli.sh github-workflow run --cloud azure --field config_env=emrys3 [--ref <branch>]
+```
+Disabling does not stop a run in progress, which `gh run cancel` does, but see [if the job is stopped](#if-the-job-is-stopped).  `--dry-run` says what would be run.
+
 ## GitHub as the identity provider
 
 The [smoke tests workflows](#smoke-tests-workflows) log in to the clouds without any stored credential, using the OIDC token that GitHub issues to each job.  The cloud does not trust the runner or its machine: it trusts **GitHub as an identity provider**, and a rule that you set up in the cloud, saying which jobs of which repo may act as which identity.
@@ -117,7 +129,7 @@ So the identity is the role, app or service account that you create, in the test
 - Only a job that runs in the environment `smoke-tests-<cloud>` gets that `sub`.  Restrict the environment's deployment branches to `main` (Settings > Environments), and optionally require reviewers.
 - Whoever can merge a workflow change into `main` can use the identity, so protect `main` and `.github/workflows/` with review (eg CODEOWNERS).
 - A workflow run from a fork cannot request the token, which is another reason not to run these on `pull_request` or `pull_request_target`.
-- Optionally also require the `job_workflow_ref` claim to be `<owner>/afon/.github/workflows/smoke-tests-linux.yml@refs/heads/main` in the rule, so that no other workflow can use it (AWS, Azure and GCP all can condition on claims; the way differs).
+- Optionally also require the `job_workflow_ref` claim to be `<owner>/afon/.github/workflows/smoke-tests.yml@refs/heads/main` in the rule, so that no other workflow can use it (AWS, Azure and GCP all can condition on claims; the way differs).
 
 The commands below are run **by an admin, from a terminal with `afon-cli.sh`, once per cloud and before the first run of the workflows**: no workflow runs them, since the identity they create is what lets a job log in at all.  
 

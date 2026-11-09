@@ -1,6 +1,6 @@
-name: Smoke Tests (Linux)
+name: Smoke Tests
 
-# Reusable workflow, called by the smoke-tests-<cloud>-linux workflows, which only give the cloud: runs
+# Reusable workflow, called by the smoke-tests-<cloud> workflows, which only give the cloud: runs
 # `afon-cli.sh smoke-test <cloud> --setup <cloud>-full --teardown` in the afon-cli Docker image, on a GitHub-hosted runner.
 #
 # WHY A HOSTED RUNNER AND THE IMAGE.  The repo is public, so no self-hosted runner may run its workflows, and the config and the

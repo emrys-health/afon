@@ -122,6 +122,7 @@ public class GenerateScriptMains {
         new ScriptEntry("github", "GithubMilestonesMain", "github/milestones.sh"),
         new ScriptEntry("github", "GithubRunnerMain", "github/runner.sh"),
         new ScriptEntry("github", "GithubSecretsMain", "github/secrets.sh"),
+        new ScriptEntry("github", "GithubWorkflowMain", "github/workflow.sh"),
 
         new ScriptEntry("logs", "LogsStoreMain", "logs/store.sh"),
 

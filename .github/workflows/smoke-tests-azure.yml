@@ -1,11 +1,11 @@
-name: Smoke Tests AWS (Linux)
+name: Smoke Tests Azure
 
-# Runs the smoke tests of the AWS full stack, ie `afon-cli.sh smoke-test aws --setup aws-full --teardown`, in the afon-cli
-# Docker image on a GitHub-hosted runner, by calling the Smoke Tests (Linux) workflow, which holds the steps that are the same for
+# Runs the smoke tests of the Azure full stack, ie `afon-cli.sh smoke-test azure --setup azure-full --teardown`, in the afon-cli
+# Docker image on a GitHub-hosted runner, by calling the Smoke Tests workflow, which holds the steps that are the same for
 # every cloud, see it, and docs/github_workflows.md for what to set up.
 #
 # Triggered by a new build of afon-cli, ie when the CLI Release workflow completes successfully on main, which has published the
-# images of the build too, so that the three smoke-tests-<cloud>-linux workflows run downstream of it, concurrently, each testing
+# images of the build too, so that the three smoke-tests-<cloud> workflows run downstream of it, concurrently, each testing
 # the image of that build.
 #
 # For a build, the config env to test with is the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys3, the env of the smoke
@@ -45,9 +45,9 @@ jobs:
       contents: read
       actions: read
       id-token: write
-    uses: ./.github/workflows/smoke-tests-linux.yml
+    uses: ./.github/workflows/smoke-tests.yml
     with:
-      cloud: aws
+      cloud: azure
       config_env: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys3' }}
       config_tag: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
       image_tag: ${{ inputs.image_tag }}
