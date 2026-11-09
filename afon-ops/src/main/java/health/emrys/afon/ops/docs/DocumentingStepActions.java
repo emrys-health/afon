@@ -89,6 +89,14 @@ public class DocumentingStepActions extends StepActions {
         call.run(format("localhost:<port of the port-forward to the pod %s>", podLabel));
     }
 
+    /**
+     * Does not open a tunnel, but documents the call with a placeholder for the local port.
+     */
+    @Override
+    protected void withKeyCloakTunnel(AfonCloud cloud, AfonPropertyProvider properties, PortForwardCall call) throws Exception {
+        call.run("localhost:<port of the port-forward to the KeyCloak pod>");
+    }
+
     @Override
     protected void whitelistPolaris(AfonCloud cloud, boolean withCaller, AfonPropertyProvider properties) throws ManagedProcessException {
         run("afon-cli.sh", null, withCaller ? new String[]{"kube-polaris-whitelist", cloud.toString(), "set", "--caller"}

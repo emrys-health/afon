@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
@@ -28,10 +29,21 @@ public class ConfigureUsersMain {
     private PolarisUserManager polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
+        this(userProvider, propertyProvider, null);
+    }
+
+    /**
+     * @param keycloakEndpoint where KeyCloak is reached, eg {@code localhost:<port>} of a port-forward to its pod, as its ingress may
+     *                         not admit this machine to its admin API, or {@code null} for its OIDC domain name
+     */
+    public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider, String keycloakEndpoint) {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
-        this.identityProvider = new KeyCloakProvider(propertyProvider);
+        this.identityProvider = new KeyCloakProvider(propertyProvider, keycloakEndpoint);
     }
+
+    /** The argument giving where KeyCloak is reached, eg {@code --keycloak-endpoint=localhost:54321}. */
+    public static final String KEYCLOAK_ENDPOINT_ARG = "--keycloak-endpoint=";
 
     /**
      * Provisions the realm, the {@link AfonProperty#POLARIS_ID} bootstrap client, and each
@@ -105,8 +117,17 @@ public class ConfigureUsersMain {
      * With two arguments (cloud, catalog-name), configures Polaris users for that single catalog -
      * catalog-scoped, meant to run once per catalog, e.g. to pick up a catalog created after the
      * cloud was last configured.
+     * Either may be followed by {@code --keycloak-endpoint=<host:port>}, eg of a port-forward to the KeyCloak pod, to reach KeyCloak
+     * there rather than at its OIDC domain name.
      */
-    public static void main(String[] args) {
+    public static void main(String[] allArgs) {
+        String keycloakEndpoint = Arrays.stream(allArgs)
+                                        .filter(arg -> arg.startsWith(KEYCLOAK_ENDPOINT_ARG))
+                                        .map(arg -> arg.substring(KEYCLOAK_ENDPOINT_ARG.length()).trim())
+                                        .filter(endpoint -> !endpoint.isEmpty())
+                                        .reduce((first, last) -> last)
+                                        .orElse(null);
+        String[] args = Arrays.stream(allArgs).filter(arg -> !arg.startsWith(KEYCLOAK_ENDPOINT_ARG)).toArray(String[]::new);
 
         if (args.length != 1 && args.length != 2) {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
@@ -121,7 +142,7 @@ public class ConfigureUsersMain {
         var    userProvider     = new FileUserProvider();
         // as seen by the cloud, whose KeyCloak it configures and whose Polaris it calls
         AfonPropertyProvider propertyProvider = new OpsPropertyProvider().forCloud(cloud);
-        var app = new ConfigureUsersMain(userProvider, propertyProvider);
+        var app = new ConfigureUsersMain(userProvider, propertyProvider, keycloakEndpoint);
 
         if (catalogName == null) {
             try {

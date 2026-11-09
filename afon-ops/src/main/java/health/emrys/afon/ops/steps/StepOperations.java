@@ -370,10 +370,15 @@ public class StepOperations {
         throw new IllegalArgumentException(format("%s should be 'https' or 'port-forward', not '%s'", POLARIS_ACCESS, access));
     }
 
+    /**
+     * Configures the realm, clients, users and MFA through the KeyCloak admin API, which its ingress may not admit this machine to:
+     * through a port-forward to the KeyCloak pod of the cluster, or through its public domain name if KeyCloak is another stack's.
+     */
     public Step configureOidcUsersFor(AfonCloud cloud) {
         return new Step(format("configure_oidc_users_for_cloud_%s", cloud),
                 format("configure OIDC users for cloud `%s`", cloud),
-                () -> actions.configureOidcUsersFor(cloud));
+                () -> actions.withKeyCloakTunnel(cloud, properties,
+                                                 endpoint -> actions.configureOidcUsersFor(cloud, endpoint)));
     }
 
     /**

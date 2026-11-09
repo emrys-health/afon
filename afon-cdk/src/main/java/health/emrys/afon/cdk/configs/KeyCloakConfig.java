@@ -367,9 +367,12 @@ public class KeyCloakConfig extends Construct {
     /**
      * The paths of KeyCloak that stay open to all when it is restricted to {@code <CLOUD>_KEYCLOAK_ALLOWED_CIDRS}: those of
      * the realm the users log in to, ie its login page, token endpoint and keys, and the static resources of the login page.
-     * The rest, ie the admin console and REST API, and the master realm its admin authenticates in, is restricted.
+     * Also the well-known documents of the master realm, ie its public discovery metadata, which the setup asks for to tell that
+     * KeyCloak answers, also that of a stack using the KeyCloak of another.
+     * The rest, ie the admin console and REST API, and the master realm its admin authenticates in, is restricted: the setup
+     * reaches it through a port-forward to the KeyCloak pod.
      */
-    public static final List<String> OPEN_PATHS = List.of("/realms/" + KEYCLOAK_REALM, "/resources");
+    public static final List<String> OPEN_PATHS = List.of("/realms/" + KEYCLOAK_REALM, "/realms/master/.well-known", "/resources");
 
     /**
      * Exposes KeyCloak over HTTPS at the OIDC domain name of its cloud, and makes it resolvable.

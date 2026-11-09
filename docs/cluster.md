@@ -282,8 +282,8 @@ users and the Spark step, reach it in one of two ways, as `POLARIS_ACCESS` in `a
   the step and closed after it, so the call comes from inside the cluster and needs no access through the ingress, however it is
   restricted. The kubectl context must be the cluster of the stack: the step fails, before calling anything, if it is not of the kind of the
   cloud (EKS, AKS or GKE) or is not named `CLUSTER_NAME` or `<stack>-CLUSTER_NAME`, so point it at the right one first, eg
-  `afon-cli.sh azure-update-kube-config tre`. Keycloak is still reached through its public domain name, so if it is restricted, see
-  [Restricting who can reach KeyCloak](#restricting-who-can-reach-keycloak), this machine must be among its allowed addresses.
+  `afon-cli.sh azure-update-kube-config tre`. The admin API of KeyCloak is reached through a port-forward to its pod too, whatever
+  `POLARIS_ACCESS` is, see [Restricting who can reach KeyCloak](#restricting-who-can-reach-keycloak).
 - `https`: through the public domain name of Polaris, as before. If its ingress is restricted, see the sections below, this machine must
   be among the allowed addresses while the steps run, so the setup admits it: `whitelist_polaris_for_<cloud>_with_caller` runs after
   `deploy_complete_for_<stack>`, adds the IPv4 address of this machine to the CIDRs, and waits (up to 2 minutes) until Polaris answers it,
@@ -399,8 +399,9 @@ the KeyCloak that the stacks of that cloud deploy. An address without a `/` is t
 `/128` for IPv6). Left empty, the default, there are no restraints.
 
 What users log in with stays open to all, so their addresses need not be known: the paths of the `polaris` realm, `/realms/polaris/…`,
-ie its login page, the OTP set-up, its token endpoint and its keys, and `/resources/…`, the stylesheets and scripts of the login
-page. Everything else is restricted: the admin console and REST API, `/admin/…`, the `master` realm, `/realms/master/…`, which the
+ie its login page, the OTP set-up, its token endpoint and its keys, `/resources/…`, the stylesheets and scripts of the login
+page, and `/realms/master/.well-known/…`, the public discovery metadata of the `master` realm, which the setup asks for to tell that
+KeyCloak answers. Everything else is restricted: the admin console and REST API, `/admin/…`, the `master` realm, `/realms/master/…`, which the
 admin authenticates in, and the welcome page. The open paths are `KeyCloakConfig.OPEN_PATHS`.
 
 How it is done differs per cloud:
@@ -415,12 +416,19 @@ How it is done differs per cloud:
 The cluster's own addresses are added automatically, as for Polaris: the egress IP on AWS, the pod CIDR and pinned `AZURE_EGRESS_IP` on
 Azure, and the pod range, node subnet and pinned `GCP_EGRESS_IP` on GCP.
 
-The callers of the restricted paths must be listed, or KeyCloak refuses them with a 403:
+The machine running the setup, `afon-cli.sh manage-stack setup`, need not be listed: the step `configure_oidc_users_for_cloud_<cloud>`,
+which authenticates in the `master` realm and calls the admin API to create the realm, clients and users and to configure MFA, reaches
+KeyCloak through a port-forward to its pod (labelled `app=keycloak`, port 8080), in the cluster of the stack, whatever `POLARIS_ACCESS`
+is. KeyCloak takes those requests as local ones, so answers them over plain http, and issues the tokens for its public domain name, as
+through its ingress. So does `DeleteClientsMain`. Both need `KUBECONFIG` to be the kubeconfig of the stack whose cluster runs KeyCloak.
+If no KeyCloak pod runs in that cluster, as for a stack using the KeyCloak of another, eg with `<CLOUD>_KEYCLOAK_EXTERNAL=true`, they
+log a warning and call it through its public domain name, which must then admit this machine: list it, or set up the stack that
+deploys that KeyCloak first, as its setup configures the users.
 
-- the **machine running the setup**, `afon-cli.sh manage-stack setup`, which authenticates in the `master` realm and calls the admin API
-  through the public domain name, to create the realm, clients and users and to configure MFA, whatever `POLARIS_ACCESS` is. Unlike for
-  Polaris, the setup does not admit this machine for the time it runs;
-- **administrators** using the admin console;
+The other callers of the restricted paths must be listed, or KeyCloak refuses them with a 403:
+
+- **administrators** using the admin console, or, without being listed, through a port-forward of their own, eg
+  `kubectl port-forward deploy/keycloak 8080` and `http://localhost:8080/admin/`;
 - the **clusters of other stacks** that call the admin API of this KeyCloak, if any: list their egress IPs. Those that only log users
   in or check tokens, eg with `<CLOUD>_KEYCLOAK_EXTERNAL=true`, use the open paths and need not be listed.
 

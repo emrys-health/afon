@@ -85,6 +85,17 @@ class StepOperationsTest {
         }
 
         @Override
+        protected void withKeyCloakTunnel(AfonCloud cloud, AfonPropertyProvider config, PortForwardCall call) throws Exception {
+            calls.add("tunnel to KeyCloak of " + cloud);
+            call.run("localhost:12345");
+        }
+
+        @Override
+        public void configureOidcUsersFor(AfonCloud cloud, String keycloakEndpoint) {
+            calls.add("configure OIDC users in " + cloud + " at " + keycloakEndpoint);
+        }
+
+        @Override
         public void createCatalogFor(AfonCloud cloud, AfonCatalog catalog, String polarisEndpoint) {
             calls.add("create catalog " + catalog + " in " + cloud + " at " + polarisEndpoint);
         }

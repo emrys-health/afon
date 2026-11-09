@@ -15,6 +15,7 @@ import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.KeyCloakTunnel;
 import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.spark.SparkRunner;
@@ -886,9 +887,22 @@ public class StepActions {
                 new String[]{CREATE, cloud.toString(), catalog.toString()}, polarisEndpointOverride(polarisEndpoint));
     }
 
-    public void configureOidcUsersFor(AfonCloud cloud) throws Exception {
-        executeMainOf(ConfigureUsersMain.class,
-                new String[]{cloud.toString()});
+    /**
+     * @param keycloakEndpoint the endpoint to call KeyCloak at, eg {@code localhost:54321} for a port-forward to its pod, or
+     *                         {@code null} for its public domain name
+     */
+    public void configureOidcUsersFor(AfonCloud cloud, String keycloakEndpoint) throws Exception {
+        executeMainOf(ConfigureUsersMain.class, keycloakEndpoint == null
+            ? new String[]{cloud.toString()}
+            : new String[]{cloud.toString(), ConfigureUsersMain.KEYCLOAK_ENDPOINT_ARG + keycloakEndpoint});
+    }
+
+    /**
+     * Calls the KeyCloak of the cluster of the current kubectl context through a port-forward to its pod, as its ingress may not
+     * admit this machine to its admin API, see {@link KeyCloakTunnel}.
+     */
+    protected void withKeyCloakTunnel(AfonCloud cloud, AfonPropertyProvider properties, PortForwardCall call) throws Exception {
+        KeyCloakTunnel.run(cloud, properties, call::run);
     }
 
     /**

@@ -1329,7 +1329,10 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
             paths = List.of(servicePath("/", serviceName, servicePort));
         } else {
-            SourceIpRules rules = sourceIpRules(inboundCidrs, openPaths, serviceName, servicePort);
+            // the cluster's own egress IP is only known on apply, so cannot be told apart from a configured CIDR: it gets rules of its own
+            String       ownCidr    = egressIp + "/32";
+            List<String> configured = inboundCidrs.stream().filter(cidr -> !cidr.equals(ownCidr)).toList();
+            SourceIpRules rules = sourceIpRules(configured, List.of(ownCidr), openPaths, serviceName, servicePort);
             albAnnotations.putAll(rules.annotations());
             paths = rules.paths();
         }
@@ -1396,32 +1399,46 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     static final String FORBIDDEN_ACTION = "forbidden";
 
     /**
-     * The listener rules that admit all to the {@code openPaths} but only {@code inboundCidrs} to the rest, the ALB taking
-     * the first rule that matches, in the order of the paths: the open paths, forwarded to the service; then {@code /},
-     * forwarded to it by actions with a {@code source-ip} condition each, {@code admitted-<n>}, of up to
-     * {@link #SOURCE_IPS_PER_RULE} CIDRs; then {@code /} again, answered by a fixed 403.
+     * The listener rules that admit all to the {@code openPaths} but only the CIDRs to the rest, the ALB taking the first rule
+     * that matches, in the order of the paths: the open paths, forwarded to the service; then {@code /}, forwarded to it by
+     * actions with a {@code source-ip} condition each, {@code admitted-<n>}, of up to {@link #SOURCE_IPS_PER_RULE} CIDRs; then
+     * {@code /} again, answered by a fixed 403.
+     *
+     * <p>The values of a condition must be unique, so the CIDRs are made distinct, and the {@code ownCidrs}, eg the cluster's
+     * egress IP, which is a Terraform reference only resolved on apply, so may be one of the {@code configuredCidrs} without it
+     * showing, never share a rule with those: the same CIDR in two rules is allowed.
      */
-    static SourceIpRules sourceIpRules(List<String> inboundCidrs, List<String> openPaths, String serviceName, int servicePort) {
+    static SourceIpRules sourceIpRules(List<String> configuredCidrs, List<String> ownCidrs, List<String> openPaths,
+                                       String serviceName, int servicePort) {
         Map<String, String> annotations = new LinkedHashMap<>();
         List<IngressV1SpecRuleHttpPath> paths = new ArrayList<>();
         openPaths.forEach(path -> paths.add(servicePath(path, serviceName, servicePort)));
         String forward = format(
             "{\"type\":\"forward\",\"forwardConfig\":{\"targetGroups\":[{\"serviceName\":\"%s\",\"servicePort\":\"%d\"}]}}",
             serviceName, servicePort);
-        for (int i = 0; i * SOURCE_IPS_PER_RULE < inboundCidrs.size(); i++) {
+        List<List<String>> rules = new ArrayList<>(chunks(configuredCidrs.stream().distinct().toList()));
+        rules.addAll(chunks(ownCidrs.stream().distinct().toList()));
+        for (int i = 0; i < rules.size(); i++) {
             String action = "admitted-" + i;
-            List<String> cidrs = inboundCidrs.subList(
-                i * SOURCE_IPS_PER_RULE, Math.min((i + 1) * SOURCE_IPS_PER_RULE, inboundCidrs.size()));
             annotations.put("alb.ingress.kubernetes.io/actions." + action, forward);
             annotations.put("alb.ingress.kubernetes.io/conditions." + action, format(
                 "[{\"field\":\"source-ip\",\"sourceIpConfig\":{\"values\":[%s]}}]",
-                cidrs.stream().map(cidr -> "\"" + cidr + "\"").collect(Collectors.joining(","))));
+                rules.get(i).stream().map(cidr -> "\"" + cidr + "\"").collect(Collectors.joining(","))));
             paths.add(actionPath("/", action));
         }
         annotations.put("alb.ingress.kubernetes.io/actions." + FORBIDDEN_ACTION,
             "{\"type\":\"fixed-response\",\"fixedResponseConfig\":{\"contentType\":\"text/plain\",\"statusCode\":\"403\",\"messageBody\":\"Forbidden\"}}");
         paths.add(actionPath("/", FORBIDDEN_ACTION));
         return new SourceIpRules(annotations, paths);
+    }
+
+    /** The CIDRs in lists of at most {@link #SOURCE_IPS_PER_RULE}, those of one rule each. */
+    private static List<List<String>> chunks(List<String> cidrs) {
+        List<List<String>> chunks = new ArrayList<>();
+        for (int i = 0; i < cidrs.size(); i += SOURCE_IPS_PER_RULE) {
+            chunks.add(cidrs.subList(i, Math.min(i + SOURCE_IPS_PER_RULE, cidrs.size())));
+        }
+        return chunks;
     }
 
     private static IngressV1SpecRuleHttpPath servicePath(String path, String serviceName, int servicePort) {

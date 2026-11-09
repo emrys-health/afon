@@ -33,6 +33,9 @@ public class KeyCloakConfigurer {
         String url;
         if (host.toLowerCase().startsWith(HTTP)) {
             url = host;
+        } else if (HTTP.equalsIgnoreCase(protocol.toLowerCase()) && host.contains(":")) {
+            // a port of its own, eg localhost:54321 of a port-forward to the KeyCloak pod
+            url = format("%s://%s", protocol, host);
         } else if (HTTP.equalsIgnoreCase(protocol.toLowerCase())) {
             url = format(
                     "%s://%s:%d",

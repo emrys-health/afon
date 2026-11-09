@@ -114,10 +114,25 @@ public class KeyCloakProvider implements IdentityProvider {
      * @param properties
      */
     public KeyCloakProvider(AfonPropertyProvider properties) {
-        this(properties.getValue(OIDC_DOMAIN_NAME),
+        this(properties, null);
+    }
+
+    /**
+     * As {@link #KeyCloakProvider(AfonPropertyProvider)}, but reaching KeyCloak at the endpoint, if any, rather than at its OIDC
+     * domain name, eg {@code localhost:<port>} of a port-forward to its pod, as its ingress may not admit this machine to its admin API.
+     *
+     * @param endpoint where KeyCloak is reached, as {@code host:port}, or {@code null} for its OIDC domain name
+     */
+    public KeyCloakProvider(AfonPropertyProvider properties, String endpoint) {
+        this(endpoint != null ? endpoint : properties.getValue(OIDC_DOMAIN_NAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
                 properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
+    }
+
+    /** The URL of KeyCloak's REST API, for tests. */
+    String baseUrl() {
+        return restClient.getBaseUrl();
     }
 
     KeyCloakProvider(String hostname,
