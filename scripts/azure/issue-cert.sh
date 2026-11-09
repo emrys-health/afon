@@ -76,8 +76,8 @@ require_key_vault() {
     echo "- Using Key Vault $AZURE_KEY_VAULT_NAME"
   else
     echo "- Key Vault $AZURE_KEY_VAULT_NAME does not exist, creating"
-    # AFON_ROOT is a plain shell variable in the CLI, so pass it explicitly to the child script
-    AFON_ROOT="$AFON_ROOT" "$AFON_ROOT/scripts/azure/keyvault.sh" create || exit 1
+    # AFON_ROOT and AFON_HOME are plain shell variables in the CLI, so pass them explicitly to the child script
+    AFON_ROOT="$AFON_ROOT" AFON_HOME="$AFON_HOME" "$AFON_ROOT/scripts/azure/keyvault.sh" create || exit 1
   fi
 }
 

@@ -111,8 +111,8 @@ issue_via_acme() {
     fi
 
     CERT_DIR="$ACME_HOME/$DOMAIN_NAME"
-    # AFON_ROOT is a plain shell variable in the CLI, so pass it explicitly to the child script
-    AFON_ROOT="$AFON_ROOT" "$AFON_ROOT/scripts/gcp/secrets.sh" store "$CERT_DIR/fullchain.cer" "$CERT_DIR/$DOMAIN_NAME.key" "$DOMAIN_NAME" || exit 1
+    # AFON_ROOT and AFON_HOME are plain shell variables in the CLI, so pass them explicitly to the child script
+    AFON_ROOT="$AFON_ROOT" AFON_HOME="$AFON_HOME" "$AFON_ROOT/scripts/gcp/secrets.sh" store "$CERT_DIR/fullchain.cer" "$CERT_DIR/$DOMAIN_NAME.key" "$DOMAIN_NAME" || exit 1
   done
 }
 
