@@ -1,6 +1,6 @@
 ## CLI Release workflow
 
-The [CLI Release](../.github/workflows/cli-release.yml) workflow releases the afon-cli zip (not the Maven jars/poms) as a GitHub
+The [cli-release](../.github/workflows/cli-release.yml) workflow releases the afon-cli zip (not the Maven jars/poms) as a GitHub
 Release: the rolling `snapshot` pre-release for a `SNAPSHOT` version, or the release `<version>` for a release tag.
 Unlike the others it runs on a GitHub-hosted runner and needs no secrets: it is triggered by pushes to `main` that change the
 modules, scripts or templates, and by the release tag `afon-<version>` pushed by `release.sh`.  It can also be run by hand
@@ -9,7 +9,7 @@ See [CLI Release workflow](release.md#cli-release-workflow).
 
 ## Maven Release workflow
 
-The [Maven Release](../.github/workflows/maven-release.yml) workflow deploys the Maven artifacts to GitHub Packages,
+The [maven-release](../.github/workflows/maven-release.yml) workflow deploys the Maven artifacts to GitHub Packages,
 for a `SNAPSHOT` version of `main` or for a release tag.  Like CLI Release, it runs on a GitHub-hosted runner and needs
 no secrets.  Its push triggers are disabled for now: it is run by hand for `main` or a tag.
 See [Maven Release workflow](release.md#maven-release-workflow).
@@ -23,7 +23,7 @@ passed or failed.  See [Smoke tests](smoke_tests.md).  Each is only the trigger 
 [smoke-tests](../.github/workflows/smoke-tests.yml), which holds the steps, so a change to them is made there, once.
 Their Slack notifications and their recovery are per workflow, ie per cloud.
 
-They are meant to run downstream of a new build of afon-cli, ie when the [CLI Release](release.md) workflow completes successfully on
+They are meant to run downstream of a new build of afon-cli, ie when the [cli-release](release.md) workflow completes successfully on
 `main`, which has also published the images of that build, each testing the image of the project version (eg `1.0-SNAPSHOT`).  Run by
 hand, they test the image tag given by `image_tag`.  They run concurrently, each on a runner of its own: a hosted runner is a new VM for
 each job, destroyed after it, so nothing of a run (config, tofu state, kubeconfigs, logs) is left on a machine, and the repo, being
@@ -233,7 +233,7 @@ then decode the JWT payload): the token is not a secret to the job that holds it
 
 ## Slack notifications
 
-The [Acceptance Tests (Linux)](../.github/workflows/acceptance-tests-linux.yml) and [smoke tests](#smoke-tests-workflows) workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the branch, the commit, what triggered the run and a link to it.  When a job then passes again, they post that it has recovered.  Other successful runs post nothing.
+The [acceptance-tests-linux](../.github/workflows/acceptance-tests-linux.yml) and [smoke tests](#smoke-tests-workflows) workflows post to the Slack channel `#afon-ci` on `emryshealth.slack.com` when their job fails, with the workflow, the branch, the commit, what triggered the run and a link to it.  When a job then passes again, they post that it has recovered.  Other successful runs post nothing.
 
 A job has recovered when the run before it failed: the previous attempt of the same run, when it is re-run, else the
 latest earlier run of the same workflow on the same branch, passing over skipped and cancelled runs.  The notifications are posted by

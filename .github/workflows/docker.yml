@@ -1,12 +1,12 @@
-name: Docker
+name: docker
 
 # Builds the afon-base and afon-cli images from the released afon-cli zip and pushes them to Docker Hub
 # (repository emryshealth), with scripts/docker/afon/build.sh --push.
 # See docs/docker.md for the versions and tags.  Images are linux/amd64, as the GitHub-hosted runner is.
 #
-# Not triggered directly: it is called by the CLI Release workflow, once the zip is released, with the zip it built.
+# Not triggered directly: it is called by the cli-release workflow, once the zip is released, with the zip it built.
 # The images are those of the version released: a SNAPSHOT of main for a snapshot, or the tagged release, which is
-# tagged latest as well.  To publish the images of a ref by hand, run the CLI Release workflow on it.
+# tagged latest as well.  To publish the images of a ref by hand, run the cli-release workflow on it.
 #
 # Runs on a GitHub-hosted runner, so no self-hosted runner ever runs code from a tag or a fork.
 #

@@ -1,4 +1,4 @@
-name: CLI Release
+name: cli-release
 
 # Builds the afon-cli zip and releases it as a GitHub Release asset.  Only the zip is released, not the Maven
 # module jars/poms.

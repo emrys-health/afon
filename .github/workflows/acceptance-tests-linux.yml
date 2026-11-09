@@ -1,4 +1,4 @@
-name: Acceptance Tests (Linux)
+name: acceptance-tests-linux
 
 # Runs the acceptance tests (all of them, unless a cloud is given, see docs/acceptance_tests.md) on the self-hosted Linux runner.
 #

@@ -1,6 +1,6 @@
-name: Maven Release
+name: maven-release
 
-# Deploys the Maven artifacts (module jars/poms) to GitHub Packages.  The CLI zip is released by the CLI Release
+# Deploys the Maven artifacts (module jars/poms) to GitHub Packages.  The CLI zip is released by the cli-release
 # workflow, which this one mirrors: both handle SNAPSHOT and release versions.
 #
 # - SNAPSHOT version: the SNAPSHOT artifacts are deployed, replacing the previous ones of that version.

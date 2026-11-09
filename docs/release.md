@@ -44,7 +44,7 @@ Packages by the [Maven Release workflow](#maven-release-workflow).
 
 ## CLI Release workflow
 
-The [CLI Release](../.github/workflows/cli-release.yml) workflow builds the afon-cli zip and releases it on GitHub.  Only the
+The [cli-release](../.github/workflows/cli-release.yml) workflow builds the afon-cli zip and releases it on GitHub.  Only the
 zip is released, not the Maven module jars/poms.  It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`,
 so it needs no secrets, and handles both kinds of version:
 
@@ -65,7 +65,7 @@ A release version can only be released from its tag.
 
 ## Maven Release workflow
 
-The [Maven Release](../.github/workflows/maven-release.yml) workflow mirrors the CLI Release workflow, but deploys the
+The [maven-release](../.github/workflows/maven-release.yml) workflow mirrors the CLI Release workflow, but deploys the
 Maven artifacts (module jars/poms) to [GitHub Packages](https://github.com/emrys-health/afon/packages) instead of
 creating a GitHub Release.  It runs on a GitHub-hosted runner with the job's own `GITHUB_TOKEN`, so it needs no secrets.
 It builds with the unit tests, using the `github`, `distribution`, `bin` and `src` profiles and

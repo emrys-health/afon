@@ -108,7 +108,7 @@ version from `main` overwrites the existing `-SNAPSHOT` tag, while a release ver
 
 The workflow runs as the last job of each CLI Release run: for a push to `main` that publishes the snapshot, and for a
 release tag `afon-<version>` that creates the GitHub Release.  To publish the images of a branch or tag by hand, run the
-CLI Release workflow on it: in GitHub, open Actions > CLI Release > Run workflow.  Only one run at a time is allowed.
+CLI Release workflow on it: in GitHub, open Actions > cli-release > Run workflow.  Only one run at a time is allowed.
 
 #### Required secrets
 

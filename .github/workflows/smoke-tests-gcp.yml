@@ -4,7 +4,7 @@ name: smoke-tests-gcp
 # Docker image on a GitHub-hosted runner, by calling the smoke-tests workflow, which holds the steps that are the same for
 # every cloud, see it, and docs/github_workflows.md for what to set up.
 #
-# Triggered by a new build of afon-cli, ie when the CLI Release workflow completes successfully on main, which has published the
+# Triggered by a new build of afon-cli, ie when the cli-release workflow completes successfully on main, which has published the
 # images of the build too, so that the three smoke-tests-<cloud> workflows run downstream of it, concurrently, each testing
 # the image of that build.
 #
@@ -32,7 +32,7 @@ on:
         default: ""
   # On every new build of the cli.
   workflow_run:
-    workflows: ["CLI Release"]
+    workflows: ["cli-release"]
     types: [completed]
     branches: [main]
 

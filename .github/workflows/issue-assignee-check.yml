@@ -1,4 +1,4 @@
-name: Issue assignee check
+name: issue-assignee-check
 
 # Checks that any issue referenced at the start of a commit message (eg "[#203] ...") is
 # assigned to whoever pushed it, to catch a wrong issue number before it's easy to miss in
