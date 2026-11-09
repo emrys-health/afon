@@ -50,6 +50,8 @@ concurrency:
 env:
   # Keep config inside the workspace rather than the runner's home, so it is scoped to this run.
   AFON_HOME: ${{ github.workspace }}/.afon
+  # No afon output on the console of the job, which is public.  Quoted, as a bare OFF is a boolean in YAML 1.1.
+  AFON_LOGGING_CONSOLE: "OFF"
   # Without this the JVM takes a quarter of the runner's RAM as its max heap, which is not
   # enough for javac to open the spark jars. Set explicitly so the build does not silently
   # depend on the instance size.
