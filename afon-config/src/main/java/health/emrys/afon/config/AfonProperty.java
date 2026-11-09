@@ -75,7 +75,7 @@ public enum AfonProperty {
     AWS_EGRESS_IP("AWS_EGRESS_IP"),
     AWS_POLARIS_ALLOWED_CIDRS("AWS_POLARIS_ALLOWED_CIDRS"),
     /**
-     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the admin side of the KeyCloak of the
      * aws stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
      */
     AWS_KEYCLOAK_ALLOWED_CIDRS("AWS_KEYCLOAK_ALLOWED_CIDRS"),
@@ -104,7 +104,7 @@ public enum AfonProperty {
      */
     GCP_POLARIS_ALLOWED_CIDRS("GCP_POLARIS_ALLOWED_CIDRS"),
     /**
-     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the admin side of the KeyCloak of the
      * gcp stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
      */
     GCP_KEYCLOAK_ALLOWED_CIDRS("GCP_KEYCLOAK_ALLOWED_CIDRS"),
@@ -200,7 +200,7 @@ public enum AfonProperty {
     AZURE_OIDC_DOMAIN_NAME("AZURE_OIDC_DOMAIN_NAME"),
     AZURE_POLARIS_ALLOWED_CIDRS("AZURE_POLARIS_ALLOWED_CIDRS"),
     /**
-     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the KeyCloak of the
+     * Comma-separated IP addresses or CIDRs, eg {@code 203.0.113.7,198.51.100.0/24}, that alone may reach the admin side of the KeyCloak of the
      * azure stacks through its ingress, plus the cluster's own addresses.  Optional: KeyCloak is open to all when unset.
      */
     AZURE_KEYCLOAK_ALLOWED_CIDRS("AZURE_KEYCLOAK_ALLOWED_CIDRS"),

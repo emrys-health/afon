@@ -43,7 +43,7 @@ public abstract class AbstractHttpsCloudProvider extends AbstractCloudProvider {
         }
         IngressV1 ingress = nginx.expose(
             route.domainName(), route.tlsSecretName(), route.service(), route.port(), route.ingressName(),
-            dependsOn, route.ingressProvisioners(), inboundCidrs(route));
+            dependsOn, route.ingressProvisioners(), inboundCidrs(route), route.openPaths());
         return new HttpsExposure(ingress, configureDns(ingress, route));
     }
 

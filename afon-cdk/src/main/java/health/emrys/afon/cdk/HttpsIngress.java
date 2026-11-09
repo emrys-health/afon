@@ -60,6 +60,8 @@ public class HttpsIngress {
      * @param dependsOn       what the ingress must also wait for, eg the service it routes to
      * @param provisioners    the ingress' provisioners, eg to remove its finalizers on destroy
      * @param inboundCidrs    the source CIDRs the ingress admits, or empty to admit all
+     * @param openPaths       the path prefixes that stay open to all when {@code inboundCidrs} restricts the rest, served by
+     *                        an ingress of their own
      * @return the ingress, whose load balancer address the DNS record must point at
      */
     public IngressV1 expose(String domainName,
@@ -69,10 +71,17 @@ public class HttpsIngress {
                             String ingressName,
                             List<? extends TerraformResource> dependsOn,
                             Optional<List<LocalExecProvisioner>> provisioners,
-                            List<String> inboundCidrs) {
+                            List<String> inboundCidrs,
+                            List<String> openPaths) {
         List<TerraformResource> dependencies = new ArrayList<>(List.of(nginxRelease, certManager));
         dependencies.addAll(dependsOn);
-        return new CdkHelper(scope, domainName, tlsSecretName, port, service, ingressName)
-            .createIngress(dependencies, provisioners, inboundCidrs);
+        CdkHelper helper  = new CdkHelper(scope, domainName, tlsSecretName, port, service, ingressName);
+        IngressV1 ingress = helper.createIngress(dependencies, provisioners, inboundCidrs);
+        if (!inboundCidrs.isEmpty() && !openPaths.isEmpty()) {
+            List<TerraformResource> openDependencies = new ArrayList<>(dependencies);
+            openDependencies.add(ingress);
+            helper.createOpenIngress(openDependencies, openPaths);
+        }
+        return ingress;
     }
 }

@@ -27,6 +27,9 @@ import java.util.Optional;
  *                         guarantees it exists
  * @param ingressProvisioners the provisioners of the ingress, eg to remove its finalizers on destroy, for platforms
  *                         that don't do so themselves
+ * @param openPaths        the path prefixes, eg {@code /realms/polaris}, that stay open to all when the component is
+ *                         restricted to its allowed CIDRs, the rest of its paths being restricted.  Empty, the default,
+ *                         restricts every path.
  */
 public record HttpsRoute(String component,
                          String domainName,
@@ -37,8 +40,25 @@ public record HttpsRoute(String component,
                          String tlsSecretName,
                          boolean cacheCertificate,
                          List<? extends TerraformResource> dependsOn,
-                         Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+                         Optional<List<LocalExecProvisioner>> ingressProvisioners,
+                         List<String> openPaths) {
     public HttpsRoute {
         Objects.requireNonNull(healthCheck, "health check of " + component);
+        openPaths = List.copyOf(openPaths);
+    }
+
+    /** A route all of whose paths are restricted when the component is. */
+    public HttpsRoute(String component,
+                      String domainName,
+                      String service,
+                      int port,
+                      String ingressName,
+                      HealthCheck healthCheck,
+                      String tlsSecretName,
+                      boolean cacheCertificate,
+                      List<? extends TerraformResource> dependsOn,
+                      Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+        this(component, domainName, service, port, ingressName, healthCheck, tlsSecretName, cacheCertificate, dependsOn,
+             ingressProvisioners, List.of());
     }
 }

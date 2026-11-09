@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import static health.emrys.afon.cdk.CdkHelper.*;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 
 /**
  * Abstract based class for KeyCloak deployment configurations.
@@ -364,13 +365,20 @@ public class KeyCloakConfig extends Construct {
     }
 
     /**
+     * The paths of KeyCloak that stay open to all when it is restricted to {@code <CLOUD>_KEYCLOAK_ALLOWED_CIDRS}: those of
+     * the realm the users log in to, ie its login page, token endpoint and keys, and the static resources of the login page.
+     * The rest, ie the admin console and REST API, and the master realm its admin authenticates in, is restricted.
+     */
+    public static final List<String> OPEN_PATHS = List.of("/realms/" + KEYCLOAK_REALM, "/resources");
+
+    /**
      * Exposes KeyCloak over HTTPS at the OIDC domain name of its cloud, and makes it resolvable.
      */
     public void configureHttpsAndDNS() {
         dnsRecord = cloudProvider.exposeHttps(new HttpsRoute(
             "keycloak", properties.getOidcDomainName(cloudProvider.cloud()), KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT,
             KEYCLOAK_INGRESS_NAME, new HealthCheck(HEALTH_READY_PATH, MANAGEMENT_PORT_NAME),
-            "keycloak-tls", true, List.of(), Optional.empty())).dnsRecord();
+            "keycloak-tls", true, List.of(), Optional.empty(), OPEN_PATHS)).dnsRecord();
     }
 
     /**

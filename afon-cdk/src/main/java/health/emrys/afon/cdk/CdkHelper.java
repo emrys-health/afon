@@ -257,6 +257,27 @@ public class CdkHelper {
         if (!inboundCidrs.isEmpty()) {
             annotations.put(WHITELIST_SOURCE_RANGE_ANNOTATION, String.join(",", inboundCidrs));
         }
+        return createIngress(ingressName, annotations, List.of("/"), dependencies, ingressProvisioners);
+    }
+
+    /**
+     * Creates the ingress, named {@code <ingressName>-open}, of the paths of the host that stay open to all while the
+     * ingress of {@link #createIngress(List, Optional, List)} restricts the rest: the nginx controller merges the ingresses of
+     * a host, a request taking the longest path that matches, and applies the whitelist of the ingress it comes from.  It
+     * serves the same certificate, which cert-manager issues for the other ingress, so it must depend on that one.
+     *
+     * @param openPaths the path prefixes open to all, eg {@code /realms/polaris}
+     */
+    public IngressV1 createOpenIngress(List<TerraformResource> dependencies, List<String> openPaths) {
+        return createIngress(ingressName + "-open", Map.of(), openPaths, dependencies, Optional.empty());
+    }
+
+    private IngressV1 createIngress(
+        String name,
+        Map<String, String> annotations,
+        List<String> paths,
+        List<TerraformResource> dependencies,
+        Optional<List<LocalExecProvisioner>> ingressProvisioners) {
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
             .number(this.port)
@@ -266,21 +287,21 @@ public class CdkHelper {
             .name(internalService)
             .port(port)
             .build();
-        IngressV1SpecRuleHttpPath httpPath = IngressV1SpecRuleHttpPath
+        List<IngressV1SpecRuleHttpPath> httpPaths = paths.stream().map(path -> IngressV1SpecRuleHttpPath
             .builder()
-            .path("/")
+            .path(path)
             .pathType("Prefix")
             .backend(IngressV1SpecRuleHttpPathBackend
                          .builder()
                          .service(backend)
                          .build())
-            .build();
+            .build()).toList();
         IngressV1SpecRule ingressV1SpecRule = IngressV1SpecRule
             .builder()
             .host(domainName)
             .http(IngressV1SpecRuleHttp
                       .builder()
-                      .path(List.of(httpPath))
+                      .path(httpPaths)
                       .build())
             .build();
         IngressV1Spec nginxSpec = IngressV1Spec
@@ -296,10 +317,10 @@ public class CdkHelper {
             .rule(List.of(ingressV1SpecRule))
             .build();
         IngressV1.Builder ingressBuilder = IngressV1.Builder
-            .create(construct, ingressName)
+            .create(construct, name)
             .metadata(IngressV1Metadata
                           .builder()
-                          .name(ingressName)
+                          .name(name)
                           .annotations(annotations)
                           .build())
             .dependsOn(dependencies)

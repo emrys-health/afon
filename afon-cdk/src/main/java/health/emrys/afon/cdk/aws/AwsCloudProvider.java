@@ -1229,7 +1229,8 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             route.port(),
             route.healthCheck(),
             getSubnetIds(),
-            inboundCidrs(AllowedCidrs.of(properties, AWS, route.component())));
+            inboundCidrs(AllowedCidrs.of(properties, AWS, route.component())),
+            route.openPaths());
         Route53Record dnsRecord = configureDNS(
             constructIds[1],
             zone.getZoneId(),
@@ -1259,12 +1260,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                   healthCheck, subnetIds, List.of());
     }
 
-    /**
-     * As above but, when {@code inboundCidrs} is non-empty, the ALB's security group only admits
-     * those source ranges. The IP allow-list has to live here rather than in a NetworkPolicy: the
-     * ALB terminates the client's connection and opens its own, so pods only ever see the ALB's
-     * (or a node's) VPC address, never the caller's.
-     */
+    /** As below, with every path restricted to {@code inboundCidrs}, if any. */
     public IngressV1 createHttpsIngress(
         final String constructId,
         final String ingressName,
@@ -1275,6 +1271,29 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final HealthCheck healthCheck,
         final List<String> subnetIds,
         final List<String> inboundCidrs) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
+                                  healthCheck, subnetIds, inboundCidrs, List.of());
+    }
+
+    /**
+     * As above but, when {@code inboundCidrs} is non-empty, only those source ranges are admitted. The IP allow-list has to
+     * live in the ALB rather than in a NetworkPolicy: the ALB terminates the client's connection and opens its own, so pods
+     * only ever see the ALB's (or a node's) VPC address, never the caller's.
+     *
+     * <p>With no {@code openPaths}, the ALB's security group admits only those ranges.  With some, the security group admits
+     * all, and the listener rules restrict the other paths instead, see {@link #sourceIpRules}.
+     */
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final HealthCheck healthCheck,
+        final List<String> subnetIds,
+        final List<String> inboundCidrs,
+        final List<String> openPaths) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
@@ -1303,29 +1322,20 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                                    ));
         albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-path", healthCheck.path());
         albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-port", healthCheck.port());
-        if (!inboundCidrs.isEmpty()) {
+        List<IngressV1SpecRuleHttpPath> paths;
+        if (inboundCidrs.isEmpty()) {
+            paths = List.of(servicePath("/", serviceName, servicePort));
+        } else if (openPaths.isEmpty()) {
             albAnnotations.put(INBOUND_CIDRS_ANNOTATION, String.join(",", inboundCidrs));
+            paths = List.of(servicePath("/", serviceName, servicePort));
+        } else {
+            SourceIpRules rules = sourceIpRules(inboundCidrs, openPaths, serviceName, servicePort);
+            albAnnotations.putAll(rules.annotations());
+            paths = rules.paths();
         }
-
-        var sslServicePort = IngressV1SpecRuleHttpPathBackendService
-            .builder()
-            .name(serviceName)
-            .port(IngressV1SpecRuleHttpPathBackendServicePort
-                      .builder()
-                      .number(servicePort)
-                      .build()
-                 ).build();
-        IngressV1SpecRuleHttpPathBackend pathBackend = IngressV1SpecRuleHttpPathBackend
-            .builder().service(sslServicePort).build();
-        IngressV1SpecRuleHttpPath pathRule = IngressV1SpecRuleHttpPath
-            .builder()
-            .path("/")
-            .pathType("Prefix")
-            .backend(pathBackend)
-            .build();
         IngressV1SpecRuleHttp servicePortRule = IngressV1SpecRuleHttp
             .builder()
-            .path(Collections.singletonList(pathRule))
+            .path(paths)
             .build();
         IngressV1SpecRule ingressRule = IngressV1SpecRule
             .builder()
@@ -1370,6 +1380,74 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
         destroyAfterLbcCleanup(ingress);
         return ingress;
+    }
+
+    /** The ALB annotations and the ingress paths, in the order the ALB evaluates them, of {@link #sourceIpRules}. */
+    record SourceIpRules(Map<String, String> annotations, List<IngressV1SpecRuleHttpPath> paths) {
+    }
+
+    /**
+     * An ALB listener rule has at most 5 condition values: the host and the two patterns of a {@code Prefix} path, eg
+     * {@code /} and {@code /*}, leave 2 for the source IPs, so the CIDRs are spread over as many rules as it takes.
+     */
+    static final int SOURCE_IPS_PER_RULE = 2;
+
+    /** The action of the requests to the restricted paths from callers not admitted. */
+    static final String FORBIDDEN_ACTION = "forbidden";
+
+    /**
+     * The listener rules that admit all to the {@code openPaths} but only {@code inboundCidrs} to the rest, the ALB taking
+     * the first rule that matches, in the order of the paths: the open paths, forwarded to the service; then {@code /},
+     * forwarded to it by actions with a {@code source-ip} condition each, {@code admitted-<n>}, of up to
+     * {@link #SOURCE_IPS_PER_RULE} CIDRs; then {@code /} again, answered by a fixed 403.
+     */
+    static SourceIpRules sourceIpRules(List<String> inboundCidrs, List<String> openPaths, String serviceName, int servicePort) {
+        Map<String, String> annotations = new LinkedHashMap<>();
+        List<IngressV1SpecRuleHttpPath> paths = new ArrayList<>();
+        openPaths.forEach(path -> paths.add(servicePath(path, serviceName, servicePort)));
+        String forward = format(
+            "{\"type\":\"forward\",\"forwardConfig\":{\"targetGroups\":[{\"serviceName\":\"%s\",\"servicePort\":\"%d\"}]}}",
+            serviceName, servicePort);
+        for (int i = 0; i * SOURCE_IPS_PER_RULE < inboundCidrs.size(); i++) {
+            String action = "admitted-" + i;
+            List<String> cidrs = inboundCidrs.subList(
+                i * SOURCE_IPS_PER_RULE, Math.min((i + 1) * SOURCE_IPS_PER_RULE, inboundCidrs.size()));
+            annotations.put("alb.ingress.kubernetes.io/actions." + action, forward);
+            annotations.put("alb.ingress.kubernetes.io/conditions." + action, format(
+                "[{\"field\":\"source-ip\",\"sourceIpConfig\":{\"values\":[%s]}}]",
+                cidrs.stream().map(cidr -> "\"" + cidr + "\"").collect(Collectors.joining(","))));
+            paths.add(actionPath("/", action));
+        }
+        annotations.put("alb.ingress.kubernetes.io/actions." + FORBIDDEN_ACTION,
+            "{\"type\":\"fixed-response\",\"fixedResponseConfig\":{\"contentType\":\"text/plain\",\"statusCode\":\"403\",\"messageBody\":\"Forbidden\"}}");
+        paths.add(actionPath("/", FORBIDDEN_ACTION));
+        return new SourceIpRules(annotations, paths);
+    }
+
+    private static IngressV1SpecRuleHttpPath servicePath(String path, String serviceName, int servicePort) {
+        return httpPath(path, IngressV1SpecRuleHttpPathBackendService
+            .builder()
+            .name(serviceName)
+            .port(IngressV1SpecRuleHttpPathBackendServicePort.builder().number(servicePort).build())
+            .build());
+    }
+
+    /** A path whose backend is the action of that name in the annotations, as the AWS load balancer controller has it. */
+    private static IngressV1SpecRuleHttpPath actionPath(String path, String action) {
+        return httpPath(path, IngressV1SpecRuleHttpPathBackendService
+            .builder()
+            .name(action)
+            .port(IngressV1SpecRuleHttpPathBackendServicePort.builder().name("use-annotation").build())
+            .build());
+    }
+
+    private static IngressV1SpecRuleHttpPath httpPath(String path, IngressV1SpecRuleHttpPathBackendService service) {
+        return IngressV1SpecRuleHttpPath
+            .builder()
+            .path(path)
+            .pathType("Prefix")
+            .backend(IngressV1SpecRuleHttpPathBackend.builder().service(service).build())
+            .build();
     }
 
     /**
