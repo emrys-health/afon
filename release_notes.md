@@ -31,6 +31,9 @@
 - **Polaris database user is now configurable ([#340](https://github.com/emrys-health/afon/issues/340)):**
   - It was hard coded; it is now the required property `POLARIS_DB_USERNAME` in `secret.properties`, next to `POLARIS_DB_PASSWORD`.
   - `afon-cli.sh config-updates` adds it, as `postgres` (the default of the template), before `POLARIS_DB_PASSWORD`: change it if the Polaris database uses another user, then run `config-validate`.
+- **`github-secrets pull` is removed ([#378](https://github.com/emrys-health/afon/issues/378)):**
+  - `afon-cli.sh github-secrets push` publishes the secrets only, no longer the encrypted copy of the config in the variable `AFON_CONFIG_BUNDLE`, and the `pull`, `--force` and `--no-bundle` options and the `AFON_SECRETS_PASSPHRASE` are gone.  To keep a copy of a config env and retrieve it, use `afon-cli.sh config-vault push|pull <tag> -c <cloud>`, which stores it in the secret store of a cloud.
+
 
 ## 1.0-beta-8
 

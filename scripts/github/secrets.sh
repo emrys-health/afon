@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Publishes the afon config files to GitHub, and retrieves them again.
+# Publishes the afon config files to GitHub as secrets, for the workflows.
 #
-# ./afon.sh -a github-secrets [--] {push|pull|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--force] [--no-bundle] [--dry-run]
+# ./afon.sh -a github-secrets [--] {push|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--dry-run]
 # (the -- is needed by afon.sh before any arg starting with -, eg: ./afon.sh -a github-secrets -- push --env dev)
 #
 # Without an env, the files in <afon-home>/config are published to the repository.
@@ -12,9 +12,7 @@
 # workflows), so the same workflow can be run against any config env.  The env is also taken from the global
 # --config-env, --env or AFON_ENV of afon.sh, if --env is not given here.
 #
-# 'push' publishes two things:
-#
-# 1. The secrets, for the workflows.  Each file becomes one base64-encoded secret, named after the file:
+# 'push' publishes each file as one base64-encoded secret, named after the file:
 #      afon.properties         -> AFON_PROPERTIES
 #      afon-aws.properties     -> AFON_AWS_PROPERTIES
 #      catalogs.properties     -> CATALOGS_PROPERTIES
@@ -25,40 +23,29 @@
 #    base64 is used so that multi-line values (SNOWFLAKE_PRIVATE_KEY, GOOGLE_APPLICATION_CREDENTIALS)
 #    survive the round trip byte for byte.  Empty files are skipped, as GitHub secrets cannot be empty.
 #
-# 2. The bundle, for 'pull'.  GitHub secrets are write-only, so they cannot be read back.  All the config files,
-#    empty ones included, are also put in a tar, encrypted with AES-256 (PBKDF2, 600000 iterations) under a
-#    passphrase, and stored as the GitHub variable AFON_CONFIG_BUNDLE.  Unlike the secrets, variables can be read
-#    by anyone with read access to the repo, so the bundle is only as safe as its passphrase: it must be at least
-#    16 characters, and shared with the team out of band.  Give it as env variable AFON_SECRETS_PASSPHRASE, or
-#    it is prompted for.  Use --no-bundle to publish the secrets only.
-#
-# 'pull' reads the bundle, decrypts it and writes the files back to the config dir.  It needs neither the
-# workflows nor the secrets.
+# GitHub secrets are write-only, so they cannot be read back.  To keep a copy of the config files and retrieve them
+# again, use the config-vault command, which stores them in the secret store of a cloud.
 #
 # Requires a recent gh CLI, logged in (gh auth login, or GH_TOKEN) with the 'repo' scope, or for a fine-grained token
 # read and write on Secrets, Variables and Administration.  Creating the environment requires admin access to the
-# repo, and using environments in a private repo requires a paid plan.  The bundle also requires openssl with
-# PBKDF2 support (OpenSSL 1.1.1+ or LibreSSL 3.1+).  See docs/acceptance_tests.md, section gh prerequisites.
+# repo, and using environments in a private repo requires a paid plan.  See docs/acceptance_tests.md, section gh
+# prerequisites.
 #
 # The repo is --repo, else env variable GH_REPO, else emrys-health/afon.  It does not depend on the current dir.
 set -euo pipefail
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {push|pull|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--force] [--no-bundle] [--dry-run]"
-  echo "actions:  push   :  writes each config file to its secret, and the encrypted bundle of them all to variable $BUNDLE_VARIABLE"
-  echo "          pull   :  writes the config files held in the bundle back into the config dir.  Refuses to"
-  echo "                    touch a non-empty config dir without --force"
+  echo "Usage: ${BASH_SOURCE[0]} {push|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--dry-run]"
+  echo "actions:  push   :  writes each config file to its secret"
   echo "          list   :  lists the secrets and variables currently set on the repo (or on the env)"
-  echo "          delete :  removes the config secrets and the bundle from the repo (or from the env)"
+  echo "          delete :  removes the config secrets from the repo (or from the env), and the variable $LEGACY_VARIABLE"
+  echo "                    that an earlier push set, if there is one"
   echo "home:       the afon home dir.  Defaults to \$HOME/.afon."
   echo "env:        the config env, which is also the name of the GitHub environment to hold the secrets."
   echo "            Reads or writes <afon-home>/config-<env>.  Defaults to the global config env, if set, else to"
   echo "            the repository and <afon-home>/config."
   echo "repo:       the target repo.  Defaults to env variable GH_REPO, if set, else to $DEFAULT_REPO."
-  echo "force:      the flag to let pull overwrite the files of a non-empty config dir."
-  echo "no-bundle:  the flag to let push publish the secrets only, without the bundle and its passphrase."
   echo "dry-run:    the flag to report what would be done, without calling gh."
-  echo "The bundle passphrase is read from env variable AFON_SECRETS_PASSPHRASE, else prompted for."
 }
 
 # Maps a config file name to its secret name: uppercased, with '-' and '.' as underscores.
@@ -102,97 +89,14 @@ ensure_environment(){
 
 # The repo whose workflows use the secrets, as in scripts/github/runner.sh.
 DEFAULT_REPO="emrys-health/afon"
-BUNDLE_VARIABLE="AFON_CONFIG_BUNDLE"
-# GitHub variables are limited to 48 KB.
-BUNDLE_MAX_BYTES=48000
-PASSPHRASE_MIN_LENGTH=16
-PBKDF2_ITERATIONS=600000
-
-# Removes the work dir, which holds the decrypted config, and stops.
-pull_fail(){
-  echo "$1" >&2
-  rm -rf "${WORK_DIR:-}"
-  exit 1
-}
-
-check_openssl(){
-  if ! echo x | openssl enc -aes-256-cbc -md sha256 -pbkdf2 -pass pass:x > /dev/null 2>&1 ; then
-    echo "Requires openssl with PBKDF2 support (OpenSSL 1.1.1+ or LibreSSL 3.1+): $(command -v openssl || echo 'openssl not found')" >&2
-    exit 1
-  fi
-}
-
-# Sets PASSPHRASE from env variable AFON_SECRETS_PASSPHRASE, else prompts for it.  With $1=new the passphrase
-# is checked for strength and confirmed, as it is going to protect the bundle.
-get_passphrase(){
-  PASSPHRASE="${AFON_SECRETS_PASSPHRASE:-}"
-  if [ -z "$PASSPHRASE" ]; then
-    if [ ! -t 0 ]; then
-      echo "No passphrase: set env variable AFON_SECRETS_PASSPHRASE, as there is no terminal to prompt on" >&2
-      exit 1
-    fi
-    read -rsp "Passphrase for the config bundle: " PASSPHRASE
-    echo
-    if [ "${1:-}" == "new" ]; then
-      local CONFIRM
-      read -rsp "Confirm passphrase: " CONFIRM
-      echo
-      if [ "$PASSPHRASE" != "$CONFIRM" ]; then
-        echo "The passphrases differ" >&2
-        exit 1
-      fi
-    fi
-  fi
-  if [ "${1:-}" == "new" ] && [ ${#PASSPHRASE} -lt $PASSPHRASE_MIN_LENGTH ]; then
-    echo "The passphrase must be at least $PASSPHRASE_MIN_LENGTH characters, as the bundle can be read by anyone with read access to the repo" >&2
-    exit 1
-  fi
-}
-
-# Runs openssl enc with $@, taking the passphrase from PASSPHRASE without it showing in the process list.
-crypt(){
-  AFON_SECRETS_PASSPHRASE="$PASSPHRASE" openssl enc -aes-256-cbc -md sha256 -pbkdf2 -iter $PBKDF2_ITERATIONS \
-    -pass env:AFON_SECRETS_PASSPHRASE "$@"
-}
-
-# The config files present in the config dir.
-bundle_files(){
-  local FILE
-  for FILE in $CONFIG_FILES ; do {
-    if [ -f "$CONFIG_DIR/$FILE" ]; then
-      echo "$FILE"
-    fi
-  } done
-}
-
-# Writes the bundle to stdout: the config files as a tar, encrypted, as a single line of base64.
-# COPYFILE_DISABLE stops the macOS tar from adding ._ files for the extended attributes.  The tar is
-# gzipped separately, as the macOS tar does not compress when writing to a pipe with -z.
-bundle_encrypt(){
-  COPYFILE_DISABLE=1 tar -C "$CONFIG_DIR" -cf - $(bundle_files) | gzip -c | crypt -salt | base64 | tr -d '\n'
-}
-
-# Reads the bundle from stdin, decrypts it and extracts the config files to dir $1.
-bundle_decrypt(){
-  base64 -d | crypt -d | gzip -dc | tar -xf - -C "$1"
-}
+# The variable that the pushes of an earlier version set, which held an encrypted copy of the config for a pull.  Nothing reads it now:
+# delete removes it.
+LEGACY_VARIABLE="AFON_CONFIG_BUNDLE"
 
 push(){
   if [ ! -d "$CONFIG_DIR" ]; then
     echo "Missing config dir $CONFIG_DIR" >&2
     exit 1
-  fi
-
-  # Done first, so that a bad passphrase or a bundle too big stops us before anything is published.
-  local BUNDLE=
-  if [ "$BUNDLE_ENABLED" == "true" ] && [ "$DRY_RUN" != "true" ]; then
-    check_openssl
-    get_passphrase new
-    BUNDLE=$(bundle_encrypt) || { echo "Failed to encrypt the bundle" >&2; exit 1; }
-    if [ ${#BUNDLE} -gt $BUNDLE_MAX_BYTES ]; then
-      echo "The bundle is ${#BUNDLE} bytes, over the $BUNDLE_MAX_BYTES bytes GitHub allows for a variable" >&2
-      exit 1
-    fi
   fi
 
   echo "Pushing config from $CONFIG_DIR to $(target)"
@@ -215,59 +119,11 @@ push(){
     base64 < "$CONFIG_FILE" | tr -d '\n' | gh secret set "$NAME" $(gh_repo) $(gh_env)
     echo "$NAME: set on $(target) from $CONFIG_FILE"
   } done
-
-  if [ "$BUNDLE_ENABLED" != "true" ]; then
-    echo "$BUNDLE_VARIABLE: skipped, --no-bundle"
-  elif [ "$DRY_RUN" == "true" ]; then
-    echo "$BUNDLE_VARIABLE: would set on $(target) from $(bundle_files | wc -l | tr -d ' ') files in $CONFIG_DIR, encrypted"
-  else
-    printf '%s' "$BUNDLE" | gh variable set "$BUNDLE_VARIABLE" $(gh_repo) $(gh_env)
-    echo "$BUNDLE_VARIABLE: set on $(target) from $(bundle_files | wc -l | tr -d ' ') files in $CONFIG_DIR, encrypted (${#BUNDLE} bytes)"
-  fi
-}
-
-pull(){
-  if [ -d "$CONFIG_DIR" ] && [ -n "$(ls -A "$CONFIG_DIR")" ] && [ "$FORCE" != "true" ]; then
-    echo "Config dir $CONFIG_DIR is not empty.  Use --force to overwrite its files." >&2
-    exit 1
-  fi
-  if [ "$DRY_RUN" == "true" ]; then
-    echo "$BUNDLE_VARIABLE: would read from $(target) and extract the config files to $CONFIG_DIR"
-    return
-  fi
-  check_openssl
-  get_passphrase
-
-  local BUNDLE
-  BUNDLE=$(gh variable get "$BUNDLE_VARIABLE" $(gh_repo) $(gh_env)) \
-    || { echo "No $BUNDLE_VARIABLE on $(target).  Was it pushed, and without --no-bundle?" >&2; exit 1; }
-
-  WORK_DIR=$(mktemp -d)
-  chmod 700 "$WORK_DIR"
-  printf '%s' "$BUNDLE" | bundle_decrypt "$WORK_DIR" 2> /dev/null || pull_fail "Failed to decrypt the bundle: wrong passphrase?"
-
-  # Only plain files with a plain name are taken, whatever the bundle holds.
-  mkdir -p "$CONFIG_DIR"
-  local CONFIG_FILE NAME COUNT=0
-  for CONFIG_FILE in "$WORK_DIR"/* ; do {
-    NAME=$(basename "$CONFIG_FILE")
-    if [ ! -f "$CONFIG_FILE" ] || [ -L "$CONFIG_FILE" ] || [[ ! "$NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-      echo "$NAME: skipped, not a plain file"
-      continue
-    fi
-    cp "$CONFIG_FILE" "$CONFIG_DIR/$NAME"
-    chmod 600 "$CONFIG_DIR/$NAME"
-    echo "$NAME: written to $CONFIG_DIR"
-    COUNT=$((COUNT + 1))
-  } done
-  rm -rf "$WORK_DIR"
-  echo "Pulled $COUNT config files from $(target) to $CONFIG_DIR"
 }
 
 list(){
   echo "Secrets of $(target)"
   gh secret list $(gh_repo) $(gh_env)
-  # The value of the bundle is not shown, as it is long.
   echo "Variables of $(target)"
   gh variable list $(gh_repo) $(gh_env) --json name,updatedAt --jq '.[] | "\(.name)\tupdated \(.updatedAt)"'
 }
@@ -282,10 +138,12 @@ delete(){
     gh secret delete "$NAME" $(gh_repo) $(gh_env) && echo "$NAME: deleted from $(target)" || echo "$NAME: not deleted from $(target)"
   } done
   if [ "$DRY_RUN" == "true" ]; then
-    echo "$BUNDLE_VARIABLE: would delete from $(target)"
+    echo "$LEGACY_VARIABLE: would delete from $(target), if set"
     return
   fi
-  gh variable delete "$BUNDLE_VARIABLE" $(gh_repo) $(gh_env) && echo "$BUNDLE_VARIABLE: deleted from $(target)" || echo "$BUNDLE_VARIABLE: not deleted from $(target)"
+  if gh variable get "$LEGACY_VARIABLE" $(gh_repo) $(gh_env) > /dev/null 2>&1; then
+    gh variable delete "$LEGACY_VARIABLE" $(gh_repo) $(gh_env) && echo "$LEGACY_VARIABLE: deleted from $(target)"
+  fi
 }
 
 ACTION="${1:-}"
@@ -294,8 +152,6 @@ shift || true
 AFON_HOME=
 GH_ENV=
 REPO=
-FORCE=false
-BUNDLE_ENABLED=true
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
@@ -306,10 +162,6 @@ while [[ $# -gt 0 ]]; do
       GH_ENV="$2"; shift 2 ;;
     --repo)
       REPO="$2"; shift 2 ;;
-    --force)
-      FORCE=true; shift ;;
-    --no-bundle)
-      BUNDLE_ENABLED=false; shift ;;
     --dry-run)
       DRY_RUN=true; shift ;;
     --help|-h)
@@ -351,7 +203,7 @@ CLOUD=
 source $AFON_ROOT/scripts/config/config-files.sh
 
 case "$ACTION" in
-  push|list|delete|pull)
+  push|list|delete)
     $ACTION
     ;;
   *)
