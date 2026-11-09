@@ -385,7 +385,8 @@ gcp_create(){
   if gcloud iam workload-identity-pools describe "$POOL" --location=global --project "$PROJECT_ID" > /dev/null 2>&1; then
     echo "The workload identity pool $POOL exists"
   else
-    write gcloud iam workload-identity-pools create "$POOL" --location=global --project "$PROJECT_ID" --display-name="GitHub" > /dev/null
+    write gcloud iam workload-identity-pools create "$POOL" --location=global --project "$PROJECT_ID" --display-name="GitHub" > /dev/null \
+      || die "Cannot create the workload identity pool $POOL: it takes roles/iam.workloadIdentityPoolAdmin on the project $PROJECT_ID, ask an Owner to grant it or to create the pool, then run this again"
     say "Created the workload identity pool $POOL"
   fi
 
@@ -397,7 +398,8 @@ gcp_create(){
   write gcloud iam workload-identity-pools providers "$VERB" "$PROVIDER" --workload-identity-pool="$POOL" --location=global \
     --project "$PROJECT_ID" --issuer-uri="$GITHUB_ISSUER" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-    --attribute-condition="assertion.sub=='$SUBJECT'" > /dev/null
+    --attribute-condition="assertion.sub=='$SUBJECT'" > /dev/null \
+    || die "Cannot ${VERB%-oidc} the provider $PROVIDER: it takes roles/iam.workloadIdentityPoolAdmin on the project $PROJECT_ID, ask an Owner to grant it, then run this again"
   say "Set the provider $PROVIDER (${VERB%-oidc}d), limited to $SUBJECT"
 
   if gcloud iam service-accounts describe "$SA_EMAIL" --project "$PROJECT_ID" > /dev/null 2>&1; then

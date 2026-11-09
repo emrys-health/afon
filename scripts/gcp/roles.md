@@ -66,13 +66,16 @@ Google Workspace session control forces a new login after a set time: run `gcp-l
 | `PERMISSION_DENIED ... secretmanager.secrets.create`                                          | `roles/secretmanager.admin`                  |
 | `does not have storage.hmacKeys.create access to the Google Cloud project` from `gcp-create`  | `roles/storage.hmacKeyAdmin`, see [HMAC key](#hmac-key) |
 | `Policy update access denied` ... `setIamPolicy` from `gcp-destroy`                           | `roles/resourcemanager.projectIamAdmin`      |
+| `iam.workloadIdentityPoolProviders.create` denied from `github-cloud-identity create gcp`     | `roles/iam.workloadIdentityPoolAdmin`, see [GitHub identity](#github-identity-for-the-smoke-tests) |
+| `Permission denied to enable service [sts.googleapis.com]` from `github-cloud-identity create gcp` | `roles/serviceusage.serviceUsageAdmin`, or have an admin enable it |
 
 ### Project prerequisites
 
 These are not roles, but are also required:
 
 - The APIs are enabled: `compute.googleapis.com`, `container.googleapis.com`, `dns.googleapis.com`,
-  `iam.googleapis.com`, and, if `GCP_SECRETS_ENABLED=true`, `secretmanager.googleapis.com`.
+  `iam.googleapis.com`, and, if `GCP_SECRETS_ENABLED=true`, `secretmanager.googleapis.com`.  For the [GitHub identity](#github-identity-for-the-smoke-tests)
+  also `iamcredentials.googleapis.com`, `sts.googleapis.com`, `cloudresourcemanager.googleapis.com` and `storage.googleapis.com`.
 - The Polaris DNS zone exists in the project, as the stack assumes it, named after `GCP_POLARIS_DOMAIN_NAME` with its dots replaced by dashes, eg `emryspolarisgcp2-click`.  `scripts/gcp/create.sh` creates it.
 - The default Compute Engine service account exists and is enabled.
 
@@ -120,6 +123,31 @@ gcloud storage hmac create $GCP_SERVICE_ACCOUNT --project=$GCP_PROJECT_ID
 If the role is granted and the creation is still refused, an organisation policy may forbid HMAC keys, eg `constraints/storage.restrictAuthTypes`: that
 needs an organisation admin to change.  Without the key a stack with Git still deploys, but Gitea cannot use its bucket and crash-loops, and the log shipper of Polaris
 is refused by the bucket: leave `GCP_POLARIS_LOG_BUCKET` blank to skip it.
+
+## GitHub identity for the smoke tests
+
+The user running `afon-cli.sh github-cloud-identity create|show|delete gcp` (`scripts/github/cloud-identity.sh`), which creates, on the project
+`GCP_PROJECT_ID`, what lets the smoke tests job log in without a stored key: the workload identity pool `github` and its OIDC provider, limited to the
+subject of the GitHub environment `smoke-tests-gcp`, and the service account `afon-smoke-tests`, which that subject may impersonate.
+
+| Role                                         | Needed for                                                                                                  |
+|----------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| `roles/serviceusage.serviceUsageAdmin`       | Enabling the APIs that are not yet: `iam`, `iamcredentials`, `sts`, `cloudresourcemanager`, `secretmanager` and `storage`.  The script enables only the missing ones, so none is needed if an admin has enabled them |
+| `roles/iam.workloadIdentityPoolAdmin`        | Creating, updating and deleting the pool and the provider (`iam.workloadIdentityPools.*`, `iam.workloadIdentityPoolProviders.*`) |
+| `roles/iam.serviceAccountAdmin`              | Creating the service account, and letting the GitHub subject impersonate it (`roles/iam.workloadIdentityUser` on it) |
+| `roles/resourcemanager.projectIamAdmin`      | Granting the service account its roles on the project                                                       |
+| `roles/storage.admin`                        | Granting the service account access to the cdktf store `afon-cdktf-<project>` and the logs store `afon-logs-<project>`, once they exist |
+
+`roles/owner` covers all of them.  An admin who prefers not to grant them can run the command themselves: it skips what exists, so it is safe to repeat.
+
+The service account gets, on the project, `roles/owner` by default (the deploy roles can be narrowed to those of [Stack deployer](#stack-deployer)), plus
+`roles/secretmanager.secretAccessor` and `roles/secretmanager.viewer` for the cached TLS certs.  On the stores it gets `roles/storage.objectAdmin` on the
+cdktf store, and `roles/storage.objectCreator` with `roles/storage.legacyBucketReader` on the logs store, which the job only writes to.  The buckets must
+exist for these: create them with a first `cdktf-store push` and `logs-store push`, then run `github-cloud-identity create gcp` again.
+
+The TLS certs of the stacks are not issued in the job, as Let's Encrypt limits the identical certs to five a week: cache them first, with the roles of
+[TLS cert management](#tls-cert-management), by `gcp-issue-cert acme` for each domain, which the smoke test pre-flight checks (`gcp-issue-cert --check`, when
+`GCP_SECRETS_ENABLED=true`).
 
 ## TLS cert management
 
