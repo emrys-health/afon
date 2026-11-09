@@ -120,6 +120,11 @@ jobs:
 
     steps:
       - name: Check the environment
+        # The identifiers of the login, which are set in this step only: AWS_ROLE_ARN would otherwise be read by the aws cli in the later steps.
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT || vars.GCP_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
           case "$CLOUD" in
@@ -128,6 +133,21 @@ jobs:
           esac
           if [ -z "$CONFIG_ENV" ] || [ -z "$CONFIG_TAG" ]; then
             echo "::error::The config to pull is not given: set the config env and the config tag (inputs, else the repository variables SMOKE_TESTS_CONFIG_ENV and SMOKE_TESTS_CONFIG_TAG)"
+            exit 1
+          fi
+          # The environment smoke-tests-<cloud> must hold the identifiers of the login, which github-cloud-env create sets: without them the login
+          # fails in a step that does not say which is missing.
+          case "$CLOUD" in
+            aws)   NAMES="AWS_ROLE_ARN AWS_REGION" ;;
+            azure) NAMES="AZURE_OIDC_CLIENT_ID AZURE_OIDC_TENANT_ID AZURE_OIDC_SUBSCRIPTION_ID AZURE_KEY_VAULT_NAME" ;;
+            gcp)   NAMES="GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID" ;;
+          esac
+          MISSING=""
+          for NAME in $NAMES; do
+            [ -n "${!NAME:-}" ] || MISSING="$MISSING ${NAME/AZURE_OIDC_/AZURE_}"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::The GitHub environment smoke-tests-$CLOUD has no value for:$MISSING.  Set them with 'afon-cli.sh --env $CONFIG_ENV github-cloud-env create $CLOUD' (as an admin, logged in to the cloud), see docs/github_workflows.md"
             exit 1
           fi
           for TOOL in afon-cli.sh jq tofu kubectl; do command -v "$TOOL" > /dev/null || { echo "::error::$TOOL is not in the image"; exit 1; }; done
