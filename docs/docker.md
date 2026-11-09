@@ -4,7 +4,7 @@ Three Docker images give a ready-made environment for running Afon, with the pin
 [local setup](local_setup.md):
 
 - `emryshealth/afon-base`: Ubuntu 22.04 with the cli tools Afon uses, at pinned versions: java, maven, node,
-  tofu, helm, yq, jq, dig, and the aws (with eksctl), azure (with kubectl and kubelogin) and gcloud clis.
+  tofu, helm, yq, jq, dig, kind, cosign, and the aws (with eksctl), azure (with kubectl and kubelogin) and gcloud clis.
 - `emryshealth/afon-cli`: the runtime image, being the base image with the pre-built [Afon CLI](afon_cli.md) zip
   installed in `/opt/afon/cli` (`AFON_CLI_DIR`) and on the `PATH`.  The zip is built outside of the image.
 - `emryshealth/afon-azure-agent`: a self-hosted [Azure Pipelines agent](#azure-pipelines-agent), being the cli image with an

@@ -8,6 +8,7 @@ ARG TOFU_VERSION=1.13.2
 ARG EKSCTL_VERSION=v0.215.0
 ARG YQ_VERSION=4.54.1
 ARG KUBELOGIN_VERSION=v0.2.22
+ARG COSIGN_VERSION=v3.1.4
 ARG EKSCTL_PLATFORM=linux/amd64
 
 FROM eclipse-temurin:${JAVA_VERSION}-jdk-jammy AS jdk
@@ -15,6 +16,7 @@ FROM ghcr.io/opentofu/opentofu:${TOFU_VERSION}-minimal AS tofu
 FROM --platform=${EKSCTL_PLATFORM} weaveworks/eksctl:${EKSCTL_VERSION} AS eksctl
 FROM mikefarah/yq:${YQ_VERSION} AS yq
 FROM ghcr.io/azure/kubelogin:${KUBELOGIN_VERSION} AS kubelogin
+FROM ghcr.io/sigstore/cosign/cosign:${COSIGN_VERSION} AS cosign
 
 FROM ubuntu:22.04
 
@@ -29,6 +31,7 @@ ARG AZ_CLI_VERSION=2.90.0
 ARG GCLOUD_VERSION=565.0.0
 ARG HELM_VERSION=v4.3.1
 ARG KUBECTL_VERSION=v1.37.2
+ARG KIND_VERSION=v0.33.0
 
 ARG MAVEN_VERSION=3.9.16
 
@@ -107,6 +110,12 @@ RUN curl $CURL_OPTS https://packages.microsoft.com/keys/microsoft.asc | gpg --de
 RUN curl $CURL_OPTS https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl -o /usr/local/bin/kubectl \
  && chmod 0755 /usr/local/bin/kubectl
 COPY --from=kubelogin /usr/local/bin/kubelogin /usr/local/bin/kubelogin
+
+# kind, which runs a Kubernetes cluster in Docker, from its release server as in the local setup, and cosign, which signs images,
+# from its image
+RUN curl $CURL_OPTS https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${TARGETARCH} -o /usr/local/bin/kind \
+ && chmod 0755 /usr/local/bin/kind
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 
 ARG AFON_VERSION
 ARG AFON_COMMIT
