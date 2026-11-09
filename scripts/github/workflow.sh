@@ -3,9 +3,11 @@
 # .github/workflows/<name>-<cloud>.yml, eg smoke-tests-aws.yml.
 #
 # github-workflow {list|view|enable|disable|run} [--cloud {aws|azure|gcp|all}] [--name <name>] [--repo <owner/repo>]
-#                 [--ref <branch>] [--field <key=value>]... [--dry-run]
+#                 [--ref <branch>] [--field <key=value>]... [--all] [--dry-run]
 #
-#   list      lists the workflows of the repo, with their state (also the disabled ones), eg to see which are paused
+#   list      lists the workflows of the repo, with their state (also the disabled ones), eg to see which are paused.  Only
+#             those of the files in .github/workflows of the default branch, so not the ones GitHub runs itself, eg CodeQL, nor the
+#             entries left by files that were deleted; --all lists every workflow
 #   view      shows the workflow <name>-<cloud>, with its recent runs
 #   enable    enables the workflow, eg to resume the smoke tests
 #   disable   disables the workflow, so that no run starts, whether triggered by a build or by hand: runs in progress are not stopped
@@ -28,7 +30,7 @@ CLOUDS=(aws azure gcp)
 
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} {list|view|enable|disable|run} [--cloud {aws|azure|gcp|all}] [--name <name>] [--repo <owner/repo>]"
-  echo "          [--ref <branch>] [--field <key=value>]... [--dry-run]"
+  echo "          [--ref <branch>] [--field <key=value>]... [--all] [--dry-run]"
   echo "actions:  list    :  lists the workflows of the repo and their state"
   echo "          view    :  shows the workflow and its recent runs"
   echo "          enable  :  enables the workflow"
@@ -40,6 +42,7 @@ usage(){
   echo "repo:     the target repo.  Defaults to env variable GH_REPO, if set, else to $DEFAULT_REPO."
   echo "ref:      for run, the branch or tag to run the workflow on.  Defaults to the default branch of the repo."
   echo "field:    for run, an input of the workflow as key=value, repeatable, eg config_env=emrys3."
+  echo "all:      the flag to let list show every workflow, also those GitHub runs itself, and the entries of deleted files."
   echo "dry-run:  the flag to say what would be run, without running it."
 }
 
@@ -76,6 +79,29 @@ table(){
   fi
 }
 
+# Lists the workflows of the files in .github/workflows of the default branch, or every workflow with --all, as a table.
+list_workflows(){
+  if [ "$ALL" == "true" ]; then
+    table "NAME\tSTATE\tID" gh workflow list --all
+    return
+  fi
+  if [ "$DRY_RUN" == "true" ]; then
+    echo "would run: gh api repos/$REPO/actions/workflows, limited to the files in .github/workflows"
+    return
+  fi
+  local FILES
+  FILES="$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[].path')"
+  {
+    printf 'NAME\tSTATE\tID\tFILE\n'
+    gh api "repos/$REPO/actions/workflows" --paginate --jq '.workflows[] | [.name, .state, .id, .path] | @tsv' |
+      while IFS=$'\t' read -r WF_NAME WF_STATE WF_ID WF_PATH; do
+        if grep -qxF "$WF_PATH" <<< "$FILES"; then
+          printf '%s\t%s\t%s\t%s\n' "$WF_NAME" "$WF_STATE" "$WF_ID" "$WF_PATH"
+        fi
+      done
+  } | { command -v column > /dev/null 2>&1 && column -t -s $'\t' || cat; }
+}
+
 # Applies the action to the workflow file of the cloud, and prints its name first.
 apply(){
   local CLOUD_NAME="$1" WORKFLOW="${NAME}-${1}.yml" FIELD
@@ -107,10 +133,12 @@ CLOUD="${AFON_CLOUD:-}" # afon-cli.sh takes --cloud itself, and passes it on as 
 REF=
 FIELDS=()
 DRY_RUN=false
+ALL=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift; continue ;;
+    --all) ALL=true; shift; continue ;;
     -h|--help) usage; exit 0 ;;
   esac
   [ $# -ge 2 ] || die "Option $1 requires a value"
@@ -130,11 +158,14 @@ export GH_REPO="$REPO"
 if [ "$ACTION" != "run" ] && { [ -n "$REF" ] || [ ${#FIELDS[@]} -gt 0 ]; }; then
   die "--ref and --field are for run only"
 fi
+if [ "$ALL" == "true" ] && [ "$ACTION" != "list" ]; then
+  die "--all is for list only"
+fi
 
 check_tools
 echo "Repo $REPO"
 if [ "$ACTION" == "list" ]; then
-  table "NAME\tSTATE\tID" gh workflow list --all
+  list_workflows
   exit 0
 fi
 

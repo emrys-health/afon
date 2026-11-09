@@ -96,7 +96,8 @@ It lists, without deleting, the resources that the stack `<cloud>-full` names af
 
 [github-workflow](../scripts/github/workflow.sh) wraps the `gh workflow` commands for the `<name>-<cloud>` workflows, `--name` being `smoke-tests` by default, and `--cloud all` applying to the workflows of every cloud, in the repo `emrys-health/afon` unless `--repo` (or `GH_REPO`) says otherwise:
 ```shell
-afon-cli.sh github-workflow list                                   # all the workflows, and whether they are disabled
+afon-cli.sh github-workflow list [--all]                           # the repo's workflows and whether they are disabled
+                                                                   # --all adds those GitHub runs itself, independent of the repo's
 afon-cli.sh github-workflow disable --cloud all                    # pause: no run starts, by a build or by hand
 afon-cli.sh github-workflow enable --cloud all                     # resume
 afon-cli.sh github-workflow view --cloud azure                     # the workflow and its recent runs
