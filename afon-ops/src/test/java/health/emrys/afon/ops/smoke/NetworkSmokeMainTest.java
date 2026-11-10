@@ -3,6 +3,7 @@ package health.emrys.afon.ops.smoke;
 import health.emrys.afon.ops.kube.ExecResult;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,5 +70,65 @@ class NetworkSmokeMainTest {
 
         assertThat(results).hasSize(2).allMatch(ExecResult::isSuccess);
         assertThat(results.get(0)).isSameAs(OK);
+    }
+
+    private static IllegalStateException refused(int code, String body) {
+        // as HttpResponses.parseAccessToken words it
+        return new IllegalStateException("Failed to obtain access token, code: " + code + ", response: " + body);
+    }
+
+    @Test
+    void theAdminSideRefusedByTheIngressPasses() {
+        assertThat(NetworkSmokeMain.adminSideRefused("oauth.example", () -> { throw refused(403, "Forbidden"); }).isSuccess()).isTrue();
+    }
+
+    @Test
+    void anAdminTokenObtainedFromHereFails() {
+        ExecResult result = NetworkSmokeMain.adminSideRefused("oauth.example", () -> "a-token");
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.stderr()).contains("Obtained an admin token").contains("oauth.example");
+    }
+
+    @Test
+    void anAdminTokenRequestThatKeyCloakItselfAnsweredFails() {
+        // a wrong password: KeyCloak was reached
+        ExecResult result = NetworkSmokeMain.adminSideRefused(
+            "oauth.example", () -> { throw refused(401, "{\"error\":\"invalid_grant\"}"); });
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.stderr()).contains("HTTP 401");
+    }
+
+    @Test
+    void anAdminTokenRequestThatGotNoResponseFails() {
+        assertThat(NetworkSmokeMain.adminSideRefused("oauth.example", () -> { throw new IOException("Connection refused"); })
+                                   .isSuccess()).isFalse();
+    }
+
+    @Test
+    void anUnknownUserRefusedByKeyCloakShowsTheLoginSideIsOpen() {
+        assertThat(NetworkSmokeMain.loginSideOpen(
+            "oauth.example", () -> { throw refused(401, "{\"error\":\"invalid_client\"}"); }).isSuccess()).isTrue();
+    }
+
+    @Test
+    void aLoginRefusedByTheIngressFails() {
+        ExecResult result = NetworkSmokeMain.loginSideOpen("oauth.example", () -> { throw refused(403, "Forbidden"); });
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.stderr()).contains("open to all");
+    }
+
+    @Test
+    void aLoginThatGotNoResponseFails() {
+        assertThat(NetworkSmokeMain.loginSideOpen("oauth.example", () -> { throw new IOException("timed out"); }).isSuccess()).isFalse();
+    }
+
+    @Test
+    void onlyARefusalHasACode() {
+        assertThat(NetworkSmokeMain.refusalCodeOf(refused(502, "Bad Gateway"))).isEqualTo(502);
+        assertThat(NetworkSmokeMain.refusalCodeOf(new IOException("code: 403"))).isEqualTo(-1);
+        assertThat(NetworkSmokeMain.refusalCodeOf(new IllegalStateException("No KeyCloak bootstrap admin credentials"))).isEqualTo(-1);
     }
 }

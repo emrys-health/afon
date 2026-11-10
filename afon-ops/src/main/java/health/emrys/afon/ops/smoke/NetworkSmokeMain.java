@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.cdk.AllowedCidrs;
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.cdk.configs.JupyterHubConfig;
 import health.emrys.afon.cdk.configs.SparkNames;
@@ -13,6 +14,7 @@ import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
 import health.emrys.afon.rest.HttpResponses;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Ingress;
 import io.kubernetes.client.openapi.models.V1IngressRule;
@@ -33,9 +35,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.configs.PolarisConfig.DB_PORT;
+import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_ALLOWED_CIDRS;
+import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_EXTERNAL;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
@@ -69,6 +75,7 @@ public class NetworkSmokeMain {
 
     public List<ExecResult> checkNetworkWithPods() throws Exception {
         List<ExecResult> results = new ArrayList<>();
+        results.addAll(checkKeyCloakAdminOnlyAccessibleFromAllowedCidrs());
         results.addAll(checkPolarisCanTalkToDB());
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
@@ -247,6 +254,125 @@ public class NetworkSmokeMain {
             results.add(new ExecResult(0, msg, "", format("curl https://%s", polarisHost), "localhost"));
         }
         return results;
+    }
+
+    /**
+     * A user that KeyCloak does not know, whose token request it can only refuse, with a 401: an answer of KeyCloak's own.
+     */
+    static final String UNKNOWN_KEYCLOAK_USER = "network-smoke-test-unknown-user";
+
+    /**
+     * The HTTP code of a refused token request, as {@link HttpResponses#parseAccessToken} words it.
+     */
+    private static final Pattern TOKEN_REFUSAL_CODE = Pattern.compile("code: (\\d+)");
+
+    /**
+     * Calls KeyCloak from outside the cluster, ie from here, through {@link KeyCloakProvider}, when {@code
+     * <CLOUD>_KEYCLOAK_ALLOWED_CIDRS} restricts it: its admin side must refuse this machine, which is not expected to be among
+     * the allowed CIDRs, while its login side, the {@code polaris} realm, stays open to all.
+     * <ul>
+     *   <li>The admin side, by asking the {@code master} realm for a token as the bootstrap admin, which the ingress must answer
+     *   with its own 403: the AWS ALB's fixed response, or nginx's page on Azure and GCP. KeyCloak itself never answers a token
+     *   request so, so any other answer, a token above all, means that this machine reached the admin side.</li>
+     *   <li>The login side, by asking the {@code polaris} realm for a token as {@link #UNKNOWN_KEYCLOAK_USER}, which KeyCloak must
+     *   refuse itself, ie a response other than a 403, as anyone may log in from anywhere.</li>
+     * </ul>
+     * Not checked when KeyCloak is not restricted, or is another stack's, with {@code <CLOUD>_KEYCLOAK_EXTERNAL=true}, so whose
+     * ingress is not this stack's.
+     */
+    private List<ExecResult> checkKeyCloakAdminOnlyAccessibleFromAllowedCidrs() {
+        AfonCloud            cloud           = new SmokeConfig(properties).cloud();
+        AfonPropertyProvider cloudProperties = properties.forCloud(cloud);
+        String               host            = cloudProperties.getValue(OIDC_DOMAIN_NAME);
+        String               command         = format("POST https://%s/realms/{master,polaris}/protocol/openid-connect/token", host);
+        if (Boolean.parseBoolean(properties.getCloudValue(cloud, KEYCLOAK_EXTERNAL, "false").trim())) {
+            return List.of(new ExecResult(
+                0, format("Not checked: the KeyCloak at %s is another stack's, as %s_KEYCLOAK_EXTERNAL=true", host,
+                          cloud.name()), "", command, "localhost"));
+        }
+        if (AllowedCidrs.of(properties, cloud, "keycloak").isEmpty()) {
+            return List.of(new ExecResult(
+                0, format("Not checked: the KeyCloak at %s is open to all, as %s is not set", host,
+                          KEYCLOAK_ALLOWED_CIDRS.forCloud(cloud).map(Enum::name).orElse("its allowed CIDRs")), "", command,
+                "localhost"));
+        }
+        KeyCloakProvider keyCloak = new KeyCloakProvider(cloudProperties);
+        logger.info("Checking that the admin side of the KeyCloak at {} refuses this machine, while its login side admits it", host);
+        return List.of(
+            adminSideRefused(host, keyCloak::adminToken),
+            loginSideOpen(host, () -> keyCloak.userToken(UNKNOWN_KEYCLOAK_USER, "not-a-password")));
+    }
+
+    /**
+     * @param adminToken asks the {@code master} realm for a token as the bootstrap admin
+     * @return a success if the ingress refused the request with a 403, else a failure
+     */
+    static ExecResult adminSideRefused(String host, Callable<String> adminToken) {
+        String command = format("POST https://%s/realms/master/protocol/openid-connect/token", host);
+        String error;
+        try {
+            adminToken.call();
+            error = format("Obtained an admin token from the KeyCloak at %s from here, which is not meant to be allowed to reach its "
+                           + "admin side", host);
+        } catch (Exception e) {
+            int code = refusalCodeOf(e);
+            if (code == 403) {
+                String msg = format("The ingress of the KeyCloak at %s refused an admin token request from here with HTTP 403, as it "
+                                    + "should", host);
+                logger.info(msg);
+                return new ExecResult(0, msg, "", command, "localhost");
+            }
+            error = code > 0
+                    ? format("The KeyCloak at %s answered an admin token request from here with HTTP %d rather than its ingress refusing "
+                             + "it with 403, so its admin side is reachable from here: %s", host, code, e.getMessage())
+                    : format("Could not tell whether the admin side of the KeyCloak at %s is reachable from here: %s", host,
+                             e.getMessage());
+        }
+        return new ExecResult(-1, "", error + adminRestrictionAdvice(), command, "localhost");
+    }
+
+    /**
+     * @param userToken asks the {@code polaris} realm for a token as {@link #UNKNOWN_KEYCLOAK_USER}
+     * @return a success if KeyCloak itself refused the request, ie with a code other than 403, else a failure
+     */
+    static ExecResult loginSideOpen(String host, Callable<String> userToken) {
+        String command = format("POST https://%s/realms/polaris/protocol/openid-connect/token", host);
+        String error;
+        try {
+            userToken.call();
+            error = format("The KeyCloak at %s gave a token to %s, a user it should not know", host, UNKNOWN_KEYCLOAK_USER);
+        } catch (Exception e) {
+            int code = refusalCodeOf(e);
+            if (code > 0 && code != 403) {
+                String msg = format("The login side of the KeyCloak at %s is reachable from here: it refused an unknown user with HTTP %d",
+                                    host, code);
+                logger.info(msg);
+                return new ExecResult(0, msg, "", command, "localhost");
+            }
+            error = code == 403
+                    ? format("The ingress of the KeyCloak at %s refused a login from here with HTTP 403, but logins must be open to all: "
+                             + "%s", host, e.getMessage())
+                    : format("Could not reach the login side of the KeyCloak at %s from here: %s", host, e.getMessage());
+        }
+        return new ExecResult(-1, "", error, command, "localhost");
+    }
+
+    /**
+     * @return the HTTP code of a token request that KeyCloak or its ingress refused, or -1 if it got no response
+     */
+    static int refusalCodeOf(Exception e) {
+        if (e instanceof IllegalStateException && e.getMessage() != null) {
+            Matcher matcher = TOKEN_REFUSAL_CODE.matcher(e.getMessage());
+            if (matcher.find()) {
+                return Integer.parseInt(matcher.group(1));
+            }
+        }
+        return -1;
+    }
+
+    private static String adminRestrictionAdvice() {
+        return format("%n%nCheck that <CLOUD>_KEYCLOAK_ALLOWED_CIDRS does not include this machine (curl -s https://ifconfig.me), that "
+                      + "the stack was redeployed since it was set, and what kubectl describe ingress keycloak-ingress says.");
     }
 
     /**
