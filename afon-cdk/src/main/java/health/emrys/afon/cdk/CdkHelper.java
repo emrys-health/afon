@@ -164,12 +164,31 @@ public class CdkHelper {
             .createNamespace(true)
             .timeout(600)
             .atomic(true);
-        if (annotations != null && !annotations.isEmpty()) {
-            builder.set(annotations.entrySet().stream()
-                                   .map(entry -> ReleaseSet.builder().name(entry.getKey()).value(entry.getValue()).build())
-                                   .toList());
-        }
+        builder.set(nginxValues(annotations).entrySet().stream()
+                                            .map(entry -> ReleaseSet.builder().name(entry.getKey()).value(entry.getValue()).build())
+                                            .toList());
         return builder.build();
+    }
+
+    /**
+     * The size of nginx's buffer for the headers of an upstream's response, which must hold all of them. oauth2-proxy's
+     * callback sets its session cookie, which holds the user's KeyCloak tokens, split into several {@code Set-Cookie}
+     * headers that together exceed nginx's default of 4k: nginx then answers {@code 502 Bad Gateway}, logging "upstream sent
+     * too big header", once the user has logged in. The AWS ALB has no such limit.
+     */
+    public static final String NGINX_PROXY_BUFFER_SIZE = "16k";
+
+    /**
+     * @return the Helm values of the nginx ingress controller: the cloud's own, eg the annotations of its service, plus
+     * {@link #NGINX_PROXY_BUFFER_SIZE}
+     */
+    static Map<String, String> nginxValues(Map<String, String> cloudValues) {
+        Map<String, String> values = new java.util.LinkedHashMap<>();
+        values.put("controller.config.proxy-buffer-size", NGINX_PROXY_BUFFER_SIZE);
+        if (cloudValues != null) {
+            values.putAll(cloudValues);
+        }
+        return values;
     }
 
     /**
