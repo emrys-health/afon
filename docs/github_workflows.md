@@ -80,7 +80,7 @@ The tests step has a limit of 60 minutes, inside the job's 100 minutes, as the t
 
 If the job itself is killed, eg a cancel, the VM goes with its state, but the cdktf store has what the last deploy stored: from a machine with access to the testing cloud account, run 
 ```shell
-afon-cli.sh -e <env> cdktf-store pull current <stack-id>
+afon-cli.sh -e <env> -c <cloud> cdktf-store pull current <stack-id>
 afon-cli.sh tofu-init <stack-id>
 afon-cli.sh tofu-destroy <stack-id>
 ```

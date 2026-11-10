@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Stores snapshots of the afon config files in the secret store of a cloud, and retrieves them by a tag:
-# AWS Secrets Manager (the default), Azure Key Vault or GCP Secret Manager.
+# AWS Secrets Manager, Azure Key Vault or GCP Secret Manager.  The cloud is required, to be clear which store is used.
+# For push only, the cloud can be all, which pushes the same config to the stores of all three clouds, each in turn
+# (one failing does not stop the others, but the exit status is then 1).  Then --region, --vault and --project are not
+# given: each cloud uses its config or defaults.
 #
-# ./afon.sh -a config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [-c|--cloud {aws|azure|gcp}] [-- [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]]
-# afon-cli.sh config-vault {push|pull|delete <tag>|list} [-e|--env|--config-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]
+# ./afon.sh -a config-vault {push|pull|delete <tag>|list} -c|--cloud {aws|azure|gcp|all} [-e|--env|--config-env <env>] [-- [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]]
+# afon-cli.sh config-vault {push|pull|delete <tag>|list} -c|--cloud {aws|azure|gcp|all} [-e|--env|--config-env <env>] [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]
 # (the -- is needed by afon.sh before the script's own options, eg: ./afon.sh -a config-vault push v1 -e dev -- --force)
 #
 # The env and the afon home are the global ones of afon.sh and afon-cli.sh (--env, --config-env, AFON_ENV,
@@ -65,8 +68,8 @@ usage(){
   echo "          delete :  removes the snapshot of the tag.  AWS keeps it for a recovery window of $RECOVERY_DAYS days, Azure"
   echo "                    soft-deletes it, GCP deletes it at once.  With --force it is removed at once (purged on Azure)"
   echo "cloud:      the cloud of the secret store: aws (Secrets Manager), azure (Key Vault) or gcp (Secret Manager)."
-  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Defaults to aws,"
-  echo "            also if it is ALL."
+  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Required: there"
+  echo "            is no default.  For push only it can also be all, to push to the stores of all clouds."
   echo "tag:        the tag of the snapshot, free-form text without spaces.  The characters allowed are those of the"
   echo "            secret names of the cloud: aws letters, digits and / _ + = . @ -, azure letters, digits and -,"
   echo "            gcp letters, digits and _ -.  Required by push, pull and delete."
@@ -500,11 +503,8 @@ shift || true
 
 TAG=
 # The cloud is the global one of afon.sh and afon-cli.sh (-c|--cloud, AFON_CLOUD), given to the script as CLOUD.
-# Without one, or with ALL, it is aws.
+# It is required, so that it is always clear which secret store is used.  all is accepted by push only.
 VAULT_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
-if [ -z "$VAULT_CLOUD" ] || [ "$VAULT_CLOUD" == "all" ]; then
-  VAULT_CLOUD=aws
-fi
 REGION=
 VAULT_NAME=
 VAULT_PROJECT=
@@ -558,76 +558,107 @@ CONFIG_DIR="$AFON_HOME/config-$SNAPSHOT_ENV"
 echo "Using env $SNAPSHOT_ENV"
 echo "Using config dir $CONFIG_DIR"
 
-set_cloud
-echo "Using cloud $VAULT_CLOUD"
-if [ -n "$REGION" ] && [ "$VAULT_CLOUD" != "aws" ]; then
-  echo "--region is for aws only" >&2; exit 1
+if [ -z "$VAULT_CLOUD" ]; then
+  echo "Missing cloud, required by config-vault: give -c|--cloud {aws|azure|gcp|all} to afon.sh or afon-cli.sh, or set AFON_CLOUD" >&2
+  usage; exit 1
 fi
-if [ -n "$VAULT_NAME" ] && [ "$VAULT_CLOUD" != "azure" ]; then
-  echo "--vault is for azure only" >&2; exit 1
+if [ "$VAULT_CLOUD" == "all" ] && [ "$ACTION" != "push" ]; then
+  echo "Cloud all is for push only: $ACTION needs one of aws, azure or gcp" >&2
+  usage; exit 1
 fi
-if [ -n "$VAULT_PROJECT" ] && [ "$VAULT_CLOUD" != "gcp" ]; then
-  echo "--project is for gcp only" >&2; exit 1
-fi
-if [ -n "$REGION" ] ; then
-  echo "Using region $REGION"
+if [ "$VAULT_CLOUD" == "all" ] && { [ -n "$REGION" ] || [ -n "$VAULT_NAME" ] || [ -n "$VAULT_PROJECT" ]; }; then
+  echo "--region, --vault and --project are for one cloud: with cloud all, each cloud uses its config or defaults" >&2
+  exit 1
 fi
 
-# Prints the value of a property of the config dir of the env, which may be set in terms of others, eg
-# ${ENV_NAME}-afon-key-vault.  The files are read from the config dir of the env rather than via the config symlink,
-# which may not exist yet, eg to pull.  Prints nothing if there is none.
-config_property(){
-  local PROPERTY="$1" CLOUD_NAME="$2" FILE
-  (
-    set +eu
-    set -a
-    for FILE in afon.properties "afon-$CLOUD_NAME.properties" ; do {
-      [ -f "$CONFIG_DIR/$FILE" ] && source "$CONFIG_DIR/$FILE" > /dev/null 2>&1
-    } done
-    printf '%s' "${!PROPERTY:-}"
-  )
+# Runs the action on the cloud VAULT_CLOUD.  It is run in a subshell, as it stops with exit, so that with cloud all a
+# failure on one cloud does not keep the others from being pushed.
+run_on_cloud(){
+  set_cloud
+  echo "Using cloud $VAULT_CLOUD"
+  if [ -n "$REGION" ] && [ "$VAULT_CLOUD" != "aws" ]; then
+    echo "--region is for aws only" >&2; exit 1
+  fi
+  if [ -n "$VAULT_NAME" ] && [ "$VAULT_CLOUD" != "azure" ]; then
+    echo "--vault is for azure only" >&2; exit 1
+  fi
+  if [ -n "$VAULT_PROJECT" ] && [ "$VAULT_CLOUD" != "gcp" ]; then
+    echo "--project is for gcp only" >&2; exit 1
+  fi
+  if [ -n "$REGION" ] ; then
+    echo "Using region $REGION"
+  fi
+
+  # Prints the value of a property of the config dir of the env, which may be set in terms of others, eg
+  # ${ENV_NAME}-afon-key-vault.  The files are read from the config dir of the env rather than via the config symlink,
+  # which may not exist yet, eg to pull.  Prints nothing if there is none.
+  config_property(){
+    local PROPERTY="$1" CLOUD_NAME="$2" FILE
+    (
+      set +eu
+      set -a
+      for FILE in afon.properties "afon-$CLOUD_NAME.properties" ; do {
+        [ -f "$CONFIG_DIR/$FILE" ] && source "$CONFIG_DIR/$FILE" > /dev/null 2>&1
+      } done
+      printf '%s' "${!PROPERTY:-}"
+    )
+  }
+
+  # The Azure Key Vault and the GCP project are --vault and --project, else read from the config of the cloud.
+  if [ "$VAULT_CLOUD" == "azure" ] && [ -z "$VAULT_NAME" ]; then
+    VAULT_NAME=$(config_property AZURE_KEY_VAULT_NAME azure)
+    if [ -z "$VAULT_NAME" ]; then
+      # No config, eg to pull into a new env: the name that the templates give it.
+      VAULT_NAME="$SNAPSHOT_ENV-afon-key-vault"
+      echo "No AZURE_KEY_VAULT_NAME in the config of $CONFIG_DIR: using the default $VAULT_NAME, or give --vault"
+    fi
+  fi
+  if [ "$VAULT_CLOUD" == "gcp" ] && [ -z "$VAULT_PROJECT" ]; then
+    VAULT_PROJECT=$(config_property GCP_PROJECT_ID gcp)
+    if [ -z "$VAULT_PROJECT" ] && command -v gcloud > /dev/null 2>&1; then
+      # No config, eg to pull into a new env: the project of the gcloud CLI.
+      VAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
+      [ -n "$VAULT_PROJECT" ] && echo "No GCP_PROJECT_ID in the config of $CONFIG_DIR: using the project of gcloud, or give --project"
+    fi
+    if [ -z "$VAULT_PROJECT" ]; then
+      echo "No GCP project: give --project, set GCP_PROJECT_ID in afon-gcp.properties of $CONFIG_DIR, or set one in gcloud" >&2
+      exit 1
+    fi
+  fi
+  case "$VAULT_CLOUD" in
+    azure) echo "Using Key Vault $VAULT_NAME" ;;
+    gcp)   echo "Using project $VAULT_PROJECT" ;;
+  esac
+
+  # All clouds are always stored, so that the config dir is restored whole.
+  CLOUD=
+  source $AFON_ROOT/scripts/config/config-files.sh
+
+  case "$ACTION" in
+    push|pull|delete)
+      check_tools
+      check_tag
+      $ACTION
+      ;;
+    list)
+      check_tools
+      list
+      ;;
+    *)
+      usage; exit 1 ;;
+  esac
 }
 
-# The Azure Key Vault and the GCP project are --vault and --project, else read from the config of the cloud.
-if [ "$VAULT_CLOUD" == "azure" ] && [ -z "$VAULT_NAME" ]; then
-  VAULT_NAME=$(config_property AZURE_KEY_VAULT_NAME azure)
-  if [ -z "$VAULT_NAME" ]; then
-    # No config, eg to pull into a new env: the name that the templates give it.
-    VAULT_NAME="$SNAPSHOT_ENV-afon-key-vault"
-    echo "No AZURE_KEY_VAULT_NAME in the config of $CONFIG_DIR: using the default $VAULT_NAME, or give --vault"
-  fi
-fi
-if [ "$VAULT_CLOUD" == "gcp" ] && [ -z "$VAULT_PROJECT" ]; then
-  VAULT_PROJECT=$(config_property GCP_PROJECT_ID gcp)
-  if [ -z "$VAULT_PROJECT" ] && command -v gcloud > /dev/null 2>&1; then
-    # No config, eg to pull into a new env: the project of the gcloud CLI.
-    VAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
-    [ -n "$VAULT_PROJECT" ] && echo "No GCP_PROJECT_ID in the config of $CONFIG_DIR: using the project of gcloud, or give --project"
-  fi
-  if [ -z "$VAULT_PROJECT" ]; then
-    echo "No GCP project: give --project, set GCP_PROJECT_ID in afon-gcp.properties of $CONFIG_DIR, or set one in gcloud" >&2
+if [ "$VAULT_CLOUD" == "all" ]; then
+  FAILED=()
+  for VAULT_CLOUD in aws azure gcp ; do {
+    echo "== Pushing to $VAULT_CLOUD"
+    ( run_on_cloud ) || FAILED+=("$VAULT_CLOUD")
+  } done
+  if [ ${#FAILED[@]} -gt 0 ]; then
+    echo "Failed to push to: ${FAILED[*]}" >&2
     exit 1
   fi
+else
+  run_on_cloud
 fi
-case "$VAULT_CLOUD" in
-  azure) echo "Using Key Vault $VAULT_NAME" ;;
-  gcp)   echo "Using project $VAULT_PROJECT" ;;
-esac
-
-# All clouds are always stored, so that the config dir is restored whole.
-CLOUD=
-source $AFON_ROOT/scripts/config/config-files.sh
-
-case "$ACTION" in
-  push|pull|delete)
-    check_tools
-    check_tag
-    $ACTION
-    ;;
-  list)
-    check_tools
-    list
-    ;;
-  *)
-    usage; exit 1 ;;
-esac

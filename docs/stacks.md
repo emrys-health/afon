@@ -711,17 +711,18 @@ provide information to the user of the cdktf content.  It will also list the fil
 
 #### Command cdktf-store
 
-You can keep snapshots of the tofu state and plans of the cdktf dir in the object storage of a cloud under a tag, and pull them back by it: AWS S3 (the default), Azure Blob Storage or GCP Cloud Storage, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`).  Unlike [config-vault](configuration.md#command-config-vault), which keeps the small config files in the secret store of the cloud, object storage has no size limit that matters, so the state and the plans fit, however many stacks.  It can be applied to one stack only:
+You can keep snapshots of the tofu state and plans of the cdktf dir in the object storage of a cloud under a tag, and pull them back by it: AWS S3, Azure Blob Storage or GCP Cloud Storage, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`), which is required, so that it is always clear which store is used.  Unlike [config-vault](configuration.md#command-config-vault), which keeps the small config files in the secret store of the cloud, object storage has no size limit that matters, so the state and the plans fit, however many stacks.  It can be applied to one stack only:
 ```shell
-afon-cli.sh cdktf-store push <tag> -e <env>                          # stores the state and plans of all the stacks of cdktf-<env>
-afon-cli.sh cdktf-store push <tag> aws-keycloak -e <env>             # stores just those of the stack
-afon-cli.sh cdktf-store list -e <env>                                # lists the snapshots of the env, and their stacks
-afon-cli.sh cdktf-store pull <tag> -e <env>                          # writes the missing files of the snapshot to cdktf-<env>
-afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env>             # just the files of the stack
-afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env> -- --force  # also overwrites the files that differ
-afon-cli.sh cdktf-store delete <tag> aws-keycloak -e <env>           # removes the files of the stack from the snapshot
+afon-cli.sh cdktf-store push <tag> -e <env> -c aws                          # stores the state and plans of all the stacks of cdktf-<env>
+afon-cli.sh cdktf-store push <tag> aws-keycloak -e <env> -c aws             # stores just those of the stack
+afon-cli.sh cdktf-store push <tag> -e <env> -c all                          # stores those of all the stacks in the stores of aws, azure and gcp
+afon-cli.sh cdktf-store list -e <env> -c aws                                # lists the snapshots of the env, and their stacks
+afon-cli.sh cdktf-store pull <tag> -e <env> -c aws                          # writes the missing files of the snapshot to cdktf-<env>
+afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env> -c aws             # just the files of the stack
+afon-cli.sh cdktf-store pull <tag> aws-keycloak -e <env> -c aws -- --force  # also overwrites the files that differ
+afon-cli.sh cdktf-store delete <tag> aws-keycloak -e <env> -c aws           # removes the files of the stack from the snapshot
 ```
-The cloud of the store is the global `-c`/`--cloud` (or `AFON_CLOUD`); without it, the cloud of the stack id given, eg `azure` for `azure-full`, else `aws`, which the command says.  The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
+The cloud of the store is the global `-c`/`--cloud` (or `AFON_CLOUD`), and is required.  Only `push` also accepts `-c all`, which pushes all the stacks to the stores of all three clouds, one after the other (a failure on one does not stop the others, but the exit status is then 1); then no stack id, `--region`, `--account` nor `--project` is given, as each cloud uses its config or defaults.  A stack id must be of the cloud given, eg `azure-full` with `-c azure`.  The env and the cdktf dir are the global ones (`--env`, `--cdktf-env`, `AFON_ENV`, `--cdktf`, `AFON_CDKTF`), else the env that the `cdktf` symlink points to.  With `afon.sh`, the options of the script go after a `--`.
 
 For each stack, or just the one given, it stores `terraform.<stack-id>.tfstate` and the plan `stacks/<stack-id>/` (`cdk.tf.json` and `assets`), so that a stack can be destroyed with `tofu-destroy` after a pull on another machine.  It leaves out `.terraform` and `.terraform.lock.hcl`, which `manage-stack` creates again, or `tofu-init` if you use the `tofu-*` commands, the kubeconfig `kube/` and the `*.backup` state backups.  The objects are named `<env>/<tag>/<file>`, eg `dev/v1/terraform.aws-keycloak.tfstate`, so stacks can be pushed to the same tag one at a time.  `<tag>` is free-form text of letters, digits and `. _ -`.
 

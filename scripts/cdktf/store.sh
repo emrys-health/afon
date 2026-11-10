@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Stores snapshots of the cdktf state and plans in the object storage of a cloud, and retrieves them by a tag:
-# AWS S3 (the default), Azure Blob Storage or GCP Cloud Storage.  Unlike config-vault, which keeps the small config
+# AWS S3, Azure Blob Storage or GCP Cloud Storage.  Unlike config-vault, which keeps the small config
 # files in the secret store of the cloud, the objects have no size limit, so the state files and the plans fit.
 #
-# cdktf-store {push|pull|delete <tag>|list} [<stack-id>] [-e|--env|--cdktf-env <env>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]
+# cdktf-store {push|pull|delete <tag>|list} [<stack-id>] [-e|--env|--cdktf-env <env>] -c|--cloud {aws|azure|gcp|all} [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]
+#
+# The cloud is required, to be clear which store is used.  For push only, it can be all, which pushes all the stacks to
+# the stores of all three clouds, each in turn (one failing does not stop the others, but the exit status is then 1).
+# Then <stack-id>, --region, --account and --project are not given: each cloud uses its config or defaults.
 #
 # The env and the cdktf dir are the global ones (--env, --cdktf-env, AFON_ENV, AFON_CDKTF_ENV,
 # --cdktf, AFON_CDKTF).  Without a global env, the env is the one that the <afon-home>/cdktf symlink points to.
@@ -37,7 +41,7 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [<stack-id>] [-c|--cloud {aws|azure|gcp}] [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]"
+  echo "Usage: ${BASH_SOURCE[0]} {push|pull|delete <tag>|list} [<stack-id>] -c|--cloud {aws|azure|gcp|all} [--region <region>] [--account <name>] [--project <id>] [--force] [--dry-run]"
   echo "actions:  push   :  writes the state and plan of the stack, or of all the stacks, to the snapshot of the tag.  Refuses"
   echo "                    to replace files that the snapshot already has without --force"
   echo "          pull   :  writes the files held in the snapshot of the tag back into the cdktf dir, if they differ."
@@ -45,7 +49,8 @@ usage(){
   echo "          list   :  lists the snapshots of the env, and the stacks that they hold"
   echo "          delete :  removes the snapshot of the tag, or just the files of the stack"
   echo "cloud:      the cloud of the store: aws (S3), azure (Blob Storage) or gcp (Cloud Storage), given by -c or --cloud"
-  echo "            (or AFON_CLOUD).  Without it, that of the stack-id, if one is given, else aws, which it says."
+  echo "            (or AFON_CLOUD).  Required: there is no default.  For push only it can also be all, to push all the"
+  echo "            stacks to the stores of all clouds."
   echo "tag:        the tag of the snapshot, of letters, digits and . _ -.  Required by push, pull and delete."
   echo "stack-id:   the stack, eg aws-keycloak, to push, pull or delete on its own.  Defaults to all the stacks."
   echo "region:     the AWS region or GCP location of the bucket created on first push.  Defaults to the one of the aws CLI,"
@@ -103,9 +108,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-source "$AFON_ROOT/scripts/store/object-store-source.sh"
-check_store_options
-resolve_store_env
+# The cloud is required, so that it is always clear which store is used.  all is accepted by push only.
+CLOUD_GIVEN=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
+if [ -z "$CLOUD_GIVEN" ]; then
+  echo "Missing cloud, required by cdktf-store: give -c|--cloud {aws|azure|gcp|all} to afon.sh or afon-cli.sh, or set AFON_CLOUD" >&2
+  usage; exit 1
+fi
+if [ "$CLOUD_GIVEN" == "all" ]; then
+  if [ "$ACTION" != "push" ]; then
+    echo "Cloud all is for push only: $ACTION needs one of aws, azure or gcp" >&2
+    usage; exit 1
+  fi
+  if [ -n "$STACK" ]; then
+    echo "Cloud all pushes all the stacks of the cdktf dir to each cloud: stack $STACK is of one cloud, so give that one" >&2
+    exit 1
+  fi
+  if [ -n "$REGION" ] || [ -n "$ACCOUNT" ] || [ -n "$STORE_PROJECT" ]; then
+    echo "--region, --account and --project are for one cloud: with cloud all, each cloud uses its config or defaults" >&2
+    exit 1
+  fi
+fi
 
 if [ -n "$STACK" ] && [[ ! "$STACK" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
   echo "Invalid stack id $STACK, eg aws-keycloak" >&2; exit 1
@@ -300,20 +322,42 @@ delete(){
   echo "$STORE_ENV/$TAG: deleted $COUNT files of $(scope) from $BUCKET"
 }
 
-case "$ACTION" in
-  push|pull|delete)
-    check_tools
-    check_tag
-    set_store "$STORE_NAME"
-    echo "Running $ACTION of $STORE_ENV/$TAG${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
-    $ACTION
-    ;;
-  list)
-    check_tools
-    set_store "$STORE_NAME"
-    echo "Running list of $STORE_ENV${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
-    list
-    ;;
-  *)
-    usage; exit 1 ;;
-esac
+# Runs the action on the cloud CLOUD.  It is run in a subshell, as it stops with exit, so that with cloud all a failure
+# on one cloud does not keep the others from being pushed.
+run_on_cloud(){
+  source "$AFON_ROOT/scripts/store/object-store-source.sh"
+  check_store_options
+  resolve_store_env
+
+  case "$ACTION" in
+    push|pull|delete)
+      check_tools
+      check_tag
+      set_store "$STORE_NAME"
+      echo "Running $ACTION of $STORE_ENV/$TAG${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
+      $ACTION
+      ;;
+    list)
+      check_tools
+      set_store "$STORE_NAME"
+      echo "Running list of $STORE_ENV${STACK:+ (stack $STACK)} on $STORE_CLOUD in $BUCKET"
+      list
+      ;;
+    *)
+      usage; exit 1 ;;
+  esac
+}
+
+if [ "$CLOUD_GIVEN" == "all" ]; then
+  FAILED=()
+  for CLOUD in aws azure gcp ; do {
+    echo "== Pushing to $CLOUD"
+    ( run_on_cloud ) || FAILED+=("$CLOUD")
+  } done
+  if [ ${#FAILED[@]} -gt 0 ]; then
+    echo "Failed to push to: ${FAILED[*]}" >&2
+    exit 1
+  fi
+else
+  run_on_cloud
+fi

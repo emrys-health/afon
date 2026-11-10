@@ -58,14 +58,15 @@ If a config dir is already present, it will stop.
 
 ### Command config-vault
 
-You can store snapshots of a config env in the secret store of a cloud under a tag, and pull them back by it: AWS Secrets Manager (the default), Azure Key Vault or GCP Secret Manager, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`), `aws` if none:
+You can store snapshots of a config env in the secret store of a cloud under a tag, and pull them back by it: AWS Secrets Manager, Azure Key Vault or GCP Secret Manager.  The cloud is required, chosen with the global `-c|--cloud <aws|azure|gcp>` of `afon.sh` and `afon-cli.sh` (or `AFON_CLOUD`), so that it is always clear which store is used.  There is no default.  Only `push` also accepts `-c all`, which pushes the same config to the stores of all three clouds, one after the other (a failure on one does not stop the others, but the exit status is then 1); `--region`, `--vault` and `--project` are not given then, as each cloud uses its config or defaults:
 ```shell
-afon-cli.sh config-vault push <tag> -e <env>                # stores config-<env>, tagged with <tag>
-afon-cli.sh config-vault list -e <env>                      # lists the snapshots of the env
-afon-cli.sh config-vault pull <tag> -e <env>                # writes the missing files of the snapshot to config-<env>
-afon-cli.sh config-vault pull <tag> -e <env> -- --force     # also overwrites the files of config-<env> that differ
-afon-cli.sh config-vault delete <tag> -e <env>              # removes the snapshot, recoverable for 30 days
+afon-cli.sh config-vault push <tag> -e <env> -c aws         # stores config-<env>, tagged with <tag>
+afon-cli.sh config-vault list -e <env> -c aws               # lists the snapshots of the env
+afon-cli.sh config-vault pull <tag> -e <env> -c aws         # writes the missing files of the snapshot to config-<env>
+afon-cli.sh config-vault pull <tag> -e <env> -c aws -- --force  # also overwrites the files of config-<env> that differ
+afon-cli.sh config-vault delete <tag> -e <env> -c aws       # removes the snapshot, recoverable for 30 days
 afon-cli.sh config-vault push <tag> -e <env> -c azure       # the same in Azure Key Vault, likewise with -c gcp
+afon-cli.sh config-vault push <tag> -e <env> -c all         # pushes to the stores of aws, azure and gcp
 ```
 The env is the global one of `afon.sh` or `afon-cli.sh`: `--env`, `--config-env`, or `AFON_ENV`, which also switch
 the `config` symlink to `config-<env>`.  Without one, it is the env that `config` currently points to.  Likewise the afon home is the global `--home` or `AFON_HOME`.
