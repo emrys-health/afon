@@ -155,7 +155,7 @@ the env's name, eg a domain registered under another name, is set by hand.  Chec
 | `AZURE_STORAGE_ACCOUNT`, `AZURE_KEY_VAULT_NAME`, `<CLOUD>_GITEA_BUCKET`, `<CLOUD>_POLARIS_LOG_BUCKET` | names of the new env, which `${ENV_NAME}` gives, as in the templates       |
 | `AZURE_CONNECTION_STRING` (`secret-azure.properties`)                                          | **blank** it in the copy: it has the key of the old env's storage account, so a copy would write to that account. `azure-create` then says that it is not set, which is expected on the first run, as the string is only known once the account exists.  Set it afterwards to the output of `az storage account show-connection-string`, and check it with `azure-check-storage`.  Until then, what needs it does not work: the Azure monitoring (Loki), which stops with a message that says so, Gitea's blob container and `AzureReader` |
 | `KEYCLOAK_DB_URL`                                                                              | a database of its own, `jdbc:postgresql://${POLARIS_DB_HOST}:5432/keycloak-${ENV_NAME}`: it is the one value that names the database directly, so two envs on the same Postgres would otherwise share the KeyCloak realm and its users.  The database is created when KeyCloak starts.  An env that already runs on another name, eg `keycloak-2`, keeps it, as a new name starts on an empty database: its users are created again from `users.csv` by the next setup |
-| `<CLOUD>_EGRESS_IP`                                                                            | **blank** them in the copy: one address serves one cluster's outbound traffic, so two envs deployed together on a cloud cannot both pin the same one, and left blank, the cluster gets an address of its own from the cloud (see [the egress IP of each cloud](cluster.md#egress-ip-aws)).  Give the new env an address of its own only if something allow-lists it: `<cloud>-egress-ip create <name>` |
+| `<CLOUD>_EGRESS_IP`                                                                            | **blank** them in the copy: one address serves one cluster's outbound traffic, so two envs deployed together on a cloud cannot both pin the same one, and left blank, the cluster gets an address of its own from the cloud (see [the egress IP of each cloud](cluster.md#egress-ip-aws)).  Give the new env an address of its own only if something allow-lists it: `<cloud>-egress-ip create <name>`.  Once an address is set in the config, whitelist it on the Postgres instance, with `db-whitelist` |
 | `<CLOUD>_POLARIS_ALLOWED_CIDRS`                                                                | only if the new env is to be reached from other addresses                  |
 
 #### In the clouds
@@ -216,8 +216,9 @@ What differs by cloud:
   logs buckets, which must exist.
 
 Nothing else is needed from the cloud for an optional `<CLOUD>_EGRESS_IP`: left blank, the cluster gets an address of its own.  To pin one, allocate it with
-`afon-cli.sh --env <env> <cloud>-egress-ip create <name>`, with a name of its own, as the default name is that of the other env, and set it in the config before
-step 7.  The Google OAuth client of Jupyter also needs the redirect URIs of the new Jupyter domain names, in the Google console.
+`afon-cli.sh --env <env> <cloud>-egress-ip create <name>`, with a name of its own, as the default name is that of the other env, and set it in the config before step 7.
+Whitelist each address that is set on the Postgres instance of `POLARIS_DB_HOST`, as the clusters connect to it from their egress IPs: `afon-cli.sh --env <env> db-whitelist [<cloud>]`
+(`--dry-run` says what it would add; a cloud with no address is skipped, and one already allowed is left as it is), before the stack is deployed.
 
 ## Properties
 

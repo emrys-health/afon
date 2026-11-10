@@ -61,6 +61,8 @@ public class GenerateScriptMains {
         new ScriptEntry("dns", "DnsCreateZonesMain", "dns/create-zones.sh"),
         new ScriptEntry("dns", "DnsDelegateMain", "dns/delegate.sh"),
 
+        new ScriptEntry("db", "DbWhitelistMain", "db/whitelist.sh"),
+
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
