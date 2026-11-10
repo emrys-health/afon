@@ -33,7 +33,9 @@
   - `afon-cli.sh config-updates` adds it, as `postgres` (the default of the template), before `POLARIS_DB_PASSWORD`: change it if the Polaris database uses another user, then run `config-validate`.
 - **`github-secrets pull` is removed ([#378](https://github.com/emrys-health/afon/issues/378)):**
   - `afon-cli.sh github-secrets push` publishes the secrets only, no longer the encrypted copy of the config in the variable `AFON_CONFIG_BUNDLE`, and the `pull`, `--force` and `--no-bundle` options and the `AFON_SECRETS_PASSPHRASE` are gone.  To keep a copy of a config env and retrieve it, use `afon-cli.sh config-vault push|pull <tag> -c <cloud>`, which stores it in the secret store of a cloud.
-
+- **The network and identity of an Azure stack have the cluster name in their names:**
+  - They are now `<stack-type>-<CLUSTER_NAME>-aks-vnet`, `-aks-subnet`, `-aks-nsg` and `-aks-identity`, eg `full-emrys3-cluster-aks-identity`, no longer `full-aks-identity`, as on AWS and GCP, so that the envs that share a resource group can run side by side.
+  - An Azure stack that is already deployed is replaced on its next deploy: delete it first, with `manage-stack delete <stack>`, so that the resources with the old names are removed.
 
 ## 1.0-beta-8
 

@@ -156,11 +156,12 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     }
 
     /**
-     * @return the name of a resource of the stack's network or identity, qualified by the stack type, as these are
-     * named in the resource group, which the stacks running side by side share
+     * @return the name of a resource of the stack's network or identity, qualified by the cluster name of the stack, ie
+     * {@code <stack-type>-<CLUSTER_NAME>-<name>}, as for the VPC of AWS and GCP.  These are named in the resource group, which
+     * the stacks running side by side, and the envs that share it, may share
      */
     private String resourceName(String name) {
-        return stackType + "-" + name;
+        return clusterName + "-" + name;
     }
 
     /**

@@ -48,7 +48,7 @@ azure_status_check_cluster() {
     return 0
   fi
   local vnets
-  if vnets=$(az network vnet list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?name=='$STACK_TYPE-aks-vnet'].name" --output tsv 2>"$STATUS_ERR"); then
+  if vnets=$(az network vnet list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?name=='$STATUS_CLUSTER_NAME-aks-vnet'].name" --output tsv 2>"$STATUS_ERR"); then
     status_check_network "AKS network" "$vnets"
   else
     status_cannot_verify "- Could not list the networks in resource group $AZURE_RESOURCE_GROUP:"

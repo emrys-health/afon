@@ -128,7 +128,7 @@ list its steps with `manage-stack run <flow> --dry-run`.
 
 ### Stacks side by side
 
-**NOTE:** The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<name>`, eg `keycloak-aks-vnet` and `keycloak-<CLUSTER_NAME>`, as on AWS, so the stacks of a resource group don't collide.  The GKE cluster, VPC, subnet and router of a GCP stack are likewise named after the stack type, eg `keycloak-<CLUSTER_NAME>`, so the stacks of a project don't either.
+**NOTE:** The AKS cluster, network and identity of an Azure stack are named `<stack-type>-<CLUSTER_NAME>` and `<stack-type>-<CLUSTER_NAME>-<name>`, eg `keycloak-emrys-cluster` and `keycloak-emrys-cluster-aks-vnet`, as on AWS, so neither the stacks nor the envs of a resource group collide.  The GKE cluster, VPC, subnet and router of a GCP stack are likewise named after the stack type, eg `keycloak-<CLUSTER_NAME>`, so the stacks of a project don't either.
 
 Each stack has its own `tofu` state, so stacks run side by side, unless they conflict, ie they hold a common exclusive
 resource: the DNS record of a domain name, eg `OIDC_DOMAIN_NAME`, or the pinned egress IP, `AWS_EGRESS_IP`, `AZURE_EGRESS_IP` or `GCP_EGRESS_IP`, which only
@@ -843,7 +843,7 @@ And if all else fails, login to the [AWS VPC Console](https://eu-west-2.console.
 ### Azure
 
 The Azure components of each stack are named from its id, like the AWS ones: its AKS cluster is `<stack>-<CLUSTER_NAME>`, where `<stack>` is the stack id without the cloud, eg
-`keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack>-aks-vnet` and `<stack>-aks-identity`.
+`keycloak-emrys-cluster` for stack `azure-keycloak`, and its network and identity `<stack>-<CLUSTER_NAME>-aks-vnet` and `<stack>-<CLUSTER_NAME>-aks-identity`.
 So the Azure scripts acting on a stack are given the stack, by its id or its role (`identity`, `catalog` or `tre`), as on AWS, eg:
 ```shell
 afon-cli.sh azure-cluster identity             # is the AKS cluster up?

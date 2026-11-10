@@ -8,7 +8,7 @@
 #
 # Run it after <cloud>-login, with read access to the testing cloud account.  What it lists, with the age where the cloud tells it:
 #   aws    the EKS clusters, VPCs, NAT gateways, load balancers and IAM roles named after the cluster, in the region AWS_REGION
-#   azure  the resources named <stack-type>-* in the resource group AZURE_RESOURCE_GROUP, and the AKS node resource group of the cluster
+#   azure  the resources named <stack-type>-<cluster-name>* in the resource group AZURE_RESOURCE_GROUP, and the AKS node resource group of the cluster
 #   gcp    the GKE clusters, VPC networks, subnets, routers and addresses named after the cluster, in the project GCP_PROJECT_ID
 # The retained volumes outlive the stacks by design and are not listed.  A resource whose age the cloud does not tell is always listed.
 #
@@ -103,7 +103,7 @@ azure_search(){
   SUBSCRIPTION="$(az account show --query name -o tsv 2> /dev/null)" || die "az is not logged in"
   echo "Azure subscription $SUBSCRIPTION, resource group $RESOURCE_GROUP"
 
-  az resource list --resource-group "$RESOURCE_GROUP" --query "[?starts_with(name, '$STACK_TYPE-')].{name: name, kind: type, created: createdTime}" \
+  az resource list --resource-group "$RESOURCE_GROUP" --query "[?starts_with(name, '$STACK_TYPE-$CLUSTER_NAME')].{name: name, kind: type, created: createdTime}" \
     -o json 2> /dev/null | jq '[.[]? | {name: (.kind + " " + .name), created}]' | add_json "resource"
   az group list --query "[?starts_with(name, 'MC_${RESOURCE_GROUP}_${STACK_TYPE}-${CLUSTER_NAME}')].{name: name}" -o json 2> /dev/null \
     | add_json "aks node resource group"
