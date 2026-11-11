@@ -220,7 +220,14 @@ public enum AfonProperty {
     AZURE_GRANT_ROLES("AZURE_GRANT_ROLES"),
     AZURE_TENANT_ID("AZURE_TENANT_ID"),
     AZURE_APP_ID("AZURE_APP_ID"),
+    /** Secret of the app registration.  Required unless {@link #AZURE_WORKLOAD_IDENTITY} is {@code true}, when it is ignored. */
     AZURE_APP_SECRET("AZURE_APP_SECRET"),
+    /**
+     * Whether the app registration has a federated credential, that trusts the OIDC issuer of the AKS cluster, instead of
+     * {@link #AZURE_APP_SECRET}.  Then the Polaris pod runs under a service account that AKS workload identity exchanges for a
+     * token of the app.  Optional: {@code false} when unset.
+     */
+    AZURE_WORKLOAD_IDENTITY("AZURE_WORKLOAD_IDENTITY"),
     AZURE_SP_ID("AZURE_SP_ID"),
     AZURE_CONNECTION_STRING("AZURE_CONNECTION_STRING"),
     AZURE_RESOURCE_PROVIDER_REGISTRATIONS("AZURE_RESOURCE_PROVIDER_REGISTRATIONS"),

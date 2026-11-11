@@ -112,16 +112,41 @@ public class CdkUtils {
         List<DeploymentSpecTemplateSpecVolume>        volumes,
         String                                        name,
         String                                        createTimeout) {
+        return deploy(scope, eksDependOn, labels, containers, initContainers, volumes, name, createTimeout, null, Map.of());
+    }
+
+    /**
+     * As {@link #deploy(Construct, List, Map, List, List, List, String, String)}, additionally running the pods under a
+     * service account and with more pod labels, which are not in the selector of the deployment.
+     *
+     * @param serviceAccountName the service account of the pods, or {@code null} for the default
+     * @param extraPodLabels     labels of the pods only, eg {@code azure.workload.identity/use} for AKS workload identity
+     */
+    public static Deployment deploy(
+        Construct                                     scope,
+        List<@NonNull ITerraformDependable>           eksDependOn,
+        Map<String, String>                           labels,
+        List<DeploymentSpecTemplateSpecContainer>     containers,
+        List<DeploymentSpecTemplateSpecInitContainer> initContainers,
+        List<DeploymentSpecTemplateSpecVolume>        volumes,
+        String                                        name,
+        String                                        createTimeout,
+        String                                        serviceAccountName,
+        Map<String, String>                           extraPodLabels) {
         // Mirror `app` onto the canonical Kubernetes label so Hubble UI shows
         // a real workload name rather than "Unknown App". Only the pod template
         // gets the extra label — the selector and Deployment metadata keep the
         // original label set so this is a zero-recreate change for existing
         // resources (selectors are immutable once a Deployment exists).
-        Map<String, String> podLabels = withAppKubernetesIoName(labels);
+        Map<String, String> podLabels = new LinkedHashMap<>(withAppKubernetesIoName(labels));
+        podLabels.putAll(extraPodLabels);
         DeploymentSpecTemplateMetadata metadata = DeploymentSpecTemplateMetadata.builder().labels(podLabels).build();
         DeploymentSpecTemplateSpec.Builder podSpec = DeploymentSpecTemplateSpec.builder()
                                                                                .container(containers)
                                                                                .volume(volumes);
+        if (serviceAccountName != null) {
+            podSpec.serviceAccountName(serviceAccountName);
+        }
         // Left unset when empty so callers that pass none keep emitting no init_container block at all.
         if (!initContainers.isEmpty()) {
             podSpec.initContainer(initContainers);

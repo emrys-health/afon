@@ -89,6 +89,117 @@ The admin securely provides `SUBSCRIPTION_ID`, `TENANT_ID`, `APP_ID`, `APP_SP_ID
 | `APP_SP_ID` | `AZURE_SP_ID` | `secret-azure.properties` |
 | `APP_SECRET` | `AZURE_APP_SECRET` | `secret-azure.properties` |
 
+#### Federated credential instead of a secret
+
+The admin may give the app registration a federated credential, which replaces the secret: a token of an issuer that the credential trusts, for a subject it names,
+acts as the app.  Then there is no `APP_SECRET`, and the deployer sets `AZURE_WORKLOAD_IDENTITY=true` in `secret-azure.properties` and leaves `AZURE_APP_SECRET`
+blank.  The flag is explicit and never inferred from a blank secret: with `AZURE_WORKLOAD_IDENTITY=false` (the default) a blank `AZURE_APP_SECRET` is an error.
+
+The app needs two credentials, for two different jobs, so that nothing holds a secret:
+
+| Credential | For | Issuer | Subject | Created |
+|------------|-----|--------|---------|---------|
+| deployer's login | the deploy logging in as the app | the one the pipeline's identity provider has, see 2 | that of the pipeline, eg `sc://<organization>/<project>/<service connection name>` | once |
+| Polaris pod | Polaris reading and writing the storage | that of the AKS cluster, which exists only once the cluster is up | `system:serviceaccount:default:polaris` | for each cluster, again if it is rebuilt |
+
+The audience of both is `api://AzureADTokenExchange`.
+
+**Step by step.**  The commands that need the rights to change the app registration (Application Owner or Application Administrator) are the admin's, as in step 1.
+
+1. *Admin: create the app and its service principal, without a secret.*  As in [Run create-admin.sh](#run-create-adminsh-as-the-admin), but leave `APP_CREDENTIAL_RESET` unset,
+   so no secret is created.  `azure-login` logs in to `AZURE_TENANT_ID` and selects `AZURE_SUBSCRIPTION` of the config:
+   ```shell
+   afon-cli.sh azure-login
+   afon-cli.sh azure-create-admin [<app-name>]
+   ```
+   Read `APP_ID` and `APP_SP_ID` from the output, as above.
+
+2. *Admin: give the app the credential of the deployer's login.*  Which issuer and subject depends on where the deploy runs:
+   - *An Azure DevOps Services pipeline.*  Create the service connection (Azure Resource Manager, workload identity federation, manual, for the existing app
+     registration), which shows its issuer (new connections use Microsoft Entra, the older Azure DevOps issuer is being retired) and subject.  Then:
+     ```shell
+     afon-cli.sh azure-identity-admin afon-deployer "<issuer of the service connection>" "sc://<organization>/<project>/<service connection name>" <APP_ID>
+     ```
+   - *Agents in a Kubernetes cluster* (self-hosted Azure Pipelines agents, eg the `afon-azure-agent` image).  The token is the projected service account token of the agent
+     pod, so the issuer is that of the agent cluster:
+     ```shell
+     ISSUER=$(az aks show -g <agent cluster resource group> -n <agent cluster> --query oidcIssuerProfile.issuerUrl -o tsv)
+     afon-cli.sh azure-identity-admin afon-agent "$ISSUER" "system:serviceaccount:<namespace>:<agent service account>" <APP_ID>
+     ```
+   - *A machine that is neither, for testing, eg the deployer's laptop.*  First, it needs no credential to deploy: log in as yourself with `afon-cli.sh azure-login`, and only
+     the credential of the Polaris pod in step 6 is needed.  Only to try `azure-login-app` and the token path from a machine, give it an issuer of its own with
+     `azure-issue-token`, a throwaway one for testing, as whoever has its key can act as the app.  Entra ID checks a token against two small files of the issuer, which hold
+     only its public key and must be public over HTTPS, eg in an Azure Storage static website or GitHub Pages:
+     ```shell
+     afon-cli.sh azure-issue-token init https://<host>/<path> [<subject>]
+     ```
+     This creates the key and the files in `$AFON_HOME/azure-issue-token` (`AZURE_ISSUE_TOKEN_DIR`), says where to publish each of them, and prints the command for the admin,
+     which trusts the issuer for the subject (`deployer-test` by default):
+     ```shell
+     afon-cli.sh azure-identity-admin afon-test-machine "https://<host>/<path>" "deployer-test" <APP_ID>
+     ```
+     Then step 4 gets a token of ten minutes for each login, signed with the key:
+     ```shell
+     export AZURE_FEDERATED_TOKEN_FILE=$(afon-cli.sh azure-issue-token test-token)
+     ```
+     Keep the key on that machine only, and delete the credential (`az ad app federated-credential delete`) and the directory when done.
+   It is idempotent, a credential of the same issuer and subject is left as it is.  Azure DevOps Server does not issue these tokens as far as is known, so use the
+   agent cluster there.
+
+3. *Deployer: set the values from the admin.*  As in the table above, plus the flag, in `secret-azure.properties`:
+   ```shell
+   AZURE_TENANT_ID=<TENANT_ID>
+   AZURE_APP_ID=<APP_ID>
+   AZURE_SP_ID=<APP_SP_ID>
+   AZURE_APP_SECRET=
+   AZURE_WORKLOAD_IDENTITY=true
+   ```
+   and check them:
+   ```shell
+   afon-cli.sh config-validate -c azure
+   ```
+
+4. *Deployer: log in as the app.*  In a pipeline, run the following steps in an `AzureCLI@2` step that uses the service connection: `az` is then logged in as the app already, and
+   no login command is needed.  Elsewhere, with a file that has the token (a JWT of the issuer and subject of step 2):
+   ```shell
+   export AZURE_FEDERATED_TOKEN_FILE=<file with the token>
+   afon-cli.sh azure-login-app
+   ```
+   On an agent pod in AKS with workload identity the webhook sets `AZURE_FEDERATED_TOKEN_FILE`, and the kubelet refreshes the file; in an `AzureCLI@2` step, `$idToken` (`addSpnToEnvironment: true`)
+   is the token.  A person logs in as themself with `afon-cli.sh azure-login`.
+
+5. *Deployer: create the env and deploy the stack*, as in [§9](#9-create-the-env-and-check-the-storage) and the deploy of the stack:
+   ```shell
+   afon-cli.sh azure-create <stack-id>
+   afon-cli.sh manage-stack setup <stack-id>
+   ```
+   The stack enables AKS workload identity on the cluster, creates the service account `polaris` in the `default` namespace, annotated with `AZURE_APP_ID`, and labels the
+   Polaris pod `azure.workload.identity/use: "true"`.  Polaris is not given `AZURE_CLIENT_SECRET`, and gets no token until step 6.
+
+6. *Give the app the credential of the cluster*, as soon as the cluster is up.  The deployer checks it, and prints the command for the admin if it is missing:
+   ```shell
+   afon-cli.sh azure-identity <stack-id>
+   ```
+   The admin then runs the `azure-identity-admin` command it prints, with the issuer of the cluster and the subject `system:serviceaccount:default:polaris`.
+   If the deployer may change the app registration, `afon-cli.sh azure-identity true <stack-id>` does it, like `azure-create true` does with `azure-create-admin`.
+   Until it takes effect, which can take a few minutes, Polaris fails to get a token (AADSTS70021: no matching federated identity record).  Repeat it when the
+   cluster is rebuilt, as its issuer changes.
+
+7. *Check.*  The pod has no secret, but has a token:
+   ```shell
+   kubectl exec deploy/<polaris> -- env | grep AZURE_     # AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE, no AZURE_CLIENT_SECRET
+   ```
+   then run the Azure smoke test, which writes to the container through Polaris.
+
+**Trying it on an env that uses the secret.**  The same app can hold both.  Skip steps 1 to 2, keep the IDs and the secret, run step 6, set `AZURE_WORKLOAD_IDENTITY=true`, plan and apply
+the stack, and check as in step 7: the secret is then ignored, with a warning.  Set the flag back to `false` to return to the secret.
+
+**Notes**
+- `issue-cert.sh` with Let's Encrypt gives acme.sh the token of the deployer's `az` login for Azure DNS, so the deployer needs to write DNS records in the resource group, eg
+  as its Contributor.
+- The token of the login lasts minutes, so a long deploy can fail late with `AADSTS700024`: log in again with a fresh token.  `azure-login-oidc` does this for GitHub Actions;
+  for Azure DevOps it is not supported yet.
+
 The deployer then runs `create.sh` ([§9](#9-create-the-env-and-check-the-storage)) without admin rights.  Both scripts are idempotent.
 
 ## 5. Create and fill in the config

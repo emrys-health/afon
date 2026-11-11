@@ -252,20 +252,28 @@ issue_via_acme() {
   DOMAIN_NAME="$1"
   install_acme
   DNS_ZONE_ROLE_GRANTED=false
-  grant_dns_zone_role "$DOMAIN_NAME"
-
-  # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
-  # principal above when it creates/deletes the _acme-challenge TXT record.
   export AZUREDNS_SUBSCRIPTIONID=$AZURE_SUBSCRIPTION
   export AZUREDNS_TENANTID=$AZURE_TENANT_ID
-  export AZUREDNS_APPID=$AZURE_APP_ID
-  export AZUREDNS_CLIENTSECRET=$AZURE_APP_SECRET
+  if [ "${AZURE_WORKLOAD_IDENTITY:-false}" = "true" ]; then
+    # The app has no secret to sign in with outside the cluster, so acme.sh's dns_azure hook is given the token of the az login
+    # of the deployer instead, who needs to write DNS records in the resource group, eg as its Contributor.  The token lasts
+    # about an hour, which is more than the challenge takes.
+    echo "- AZURE_WORKLOAD_IDENTITY=true: acme.sh uses the token of the az login of the deployer for Azure DNS"
+    AZUREDNS_BEARERTOKEN="$(az account get-access-token --resource https://management.azure.com --query accessToken -o tsv)" || exit 1
+    export AZUREDNS_BEARERTOKEN
+  else
+    grant_dns_zone_role "$DOMAIN_NAME"
+    # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
+    # principal above when it creates/deletes the _acme-challenge TXT record.
+    export AZUREDNS_APPID=$AZURE_APP_ID
+    export AZUREDNS_CLIENTSECRET=$AZURE_APP_SECRET
 
-  # A role just granted can take some minutes to propagate, during which acme.sh cannot add its TXT record.  Every
-  # attempt failing counts toward Let's Encrypt's limit of 5 failed authorizations per domain name per hour, so acme.sh
-  # is never retried: Azure DNS is probed as the service principal instead, until it may write to the zone.
-  if [ "$DNS_ZONE_ROLE_GRANTED" = "true" ]; then
-    wait_for_dns_zone_access "$DOMAIN_NAME"
+    # A role just granted can take some minutes to propagate, during which acme.sh cannot add its TXT record.  Every
+    # attempt failing counts toward Let's Encrypt's limit of 5 failed authorizations per domain name per hour, so acme.sh
+    # is never retried: Azure DNS is probed as the service principal instead, until it may write to the zone.
+    if [ "$DNS_ZONE_ROLE_GRANTED" = "true" ]; then
+      wait_for_dns_zone_access "$DOMAIN_NAME"
+    fi
   fi
 
   echo "- Requesting/renewing $DOMAIN_NAME via Let's Encrypt (DNS-01)"

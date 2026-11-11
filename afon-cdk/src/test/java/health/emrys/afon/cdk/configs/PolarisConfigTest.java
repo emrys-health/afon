@@ -18,6 +18,7 @@ import static health.emrys.afon.config.ConfigUtils.cloudPropertySet;
 import static health.emrys.afon.config.ConfigUtils.cloudPropertyValue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PolarisConfigTest {
     static String TEMPLATES_CONFIG_DIR = "../templates/config";
@@ -25,6 +26,7 @@ class PolarisConfigTest {
     @Test
     public void canGenerateConfigScriptForGivenCloud() {
         AfonPropertyProvider properties = new FilePropertyProvider(TEMPLATES_CONFIG_DIR);
+        properties.setValue(AZURE_APP_SECRET, "azure-app-secret"); // blank in templates, but required without a workload identity
         for (AfonCloud cloud : AfonCloud.values()) {
             validateScriptFor(cloud, properties);
         }
@@ -53,12 +55,42 @@ class PolarisConfigTest {
                       "afon-azure.properties", "secret-azure.properties");
         AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
         properties.setValue(AZURE_APP_ID, "azure-app-id");
+        properties.setValue(AZURE_APP_SECRET, "azure-app-secret");
 
         String script = PolarisConfig.getProviderCredentials(properties, "azure");
 
         assertThat(script).contains("export AZURE_CLIENT_ID='azure-app-id'");
+        assertThat(script).contains("export AZURE_CLIENT_SECRET='azure-app-secret'");
         assertThat(script).doesNotContain(AWS_ACCESS_KEY_ID.getName());
         assertThat(script).doesNotContain(GOOGLE_APPLICATION_CREDENTIALS.getName());
+    }
+
+    @Test
+    public void omitsClientSecretForWorkloadIdentity(@TempDir Path configDir) throws IOException {
+        assumeTrue(!cloudPropertySet() || cloudPropertyValue().equalsIgnoreCase("azure"));
+        copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
+                      "afon-azure.properties", "secret-azure.properties");
+        AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AZURE_APP_ID, "azure-app-id");
+        properties.setValue(AZURE_WORKLOAD_IDENTITY, "true");
+
+        String script = PolarisConfig.getProviderCredentials(properties, "azure");
+
+        assertThat(script).contains("export AZURE_CLIENT_ID='azure-app-id'");
+        assertThat(script).doesNotContain("AZURE_CLIENT_SECRET");
+    }
+
+    @Test
+    public void rejectsBlankClientSecretWithoutWorkloadIdentity(@TempDir Path configDir) throws IOException {
+        assumeTrue(!cloudPropertySet() || cloudPropertyValue().equalsIgnoreCase("azure"));
+        copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
+                      "afon-azure.properties", "secret-azure.properties");
+        AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AZURE_APP_ID, "azure-app-id");
+
+        assertThatThrownBy(() -> PolarisConfig.getProviderCredentials(properties, "azure"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("AZURE_WORKLOAD_IDENTITY");
     }
 
     @Test
@@ -67,6 +99,7 @@ class PolarisConfigTest {
         copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
                       "afon-azure.properties", "secret-azure.properties", "secret-aws.properties");
         AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AZURE_APP_SECRET, "azure-app-secret");
         properties.setValue(AWS_ACCESS_KEY_ID, "aws-key-id");
         properties.setValue(GOOGLE_APPLICATION_CREDENTIALS, "{}");
 

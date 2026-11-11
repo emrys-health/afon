@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudProvider;
+import health.emrys.afon.cdk.azure.AzureWorkloadIdentity;
 import health.emrys.afon.cdk.DockerImages;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
@@ -24,6 +25,8 @@ import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccount;
+import com.hashicorp.cdktf.providers.kubernetes.service_account.ServiceAccountMetadata;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper;
@@ -72,6 +75,8 @@ public class PolarisConfig extends Construct {
     private final ServiceSpecPort     polarisManagementSpecPort;
     private final Map<String, String> polarisLabels;
     private final CloudProvider       cloudProvider;
+    /** The client ID of the app, if the Polaris pod authenticates by AKS workload identity, else null */
+    private final String              workloadIdentityClientId;
 
     public PolarisConfig(@NonNull Construct scope,
                          @NonNull String id,
@@ -80,6 +85,10 @@ public class PolarisConfig extends Construct {
     ) {
         super(scope, id);
         this.cloudProvider = cloudProvider;
+        this.workloadIdentityClientId = AfonCloud.AZURE.toString().equalsIgnoreCase(cloudProvider.getId())
+                                        && AzureWorkloadIdentity.isEnabled(properties)
+                                        ? properties.getValue(AZURE_APP_ID)
+                                        : null;
         // Configure the Kubernetes Provider
         cloudProvider.configureK8s();
 
@@ -282,8 +291,17 @@ public class PolarisConfig extends Construct {
     ) {
         AfonCloud           deploymentCloud = toCloud(deploymentId);
         Map<String, String> env             = new TreeMap<>();
+        boolean workloadIdentity = deploymentCloud == AfonCloud.AZURE && AzureWorkloadIdentity.isEnabled(properties);
+        if (deploymentCloud == AfonCloud.AZURE) {
+            AzureWorkloadIdentity.validate(properties);
+        }
         getPolarisProperties(deploymentCloud)
-            .forEach((property, envName) -> env.put(envName, properties.getValue(property)));
+            .forEach((property, envName) -> {
+                // A workload identity has no secret, and a blank AZURE_CLIENT_SECRET would stop the Azure SDK from using its token
+                if (!(workloadIdentity && property == AZURE_APP_SECRET)) {
+                    env.put(envName, properties.getValue(property));
+                }
+            });
         Arrays.stream(AfonCloud.values())
               .filter(cloud -> cloud != deploymentCloud)
               .forEach(cloud -> getPolarisCredentialProperties(cloud).forEach((property, envName) -> {
@@ -449,13 +467,35 @@ public class PolarisConfig extends Construct {
             .volumeMount(mounts)
             .readinessProbe(readinessProbe)
             .build();
+        String serviceAccount = null;
+        Map<String, String> podLabels = Map.of();
+        if (workloadIdentityClientId != null) {
+            // AKS workload identity: the webhook injects the token of this service account into pods that have the label,
+            // which the federated credential of the app trusts, see AzureWorkloadIdentity
+            ServiceAccount sa = ServiceAccount.Builder
+                .create(this, "polarisServiceAccount")
+                .dependsOn(cloudProvider.getDependables())
+                .metadata(ServiceAccountMetadata.builder()
+                                                .name(AzureWorkloadIdentity.SERVICE_ACCOUNT)
+                                                .namespace(AzureWorkloadIdentity.NAMESPACE)
+                                                .annotations(Map.of("azure.workload.identity/client-id", workloadIdentityClientId))
+                                                .build())
+                .build();
+            dependsOn.add(sa);
+            serviceAccount = AzureWorkloadIdentity.SERVICE_ACCOUNT;
+            podLabels      = Map.of("azure.workload.identity/use", "true");
+        }
         var polarisDeployment = CdkUtils.deploy(
             this,
             dependsOn,
             polarisLabels,
             List.of(polarisContainer),
+            List.of(),
             volumes,
-            "polaris");
+            "polaris",
+            null,
+            serviceAccount,
+            podLabels);
 
         return configurePolarisService(polarisDeployment);
     }

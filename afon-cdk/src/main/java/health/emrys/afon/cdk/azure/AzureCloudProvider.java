@@ -567,6 +567,10 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             // disable it once on (OIDCIssuerFeatureCannotBeDisabled), so declare it
             // enabled to avoid a spurious update diff.
             .oidcIssuerEnabled(true)
+            // The webhook that injects the token of the service account into the pods that have the label
+            // azure.workload.identity/use, see AzureWorkloadIdentity.  Only if the app has no secret, so as not to change
+            // the cluster of the other envs.
+            .workloadIdentityEnabled(AzureWorkloadIdentity.isEnabled(properties) ? true : null)
             .identity(KubernetesClusterIdentity
                           .builder()
                           .type("UserAssigned")
