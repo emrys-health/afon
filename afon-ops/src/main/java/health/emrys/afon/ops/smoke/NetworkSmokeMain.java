@@ -5,6 +5,8 @@ import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.cdk.configs.JupyterHubConfig;
 import health.emrys.afon.cdk.configs.SparkNames;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonCloudProperty;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -282,9 +284,11 @@ public class NetworkSmokeMain {
      */
     private List<ExecResult> checkKeyCloakAdminOnlyAccessibleFromAllowedCidrs() {
         AfonCloud            cloud           = new SmokeConfig(properties).cloud();
+        AfonProperty         oidcProperty    = AfonCloudProperty.OIDC_DOMAIN_NAME.forCloud(cloud).get();
         AfonPropertyProvider cloudProperties = properties.forCloud(cloud);
-        String               host            = cloudProperties.getValue(OIDC_DOMAIN_NAME);
+        String               host            = cloudProperties.getValue(oidcProperty);
         String               command         = format("POST https://%s/realms/{master,polaris}/protocol/openid-connect/token", host);
+        logger.info("Using cloud {} and KeyCloak host {}", cloud, host);
         if (Boolean.parseBoolean(properties.getCloudValue(cloud, KEYCLOAK_EXTERNAL, "false").trim())) {
             return List.of(new ExecResult(
                 0, format("Not checked: the KeyCloak at %s is another stack's, as %s_KEYCLOAK_EXTERNAL=true", host,

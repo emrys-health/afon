@@ -59,8 +59,12 @@ public class KubeClient implements AutoCloseable {
     protected ApiClient buildClient(AfonPropertyProvider properties) {
         String kubeConfigPath = ConfigUtils.opsKubeConfigPath();
         try {
-            FileReader reader = new FileReader(kubeConfigPath);
-            return ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(reader)).build();
+            FileReader reader     = new FileReader(kubeConfigPath);
+            KubeConfig kubeConfig = KubeConfig.loadKubeConfig(reader);
+            // which cluster is acted on, as it may not be the one thought, eg KUBECONFIG of an IDE's run configuration
+            logger.info("Using kube config {}: context '{}', server {}", kubeConfigPath, kubeConfig.getCurrentContext(),
+                        kubeConfig.getServer());
+            return ClientBuilder.kubeconfig(kubeConfig).build();
         } catch (IOException e) {
             logger.error("Failed to build client from kube config {}", kubeConfigPath, e);
             throw new RuntimeException("Failed to build client from kube config " + kubeConfigPath, e);
