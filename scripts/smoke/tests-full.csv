@@ -1,4 +1,5 @@
 name|command|args
+keycloak|key-cloak-smoke|
 db|db-smoke|
 trino|trino-query-smoke|
 tetragon|tetragon-loki-smoke|
