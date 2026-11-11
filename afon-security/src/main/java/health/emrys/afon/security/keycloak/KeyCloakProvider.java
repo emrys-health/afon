@@ -254,7 +254,7 @@ public class KeyCloakProvider implements IdentityProvider {
         logger.info("Retrieving token from {}", path);
         Map<String, String> form = Map.of(
             "grant_type", "password",
-            "client_id", "admin-cli",
+            "client_id", ADMIN_CLI,
             "username", username,
             "password", password
         );
@@ -545,6 +545,11 @@ public class KeyCloakProvider implements IdentityProvider {
      * the second factor guards interactive logins (oauth2-proxy, JupyterHub), and a headless login -
      * which has nobody to read a phone - is guarded by its confidential client's secret instead.
      *
+     * <p>As a headless login is guarded by a client secret, no public client may take a username/password: KeyCloak's
+     * own {@value #ADMIN_CLI} client, which every realm has, is public and takes them by default, so would give any user
+     * a token with their password alone. Its direct access grants are therefore turned off in this realm (not in
+     * 'master', whose own {@value #ADMIN_CLI} {@link #adminToken()} uses).
+     *
      * <p>KeyCloak refuses to modify its own built-in flows, so each is copied first and the realm
      * bound to the copy. Idempotent: re-running against a converged realm re-copies nothing (the copy
      * 409s) and issues no execution updates.
@@ -554,7 +559,44 @@ public class KeyCloakProvider implements IdentityProvider {
         List<HttpResponse> responses = new  ArrayList<>();
         responses.addAll(requireOtpForBrowserLogins(adminToken, realm));
         responses.addAll(skipOtpForDirectGrants(adminToken, realm));
+        responses.addAll(disableDirectGrants(adminToken, realm, ADMIN_CLI));
         return responses;
+    }
+
+    /** KeyCloak's own public client, which every realm has. */
+    public static final String ADMIN_CLI = "admin-cli";
+
+    /**
+     * Stops the client taking a username/password for a token, if it does.
+     *
+     * @return the response of the update, or none if the client is absent or already takes none
+     */
+    private List<HttpResponse> disableDirectGrants(String adminToken, String realm, String clientId) throws IOException {
+        String uuid = clientUuid(adminToken, realm, clientId);
+        if (uuid == null) {
+            logger.info("No KeyCloak client {} in realm {} whose direct access grants to disable", clientId, realm);
+            return List.of();
+        }
+        String uri = format("/admin/realms/%s/clients/%s", realm, uuid);
+        Map<String, Object> client = restClient.get(uri, adminToken, response -> {
+            if (response.getCode() != HttpStatus.SC_OK) {
+                throw new IOException(format(
+                    "Could not read KeyCloak client %s of realm %s: HTTP %d", clientId, realm, response.getCode()));
+            }
+            return mapper.readValue(response.getEntity().getContent(), Map.class);
+        });
+        if (Boolean.FALSE.equals(client.get("directAccessGrantsEnabled"))) {
+            logger.info("KeyCloak client {} of realm {} already takes no username/password", clientId, realm);
+            return List.of();
+        }
+        client.put("directAccessGrantsEnabled", false);
+        HttpResponse response = putJson(adminToken, uri, mapper.writeValueAsString(client), "client " + clientId);
+        if (isFailure(response)) {
+            throw new IOException(format(
+                "Could not disable direct access grants of KeyCloak client %s of realm %s", clientId, realm));
+        }
+        logger.info("KeyCloak client {} of realm {} no longer takes a username/password", clientId, realm);
+        return List.of(response);
     }
 
     /**

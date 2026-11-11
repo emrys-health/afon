@@ -6,6 +6,7 @@ import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,14 +55,11 @@ public class KeyCloakSmokeMain {
         String       token;
         try {
             token = keyCloak.getTokenFor(KEYCLOAK_REALM, user.username(), user.password());
-            if (!isAdmin(user)) {
-                errors.add(format("Could get a token for  %s", user.username()));
-            }
-        } catch (Exception e) {
-            if (isAdmin(user)) {
-                errors.add(format("User '%s' could not get a token: %s", user.username(), e.getMessage()));
-            }
-            return errors;
+            errors.add(format("Could get a token for  %s", user.username()));
+        } catch (IllegalStateException e) {
+           logger.info(format("Could not get token for %s. Error = {}", user.username()), e.getMessage());
+        } catch (IOException e) {
+            errors.add(format("IO error getting token for %s. Error = %s", user.username(), e.getMessage()));
         }
         return errors;
     }
