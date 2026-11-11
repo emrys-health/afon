@@ -1,7 +1,5 @@
 package health.emrys.afon.ops.smoke;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
@@ -14,34 +12,36 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Console;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
 import static health.emrys.afon.config.AfonProperty.USER_ID;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
+import static health.emrys.afon.security.keycloak.KeyCloakProvider.ADMIN_CLI;
 import static java.lang.String.format;
 
 /**
- * Smoke test that a KeyCloak <em>user</em>, rather than an OAuth client, can get an OIDC token from the
- * {@code polaris} realm of the TRE cloud, with its username and password.
+ * Smoke test that a KeyCloak <em>user</em> cannot get an OIDC token from the {@code polaris} realm of the TRE cloud with
+ * their username and password alone, ie without the second factor of MFA, which only the browser flow asks for.
  * <p>
- * The token is got with the direct-access (password) grant through KeyCloak's own public {@code admin-cli} client, which
- * every realm has, so no client of Afon's, nor its secret, is used: only the user's credentials.  The realm's direct-grant
- * flow has its OTP step taken out (see {@link KeyCloakProvider#DIRECT_GRANT_NO_OTP_FLOW}), so no second factor is asked.
+ * The realm's direct-grant flow has its OTP step taken out (see {@link KeyCloakProvider#DIRECT_GRANT_NO_OTP_FLOW}), as a
+ * headless login is guarded by a confidential client's secret instead.  So a public client, with no secret, must not take a
+ * username/password: this tries the password grant through KeyCloak's own public {@value KeyCloakProvider#ADMIN_CLI}
+ * client, which every realm has, and passes only if KeyCloak refuses that client direct access grants.  A refusal for any
+ * other reason, eg a wrong password, fails the test, as it says nothing about the client.
  * <p>
  * The user is the one named as the first argument, else {@code USER_ID}.  Its password is that of users.csv, if it is there,
  * else the human running the test is asked for it on the console.
- * <p>
- * Checks that the token is for that user, is issued by the realm and has not expired, and that a wrong password is refused.
  */
 public class OidcUserTokenSmokeMain {
 
-    private static final Logger       logger = LoggerFactory.getLogger(OidcUserTokenSmokeMain.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(OidcUserTokenSmokeMain.class);
+
+    /**
+     * The OAuth error KeyCloak answers with when a client may not use the grant, here direct access grants, eg
+     * {@code {"error":"unauthorized_client","error_description":"Client not allowed for direct access grants"}}.
+     */
+    static final String UNAUTHORIZED_CLIENT = "unauthorized_client";
 
     interface PasswordReader {
         String read(String username);
@@ -78,68 +78,36 @@ public class OidcUserTokenSmokeMain {
     }
 
     /**
-     * @return the errors, if any, of getting a token for the user
+     * @return the errors, if any, of the user getting a token with only their password, or of it being refused for another
+     * reason than the client taking no passwords
      */
     public List<String> check(String username) throws IOException {
-        List<String> errors   = new ArrayList<>();
-        String       password = passwordFor(username);
-        logger.info("Getting an OIDC token for user '{}' from realm '{}' of {} at {}",
-                    username, KEYCLOAK_REALM, cloud, properties.getOidcDomainName(cloud));
-        String token;
+        String password = passwordFor(username);
+        logger.info("Trying to get an OIDC token for user '{}' with only a password, through {}, from realm '{}' of {} at {}",
+                    username, ADMIN_CLI, KEYCLOAK_REALM, cloud, properties.getOidcDomainName(cloud));
         try {
-            token = keyCloak.getTokenFor(KEYCLOAK_REALM, username, password);
+            keyCloak.getTokenFor(KEYCLOAK_REALM, username, password);
+            return List.of(format(
+                "User '%s' got a token from realm '%s' with only a password, bypassing MFA, through public client %s: "
+                + "its direct access grants should be disabled (see KeyCloakProvider#configureMfa)",
+                username, KEYCLOAK_REALM, ADMIN_CLI));
         } catch (IllegalStateException e) {
-            errors.add(format("User '%s' could not get a token: %s", username, e.getMessage()));
-            return errors;
+            return refusalErrors(username, e.getMessage());
         }
-        errors.addAll(checkClaims(claimsOf(token), username, Instant.now()));
-        errors.addAll(checkWrongPasswordRefused(username, password));
-        if (errors.isEmpty()) {
-            logger.info("User '{}' got a valid OIDC token", username);
-        }
-        return errors;
     }
 
-    private List<String> checkWrongPasswordRefused(String username, String password) throws IOException {
-        try {
-            keyCloak.getTokenFor(KEYCLOAK_REALM, username, password + "-wrong");
-            return List.of(format("User '%s' got a token with a wrong password", username));
-        } catch (IllegalStateException e) {
-            logger.info("A wrong password for '{}' was correctly refused: {}", username, e.getMessage());
+    /**
+     * @param refusal the message of KeyCloak refusing the token
+     * @return no error if KeyCloak refused the client the grant, else one, as the refusal was for another reason
+     */
+    static List<String> refusalErrors(String username, String refusal) {
+        if (refusal != null && refusal.contains(UNAUTHORIZED_CLIENT)) {
+            logger.info("User '{}' was correctly refused a password-only token through {}: {}", username, ADMIN_CLI, refusal);
             return List.of();
         }
-    }
-
-    /**
-     * @return the errors of the claims not being those of a live token of the user, issued by the realm
-     */
-    static List<String> checkClaims(JsonNode claims, String username, Instant now) {
-        List<String> errors   = new ArrayList<>();
-        String       subject  = claims.path("preferred_username").asText("");
-        if (!username.equalsIgnoreCase(subject)) {
-            errors.add(format("Token is for '%s', not '%s'", subject, username));
-        }
-        String issuer = claims.path("iss").asText("");
-        if (!issuer.endsWith("/realms/" + KEYCLOAK_REALM)) {
-            errors.add(format("Token was issued by '%s', not realm '%s'", issuer, KEYCLOAK_REALM));
-        }
-        long expiry = claims.path("exp").asLong(0);
-        if (expiry <= now.getEpochSecond()) {
-            errors.add(format("Token expired at %s, before %s", Instant.ofEpochSecond(expiry), now));
-        }
-        return errors;
-    }
-
-    /**
-     * @return the payload of the JWT, which is not verified, as KeyCloak just issued it over TLS
-     */
-    static JsonNode claimsOf(String jwt) throws IOException {
-        String[] parts = jwt.split("\\.");
-        if (parts.length < 2) {
-            throw new IOException("Token is not a JWT");
-        }
-        byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
-        return MAPPER.readTree(new String(payload, StandardCharsets.UTF_8));
+        return List.of(format(
+            "User '%s' was refused a token, but not because %s takes no passwords, so nothing is shown about MFA: %s",
+            username, ADMIN_CLI, refusal));
     }
 
     private String passwordFor(String username) {
