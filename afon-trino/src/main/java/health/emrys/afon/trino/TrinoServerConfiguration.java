@@ -4,6 +4,12 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import org.jspecify.annotations.NonNull;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.util.HexFormat;
+
 import static health.emrys.afon.config.AfonProperty.AWS_REGION;
 import static health.emrys.afon.security.SecurityUtils.OAUTH_SCOPE;
 import static java.lang.String.format;
@@ -14,6 +20,11 @@ import static java.lang.String.format;
  * {@code extraCredentials=token:<access token>} in the JDBC URL or properties, and only starts each catalog, which calls
  * Polaris before any query has come, with the credential that Trino reads from the environment variable
  * {@value #CREDENTIAL_ENV}, see {@link #credential()}.
+ * <p>
+ * The client must also authenticate to Trino with the same token, as its access token (the {@code Authorization: Bearer}
+ * header, eg {@code accessToken=<access token>} in JDBC), and may only run queries as the user it names: Trino does not pass
+ * that header on to Polaris, and the Iceberg client caches each user's Polaris session by user, not by token, so a user
+ * that Trino did not authenticate could otherwise use another's.
  */
 public class TrinoServerConfiguration {
 
@@ -25,6 +36,11 @@ public class TrinoServerConfiguration {
      * The extra credential, of a query, that holds the token with which Trino calls Polaris for it.
      */
     public static final String TOKEN_EXTRA_CREDENTIAL = "token";
+    /**
+     * The environment variable of the Trino pods that holds the secret with which the coordinator and workers authenticate
+     * one another, which Trino requires once clients are authenticated, see {@link #sharedSecret()}.
+     */
+    public static final String SHARED_SECRET_ENV      = "TRINO_SHARED_SECRET";
 
     private final AfonPropertyProvider properties;
     private final String               polarisDomainName;
@@ -80,6 +96,20 @@ public class TrinoServerConfiguration {
      */
     public String credential() {
         return user.username() + ":" + user.password();
+    }
+
+    /**
+     * @return the value of {@value #SHARED_SECRET_ENV}: derived from {@link #credential()}, so that it is secret, and the
+     * same on every deploy, as a new one would restart the pods, without a property of its own
+     */
+    public String sharedSecret() {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(credential().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal("trino-internal-communication".getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Could not derive Trino's shared secret", e);
+        }
     }
 
     protected String additionalProperties() {

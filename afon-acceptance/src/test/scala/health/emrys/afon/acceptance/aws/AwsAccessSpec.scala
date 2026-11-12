@@ -40,7 +40,9 @@ class AwsAccessSpec extends AbstractAccessSpec {
       val smokeTest = new TrinoQuerySmokeMain(AfonCloud.AWS, properties)
       val sql = s"SELECT COUNT(*) FROM $tableName"
       And(s"execute SQL: ${formatSQL(sql)}")
-      val result = smokeTest.query(url, sql, user, token)
+      val props = smokeTest.trinoAccessPropertiesFor(user.username(), token)
+      props.remove(TrinoQuerySmokeMain.ACCESS_TOKEN) // would get "TLS/SSL required for authentication using an access token" error otherwise
+      val result = smokeTest.query(url, sql, props)
       Then(s"the result is $result")
       assert(Integer.parseInt(result) == NUM_ROWS)
     }

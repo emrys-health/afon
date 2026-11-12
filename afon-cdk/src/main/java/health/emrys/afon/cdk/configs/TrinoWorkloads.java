@@ -23,8 +23,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.internalRealmUrl;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoint;
 import static health.emrys.afon.trino.TrinoServerConfiguration.CREDENTIAL_ENV;
+import static health.emrys.afon.trino.TrinoServerConfiguration.SHARED_SECRET_ENV;
 
 /**
  * Cloud-agnostic deployment of Trino via its official Helm chart — the counterpart to
@@ -41,6 +43,9 @@ import static health.emrys.afon.trino.TrinoServerConfiguration.CREDENTIAL_ENV;
  * <p>The catalog files hold no credentials (see {@link TrinoServerConfiguration}): the credential with which each
  * catalog starts is in the {@code Secret} {@value #SECRET_NAME}, which the pods read as {@code CREDENTIAL_ENV}, and
  * the token for each query, which Trino passes on to Polaris, comes from the client.
+ *
+ * <p>The client authenticates to Trino with the same OIDC token, which the coordinator checks against KeyCloak's keys, and
+ * may run queries only as the user that it is of (see {@link #jwtAuthenticationConfig} and {@link #noImpersonation}).
  */
 public class TrinoWorkloads {
 
@@ -55,6 +60,7 @@ public class TrinoWorkloads {
 
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs             afonCatalogs;
+    private final String                   realmUrl;
 
     /**
      * @param oidcDomainName the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
@@ -67,6 +73,7 @@ public class TrinoWorkloads {
         this.trinoConfig  = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
                                                                  tokenEndpoint(oidcDomainName, "https"));
         this.afonCatalogs = new AfonCatalogs(properties);
+        this.realmUrl     = internalRealmUrl(oidcDomainName, "https");
     }
 
     /**
@@ -85,22 +92,25 @@ public class TrinoWorkloads {
                        @NonNull HelmProvider helmProvider,
                        @NonNull AfonCatalog id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
-        Map<String, Object> values = Map.of(
-            "image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG),
-            "server", Map.of("workers", WORKERS), // Integer type
-            "coordinator", nodeSettings(),
-            "worker", nodeSettings(),
-            "service", Map.of("type", "ClusterIP", "port", TRINO_PORT),
-            "env", List.of(Map.of(
-                "name", CREDENTIAL_ENV,
-                "valueFrom", Map.of("secretKeyRef", Map.of("name", SECRET_NAME, "key", CREDENTIAL_ENV)))),
-            "eventListenerProperties", queryLogProperties(),
-            "additionalCatalogs", catalogFiles(id.toString()));
+        Map<String, Object> values = Map.ofEntries(
+            Map.entry("image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG)),
+            Map.entry("server", Map.of(
+                "workers", WORKERS, // Integer type
+                "config", Map.of("authenticationType", "JWT"),
+                "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl))),
+            Map.entry("additionalConfigProperties", List.of("internal-communication.shared-secret=${ENV:" + SHARED_SECRET_ENV + "}")),
+            Map.entry("accessControl", noImpersonation()),
+            Map.entry("coordinator", nodeSettings()),
+            Map.entry("worker", nodeSettings()),
+            Map.entry("service", Map.of("type", "ClusterIP", "port", TRINO_PORT)),
+            Map.entry("env", List.of(secretEnv(CREDENTIAL_ENV), secretEnv(SHARED_SECRET_ENV))),
+            Map.entry("eventListenerProperties", queryLogProperties()),
+            Map.entry("additionalCatalogs", catalogFiles(id.toString())));
 
         Secret credential = Secret.Builder
             .create(scope, "trinoPolarisSecret")
             .metadata(SecretMetadata.builder().name(SECRET_NAME).namespace(TRINO_NAMESPACE).build())
-            .data(Map.of(CREDENTIAL_ENV, trinoConfig.credential()))
+            .data(Map.of(CREDENTIAL_ENV, trinoConfig.credential(), SHARED_SECRET_ENV, trinoConfig.sharedSecret()))
             .type("Opaque")
             .dependsOn(dependsOn)
             .build();
@@ -131,6 +141,35 @@ public class TrinoWorkloads {
      * chart's startup probe allows, which restarts it, every time: the release then times out.  The probe's timeout and
      * retries are those of a JVM that starts slowly, not of one that is hung.
      */
+    private static Map<String, Object> secretEnv(String name) {
+        return Map.of("name", name, "valueFrom", Map.of("secretKeyRef", Map.of("name", SECRET_NAME, "key", name)));
+    }
+
+    /**
+     * Makes the coordinator authenticate every client by its OIDC token, as KeyCloak's realm signed it, so that a query
+     * runs as the user the token is of, its {@code polaris_principal}, which is the Polaris principal that the same token
+     * is when Trino passes it on.  Plain HTTP is allowed, as Trino is only reachable in the cluster, and the JDBC driver
+     * sends the token over it.
+     *
+     * @param realmUrl the realm's URL, as the issuer of its tokens names it, eg {@code https://<oidc domain>/realms/polaris}
+     */
+    static String jwtAuthenticationConfig(String realmUrl) {
+        return String.join("\n",
+                           "http-server.authentication.jwt.key-file=" + realmUrl + "/protocol/openid-connect/certs",
+                           "http-server.authentication.jwt.required-issuer=" + realmUrl,
+                           "http-server.authentication.jwt.principal-field=polaris_principal",
+                           "http-server.authentication.allow-insecure-over-http=true");
+    }
+
+    /**
+     * File-based access control with no rules: every user may do what they could before, as Polaris decides what they may
+     * read, but none may run queries as another user than the one their token authenticated, which Trino's default access
+     * control allows, so that no user can use another's Polaris session, which the Iceberg client caches by user.
+     */
+    static Map<String, Object> noImpersonation() {
+        return Map.of("type", "configmap", "configFile", "rules.json", "rules", Map.of("rules.json", "{}"));
+    }
+
     private static Map<String, Object> nodeSettings() {
         return Map.of(
             "resources", Map.of("requests", Map.of("cpu", "500m", "memory", "1Gi")),

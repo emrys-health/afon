@@ -33,13 +33,14 @@ import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDE
 import static java.lang.String.format;
 
 public class TrinoQuerySmokeMain {
-    private static final Logger       logger = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String       QUERY  = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
+    private static final Logger       logger       = org.slf4j.LoggerFactory.getLogger(TrinoQuerySmokeMain.class);
+    private static final ObjectMapper MAPPER       = new ObjectMapper();
+    private static final String       QUERY        = "SELECT COUNT(*) FROM " + POLARIS_TABLE_NAME;
     /**
      * The logger of the OpenLineage event listener that logs each query, see {@code TrinoWorkloads.queryLogProperties}
      */
     private static final String       QUERY_LOGGER = "io.openlineage.client.transports.ConsoleTransport";
+    public static final  String       ACCESS_TOKEN = "accessToken";
 
     private final AfonCloud            cloud;
     private final AfonPropertyProvider properties;
@@ -68,7 +69,10 @@ public class TrinoQuerySmokeMain {
     }
 
     public String query(String url, String query, AfonUser user, String token) throws SQLException, IOException {
-        Properties properties = trinoAccessPropertiesFor(user, token);
+        return query(url, query, trinoAccessPropertiesFor(user.username(), token));
+    }
+
+    public String query(String url, String query, Properties properties) throws SQLException {
         logger.info("Executing {} against {}", query, url);
         try (Connection connection = DriverManager.getConnection(url, properties);
              Statement statement = connection.createStatement();
@@ -80,9 +84,14 @@ public class TrinoQuerySmokeMain {
         return "empty, like my life";
     }
 
-    private @NonNull Properties trinoAccessPropertiesFor(AfonUser user, String token) {
+    /**
+     * The token both authenticates the user to Trino, as its access token, and is what Trino calls Polaris with, as the
+     * extra credential, since Trino does not pass its access token on.
+     */
+    public Properties trinoAccessPropertiesFor(String username, String token) {
         Properties cnxnProperties = new Properties();
-        cnxnProperties.setProperty("user", user.username());
+        cnxnProperties.setProperty("user", username);
+        cnxnProperties.setProperty(ACCESS_TOKEN, token);
         cnxnProperties.setProperty("extraCredentials", TOKEN_EXTRA_CREDENTIAL + ":" + token);
         return cnxnProperties;
     }
@@ -176,8 +185,8 @@ public class TrinoQuerySmokeMain {
     private List<String> checkCallingTrinoForAllUsers() throws Exception {
         List<String> errors = new ArrayList<>();
         try (KubeClient client = new KubeClient(properties)) {
-            OffsetDateTime start = OffsetDateTime.now();
-            V1Pod trinoPod = client.getOnlyPodBegginingWith("trino-coordinator");
+            OffsetDateTime start    = OffsetDateTime.now();
+            V1Pod          trinoPod = client.getOnlyPodBegginingWith("trino-coordinator");
             errors.addAll(hitTrinoWithAllUsers(client, trinoPod));
 
             V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
@@ -194,15 +203,17 @@ public class TrinoQuerySmokeMain {
      */
     private List<String> findQueriesInTrinoLogsWithBackoff(OffsetDateTime start,
                                                            LokiClient loki,
-                                                           String trinoPodName) throws Exception {
+                                                           String trinoPodName
+    ) throws Exception {
         try {
-            return withRetries(3, () -> {
-                List<String> errors = findQueriesInTrinoLogs(start, loki, trinoPodName);
-                if (!errors.isEmpty()) {
-                    throw new IllegalStateException(String.join("\n", errors));
-                }
-                return errors;
-            });
+            return withRetries(
+                3, () -> {
+                    List<String> errors = findQueriesInTrinoLogs(start, loki, trinoPodName);
+                    if (!errors.isEmpty()) {
+                        throw new IllegalStateException(String.join("\n", errors));
+                    }
+                    return errors;
+                });
         } catch (IllegalStateException e) {
             return List.of(e.getMessage());
         }
@@ -214,10 +225,11 @@ public class TrinoQuerySmokeMain {
      */
     private List<String> findQueriesInTrinoLogs(OffsetDateTime start,
                                                 LokiClient loki,
-                                                String trinoPodName) throws IOException {
+                                                String trinoPodName
+    ) throws IOException {
         List<String> errors = new ArrayList<>();
-        String query = format("{namespace=\"%s\", pod=\"%s\"} |= \"%s\"", TRINO_NAMESPACE, trinoPodName, QUERY_LOGGER);
-        List<String> logs = loki.queryRange(query, start, 1_000);
+        String       query  = format("{namespace=\"%s\", pod=\"%s\"} |= \"%s\"", TRINO_NAMESPACE, trinoPodName, QUERY_LOGGER);
+        List<String> logs   = loki.queryRange(query, start, 1_000);
         if (logs.isEmpty()) {
             errors.add(format("Query '%s' with start time %s returned no logs from Loki", query, start));
             return errors;
@@ -275,32 +287,53 @@ public class TrinoQuerySmokeMain {
     }
 
     private List<String> tryQueriesForAllUsers(String url, String query) throws SQLException, IOException {
-        List<String>   errors = new ArrayList<>();
-        List<AfonUser> users  = clientUsers();
-        boolean isBadPasswordTested = false;
+        List<String>   errors              = new ArrayList<>();
+        List<AfonUser> users               = clientUsers();
+        boolean        isBadPasswordTested = false;
         for (AfonUser user : users) {
             logger.info("Checking Trino access for {}", user.username());
-            String result = query(url, user, query);
+            String token  = getTokenFor(user);
+            String result = query(url, query, user, token);
             logger.info("Trino returned {} for {}", result, user.username());
+            // Each after a query of the user succeeded, so while the Iceberg client caches the user's Polaris session
             if (!isBadPasswordTested) {
-                errors.addAll(tryQueryWithBadToken(url, user, query));
+                errors.addAll(tryQueryRefused(
+                    url, query, user.username(), "a bad token",
+                    trinoAccessPropertiesFor(user.username(), "bad-token")));
+                errors.addAll(tryQueryRefused(url, query, user.username(), "no token", noTokenProperties(user.username())));
+                String other = IMPERSONATED_PREFIX + user.username();
+                errors.addAll(tryQueryRefused(
+                    url, query, other, "the token of " + user.username(),
+                    trinoAccessPropertiesFor(other, token)));
                 isBadPasswordTested = true;
             }
         }
         return errors;
     }
 
-    private List<String> tryQueryWithBadToken(String url, AfonUser user, String query) throws IOException {
-        List<String> errors = new ArrayList<>();
+    /**
+     * The user that a query tries to run as with another's token, which Trino must refuse, as no user may impersonate
+     * another.
+     */
+    static final String IMPERSONATED_PREFIX = "not-";
+
+    private static Properties noTokenProperties(String username) {
+        Properties cnxnProperties = new Properties();
+        cnxnProperties.setProperty("user", username);
+        return cnxnProperties;
+    }
+
+    /**
+     * @return an error if Trino ran the query as the user with the credentials, which it must not
+     */
+    private List<String> tryQueryRefused(String url, String query, String username, String credentials, Properties properties) {
         try {
-            query(url, query, user, "bad token");
-            errors.add(format("Could execute SQL %s for user %s using a bad token", query, user.username()));
+            query(url, query, properties);
+            return List.of(format("Could execute SQL %s as user %s with %s", query, username, credentials));
         } catch (SQLException ex) {
-            logger.info(
-                "Tried a deliberately bad token for {} and was correctly refused: {}",
-                user.username(), ex.getMessage());
+            logger.info("Tried SQL as {} with {} and was correctly refused: {}", username, credentials, ex.getMessage());
+            return List.of();
         }
-        return errors;
     }
 
 }
