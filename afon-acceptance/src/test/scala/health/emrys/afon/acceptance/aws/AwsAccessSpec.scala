@@ -35,8 +35,8 @@ class AwsAccessSpec extends AbstractAccessSpec {
       val url = s"jdbc:trino://${trinoHttp}/"
       When(s"we connect to $url")
       val user = new FileUserProvider().getConfiguredUser(properties)
-      And(s"pass the token of user '${user.username()}', with which Trino calls Polaris")
-      val token = new KeyCloakProvider(KEYCLOAK_HOSTNAME).userToken(user.username(), user.password())
+      And(s"pass the token of the client of user '${user.username()}', with which Trino calls Polaris")
+      val token = new KeyCloakProvider(KEYCLOAK_HOSTNAME).clientToken(user.username(), user.password())
       val smokeTest = new TrinoQuerySmokeMain(AfonCloud.AWS, properties)
       val sql = s"SELECT COUNT(*) FROM $tableName"
       And(s"execute SQL: ${formatSQL(sql)}")

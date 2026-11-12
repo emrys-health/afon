@@ -181,23 +181,6 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Obtains an access token for a provisioned Polaris user via the direct-access-grant (ROPC) flow
-     * against the {@code polaris} realm. The confidential client that {@link #createConfidentialClient}
-     * created for this user shares the user's name and secret, hence the doubled credentials.
-     */
-    @Override
-    public String userToken(String username, String password) throws IOException {
-        logger.info("Getting token for user '{}'", username);
-        return polarisRealmToken(Map.of(
-            "grant_type",    "password",
-            "client_id",     username,
-            "client_secret", password,
-            "username",      username,
-            "password",      password
-        ));
-    }
-
-    /**
      * Obtains an access token for a user, with their second factor, via the direct-access-grant (ROPC) flow of
      * {@link #MFA_CLIENT} against the {@code polaris} realm, which requires the one-time password. No client secret
      * is used: the user's own credentials are all it takes. Not retried, as KeyCloak refuses a one-time password used
@@ -359,8 +342,13 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Creates a confidential client with direct access grants enabled so that the user's
-     * username/password can be exchanged for a token.
+     * Creates a confidential client, eg of the Polaris admin ({@code POLARIS_ID}) or of the {@code USER_ID} service user,
+     * that gets its token by the client-credentials flow ({@link #clientToken}), with its own secret and no MFA.
+     *
+     * <p>It takes no username/password (direct access grants are off). If it did, its id and secret could be presented
+     * with <em>any</em> user's username and password, as KeyCloak does not tie a client to a user, and the realm's direct
+     * grant skips OTP ({@link #DIRECT_GRANT_NO_OTP_FLOW}): whoever knew the secret could get any user a token without MFA.
+     * Upserted, so a client made by an earlier deploy, with direct access grants on, is converged.
      */
     @Override
     public HttpResponse createConfidentialClient(
@@ -376,7 +364,7 @@ public class KeyCloakProvider implements IdentityProvider {
             "protocol", "openid-connect",
             "publicClient", false,
             "serviceAccountsEnabled", true,
-            "directAccessGrantsEnabled", true,
+            "directAccessGrantsEnabled", false,
             "standardFlowEnabled", false
         ));
         HttpResponse created = postJson(
@@ -566,14 +554,12 @@ public class KeyCloakProvider implements IdentityProvider {
      * Makes every browser login to this realm present a TOTP second factor, while leaving headless
      * logins able to get a token from a username/password alone.
      *
-     * <p>Both halves are needed, and the second is not optional. Forcing MFA on the browser flow makes
-     * humans enrol an authenticator app - and KeyCloak's built-in direct-grant flow then demands OTP
-     * from exactly those users who have one, so a Spark or Trino job running as a human would start
-     * failing with "Invalid user credentials". The direct grant therefore gets its OTP step taken out:
-     * the second factor guards interactive logins (oauth2-proxy, JupyterHub), and a headless login -
-     * which has nobody to read a phone - is guarded by its confidential client's secret instead.
+     * <p>The direct grant had its OTP step taken out for headless logins as a human, eg a Spark or Trino job, which has
+     * nobody to read a phone. Those now use the client-credentials flow of a confidential client instead
+     * ({@link #createConfidentialClient}), which runs no authentication flow, so no client is left that takes a
+     * username/password through the realm's direct grant: the second factor guards every login as a user.
      *
-     * <p>As a headless login is guarded by a client secret, no public client may take a username/password: KeyCloak's
+     * <p>No public client may take a username/password through the realm's direct grant: KeyCloak's
      * own {@value #ADMIN_CLI} client, which every realm has, is public and takes them by default, so would give any user
      * a token with their password alone. Its direct access grants are therefore turned off in this realm (not in
      * 'master', whose own {@value #ADMIN_CLI} {@link #adminToken()} uses).

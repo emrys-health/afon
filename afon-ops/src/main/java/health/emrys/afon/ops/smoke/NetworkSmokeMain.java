@@ -276,7 +276,7 @@ public class NetworkSmokeMain {
      *   <li>The admin side, by asking the {@code master} realm for a token as the bootstrap admin, which the ingress must answer
      *   with its own 403: the AWS ALB's fixed response, or nginx's page on Azure and GCP. KeyCloak itself never answers a token
      *   request so, so any other answer, a token above all, means that this machine reached the admin side.</li>
-     *   <li>The login side, by asking the {@code polaris} realm for a token as {@link #UNKNOWN_KEYCLOAK_USER}, which KeyCloak must
+     *   <li>The login side, by asking the {@code polaris} realm for a token as a client named {@link #UNKNOWN_KEYCLOAK_USER}, which KeyCloak must
      *   refuse itself, ie a response other than a 403, as anyone may log in from anywhere.</li>
      * </ul>
      * Not checked when KeyCloak is not restricted, or is another stack's, with {@code <CLOUD>_KEYCLOAK_EXTERNAL=true}, so whose
@@ -304,7 +304,7 @@ public class NetworkSmokeMain {
         logger.info("Checking that the admin side of the KeyCloak at {} refuses this machine, while its login side admits it", host);
         return List.of(
             adminSideRefused(host, keyCloak::adminToken),
-            loginSideOpen(host, () -> keyCloak.userToken(UNKNOWN_KEYCLOAK_USER, "not-a-password")));
+            loginSideOpen(host, () -> keyCloak.clientToken(UNKNOWN_KEYCLOAK_USER, "not-a-password")));
     }
 
     /**
@@ -344,11 +344,11 @@ public class NetworkSmokeMain {
         String error;
         try {
             userToken.call();
-            error = format("The KeyCloak at %s gave a token to %s, a user it should not know", host, UNKNOWN_KEYCLOAK_USER);
+            error = format("The KeyCloak at %s gave a token to %s, a client it should not know", host, UNKNOWN_KEYCLOAK_USER);
         } catch (Exception e) {
             int code = refusalCodeOf(e);
             if (code > 0 && code != 403) {
-                String msg = format("The login side of the KeyCloak at %s is reachable from here: it refused an unknown user with HTTP %d",
+                String msg = format("The login side of the KeyCloak at %s is reachable from here: it refused an unknown client with HTTP %d",
                                     host, code);
                 logger.info(msg);
                 return new ExecResult(0, msg, "", command, "localhost");

@@ -53,7 +53,7 @@ class CheckOidcMainTest {
     @Test
     void showsTheUserToken() throws Exception {
         when(userProvider.getConfiguredUser(properties)).thenReturn(new AfonUser("bob", "pw", "bob@example.com", "bob", "Bob", "Smith"));
-        when(identityProvider.userToken("bob", "pw")).thenReturn("tok");
+        when(identityProvider.clientToken("bob", "pw")).thenReturn("tok");
         checkOidc.userToken(AfonCloud.AWS, "user");
         assertThat(out.toString()).contains("Access token for user 'bob' on cloud 'aws': tok");
     }
@@ -61,7 +61,7 @@ class CheckOidcMainTest {
     @Test
     void showsTheTokenOfANamedUser() throws Exception {
         when(userProvider.getUser("mauro")).thenReturn(new AfonUser("mauro", "pw", "m@example.com", "mauro", "M", "T"));
-        when(identityProvider.userToken("mauro", "pw")).thenReturn("tok");
+        when(identityProvider.clientToken("mauro", "pw")).thenReturn("tok");
         checkOidc.userToken(AfonCloud.AWS, "mauro");
         assertThat(out.toString()).contains("Access token for user 'mauro' on cloud 'aws': tok");
     }

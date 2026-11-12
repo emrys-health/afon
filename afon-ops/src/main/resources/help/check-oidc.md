@@ -13,5 +13,7 @@ Exits with 1 if the provider is not ready.
 With --token, once the provider is ready, also shows an OIDC access token, as JupyterHub injects into a user's pod as
 OIDC_TOKEN, eg for the OIDC notebook smoke test:
   --token       the token of the POLARIS_ID admin client, using POLARIS_SECRET.
-  --token user  the token of the USER_ID user, using its password from users.csv.
-  --token <username>  the token of that user from users.csv.
+  --token user  the token of the USER_ID user's confidential client, using its password from users.csv as the
+                secret, by the client-credentials flow, with no MFA.
+  --token <username>  the same, for that user from users.csv, which works only if it has a confidential client, ie
+                is USER_ID.

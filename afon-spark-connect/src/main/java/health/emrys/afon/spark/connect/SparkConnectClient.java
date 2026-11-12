@@ -67,7 +67,8 @@ public class SparkConnectClient {
     }
 
     private static String userToken(AfonPropertyProvider properties, AfonUser user) throws IOException {
-        return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).userToken(user.username(), user.password());
+        // The user's confidential client, of the same name and secret, as it takes no username/password
+        return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).clientToken(user.username(), user.password());
     }
 
     /**

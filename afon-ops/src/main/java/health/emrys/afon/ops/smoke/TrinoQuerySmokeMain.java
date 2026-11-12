@@ -61,8 +61,9 @@ public class TrinoQuerySmokeMain {
     }
 
     private String getTokenFor(AfonUser user) throws IOException {
+        // The user's confidential client, of the same name and secret, as it takes no username/password
         String token = new KeyCloakProvider(properties.getOidcDomainName(cloud))
-            .userToken(user.username(), user.password());
+            .clientToken(user.username(), user.password());
         return token;
     }
 

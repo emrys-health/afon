@@ -23,7 +23,7 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
  * scripts/smoke/notebook.sh asks it for a token.  Exits non-zero if it is not.
  * <p>
  * With {@code --token}, also shows an OIDC access token from the provider: of the Polaris admin client
- * ({@code POLARIS_ID}), or, with {@code --token user}, of the {@code USER_ID} user, or {@code --token <username>}, of that user, from users.csv, as JupyterHub
+ * ({@code POLARIS_ID}), or, with {@code --token user}, of the {@code USER_ID} user, or {@code --token <username>}, of that user's confidential client, from users.csv (only USER_ID has one), by the client-credentials flow, with no MFA, unlike the token JupyterHub
  * injects into a user's pod as {@code OIDC_TOKEN}, eg for scripts/smoke/notebook.sh.
  */
 public class CheckOidcMain {
@@ -71,7 +71,8 @@ public class CheckOidcMain {
     public void userToken(AfonCloud cloud, String username) throws IOException {
         AfonUser user = USER.equalsIgnoreCase(username) ? userProvider.getConfiguredUser(properties)
                                                           : userProvider.getUser(username);
-        String token = identityProvider.userToken(user.username(), user.password());
+        // The user's confidential client, of the same name and secret, as it takes no username/password
+        String token = identityProvider.clientToken(user.username(), user.password());
         out.printf("Access token for user '%s' on cloud '%s': %s%n", user.username(), cloud, token);
     }
 
@@ -86,7 +87,7 @@ public class CheckOidcMain {
                     Checks that the OIDC provider of the cloud is ready.
                     With '%s', also gets the OIDC token of the POLARIS_ID admin client, using POLARIS_SECRET.
                     With '%s %s', gets the OIDC token of the USER_ID user, and with '%s <username>' that of the
-                    user, using its password from users.csv.
+                    user's confidential client, using its password from users.csv as the secret (only USER_ID has one).
                     """, CheckOidcMain.class.getSimpleName(), TOKEN_OPTION, USER, TOKEN_OPTION, TOKEN_OPTION, USER,
                               TOKEN_OPTION);
             System.exit(1);

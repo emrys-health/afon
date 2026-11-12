@@ -20,13 +20,9 @@ public interface IdentityProvider {
     void registerPolarisUser(AfonUser user);
 
     /**
-     * Obtains an access token for a provisioned Polaris user via the direct-access-grant (ROPC) flow.
-     */
-    String userToken(String username, String password) throws IOException;
-
-    /**
      * Obtains an access token for a confidential client via the client-credentials flow, eg for the
-     * Polaris admin client, which is a client but not a user.
+     * Polaris admin client ({@code POLARIS_ID}) or the {@code USER_ID} service user's client, each of
+     * which is a client of the same name and secret, and gets its token with no MFA.
      */
     String clientToken(String clientId, String clientSecret) throws IOException;
 
