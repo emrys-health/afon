@@ -59,7 +59,25 @@ public final class KeyCloakMfa {
      *         with no OTP step to force.
      */
     public static List<Map<String, Object>> requireOtp(List<Map<String, Object>> executions) {
-        int otp = indexOf(executions, OTPFormAuthenticatorFactory.PROVIDER_ID);
+        return requireOtp(executions, OTPFormAuthenticatorFactory.PROVIDER_ID);
+    }
+
+    /**
+     * Rewrites, in place, the executions of a direct-grant flow so that OTP is mandatory for every user, as
+     * {@link #requireOtp} does for a browser flow: a password grant then has to carry the user's one-time password, as
+     * its {@code otp} form parameter, and a user with no OTP credential is refused rather than let through.
+     *
+     * <p>For a flow bound to one client only, so that the realm's own direct grant, and so the headless logins that
+     * {@link #skipOtp} keeps working, are untouched.
+     *
+     * @return only those executions whose requirement actually changed, in the order of {@link #requireOtp}
+     */
+    public static List<Map<String, Object>> requireDirectGrantOtp(List<Map<String, Object>> executions) {
+        return requireOtp(executions, ValidateOTP.PROVIDER_ID);
+    }
+
+    private static List<Map<String, Object>> requireOtp(List<Map<String, Object>> executions, String otpProviderId) {
+        int otp = indexOf(executions, otpProviderId);
         if (otp < 0) {
             return List.of();
         }

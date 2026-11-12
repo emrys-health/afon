@@ -66,6 +66,14 @@ public class KeyCloakProvider implements IdentityProvider {
     public static final String BROWSER_MFA_FLOW = "browser-mfa";
     /** Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out. */
     public static final String DIRECT_GRANT_NO_OTP_FLOW = "direct-grant-no-otp";
+    /** Alias of the copied direct-grant flow that only {@link #MFA_CLIENT} binds to, with its OTP step forced on. */
+    public static final String DIRECT_GRANT_MFA_FLOW = "direct-grant-mfa";
+    /**
+     * The public client through which a user, with no client secret, gets a token from their username, password and
+     * one-time password, eg from a terminal: its direct grant runs {@link #DIRECT_GRANT_MFA_FLOW}, so it never takes a
+     * password alone.
+     */
+    public static final String MFA_CLIENT = "afon-mfa-cli";
 
     /** 10 hours: how long an issued access token stays valid, so an interactive session lasts a working day. */
     private static final int ACCESS_TOKEN_LIFESPAN_SECONDS = 10 * 60 * 60;
@@ -186,6 +194,26 @@ public class KeyCloakProvider implements IdentityProvider {
             "client_secret", password,
             "username",      username,
             "password",      password
+        ));
+    }
+
+    /**
+     * Obtains an access token for a user, with their second factor, via the direct-access-grant (ROPC) flow of
+     * {@link #MFA_CLIENT} against the {@code polaris} realm, which requires the one-time password. No client secret
+     * is used: the user's own credentials are all it takes. Not retried, as KeyCloak refuses a one-time password used
+     * once already.
+     *
+     * @param otp the current code of the user's authenticator app
+     * @throws IllegalStateException if KeyCloak refuses the credentials, eg a wrong or reused one-time password
+     */
+    public String userToken(String username, String password, String otp) throws IOException {
+        logger.info("Getting token for user '{}' with a one-time password, through {}", username, MFA_CLIENT);
+        return polarisRealmToken(Map.of(
+            "grant_type", "password",
+            "client_id",  MFA_CLIENT,
+            "username",   username,
+            "password",   password,
+            "otp",        otp
         ));
     }
 
@@ -550,6 +578,9 @@ public class KeyCloakProvider implements IdentityProvider {
      * a token with their password alone. Its direct access grants are therefore turned off in this realm (not in
      * 'master', whose own {@value #ADMIN_CLI} {@link #adminToken()} uses).
      *
+     * <p>A user who wants a token from a terminal instead uses {@value #MFA_CLIENT}, a public client whose direct grant
+     * alone runs {@value #DIRECT_GRANT_MFA_FLOW}, so takes their username, password <em>and</em> one-time password.
+     *
      * <p>KeyCloak refuses to modify its own built-in flows, so each is copied first and the realm
      * bound to the copy. Idempotent: re-running against a converged realm re-copies nothing (the copy
      * 409s) and issues no execution updates.
@@ -560,7 +591,77 @@ public class KeyCloakProvider implements IdentityProvider {
         responses.addAll(requireOtpForBrowserLogins(adminToken, realm));
         responses.addAll(skipOtpForDirectGrants(adminToken, realm));
         responses.addAll(disableDirectGrants(adminToken, realm, ADMIN_CLI));
+        responses.addAll(requireOtpForMfaClient(adminToken, realm));
         return responses;
+    }
+
+    /**
+     * Makes {@link #DIRECT_GRANT_MFA_FLOW}, a direct-grant flow whose OTP step is mandatory, and binds {@link #MFA_CLIENT}'s
+     * direct grant to it, leaving the realm's own direct grant as it is. The flow is converged before the client is bound,
+     * so the client never runs a flow that lets a password alone through.
+     */
+    private List<HttpResponse> requireOtpForMfaClient(String adminToken, String realm) throws IOException {
+        List<HttpResponse> responses = new ArrayList<>();
+        responses.add(copyFlow(adminToken, realm, DefaultAuthenticationFlows.DIRECT_GRANT_FLOW, DIRECT_GRANT_MFA_FLOW));
+        List<Map<String, Object>> changed =
+            KeyCloakMfa.requireDirectGrantOtp(flowExecutions(adminToken, realm, DIRECT_GRANT_MFA_FLOW));
+        responses.addAll(updateFlowExecutions(adminToken, realm, DIRECT_GRANT_MFA_FLOW, changed));
+        String flowId = flowId(adminToken, realm, DIRECT_GRANT_MFA_FLOW);
+        responses.addAll(createMfaClient(adminToken, realm, flowId));
+        logger.info(
+            "KeyCloak realm '{}' client '{}' takes a password only with a one-time password, by flow '{}' ({} execution(s) updated)",
+            realm, MFA_CLIENT, DIRECT_GRANT_MFA_FLOW, changed.size());
+        return responses;
+    }
+
+    /**
+     * Creates, or converges, {@link #MFA_CLIENT}: public, so with no secret, taking only direct grants, which run the flow,
+     * and stamping the username onto the claim Polaris maps on, as the browser client does.
+     */
+    private List<HttpResponse> createMfaClient(String adminToken, String realm, String flowId) throws IOException {
+        List<HttpResponse> responses = new ArrayList<>();
+        String json = mapper.writeValueAsString(Map.of(
+            "clientId", MFA_CLIENT,
+            "enabled", true,
+            "protocol", "openid-connect",
+            "publicClient", true,
+            "standardFlowEnabled", false,
+            "implicitFlowEnabled", false,
+            "serviceAccountsEnabled", false,
+            "directAccessGrantsEnabled", true,
+            "authenticationFlowBindingOverrides", Map.of("direct_grant", flowId)
+        ));
+        HttpResponse created = postJson(adminToken, format("/admin/realms/%s/clients", realm), json, "client " + MFA_CLIENT);
+        responses.add(created);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            String uuid = clientUuid(adminToken, realm, MFA_CLIENT);
+            HttpResponse updated = uuid == null ? null
+                : putJson(adminToken, format("/admin/realms/%s/clients/%s", realm, uuid), json, "client " + MFA_CLIENT);
+            if (isFailure(updated)) {
+                throw new IOException(format("Could not update KeyCloak client %s of realm %s", MFA_CLIENT, realm));
+            }
+            responses.add(updated);
+        } else if (isFailure(created)) {
+            throw new IOException(format("Could not create KeyCloak client %s of realm %s", MFA_CLIENT, realm));
+        }
+        responses.add(ensureClientMapper(adminToken, realm, MFA_CLIENT, usernamePrincipalMapper()));
+        return responses;
+    }
+
+    /** The id KeyCloak gave the realm's flow of this alias, which a client's flow binding names it by. */
+    private String flowId(String adminToken, String realm, String flowAlias) throws IOException {
+        String uri = format("/admin/realms/%s/authentication/flows", realm);
+        List<Map<String, Object>> flows = restClient.get(uri, adminToken, response -> {
+            if (response.getCode() != HttpStatus.SC_OK) {
+                throw new IOException(format("Could not list KeyCloak flows of realm %s: HTTP %d", realm, response.getCode()));
+            }
+            return mapper.readValue(response.getEntity().getContent(), List.class);
+        });
+        return flows.stream()
+                    .filter(flow -> flowAlias.equals(flow.get("alias")))
+                    .map(flow -> (String) flow.get("id"))
+                    .findFirst()
+                    .orElseThrow(() -> new IOException(format("No KeyCloak flow '%s' in realm %s", flowAlias, realm)));
     }
 
     /** KeyCloak's own public client, which every realm has. */
