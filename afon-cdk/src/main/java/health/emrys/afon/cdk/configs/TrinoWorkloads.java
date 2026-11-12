@@ -9,6 +9,7 @@ import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
 import com.hashicorp.cdktf.providers.kubernetes.secret.SecretMetadata;
+import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
@@ -57,6 +58,15 @@ public class TrinoWorkloads {
     private static final int    TRINO_PORT      = 8080;
     private static final String SECRET_NAME     = "trino-polaris";
     public static final  String TRINO_NAMESPACE = "default";
+    /** The coordinator's HTTPS port, on which clients authenticate, as Trino's clients send no token over plain HTTP. */
+    public static final  int    HTTPS_PORT      = 8443;
+    /** The {@code Secret} holding the coordinator's self-signed TLS certificate, see {@link #createCertificateCommand()}. */
+    public static final  String TLS_SECRET_NAME = "trino-tls";
+    /** The key of {@link #TLS_SECRET_NAME} holding the certificate alone, which clients trust. */
+    public static final  String TLS_CA_KEY      = "ca.crt";
+    /** The key of {@link #TLS_SECRET_NAME} holding the private key and the certificate, which Trino serves. */
+    private static final String TLS_KEYSTORE    = "trino.pem";
+    private static final String TLS_PATH        = "/etc/trino/tls";
 
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs             afonCatalogs;
@@ -96,12 +106,14 @@ public class TrinoWorkloads {
             Map.entry("image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG)),
             Map.entry("server", Map.of(
                 "workers", WORKERS, // Integer type
-                "config", Map.of("authenticationType", "JWT"),
+                "config", Map.of(
+                    "authenticationType", "JWT",
+                    "https", Map.of("enabled", true, "port", HTTPS_PORT, "keystore", Map.of("path", TLS_PATH + "/" + TLS_KEYSTORE))),
                 "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl))),
             Map.entry("additionalConfigProperties", List.of("internal-communication.shared-secret=${ENV:" + SHARED_SECRET_ENV + "}")),
             Map.entry("accessControl", noImpersonation()),
             Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(realmUrl)))),
-            Map.entry("coordinator", nodeSettings()),
+            Map.entry("coordinator", coordinatorSettings()),
             Map.entry("worker", nodeSettings()),
             Map.entry("service", Map.of("type", "ClusterIP", "port", TRINO_PORT)),
             Map.entry("env", List.of(secretEnv(CREDENTIAL_ENV), secretEnv(SHARED_SECRET_ENV))),
@@ -115,8 +127,14 @@ public class TrinoWorkloads {
             .type("Opaque")
             .dependsOn(dependsOn)
             .build();
+        Resource certificate = Resource.Builder
+            .create(scope, "trinoTlsCertificate")
+            .dependsOn(dependsOn)
+            .provisioners(CdkUtils.uponCreateRun(CdkUtils.escapeTerraformTemplate(createCertificateCommand())))
+            .build();
         List<ITerraformDependable> releaseDependsOn = new ArrayList<>(dependsOn);
         releaseDependsOn.add(credential);
+        releaseDependsOn.add(certificate);
 
         // JSON is valid YAML, so a JSON serializer produces a values document Helm
         // accepts — avoiding a YAML dependency while keeping the multi-line catalog strings.
@@ -149,8 +167,8 @@ public class TrinoWorkloads {
     /**
      * Makes the coordinator authenticate every client by its OIDC token, as KeyCloak's realm signed it, so that a query
      * runs as the user the token is of, its {@code polaris_principal}, which is the Polaris principal that the same token
-     * is when Trino passes it on.  Plain HTTP is allowed, as Trino is only reachable in the cluster, and the JDBC driver
-     * sends the token over it.
+     * is when Trino passes it on.  Only over HTTPS (see {@link #coordinatorSettings()}), as Trino's clients send no token
+     * over plain HTTP, and Trino takes none over it either.
      *
      * @param realmUrl the realm's URL, as the issuer of its tokens names it, eg {@code https://<oidc domain>/realms/polaris}
      */
@@ -158,8 +176,49 @@ public class TrinoWorkloads {
         return String.join("\n",
                            "http-server.authentication.jwt.key-file=" + keysUrl(realmUrl),
                            "http-server.authentication.jwt.required-issuer=" + realmUrl,
-                           "http-server.authentication.jwt.principal-field=polaris_principal",
-                           "http-server.authentication.allow-insecure-over-http=true");
+                           "http-server.authentication.jwt.principal-field=polaris_principal");
+    }
+
+    /**
+     * The coordinator serves {@link #TLS_SECRET_NAME}'s certificate on {@link #HTTPS_PORT}.  Its HTTP port stays open for
+     * the probes, which call the unauthenticated {@code /v1/info}, and for the workers, which authenticate with the shared
+     * secret, but takes no client, as authentication over HTTP is off.
+     */
+    private static Map<String, Object> coordinatorSettings() {
+        Map<String, Object> settings = new LinkedHashMap<>(nodeSettings());
+        settings.put("secretMounts", List.of(Map.of("name", TLS_SECRET_NAME, "secretName", TLS_SECRET_NAME, "path", TLS_PATH)));
+        return settings;
+    }
+
+    /**
+     * Makes {@link #TLS_SECRET_NAME} with a self-signed certificate for the coordinator, if it does not exist, as neither a
+     * TLS provider nor, on AWS, cert-manager is in the stack.  Run once, when the stack is created, so the certificate stays
+     * the same, as the clients that trust it expect.  Its names are those of the service, in and outside its namespace, and
+     * {@code localhost}, of a port-forward to the coordinator.  Needs {@code openssl} (1.1.1 or later) and {@code kubectl},
+     * as other provisioners do, on the machine that deploys.
+     */
+    static String createCertificateCommand() {
+        String service = CdkHelper.TRINO_SERVICE_NAME;
+        String names   = String.join(",",
+                                     "DNS:" + service,
+                                     "DNS:" + service + "." + TRINO_NAMESPACE,
+                                     "DNS:" + service + "." + TRINO_NAMESPACE + ".svc",
+                                     "DNS:" + service + "." + TRINO_NAMESPACE + ".svc.cluster.local",
+                                     "DNS:localhost");
+        return String.join("\n",
+                           "set -e",
+                           "if kubectl get secret " + TLS_SECRET_NAME + " -n " + TRINO_NAMESPACE + " >/dev/null 2>&1; then",
+                           "  echo 'Trino TLS secret " + TLS_SECRET_NAME + " exists'",
+                           "  exit 0",
+                           "fi",
+                           "dir=$(mktemp -d)",
+                           "trap 'rm -rf \"$dir\"' EXIT",
+                           "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 -subj '/CN="
+                           + service + "' -addext 'subjectAltName=" + names + "' -keyout \"$dir/key.pem\" -out \"$dir/cert.pem\"",
+                           "cat \"$dir/key.pem\" \"$dir/cert.pem\" > \"$dir/" + TLS_KEYSTORE + "\"",
+                           "kubectl create secret generic " + TLS_SECRET_NAME + " -n " + TRINO_NAMESPACE
+                           + " --from-file=" + TLS_KEYSTORE + "=\"$dir/" + TLS_KEYSTORE + "\" --from-file=" + TLS_CA_KEY
+                           + "=\"$dir/cert.pem\"");
     }
 
     /** The realm's signing keys (JWKS), with which the coordinator checks each client's token. */

@@ -131,6 +131,18 @@ public class KubeClient implements AutoCloseable {
         }
     }
 
+    /**
+     * @return the value of the key of the secret, decoded
+     * @throws IllegalStateException if the secret has no such key
+     */
+    public byte[] secretValue(String namespace, String name, String key) throws ApiException {
+        Map<String, byte[]> data = new CoreV1Api().readNamespacedSecret(name, namespace).execute().getData();
+        if (data == null || !data.containsKey(key)) {
+            throw new IllegalStateException(String.format("Secret %s/%s has no key %s", namespace, name, key));
+        }
+        return data.get(key);
+    }
+
     public List<V1Service> listServices() throws ApiException {
         return new CoreV1Api().listNamespacedService("default").execute().getItems();
     }

@@ -18,12 +18,17 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import static health.emrys.afon.cdk.configs.TrinoWorkloads.HTTPS_PORT;
+import static health.emrys.afon.cdk.configs.TrinoWorkloads.TLS_CA_KEY;
+import static health.emrys.afon.cdk.configs.TrinoWorkloads.TLS_SECRET_NAME;
 import static health.emrys.afon.cdk.configs.TrinoWorkloads.TRINO_NAMESPACE;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
@@ -269,21 +274,34 @@ public class TrinoQuerySmokeMain {
 
     private List<String> hitTrinoWithAllUsers(KubeClient client, V1Pod pod) throws ApiException, SQLException, IOException {
         List<String> errors = new ArrayList<>();
+        Path trustStore = Files.createTempFile("trino-ca", ".pem");
         try (PortForwarder forward = new PortForwarder(
             client,
             TRINO_NAMESPACE,
             nameOfPod(pod),
             0,
-            8080)) {
-            int localPort = forward.localPort();
-            String url = format(
-                "jdbc:trino://localhost:%d/%s/%s",
-                localPort,
-                cloud.toString(),
-                POLARIS_NAMESPACE_EXTERNAL);
-            errors.addAll(tryQueriesForAllUsers(url, QUERY));
+            HTTPS_PORT)) {
+            Files.write(trustStore, client.secretValue(TRINO_NAMESPACE, TLS_SECRET_NAME, TLS_CA_KEY));
+            errors.addAll(tryQueriesForAllUsers(httpsUrl(forward.localPort(), trustStore), QUERY));
+        } finally {
+            Files.deleteIfExists(trustStore);
         }
         return errors;
+    }
+
+    /**
+     * Over HTTPS, as Trino's clients send no token over plain HTTP, verifying the coordinator's self-signed certificate,
+     * which names {@code localhost}, the host of the port-forward.
+     *
+     * @param trustStore the certificate, as PEM
+     */
+    String httpsUrl(int localPort, Path trustStore) {
+        return format(
+            "jdbc:trino://localhost:%d/%s/%s?SSL=true&SSLVerification=FULL&SSLTrustStorePath=%s",
+            localPort,
+            cloud.toString(),
+            POLARIS_NAMESPACE_EXTERNAL,
+            trustStore.toAbsolutePath());
     }
 
     private List<String> tryQueriesForAllUsers(String url, String query) throws SQLException, IOException {
