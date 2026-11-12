@@ -100,6 +100,7 @@ public class TrinoWorkloads {
                 "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl))),
             Map.entry("additionalConfigProperties", List.of("internal-communication.shared-secret=${ENV:" + SHARED_SECRET_ENV + "}")),
             Map.entry("accessControl", noImpersonation()),
+            Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(realmUrl)))),
             Map.entry("coordinator", nodeSettings()),
             Map.entry("worker", nodeSettings()),
             Map.entry("service", Map.of("type", "ClusterIP", "port", TRINO_PORT)),
@@ -155,10 +156,40 @@ public class TrinoWorkloads {
      */
     static String jwtAuthenticationConfig(String realmUrl) {
         return String.join("\n",
-                           "http-server.authentication.jwt.key-file=" + realmUrl + "/protocol/openid-connect/certs",
+                           "http-server.authentication.jwt.key-file=" + keysUrl(realmUrl),
                            "http-server.authentication.jwt.required-issuer=" + realmUrl,
                            "http-server.authentication.jwt.principal-field=polaris_principal",
                            "http-server.authentication.allow-insecure-over-http=true");
+    }
+
+    /** The realm's signing keys (JWKS), with which the coordinator checks each client's token. */
+    static String keysUrl(String realmUrl) {
+        return realmUrl + "/protocol/openid-connect/certs";
+    }
+
+    /**
+     * Blocks the coordinator's start until the realm serves its signing keys, as {@code JupyterMfaConfig#waitForIssuer} does
+     * oauth2-proxy's.
+     *
+     * <p>The coordinator reads the keys once, at startup, and fails to start if it cannot: nothing else makes Trino wait for
+     * KeyCloak, whose public hostname may not resolve, nor serve, until minutes after Trino is scheduled, eg on a new stack.
+     * Without this gate the coordinator crash-loops, and its back-off overruns the release's timeout, which, being atomic,
+     * then uninstalls it.  Curl's {@code -f} treats a load balancer's 5xx as a failure too, so this waits for KeyCloak to
+     * actually serve.  Unbounded: if the keys never come, the pod stays in {@code Init:0/1} with this container's log naming
+     * what it waits for.
+     */
+    static Map<String, Object> waitForKeys(String realmUrl) {
+        String script = String.join("\n",
+                                    "until curl -sfo /dev/null \"$KEYS_URL\"; do",
+                                    "  echo \"waiting for the OIDC realm's keys at $KEYS_URL\"",
+                                    "  sleep 5",
+                                    "done",
+                                    "echo \"OIDC realm's keys reachable\"");
+        return Map.of(
+            "name", "wait-for-oidc-keys",
+            "image", DockerImages.CURL_IMAGE,
+            "command", List.of("sh", "-c", script),
+            "env", List.of(Map.of("name", "KEYS_URL", "value", keysUrl(realmUrl))));
     }
 
     /**
