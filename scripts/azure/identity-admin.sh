@@ -16,7 +16,7 @@
 #   Grants the deployer the app registration role, which lets the deploy give the app the federated credential of each new cluster without going
 #   back to the admin, see AZURE_WORKLOAD_IDENTITY.  The deployer can then change that app registration, and no other.  It is, in Entra ID, what
 #   az ad app owner add gives.  The deployer is by default the identity that is logged in to az:
-#   run it as the deployer's own login if that is also allowed to grant the role, else give --deployer: a user, by its user principal name,
+#   run it as the deployer's own login if that is also allowed to grant the role, else give --deployer: a user, by its user principal name or email,
 #   eg someone@example.com, or a service principal, by its client ID, or either by its object ID.
 #   A service principal also needs the Microsoft Graph application permission Application.ReadWrite.OwnedBy, with the consent of an admin, which this
 #   does not give.  Idempotent.
@@ -40,7 +40,7 @@ fed_usage() {
   echo "       azure-identity-admin create <name> <issuer> <subject> [--app-id <client id>]"
   echo "       azure-identity-admin grant [--deployer <deployer>] [--app-id <client id>]"
   echo "       azure-identity-admin ungrant [--deployer <deployer>] [--force] [--app-id <client id>]"
-  echo "       <deployer> can be specified as user principal name, client id or object id"
+  echo "       <deployer> can be specified as user principal name, email, client id or object id"
 }
 
 FED_RG=""
@@ -125,12 +125,21 @@ if [ "$FED_ACTION" = "grant" ] || [ "$FED_ACTION" = "ungrant" ]; then
   # the object ID of the deployer: of a user, by its user principal name or object ID, else of a service principal, by its client ID or object ID
   FED_GRANTEE_ID="$(az ad user show --id "$FED_DEPLOYER" --query id -o tsv 2>/dev/null)" || FED_GRANTEE_ID=""
   FED_GRANTEE_KIND="user"
+  if [ -z "$FED_GRANTEE_ID" ] && [[ "$FED_DEPLOYER" == *@* ]]; then
+    # a guest user has a user principal name of the form name_domain#EXT#@tenant, so look it up by its email too
+    FED_MAIL_IDS="$(az ad user list --filter "mail eq '$FED_DEPLOYER'" --query "[].id" -o tsv 2>/dev/null)" || FED_MAIL_IDS=""
+    if [ "$(echo "$FED_MAIL_IDS" | grep -c .)" -gt 1 ]; then
+      echo "-- More than one user has the email '$FED_DEPLOYER': give its user principal name or object ID"
+      exit 1
+    fi
+    FED_GRANTEE_ID="$FED_MAIL_IDS"
+  fi
   if [ -z "$FED_GRANTEE_ID" ]; then
     FED_GRANTEE_ID="$(az ad sp show --id "$FED_DEPLOYER" --query id -o tsv 2>/dev/null)" || FED_GRANTEE_ID=""
     FED_GRANTEE_KIND="service principal"
   fi
   if [ -z "$FED_GRANTEE_ID" ]; then
-    echo "-- No user or service principal '$FED_DEPLOYER': give a user principal name, eg someone@example.com, or a client ID, or an object ID"
+    echo "-- No user or service principal '$FED_DEPLOYER': give a user principal name or email, eg someone@example.com, or a client ID, or an object ID"
     exit 1
   fi
   if [ "$FED_ACTION" = "grant" ]; then FED_VERB="Granting the app registration role on the app '$FED_APP_ID' to"; else FED_VERB="Taking the app registration role on the app '$FED_APP_ID' from"; fi
