@@ -38,6 +38,8 @@ class StepOperationsTest {
 
     private RuntimeException startFailure;
 
+    private RuntimeException credentialFailure;
+
     private final StepActions actions = new StepActions() {
         @Override
         protected void synthesiseStack(StackId stackId, AfonPropertyProvider config, AfonUserProvider users) {
@@ -52,6 +54,27 @@ class StepOperationsTest {
             calls.add("start " + stackId);
             if (startFailure != null) {
                 throw startFailure;
+            }
+        }
+
+        @Override
+        void startCluster(StackId stackId, OutputStream outputStream) {
+            calls.add("start only the cluster of " + stackId);
+            if (startFailure != null) {
+                throw startFailure;
+            }
+        }
+
+        @Override
+        void startStackAfterCluster(StackId stackId, OutputStream outputStream) {
+            calls.add("start the rest of " + stackId);
+        }
+
+        @Override
+        protected void giveAppFederatedCredential(StackId stackId) {
+            calls.add("give the app the federated credential of " + stackId);
+            if (credentialFailure != null) {
+                throw credentialFailure;
             }
         }
 
@@ -149,6 +172,41 @@ class StepOperationsTest {
         calls.clear();
         operations.deleteStacksIn(StackId.parse("aws-polaris"), "delete", StackFilter.ALL).getFunction().run();
         assertThat(calls).containsExactly("delete stacks in aws", "delete state of aws-polaris");
+    }
+
+    @Test
+    void deploysTheClusterThenGivesTheCredentialThenDeploysTheRestOfTheStack() throws Exception {
+        properties.setValue(AfonProperty.CDKTF_STORE_ENABLED, "true");
+        StackId stackId = StackId.parse("azure-polaris");
+
+        operations.deployCluster(stackId).getFunction().run();
+        operations.ensureFederatedCredential(stackId).getFunction().run();
+        operations.deployStackAfterCluster(stackId).getFunction().run();
+
+        assertThat(calls).containsExactly(
+            "synthesise azure-polaris with the config of the operations", "start only the cluster of azure-polaris", "push state of azure-polaris",
+            "give the app the federated credential of azure-polaris",
+            "start the rest of azure-polaris", "push state of azure-polaris");
+        // the last is named as the step that deploys the whole stack, which it takes the place of, and so as the step to resume from
+        assertThat(operations.deployStackAfterCluster(stackId).getName()).isEqualTo(operations.deployStack(stackId).getName());
+        assertThat(operations.deployCluster(stackId).getName()).isEqualTo("deploy_azure_polaris_cluster");
+        assertThat(operations.ensureFederatedCredential(stackId).getName()).isEqualTo("ensure_federated_credential_azure_polaris");
+    }
+
+    @Test
+    void failsFastSayingWhyWhenTheDeployerMayNotGiveTheCredential() {
+        credentialFailure = new IllegalStateException("Authorization_RequestDenied");
+        StackId stackId = StackId.parse("azure-polaris");
+
+        assertThatThrownBy(() -> operations.ensureFederatedCredential(stackId).getFunction().run())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("could not give the app the federated credential of the cluster of azure-polaris")
+            .hasMessageContaining("must be allowed to change the app registration")
+            .hasMessageContaining("afon-cli.sh azure-identity-admin grant")
+            .hasMessageContaining("afon-cli.sh azure-identity azure-polaris")
+            .hasCause(credentialFailure);
+        // and the rest of the stack, which has Polaris, is not deployed: the steps stop here
+        assertThat(calls).containsExactly("give the app the federated credential of azure-polaris");
     }
 
     @Test

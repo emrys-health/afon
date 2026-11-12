@@ -10,7 +10,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class Redacter {
 
     private static final Logger logger = getLogger(Redacter.class);
-    public static final String NON_REDACTABLE_WORDS = "afon|emrys|will";
+    public static final String NON_REDACTABLE_WORDS = "afon|emrys|will|true|false";
 
     /**
      * Redacts secrets in the content from a given source, using the secret properties provided.

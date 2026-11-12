@@ -36,6 +36,9 @@
 - **The network and identity of an Azure stack have the cluster name in their names:**
   - They are now `<stack-type>-<CLUSTER_NAME>-aks-vnet`, `-aks-subnet`, `-aks-nsg` and `-aks-identity`, eg `full-emrys3-cluster-aks-identity`, no longer `full-aks-identity`, as on AWS and GCP, so that the envs that share a resource group can run side by side.
   - An Azure stack that is already deployed is replaced on its next deploy: delete it first, with `manage-stack delete <stack>`, so that the resources with the old names are removed.
+- **Azure workload identity, as an alternative to the app secret ([#385](https://github.com/emrys-health/afon/issues/385)):**
+  - New and optional, off by default, so no action is needed.  When the app registration of the env has a federated credential and no secret, set flag `AZURE_WORKLOAD_IDENTITY=true` in `secret-azure.properties` and leave `AZURE_APP_SECRET` blank.  Polaris then runs as an AKS workload identity and gets its token from the cluster.
+  - The deployer needs the app registration role on the app, which an admin gives once with `afon-cli.sh azure-identity-admin grant [--deployer <deployer>]` (and takes back with `ungrant`), so that the build does not change hands.  Without it, the deploy fails fast after the cluster is created, saying why.  See [federated credential](docs/guides/azure/federated_credential.md).
 
 ## 1.0-beta-8
 

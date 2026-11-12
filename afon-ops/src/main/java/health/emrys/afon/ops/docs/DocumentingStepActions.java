@@ -109,6 +109,22 @@ public class DocumentingStepActions extends StepActions {
     }
 
     /**
+     * Documents the step, without running the script: documenting must go on to the steps after it.
+     */
+    @Override
+    protected void ensureFederatedCredential(StackId stackId) {
+        out.println(format("""
+                   Give the app the federated credential of the cluster, which trusts its OIDC issuer, which exists only once the cluster has been deployed,
+                   and which Polaris needs to get a token when it starts (see `AZURE_WORKLOAD_IDENTITY`).  The deployer must be allowed to change the app
+                   registration, ie have the app registration role: if not, fail, saying why.
+                   ```shell
+                   afon-cli.sh azure-identity true %s
+                   ```
+                   """, stackId));
+        out.flush();
+    }
+
+    /**
      * Documents the command storing the state, without running it: documenting must not run the script cdktf-store.
      */
     @Override

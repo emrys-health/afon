@@ -125,6 +125,10 @@ They are bundled in the jar, but `manage-stack <action> <stack-id> -h` generates
 stack, so that every stack of `StackDefinitions` can be managed with nothing written per stack.
 
 The stack is deployed **as a whole**, by one step (`StepOperations.deployStack`) applying the plan of all its components.
+(One exception: on Azure with `AZURE_WORKLOAD_IDENTITY=true`, a stack with Polaris is deployed in steps, `deployCluster`, `ensureFederatedCredential` and `deployStackAfterCluster`: the
+federated credential of the app trusts the issuer of the cluster, which exists only once the cluster has been created by the first `tofu apply`, and Polaris needs it when it starts.  The second step gives the app
+the credential, and fails fast, saying why, if the deployer may not change its registration.
+See [the Azure config guide](guides/azure/federated_credential.md).)
 A component's `ComponentPlan` does **not** deploy it, but decorates its deployment: it says what the component brings to the
 commands on the stack, besides being deployed with it:
 

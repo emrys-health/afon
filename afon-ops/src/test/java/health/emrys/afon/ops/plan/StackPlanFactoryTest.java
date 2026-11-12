@@ -101,6 +101,31 @@ class StackPlanFactoryTest {
     }
 
     @Test
+    void deploysTheClusterThenGivesTheFederatedCredentialOfAnAzureAppWithoutASecret() {
+        properties.setValue(AZURE_WORKLOAD_IDENTITY, "true");
+        // the credential trusts the issuer of the cluster, which Polaris needs when it starts: so between the cluster and the rest
+        assertThat(derived(DEPLOY, "azure-full")).containsExactly(
+            login("azure"), deleteConflicting("azure-full"),
+            "deployCluster(azure-full)", "ensureFederatedCredential(azure-full)", "deployStackAfterCluster(azure-full)",
+            "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "whitelistPolaris(azure,false)");
+        assertThat(derived(SETUP, "azure-polaris")).contains(
+            "deployCluster(azure-polaris)", "ensureFederatedCredential(azure-polaris)", "deployStackAfterCluster(azure-polaris)")
+            .doesNotContain("deployStack(azure-polaris)");
+        // nothing changes for a stack without Polaris, or in another cloud
+        assertThat(derived(DEPLOY, "azure-keycloak")).containsExactly(
+            login("azure"), deleteConflicting("azure-keycloak"), "deployStack(azure-keycloak)", "waitForKeyCloak(azure)",
+            "deployComplete(azure-keycloak)");
+        assertThat(derived(DEPLOY, "aws-full")).contains("deployStack(aws-full)").doesNotContain("deployCluster(aws-full)");
+    }
+
+    @Test
+    void deploysAnAzureStackInOneStepWithTheSecretOfTheApp() {
+        properties.setValue(AZURE_WORKLOAD_IDENTITY, "false");
+        assertThat(derived(DEPLOY, "azure-full")).contains("deployStack(azure-full)")
+            .doesNotContain("deployCluster(azure-full)", "ensureFederatedCredential(azure-full)");
+    }
+
+    @Test
     void setsUpEachStackAfterDeployingItInOrderOfTheComponents() {
         assertThat(derived(SETUP, "aws-keycloak")).containsExactly(
             login("aws"), deleteConflicting("aws-keycloak"), "deployStack(aws-keycloak)", "waitForKeyCloak(aws)",

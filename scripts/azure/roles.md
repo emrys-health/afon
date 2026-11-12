@@ -25,7 +25,7 @@ admin can mint `APP_ID`/`APP_SP_ID`/`APP_SECRET` for a new Azure env.
 Once these values are set as `AZURE_APP_ID`/`AZURE_SP_ID`/`AZURE_APP_SECRET` in `secret-azure.properties`,
 `create.sh` can run as non-admin (ie `AS_ADMIN=false`).
 If the app registration has a federated credential instead of a secret, there is no `APP_SECRET`: set `AZURE_WORKLOAD_IDENTITY=true` instead,
-see `docs/guides/azure/config.md`.
+see `docs/guides/azure/federated_credential.md`.
 
 Roles required for the admin part:
 
@@ -41,6 +41,10 @@ No standing tenant-wide role needed for the **deployer**.
 
 Roles required for the **deployer**:
 
+- **App registration role** on the app (`AZURE_WORKLOAD_IDENTITY=true` only)
+  - given by the admin with `azure-identity-admin grant [--deployer <deployer>]`; lets the deploy give the app the federated credential of each new cluster (`azure-identity true`) without going back to the admin: a deployer
+    without it makes the setup fail fast after the cluster is created.  It makes the deployer an admin of that one app only.
+    For a service principal it also needs `Application.ReadWrite.OwnedBy` of Microsoft Graph.  See `docs/guides/azure/federated_credential.md`.
 - **Contributor**
   - subscription scope - required specifically for registering the resource providers below
     (`Microsoft.Resources/subscriptions/providers/register/action` has no resource-group

@@ -574,6 +574,10 @@ afon-cli.sh manage-stack setup azure-polaris
 ```
 Steps: `check_azure_login` → `delete_stacks_conflicting_with_azure_polaris` → `check_keycloak_answers` → `deploy_azure_polaris_stack` → `wait_on_polaris_and_keycloak_for_cloud_azure` → `create_all_catalogs_for_cloud_azure`
 
+With `AZURE_WORKLOAD_IDENTITY=true` (a federated credential of the app instead of its secret) `deploy_azure_polaris_stack` is three steps, as the credential trusts the
+issuer of the cluster, which exists only once the cluster is created: `deploy_azure_polaris_cluster` → `ensure_federated_credential_azure_polaris` (gives the app the credential; **fails fast**, saying why, if the deployer
+may not change the app registration) → `deploy_azure_polaris_stack`.  See [the Azure config guide](guides/azure/federated_credential.md).
+
 ### Setup GCP Polaris only
 
 ```shell

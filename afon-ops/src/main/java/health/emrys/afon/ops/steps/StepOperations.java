@@ -227,6 +227,53 @@ public class StepOperations {
     }
 
     /**
+     * Deploys only the cluster of the stack, after synthesising its plan, as the first of the steps deploying the stack when something that
+     * needs the cluster must be done before the rest of it, see {@link #ensureFederatedCredential} and {@link #deployStackAfterCluster}.
+     */
+    public Step deployCluster(StackId stackId) {
+        return new Step(format("deploy_%s_cluster", stepName(stackId)),
+                format("deploy only the cluster of stack %s", stackId),
+                () -> timed(deployDurations, stackId, () -> {
+                    actions.synthesiseStack(stackId, properties, users);
+                    try {
+                        actions.startCluster(stackId, tofuOutput());
+                    } finally {
+                        if (storeEnabled()) {
+                            actions.pushStateToStore(stackId);
+                        }
+                    }
+                }));
+    }
+
+    /**
+     * Gives the app of Azure the federated credential of the cluster of the stack, after the cluster is deployed, as the credential trusts the issuer of the
+     * cluster, which exists only once it does, and Polaris, deployed next, needs it to get a token.  The deployer must be allowed to change the app
+     * registration, so that the build does not change hands: if not, the step fails, saying why, before the rest, which has Polaris, is deployed.
+     */
+    public Step ensureFederatedCredential(StackId stackId) {
+        return new Step(format("ensure_federated_credential_%s", stepName(stackId)),
+                format("give the app the federated credential of the cluster of stack %s", stackId),
+                () -> actions.ensureFederatedCredential(stackId));
+    }
+
+    /**
+     * Deploys the rest of the stack, after {@link #deployCluster}, whose plan it uses.  It is named as {@link #deployStack}, which it takes the place of.
+     */
+    public Step deployStackAfterCluster(StackId stackId) {
+        return new Step(format("deploy_%s_stack", stepName(stackId)),
+                format("deploy stack %s", stackId),
+                () -> timed(deployDurations, stackId, () -> {
+                    try {
+                        actions.startStackAfterCluster(stackId, tofuOutput());
+                    } finally {
+                        if (storeEnabled()) {
+                            actions.pushStateToStore(stackId);
+                        }
+                    }
+                }));
+    }
+
+    /**
      * Runs the operation, recording its elapsed time for the stack, so that it can be reported
      * by the *Complete steps.
      */

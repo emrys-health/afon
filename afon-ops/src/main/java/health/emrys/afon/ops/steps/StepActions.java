@@ -483,6 +483,67 @@ public class StepActions {
     }
 
     /**
+     * Phase one of {@link #startStack(StackId, int, OutputStream)} alone: brings up only the managed cluster of the stack, in the stack dir
+     * of its {@link StackId}, whose plan must have been synthesised there, so that something that needs the cluster, and not the rest of the
+     * stack, can be done before {@link #startStackAfterCluster}.  Eg the federated credential of the Azure app, which trusts the OIDC issuer
+     * of the cluster, and so needs it to exist, which Polaris needs when it starts.
+     */
+    void startCluster(StackId stackId, OutputStream outputStream) throws Exception {
+        if (stackId.cloud() == AfonCloud.AZURE) {
+            logAzureDeployer();
+        }
+        Path stackDir = stackDir(stackId);
+        if (tofuInit(stackDir, outputStream) != 0) {
+            throw new ManagedProcessException(format("tofu init failed in %s", stackDir));
+        }
+        tofuApplyBootstrap(stackDir, clusterBootstrapTargets(stackDir), 1, outputStream);
+    }
+
+    /**
+     * Phase two of {@link #startStack(StackId, int, OutputStream)} alone: the full apply, after {@link #startCluster}, which may be run by another
+     * process, on another machine, eg another agent of a pipeline, with the state and the plan restored from the store: so it initialises the stack dir too.
+     */
+    void startStackAfterCluster(StackId stackId, OutputStream outputStream) throws Exception {
+        Path stackDir = stackDir(stackId);
+        // as the first phase does, as the resume may be on a machine that only has what the store restored, ie the state and the plan, not the providers
+        if (tofuInit(stackDir, outputStream) != 0) {
+            throw new ManagedProcessException(format("tofu init failed in %s", stackDir));
+        }
+        tofuApplyAll(stackDir, 1, outputStream);
+    }
+
+    /**
+     * Gives the app of Azure the federated credential of the cluster of the stack, which Polaris, deployed next, needs to get a token, and which
+     * needs the cluster to exist, as it trusts the issuer of the cluster.  The deployer must be allowed to change the app registration, ie have
+     * the app registration role, so that the build does not go back to the admin: if not, it fails, saying why, see {@link StepOperations#ensureFederatedCredential}.
+     *
+     * @throws IllegalStateException if the deployer could not give it
+     */
+    protected void ensureFederatedCredential(StackId stackId) {
+        try {
+            giveAppFederatedCredential(stackId);
+            logger.info("The app has the federated credential of the cluster of {}", stackId);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(format("""
+                The deployer could not give the app the federated credential of the cluster of %1$s, which Polaris needs to get a token (AZURE_WORKLOAD_IDENTITY=true), see the error above.
+                The deployer must be allowed to change the app registration, ie have the app registration role, which the admin grants once, as the credential is new for each cluster:
+                  afon-cli.sh azure-identity-admin grant [--deployer <user principal name>]
+                (a service principal also needs Application.ReadWrite.OwnedBy of Microsoft Graph).  Then run the same command again: the steps before are idempotent.
+                Whether the app has it, and what it is:  afon-cli.sh azure-identity %1$s""", stackId), e);
+        }
+    }
+
+    /**
+     * Runs {@code azure-identity true}, which gives the app the federated credential of the cluster of the stack, replacing that of a previous build of
+     * the cluster.
+     *
+     * @throws RuntimeException if it fails, eg because the deployer may not change the app registration
+     */
+    protected void giveAppFederatedCredential(StackId stackId) {
+        new ScriptMain("azure/identity.sh").run("true", stackId.toString());
+    }
+
+    /**
      * Logs the kind of identity that deploys to Azure, ie a user, a service principal or a managed identity, so that a
      * failure to grant it a role, eg cluster admin, is read against who is deploying.  Informational only: if the identity
      * cannot be read, eg because {@code az} is not logged in, it is logged and the deployment goes on.
@@ -524,12 +585,22 @@ public class StepActions {
         if (tofuInit(tofuDir, outputStream) != 0) {
             throw new ManagedProcessException(format("tofu init failed in %s", tofuDir));
         }
+        tofuApplyBootstrap(tofuDir, bootstrapTargets, maxAttempts, outputStream);
+        tofuApplyAll(tofuDir, maxAttempts, outputStream);
+    }
+
+    /** Phase one: only the targets, ie the managed cluster, if there are any */
+    private void tofuApplyBootstrap(Path tofuDir, List<String> bootstrapTargets, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         if (!bootstrapTargets.isEmpty()) {
             List<String> phaseOne = new ArrayList<>(List.of("apply", "--auto-approve", "-parallelism=5"));
             phaseOne.addAll(bootstrapTargets);
             logger.info("Bootstrapping targets before the full apply: {}", phaseOne);
             tofuWithRetry(tofuDir, outputStream, maxAttempts, phaseOne.toArray(new String[0]));
         }
+    }
+
+    /** Phase two: the full apply */
+    private void tofuApplyAll(Path tofuDir, int maxAttempts, OutputStream outputStream) throws ManagedProcessException {
         tofuWithRetry(tofuDir, outputStream, maxAttempts, "apply", "--auto-approve", "-parallelism=5");
     }
 

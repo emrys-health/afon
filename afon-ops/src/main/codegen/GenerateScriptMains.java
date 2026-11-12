@@ -91,7 +91,7 @@ public class GenerateScriptMains {
         new ScriptEntry("azure", "AzureDestroyMain", "azure/destroy.sh"),
         new ScriptEntry("azure", "AzureDnsZonesMain", "azure/dns-zones.sh"),
         new ScriptEntry("azure", "AzureIdentityAdminMain", "azure/identity-admin.sh"),
-        new ScriptEntry("azure", "AzureIdentityMain", "azure/identity.sh", "azure"),
+        new ScriptEntry("azure", "AzureIdentityMain", "azure/identity.sh", "azure", "Polaris"),
         new ScriptEntry("azure", "AzureIssueCertMain", "azure/issue-cert.sh"),
         new ScriptEntry("azure", "AzureIssueTokenMain", "azure/issue-token.sh"),
         new ScriptEntry("azure", "AzureKeycloakMain", "azure/keycloak.sh", "azure", "Keycloak"),

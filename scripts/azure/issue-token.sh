@@ -64,7 +64,7 @@ case "$ACTION" in
     echo "-- $DIR/openid-configuration  as  $ISSUER/.well-known/openid-configuration"
     echo "-- $DIR/jwks.json             as  $ISSUER/jwks.json"
     echo "- Then ask the admin to trust the issuer for the app, with the app ID in place of <APP_ID>:"
-    echo "afon-cli.sh azure-identity-admin afon-test-machine '$ISSUER' '$SUBJECT' <APP_ID>"
+    echo "afon-cli.sh azure-identity-admin create afon-test-machine '$ISSUER' '$SUBJECT' --app-id <APP_ID>"
     echo "- And get a token with: export AZURE_FEDERATED_TOKEN_FILE=\$(afon-cli.sh azure-issue-token test-token)"
     ;;
 

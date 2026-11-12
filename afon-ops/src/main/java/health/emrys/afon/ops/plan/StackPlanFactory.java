@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.plan;
 
+import health.emrys.afon.cdk.azure.AzureWorkloadIdentity;
 import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.StackDefinition;
 import health.emrys.afon.cdk.StackDefinitions;
@@ -188,10 +189,19 @@ public class StackPlanFactory {
         if (components.stream().noneMatch(KeycloakComponent.class::isInstance)) {
             steps.add(ops.checkKeyCloakAnswers(cloud));
         }
-        steps.add(ops.deployStack(stackId));
+        boolean hasPolaris = components.stream().anyMatch(PolarisComponent.class::isInstance);
+        if (hasPolaris && cloud == AfonCloud.AZURE && AzureWorkloadIdentity.isEnabled(ops.properties())) {
+            // Polaris gets its token from the federated credential of the app, which trusts the issuer of the cluster, so needs it to exist:
+            // so the cluster is deployed first, then the app is given the credential, by the deployer, which fails fast if it may not, and the rest, which has
+            // Polaris, is deployed once it has it, see AzureWorkloadIdentity
+            steps.add(ops.deployCluster(stackId));
+            steps.add(ops.ensureFederatedCredential(stackId));
+            steps.add(ops.deployStackAfterCluster(stackId));
+        } else {
+            steps.add(ops.deployStack(stackId));
+        }
         steps.add(wait(components, ops, cloud));
         steps.add(ops.deployComplete(stackId));
-        boolean hasPolaris = components.stream().anyMatch(PolarisComponent.class::isInstance);
         // however Polaris was reached, it ends restricted to the configured CIDRs and the cluster's own addresses, without this machine
         Step restrictPolaris = hasPolaris ? ops.whitelistPolaris(cloud, false) : null;
         if (setup) {

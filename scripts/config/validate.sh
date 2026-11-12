@@ -24,6 +24,10 @@ for FILE in $CONFIG_FILES ; do {
      continue
   fi
   for KEY in $(grep '=' $TEMPLATE | grep -v ^\# | grep -e ^[A-Z] | perl -pe s/=.*//g) ; do {
+    # An app registration with a federated credential has no secret, see AZURE_WORKLOAD_IDENTITY
+    if [ "$KEY" = "AZURE_APP_SECRET" ] && grep -qE "^AZURE_WORKLOAD_IDENTITY=true[[:space:]]*$" $CONFIG_FILE ; then
+      continue
+    fi
     if ! grep -q "^$KEY=" $CONFIG_FILE ; then
       echo "no key $KEY"
     elif ! grep -qE "^$KEY=[^[:space:]]+" $CONFIG_FILE ; then

@@ -81,6 +81,25 @@ class PolarisConfigTest {
     }
 
     @Test
+    public void worksWithoutTheSecretPropertyForWorkloadIdentity(@TempDir Path configDir) throws IOException {
+        assumeTrue(!cloudPropertySet() || cloudPropertyValue().equalsIgnoreCase("azure"));
+        copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
+                      "afon-azure.properties", "secret-azure.properties");
+        // as if commented out, ie no AZURE_APP_SECRET at all, not blank
+        Path secrets = configDir.resolve("secret-azure.properties");
+        java.nio.file.Files.write(secrets, java.nio.file.Files.readAllLines(secrets).stream()
+                                            .filter(line -> !line.startsWith("AZURE_APP_SECRET=")).toList());
+        AfonPropertyProvider properties = new FilePropertyProvider(configDir.toString());
+        properties.setValue(AZURE_APP_ID, "azure-app-id");
+        properties.setValue(AZURE_WORKLOAD_IDENTITY, "true");
+
+        String script = PolarisConfig.getProviderCredentials(properties, "azure");
+
+        assertThat(script).contains("export AZURE_CLIENT_ID='azure-app-id'");
+        assertThat(script).doesNotContain("AZURE_CLIENT_SECRET");
+    }
+
+    @Test
     public void rejectsBlankClientSecretWithoutWorkloadIdentity(@TempDir Path configDir) throws IOException {
         assumeTrue(!cloudPropertySet() || cloudPropertyValue().equalsIgnoreCase("azure"));
         copyTemplates(configDir, "afon.properties", "secret.properties", "catalogs.properties",
