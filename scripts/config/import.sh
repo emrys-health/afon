@@ -7,7 +7,7 @@ else
 fi
 CONFIG_ZIP="${CONFIG_ZIP:-${1:-}}"
 if [ -z "$CONFIG_ZIP" ]; then
-  echo "Action $ACTION requires the config zip path, eg 'afon.sh -a config-import --config-zip <zip>' or 'afon-cli-scripts.sh config/import.sh <zip>'"
+  echo "Action $ACTION requires the config zip path, eg afon-cli.sh config-import --config-zip <zip>"
   usage; exit 0
 fi
 if [ -d $IMPORT_DIR ]; then
@@ -25,5 +25,5 @@ fi
 if [ -n "$CONFIG_ENV" ]; then
   echo "The config dir for env '$CONFIG_ENV' has been imported."
   echo "To switch to env '$CONFIG_ENV':"
-  echo "./afon.sh -a config-switch --config-env $CONFIG_ENV"
+  echo "afon-cli.sh config-switch --config-env $CONFIG_ENV"
 fi

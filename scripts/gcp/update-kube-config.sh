@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Writes the kubeconfig of the GKE cluster of the given stack, $AFON_CDKTF/kube/<stack-id>.config, not ~/.kube/config, by its id or its role (identity, catalog or tre), eg:
-# afon-cli.sh gcp-update-kube-config catalog
+# gcp-update-kube-config catalog
 STACK_ARG="${1:-}"
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 source $AFON_ROOT/scripts/gcp/stack-source.sh "$STACK_ARG"

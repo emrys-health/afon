@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sourced by the tofu scripts, whose args ($@) are passed on to tofu, after the optional stack id, eg:
-#   afon-cli.sh tofu-plan aws-polaris -target=...
+# tofu-plan aws-polaris -target=...
 # Each stack has its own dir stacks/<cloud>-<name> and tofu state terraform.<cloud>-<name>.tfstate,
 # eg stacks/aws-keycloak, or the legacy stacks/<cloud> and terraform.<cloud>.tfstate shared by all the stacks
 # of the cloud.  If the first arg is the id of a stack with a dir, it is shifted off and tofu runs in that dir.  So it is if it is

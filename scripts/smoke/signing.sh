@@ -8,7 +8,7 @@
 #   cloud     the cloud whose properties are used, aws, azure or gcp (default: aws).  Only its property names are used: the registry and the key are
 #             set for the run, so the config of the cloud, and its keys, are neither read nor changed.
 #   image     the name of the image of docker-images.yaml to sign (default: postgres-alpine)
-#   --env     the afon env, as for './afon.sh --env <env>' (exported as AFON_ENV)
+#   --env     the afon env (exported as AFON_ENV)
 #
 # The steps:
 #   1. starts a registry (the image of docker-images.yaml) on a free local port, from 5000
@@ -17,8 +17,8 @@
 #   4. checks with 'docker-image --verify --signatures' that the image is signed, and then all the images, of which only that one should be
 #   5. removes the registry and the key, also when a step fails
 #
-# Needs docker, cosign and curl, and network access to pull the image.  COSIGN_PASSWORD is set to empty for the run.  The commands are run with
-# './afon.sh -a <command>', or, from a cli distribution, with its afon-cli.sh, eg as 'afon-cli.sh smoke-signing azure'.
+# Needs docker, cosign and curl, and network access to pull the image.  COSIGN_PASSWORD is set to empty for the run.
+# The commands are run as 'smoke-signing [options]'.
 
 set -euo pipefail
 

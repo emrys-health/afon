@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Shows, or cancels, the rolling upgrades on the node scale sets of the AKS cluster of the given stack, by its id or its role
 # (identity, catalog or tre), eg:
-# afon-cli.sh azure-rolling-upgrades tre            # status is the default
-# afon-cli.sh azure-rolling-upgrades tre status
-# afon-cli.sh azure-rolling-upgrades tre cancel
+# azure-rolling-upgrades tre            # status is the default
+# azure-rolling-upgrades tre status
+# azure-rolling-upgrades tre cancel
 #
 # Azure itself starts a "VM Agent Rolling Upgrade" on the scale set of a new cluster, within the hour or so after it is created (the
 # operation upgradeVMAgent, which has no caller in the activity log).  While it runs, Azure refuses to delete the scale set

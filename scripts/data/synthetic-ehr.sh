@@ -5,8 +5,7 @@ set -euo pipefail
 # resulting parquet files into that env via SparkTestImporter.
 # See README.md for the underlying python usage.
 #
-# Runs in the common python env (scripts/python).  The afon commands are run with './afon.sh -a <command>', or, from a
-# cli distribution, which has no afon.sh, with its afon-cli.sh, eg as 'afon-cli.sh data-synthetic-ehr --site <site>'.
+# Runs in the common python env (scripts/python).  The afon commands are 'data-synthetic-ehr --site <site>'.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AFON_ROOT="${AFON_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
@@ -62,7 +61,7 @@ if [[ ! " ${SITES[*]} " == *" $site "* ]]; then
   exit 1
 fi
 
-# the afon env is the site, as for './afon.sh --env <site>': the config read, and used by every afon command, is
+# the afon env is the site (--env <site>): the config read, and used by every afon command, is
 # $AFON_HOME/config-<site>
 export AFON_ENV="$site"
 

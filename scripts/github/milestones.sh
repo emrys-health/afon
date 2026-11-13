@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generates the release notes of a GitHub milestone, named after the release version, listing its issues.
 #
-# ./afon.sh -a github-milestones -- <version> [<notes-file>] [--state <state>] [--repo <owner/repo>]
+# github-milestones -- <version> [<notes-file>] [--state <state>] [--repo <owner/repo>]
 #
 # The notes are written to <afon-home>/milestone-<version>.md, where <afon-home> defaults to $HOME/.afon, and, if a
 # notes file is given (e.g. release_notes.md), its '## <version>' section is replaced, or inserted before the first

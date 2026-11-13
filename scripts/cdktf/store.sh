@@ -111,7 +111,7 @@ done
 # The cloud is required, so that it is always clear which store is used.  all is accepted by push only.
 CLOUD_GIVEN=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
 if [ -z "$CLOUD_GIVEN" ]; then
-  echo "Missing cloud, required by cdktf-store: give -c|--cloud {aws|azure|gcp|all} to afon.sh or afon-cli.sh, or set AFON_CLOUD" >&2
+  echo "Missing cloud, required by cdktf-store: specify -c|--cloud {aws|azure|gcp|all} or set AFON_CLOUD" >&2
   usage; exit 1
 fi
 if [ "$CLOUD_GIVEN" == "all" ]; then

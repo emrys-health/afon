@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Publishes the afon config files to GitHub as secrets, for the workflows.
 #
-# ./afon.sh -a github-secrets [--] {push|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--dry-run]
-# (the -- is needed by afon.sh before any arg starting with -, eg: ./afon.sh -a github-secrets -- push --env dev)
+# github-secrets {push|list|delete} [--home <afon-home>] [--env <env>] [--repo <owner/repo>] [--dry-run]
 #
 # Without an env, the files in <afon-home>/config are published to the repository.
 #
@@ -10,7 +9,7 @@
 # created if it does not exist yet.  The names are the same as the repository ones, and the environment ones
 # take precedence over them in a workflow job that runs in that environment (see the 'config_env' input of the
 # workflows), so the same workflow can be run against any config env.  The env is also taken from the global
-# --config-env, --env or AFON_ENV of afon.sh, if --env is not given here.
+# --config-env, --env or AFON_ENV, if --env is not given here.
 #
 # 'push' publishes each file as one base64-encoded secret, named after the file:
 #      afon.properties         -> AFON_PROPERTIES
@@ -176,7 +175,7 @@ if [ -z "$AFON_HOME" ] ; then
   echo "Using AfonHome $AFON_HOME"
 fi
 
-# CONFIG_ENV is set by afon.sh when it has switched to a config env.
+# CONFIG_ENV is set when it has switched to a config env.
 if [ -z "$GH_ENV" ] ; then
   GH_ENV="${CONFIG_ENV:-}"
 fi

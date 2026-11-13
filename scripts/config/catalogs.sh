@@ -280,4 +280,4 @@ if [ ! -f "$CONFIG_DIR/catalogs.properties" ] && [ -f "$AFON_ROOT/templates/conf
   cp "$AFON_ROOT/templates/config/catalogs.properties" "$CONFIG_DIR/catalogs.properties"
 fi
 
-echo "Done. Review any *.bak files left behind (eg: diff \$FILE.bak \$FILE), then run ./afon.sh -a config-validate."
+echo "Done. Review any *.bak files left behind (eg: diff \$FILE.bak \$FILE), then run afon-cli.sh config-validate."

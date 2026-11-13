@@ -8,7 +8,7 @@ fi
 
 CONFIG_ZIP="${CONFIG_ZIP:-${1:-}}"
 if [ -z "$CONFIG_ZIP" ]; then
-  echo "Action $ACTION requires the config zip path, eg 'afon.sh -a config-export --config-zip <zip>' or 'afon-cli-scripts.sh config/export.sh <zip>'"
+  echo "Action $ACTION requires the config zip path, eg afon-cli.sh config-export --config-zip <zip>"
   usage; exit 0
 fi
 case "$CONFIG_ZIP" in

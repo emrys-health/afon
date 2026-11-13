@@ -9,7 +9,7 @@
 #             Given first, if at all.  The notebook may use the catalogs <cloud> and <cloud>_forbidden, set as AFON_CATALOG and AFON_FORBIDDEN_CATALOG, unless already set.
 #   notebook  the names of the notebooks to run, separated by spaces or commas, as listed by --list (default: all of them,
 #             in the order of the notebooks file).  All are run, even if some fail, and the script exits non-zero if any fails.
-#   --env     the afon env, as for './afon.sh --env <env>': the config read, and used by every afon command, is
+#   --env     the afon env: the config read, and used by every afon command, is
 #             $AFON_HOME/config-<env>.  Exported as AFON_ENV.  Default: the AFON_ENV already set, else the current config.
 #   --notebooks
 #             the CSV file of the notebooks (default: scripts/smoke/notebooks.csv)
@@ -26,8 +26,7 @@
 # 'check-oidc <cloud>', then
 # gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user',
 # port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook with
-# 'jupyter-execute'.  The commands are run with './afon.sh -a <command>', or, from a cli distribution, which has no
-# afon.sh, with its afon-cli.sh, eg as 'afon-cli.sh smoke-notebook <cloud> <notebook>'.  Also reads
+# 'jupyter-execute'.  The commands are run as 'smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
 # $AFON_HOME/config/*.properties, or those of --env (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
 # are read, rather than sourcing the secrets: sourcing them would also export cloud credentials that change

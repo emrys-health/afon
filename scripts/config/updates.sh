@@ -227,4 +227,4 @@ if [ -n "$PROPS" ] && [ -f "$PROPS" ]; then
   fi
 fi
 
-echo "Done. Review the diffs (eg: diff \$FILE.bak \$FILE), then run ./afon.sh -a config-validate."
+echo "Done. Review the diffs (eg: diff \$FILE.bak \$FILE), then run afon-cli.sh config-validate."

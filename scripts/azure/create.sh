@@ -17,7 +17,7 @@ for ARG in "$@"; do
   esac
 done
 if [ -z "$STACK_ID" ]; then
-  echo "-- Requires the stack the env is created for, by its id or role: azure-create [true|false] <stack-id|identity|catalog|tre>"
+  echo "-- Requires the stack the env is created for, by its id or role: afon-cli.sh azure-create [true|false] <stack-id|identity|catalog|tre>"
   exit 1
 fi
 source $AFON_ROOT/scripts/stack/needs-source.sh

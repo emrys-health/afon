@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optionally given the stack serving KeyCloak, by its id or its role, eg: afon-cli.sh aws-keycloak [identity]
+# Optionally given the stack serving KeyCloak, by its id or its role, eg: aws-keycloak [identity]
 # Without it, the stack is found among the running stacks that deploy KeyCloak, by their EKS clusters
 # <stack>-<CLUSTER_NAME>: as they all hold the DNS record of OIDC_DOMAIN_NAME, only one runs at a time.  The launcher
 # gives them, from stacks.yaml, as AFON_STACK_CANDIDATES: the stacks with a KeyCloak, which those that deploy their own do not

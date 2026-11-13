@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Given the stack, by its id or its role (identity, catalog or tre), eg: afon-cli.sh gcp-cluster tre
+# Given the stack, by its id or its role (identity, catalog or tre), eg: gcp-cluster tre
 STACK_ARG="${1:-}"
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 source $AFON_ROOT/scripts/gcp/stack-source.sh "$STACK_ARG"

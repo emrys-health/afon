@@ -17,12 +17,16 @@ source $AFON_ROOT/scripts/config/config-files.sh
 echo "Generating config files in $INIT_DIR"
 for FILE in $CONFIG_FILES ; do {
   echo $FILE
-  cp -np $AFON_ROOT/templates/config/$FILE $INIT_DIR || echo "file exists: not overwriting"
+  if [ -e "$INIT_DIR/$FILE" ]; then
+    echo "file exists: not overwriting"
+  else
+    cp -p $AFON_ROOT/templates/config/$FILE $INIT_DIR
+  fi
 } done
 echo "Generated config files from templates, which need to completed before proceeding."
 
 if [ -n "$CONFIG_ENV" ]; then
   echo "The config dir for env '$CONFIG_ENV' has been created."
   echo "To switch to env '$CONFIG_ENV':"
-  echo "./afon.sh -a config-switch --config-env $CONFIG_ENV"
+  echo "afon-cli.sh config-switch --config-env $CONFIG_ENV"
 fi

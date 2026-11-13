@@ -5,7 +5,7 @@ NOTEBOOK="${1:-}"
 OUTPUT="${2:-$NOTEBOOK}"
 
 if [ -z "$NOTEBOOK" ]; then
-  echo "Action jupyter-execute requires a notebook path, eg: ./afon.sh -a jupyter-execute -sa <notebook.ipynb>"
+  echo "Action jupyter-execute requires a notebook path, eg: jupyter-execute <notebook.ipynb>"
   exit 0
 fi
 if [ ! -f "$NOTEBOOK" ]; then

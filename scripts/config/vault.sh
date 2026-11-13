@@ -5,13 +5,11 @@
 # (one failing does not stop the others, but the exit status is then 1).  Then --region, --vault and --project are not
 # given: each cloud uses its config or defaults.
 #
-# ./afon.sh -a config-vault {push|pull|delete <tag>|list} -c|--cloud {aws|azure|gcp|all} [-e|--env|--config-env <env>] [-- [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]]
-# afon-cli.sh config-vault {push|pull|delete <tag>|list} -c|--cloud {aws|azure|gcp|all} [-e|--env|--config-env <env>] [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]
-# (the -- is needed by afon.sh before the script's own options, eg: ./afon.sh -a config-vault push v1 -e dev -- --force)
+# config-vault {push|pull|delete <tag>|list} -c|--cloud {aws|azure|gcp|all} [-e|--env|--config-env <env>] [--region <region>] [--vault <name>] [--project <id>] [--force] [--dry-run]
 #
-# The env and the afon home are the global ones of afon.sh and afon-cli.sh (--env, --config-env, AFON_ENV,
-# AFON_CONFIG_ENV, --home, AFON_HOME), which have switched the config dir to <afon-home>/config-<env> before this
-# runs.  Without a global env, the env is the one that the <afon-home>/config symlink points to.  The files used are
+# The env and the afon home are the global ones (--env, --config-env, AFON_ENV, AFON_CONFIG_ENV, --home, AFON_HOME),
+# which have switched the config dir to <afon-home>/config-<env> before this runs.
+# Without a global env, the env is the one that the <afon-home>/config symlink points to.  The files used are
 # those of <afon-home>/config-<env>.
 #
 # The tag is required by push, pull and delete.  It is free-form text without spaces, eg a release, a git tag or a
@@ -68,7 +66,7 @@ usage(){
   echo "          delete :  removes the snapshot of the tag.  AWS keeps it for a recovery window of $RECOVERY_DAYS days, Azure"
   echo "                    soft-deletes it, GCP deletes it at once.  With --force it is removed at once (purged on Azure)"
   echo "cloud:      the cloud of the secret store: aws (Secrets Manager), azure (Key Vault) or gcp (Secret Manager)."
-  echo "            It is the global one, given by -c or --cloud of afon.sh or afon-cli.sh, or AFON_CLOUD.  Required: there"
+  echo "            It is the global one, given by -c or --cloud or AFON_CLOUD.  Required: there"
   echo "            is no default.  For push only it can also be all, to push to the stores of all clouds."
   echo "tag:        the tag of the snapshot, free-form text without spaces.  The characters allowed are those of the"
   echo "            secret names of the cloud: aws letters, digits and / _ + = . @ -, azure letters, digits and -,"
@@ -79,7 +77,7 @@ usage(){
   echo "force:      the flag to let push replace a snapshot, pull overwrite the config files that differ, and"
   echo "            delete skip the recovery window."
   echo "dry-run:    the flag to report what would be done, without writing anything."
-  echo "The env is the global one, given by --env or --config-env of afon.sh or afon-cli.sh, else the one that"
+  echo "The env is the global one, given by --env or --config-env else the one that"
   echo "<afon-home>/config points to.  The config dir is <afon-home>/config-<env>."
 }
 
@@ -502,7 +500,7 @@ ACTION="${1:-}"
 shift || true
 
 TAG=
-# The cloud is the global one of afon.sh and afon-cli.sh (-c|--cloud, AFON_CLOUD), given to the script as CLOUD.
+# The cloud is the global one (-c|--cloud, AFON_CLOUD), given to the script as CLOUD.
 # It is required, so that it is always clear which secret store is used.  all is accepted by push only.
 VAULT_CLOUD=$(echo "${CLOUD:-}" | tr '[:upper:]' '[:lower:]')
 REGION=
@@ -551,7 +549,7 @@ if [ -z "$SNAPSHOT_ENV" ] && [ -L "$AFON_HOME/config" ]; then
   fi
 fi
 if [ -z "$SNAPSHOT_ENV" ] || [[ ! "$SNAPSHOT_ENV" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-  echo "No config env: give --env or --config-env to afon.sh or afon-cli.sh, or switch to one with config-switch" >&2
+  echo "No config env: specify --env or --config-env or switch to one with config-switch" >&2
   exit 1
 fi
 CONFIG_DIR="$AFON_HOME/config-$SNAPSHOT_ENV"
@@ -559,7 +557,7 @@ echo "Using env $SNAPSHOT_ENV"
 echo "Using config dir $CONFIG_DIR"
 
 if [ -z "$VAULT_CLOUD" ]; then
-  echo "Missing cloud, required by config-vault: give -c|--cloud {aws|azure|gcp|all} to afon.sh or afon-cli.sh, or set AFON_CLOUD" >&2
+  echo "Missing cloud, required by config-vault: specify -c|--cloud {aws|azure|gcp|all} or set AFON_CLOUD" >&2
   usage; exit 1
 fi
 if [ "$VAULT_CLOUD" == "all" ] && [ "$ACTION" != "push" ]; then
