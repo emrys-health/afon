@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Generates the release notes of a GitHub milestone, named after the release version, listing its issues.
+# Generates the release notes of a GitHub milestone, named after the release version, listing its issues and merged
+# pull requests.
 #
 # github-milestones -- <version> [<notes-file>] [--state <state>] [--repo <owner/repo>]
 #
@@ -66,10 +67,11 @@ if [ -z "$MILESTONE" ]; then
 fi
 IFS=$'\t' read -r NUMBER URL DUE <<< "$MILESTONE"
 
-# Lists the milestone issues in the given state, excluding pull requests, as markdown list items
+# Lists the milestone issues in the given state as markdown list items, with the pull requests that were merged
+# (the open ones, and the ones closed without merging, are left out)
 issues(){
   gh api --paginate "repos/{owner}/{repo}/issues?milestone=$NUMBER&state=$1&per_page=100" \
-    --jq '.[] | select(.pull_request == null)
+    --jq '.[] | select(.pull_request == null or .pull_request.merged_at != null)
       | (.labels | map(.name) | join(", ")) as $labels
       | "- " + (if $labels == "" then "" else "**\($labels)** — " end) + "[#\(.number)](\(.html_url)) \(.title)"'
 }
