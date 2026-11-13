@@ -389,6 +389,7 @@ update_kube_config() {
   if ! run_afon "$CLOUD-update-kube-config" tre | tee "$output"; then
     rm -f "$output"
     error "Failed to get the kubeconfig for env $(current_env): not running the tests"
+    error "If the $CLOUD-full stack is not deployed, ie its cluster does not exist, deploy it first, eg by adding '--setup $CLOUD-full' to the arguments"
     exit 1
   fi
   kube_config=$(sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' "$output" | tail -1)

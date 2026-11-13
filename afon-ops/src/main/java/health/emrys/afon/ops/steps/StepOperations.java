@@ -30,8 +30,8 @@ import static java.lang.String.format;
 public class StepOperations {
 
     /** The label of the Polaris pods, and the port that they listen on, see PolarisConfig */
-    private static final String POLARIS_POD_LABEL = "app=polaris";
-    private static final int    POLARIS_PORT      = 8181;
+    static final String POLARIS_POD_LABEL = "app=polaris";
+    static final int    POLARIS_PORT      = 8181;
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 
@@ -312,8 +312,9 @@ public class StepOperations {
 
     public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
         return Step.sequence(format("wait_on_polaris_and_keycloak_for_cloud_%s", cloud),
-                format("wait on DNS for Polaris and KeyCloak for cloud `%s`", cloud),
-                waitForPolaris(cloud), waitForKeyCloak(cloud));
+                format("wait on DNS for Polaris and KeyCloak, and for Polaris to reach KeyCloak, for cloud `%s`", cloud),
+                waitForPolaris(cloud), waitForKeyCloak(cloud),
+                actions.waitOnPolarisUsingOidc(cloud, properties, dnsWaitTimeout(), KEYCLOAK_POLL_MILLIS));
     }
 
     private Step waitForPolaris(AfonCloud cloud) {

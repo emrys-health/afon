@@ -32,9 +32,9 @@ class StepActionsCheckLoginTest {
             assertThatCode(() -> actionsExiting(0).checkLogin(cloud)).doesNotThrowAnyException();
         }
         assertThat(commands).containsExactly(
-            "aws sts get-caller-identity",
-            "az account get-access-token --output none",
-            "gcloud auth print-access-token");
+            "bash -c $*>/dev/null bash aws sts get-caller-identity",
+            "bash -c $*>/dev/null bash az account get-access-token --output none",
+            "bash -c $*>/dev/null bash gcloud auth print-access-token");
     }
 
     @Test
@@ -47,5 +47,14 @@ class StepActionsCheckLoginTest {
             .hasMessageContaining("Not logged in to AWS").hasMessageContaining("afon-cli.sh aws-login");
         assertThatThrownBy(() -> actionsExiting(1).checkLogin(AfonCloud.AZURE))
             .hasMessageContaining("Not logged in to AZURE").hasMessageContaining("azure-login-app");
+    }
+
+    /** Runs the real process, to check that the runner passes the script to bash intact, and that a failing check fails it. */
+    @Test
+    void discardingScriptRunsTheCheckAndFailsWithIt() throws Exception {
+        StepActions actions = new StepActions();
+        assertThat(actions.run("bash", null, OutputStream.nullOutputStream(), "-c", "$*>/dev/null", "bash", "echo", "a secret")).isZero();
+        assertThatThrownBy(() -> actions.run("bash", null, OutputStream.nullOutputStream(), "-c", "$*>/dev/null", "bash", "false"))
+            .isInstanceOf(ch.vorburger.exec.ManagedProcessException.class);
     }
 }

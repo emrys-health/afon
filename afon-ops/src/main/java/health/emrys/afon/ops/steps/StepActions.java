@@ -1089,7 +1089,15 @@ public class StepActions {
         String[] check = loginCheck(cloud);
         int exit;
         try {
-            exit = run(check[0], null, OutputStream.nullOutputStream(), Arrays.copyOfRange(check, 1, check.length));
+            // The output is discarded by the shell: the process runner logs the stdout of a command line by line whatever stream it
+            // is given, and that of the check is a secret, eg the access token that `gcloud auth print-access-token` prints.
+            // Only stderr, which says why a check failed, is kept.
+            // The script has no space nor quote, as the runner would quote an argument with either, and bash then take it as the name
+            // of a command: bash -c '$*>/dev/null' bash <check...> runs the check, expanding $* to its words.
+            String[] discarding = new String[3 + check.length];
+            System.arraycopy(new String[]{"-c", "$*>/dev/null", "bash"}, 0, discarding, 0, 3);
+            System.arraycopy(check, 0, discarding, 3, check.length);
+            exit = run("bash", null, OutputStream.nullOutputStream(), discarding);
         } catch (ManagedProcessException e) {
             exit = -1; // eg the CLI is not installed
             logger.warn("Cannot run {}: {}", String.join(" ", check), e.getMessage());
@@ -1155,6 +1163,70 @@ public class StepActions {
                 HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
                 HttpResponse.BodyHandlers.discarding());
             return codes.contains(response.statusCode()) ? null : "answered " + response.statusCode();
+        } catch (IOException e) {
+            return "cannot be reached: " + e;
+        }
+    }
+
+    /**
+     * Waits until Polaris, seen from the pod itself through a port-forward, can use its OIDC server, whether the KeyCloak is one
+     * of the stack or an external one: Polaris deployed before its KeyCloak is reachable, eg before its DNS record exists, fails
+     * to initialise its OIDC tenant and answers every call carrying a token with a 500 "OIDC Server is not available".  A call with
+     * a dummy bearer token needs no credentials, which are not configured yet: a Polaris that reaches its OIDC server rejects
+     * the token with a 401, whereas one that cannot answers with a 5xx.  Gives up after the timeout, saying so, leaving what needs
+     * Polaris to fail with its own error.
+     *
+     * @param pauseMs how long to wait between the requests
+     */
+    public Step waitOnPolarisUsingOidc(AfonCloud cloud, AfonPropertyProvider properties, long timeout, long pauseMs) {
+        return new Step(
+                "wait_on_polaris_using_oidc_for_cloud_" + cloud,
+                "wait until Polaris can reach its OIDC server for cloud `" + cloud + "`",
+                () -> {
+                    long start = System.currentTimeMillis();
+                    long reported = -1;
+                    logger.info("Waiting for Polaris to reach its OIDC server (until timeout of {})", formatDuration(timeout));
+                    while (true) {
+                        String[] problem = {null};
+                        try {
+                            withPortForward(cloud, properties, StepOperations.POLARIS_POD_LABEL, StepOperations.POLARIS_PORT,
+                                endpoint -> problem[0] = polarisOidcProblem("http://" + endpoint));
+                        } catch (IllegalStateException e) { // eg no running Polaris pod yet
+                            problem[0] = e.getMessage();
+                        } catch (Exception e) {
+                            problem[0] = "cannot be reached: " + e;
+                        }
+                        long elapsed = System.currentTimeMillis() - start;
+                        if (problem[0] == null) {
+                            logger.info("Polaris reaches its OIDC server after {}", formatDuration(elapsed));
+                            return;
+                        }
+                        if (reported < 0 || elapsed - reported >= PROGRESS_LOG_MILLIS) {
+                            logger.info("Still waiting for Polaris to reach its OIDC server after {}: {}",
+                                        formatDuration(elapsed), problem[0]);
+                            reported = elapsed;
+                        }
+                        if (elapsed + pauseMs >= timeout) {
+                            logger.warn("Timed out waiting for Polaris to reach its OIDC server after {}: {}",
+                                        formatDuration(timeout), problem[0]);
+                            return;
+                        }
+                        Thread.sleep(pauseMs);
+                    }
+                });
+    }
+
+    /**
+     * @return why Polaris cannot use its OIDC server, eg "answered 500: OIDC Server is not available", or null if it can
+     */
+    private static String polarisOidcProblem(String baseUrl) throws InterruptedException {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
+        try {
+            HttpResponse<String> response = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + "/api/management/v1/catalogs")).timeout(Duration.ofSeconds(30))
+                    .header("Authorization", "Bearer not-a-token").GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 500 ? "answered " + response.statusCode() + ": " + response.body() : null;
         } catch (IOException e) {
             return "cannot be reached: " + e;
         }
