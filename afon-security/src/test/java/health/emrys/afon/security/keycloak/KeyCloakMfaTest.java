@@ -149,33 +149,6 @@ class KeyCloakMfaTest {
         return executions;
     }
 
-    /**
-     * A headless login must not be asked for a second factor, or every user who enrols an
-     * authenticator app for the browser breaks their own Spark and Trino jobs. Disabling the sub-flow
-     * takes the OTP step and its condition out in one call.
-     */
-    @Test
-    public void otpIsTakenOutOfTheDirectGrantFlow() {
-        List<Map<String, Object>> executions = copiedDirectGrantFlow();
-
-        List<Map<String, Object>> changed = KeyCloakMfa.skipOtp(executions);
-
-        assertEquals(List.of(DIRECT_GRANT_OTP_SUB_FLOW), changed.stream().map(x -> x.get("displayName")).toList());
-        assertEquals(DISABLED, named(executions, DIRECT_GRANT_OTP_SUB_FLOW).get("requirement"));
-        // The username/password steps that actually authenticate the caller are untouched.
-        assertEquals(REQUIRED, named(executions, "Username Validation").get("requirement"));
-        assertEquals(REQUIRED, named(executions, "Password").get("requirement"));
-    }
-
-    /** Re-running against an already-converged direct grant flow asks for no admin API calls. */
-    @Test
-    public void reapplyingToTheDirectGrantFlowChangesNothing() {
-        List<Map<String, Object>> executions = copiedDirectGrantFlow();
-        KeyCloakMfa.skipOtp(executions);
-
-        assertTrue(KeyCloakMfa.skipOtp(executions).isEmpty());
-    }
-
     /** A flow with no OTP step in it is left alone rather than half-converted. */
     @Test
     public void aFlowWithoutOtpIsUnchanged() {

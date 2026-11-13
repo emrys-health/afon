@@ -703,21 +703,6 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Binds the realm to a direct-grant flow with no OTP step, so headless logins keep working.
-     */
-    private List<HttpResponse> skipOtpForDirectGrants(String adminToken, String realm) throws IOException {
-        copyFlow(adminToken, realm, DefaultAuthenticationFlows.DIRECT_GRANT_FLOW, DIRECT_GRANT_NO_OTP_FLOW);
-        List<Map<String, Object>> changed =
-            KeyCloakMfa.skipOtp(flowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW));
-        List<HttpResponse> responses = updateFlowExecutions(adminToken, realm, DIRECT_GRANT_NO_OTP_FLOW, changed);
-        responses.add(bindFlow(adminToken, realm, "directGrantFlow", DIRECT_GRANT_NO_OTP_FLOW));
-        logger.info(
-            "KeyCloak realm '{}' direct grant flow '{}' skips OTP ({} execution(s) updated)",
-            realm, DIRECT_GRANT_NO_OTP_FLOW, changed.size());
-        return responses;
-    }
-
-    /**
      * Copies one of KeyCloak's built-in flows. A 409 means an earlier deploy already made the copy,
      * which the caller then converges rather than replaces - deleting and re-copying would leave the
      * realm bound to a missing flow in between.

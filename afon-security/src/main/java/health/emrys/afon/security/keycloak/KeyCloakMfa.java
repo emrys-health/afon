@@ -100,33 +100,6 @@ public final class KeyCloakMfa {
         return changed;
     }
 
-    /**
-     * Rewrites, in place, the executions of a direct-grant flow so that OTP is never asked for.
-     *
-     * <p>The counterpart to {@link #requireOtp}, and required by it rather than an alternative to it.
-     * KeyCloak's built-in direct-grant flow demands OTP from any user who <em>has</em> an OTP
-     * credential - so the moment browser MFA makes a human enrol, that same human's headless logins
-     * (Spark, Trino, the CLI) start failing with "Invalid user credentials", since a batch job has no
-     * one to read an authenticator app. Taking the OTP step out of the direct-grant flow keeps those
-     * working. The second factor is thus a property of interactive logins only; a direct grant is
-     * protected by the confidential client's secret instead.
-     *
-     * @return the single execution whose requirement changed, or empty if the flow already has no OTP
-     *         step in play.
-     */
-    public static List<Map<String, Object>> skipOtp(List<Map<String, Object>> executions) {
-        int otp = indexOf(executions, ValidateOTP.PROVIDER_ID);
-        if (otp < 0) {
-            return List.of();
-        }
-        // Disabling the sub-flow that holds the OTP step takes it and its conditions out of the flow
-        // in one call; an OTP step at the top level has to be disabled on its own.
-        int                       subFlow = enclosingSubFlow(executions, otp);
-        List<Map<String, Object>> changed = new ArrayList<>();
-        setRequirement(executions.get(subFlow < 0 ? otp : subFlow), DISABLED, changed);
-        return changed;
-    }
-
     private static int indexOf(List<Map<String, Object>> executions, String providerId) {
         for (int i = 0; i < executions.size(); i++) {
             if (providerId.equals(executions.get(i).get(PROVIDER_ID))) {
