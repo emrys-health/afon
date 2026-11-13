@@ -43,6 +43,55 @@
   - Only the public paths of KeyCloak are exposed, by the ALB (AWS) and Nginx (Azure, GCP); the admin paths are no longer reachable.  The new optional properties `AWS_KEYCLOAK_ALLOWED_CIDRS`, `AZURE_KEYCLOAK_ALLOWED_CIDRS` and `GCP_KEYCLOAK_ALLOWED_CIDRS` restrict who can reach those paths.  If omitted, KeyCloak is open to all, which `NetworkSmokeMain` flags in a prod-like env.
   - KeyCloak is now configured through a Kubernetes tunnel, so the deployer needs access to the cluster.
 
+### Closed Issues (46)
+
+- **documentation, api** — [#393](https://github.com/emrys-health/afon/issues/393) Cleanup scripts comment and help output
+- **security, devops** — [#392](https://github.com/emrys-health/afon/issues/392) Make smoke tests robust against a late-starting OIDC server
+- **security, configuration** — [#385](https://github.com/emrys-health/afon/issues/385) Support Azure workload identity
+- **devops, configuration** — [#382](https://github.com/emrys-health/afon/issues/382) Make --cloud mandatory for config-vault and cdktf-store, and allow --cloud all for push
+- **devops** — [#381](https://github.com/emrys-health/afon/issues/381) Qualify Azure network and identity resource names by cluster name to run envs side by side in one resource group
+- [#379](https://github.com/emrys-health/afon/issues/379) KeyCloak exposes an `admin-cli` client_id by default. Remove.
+- **security, devops, configuration** — [#378](https://github.com/emrys-health/afon/issues/378) Remove `github-secrets pull` and the AFON_CONFIG_BUNDLE variable
+- **security, configuration** — [#377](https://github.com/emrys-health/afon/issues/377) IP whitelist KeyCloak
+- **security, devops** — [#376](https://github.com/emrys-health/afon/issues/376) Check that the TLS certificates are available before the smoke tests deploy a stack
+- **devops, api** — [#375](https://github.com/emrys-health/afon/issues/375) Make the Docker afon-base image build independent of GitHub's release downloads
+- **devops, smoke test** — [#374](https://github.com/emrys-health/afon/issues/374) Add GitHub workflows to run the smoke tests per cloud in afon-cli container
+- **security, smoke test** — [#373](https://github.com/emrys-health/afon/issues/373) Make the network smoke test check the allowed domains over HTTPS
+- **devops, smoke test** — [#372](https://github.com/emrys-health/afon/issues/372) Raise KubeSpawner’s Kubernetes API timeouts so slow admission does not fail the spawn
+- [#371](https://github.com/emrys-health/afon/issues/371) Allow concurrent stack deployments in Azure and GCP, as in AWS
+- **devops** — [#370](https://github.com/emrys-health/afon/issues/370) Add automatic cdktf-store push/pull upon deploy/delete of stack
+- **devops** — [#369](https://github.com/emrys-health/afon/issues/369) Add command tofu-init
+- **security, devops, configuration** — [#368](https://github.com/emrys-health/afon/issues/368) Pin the Polaris images by digest to stop a perpetual plan diff on Kyverno clusters
+- **devops** — [#367](https://github.com/emrys-health/afon/issues/367) Refuse to deploy an AWS stack when a VPC of the same name already exists
+- **security** — [#366](https://github.com/emrys-health/afon/issues/366) Security: fix MFA can be bypassed with just a user's password
+- **devops** — [#365](https://github.com/emrys-health/afon/issues/365) Add GitHub workflow to release `afon-cli` zip for both snapshot and tagged version
+- [#364](https://github.com/emrys-health/afon/pull/364) Add Azure DevOps Agent image
+- **devops, api** — [#362](https://github.com/emrys-health/afon/issues/362) Afon docker images:  split build from runtime and get version from pom
+- **api** — [#361](https://github.com/emrys-health/afon/issues/361) Add `--debug` and `--lenient` flags for script execution
+- **bug** — [#360](https://github.com/emrys-health/afon/issues/360) local-setup adds an apt repo that is already configured
+- **api** — [#359](https://github.com/emrys-health/afon/issues/359) Ensure all scripts are run by bash
+- **devops, configuration** — [#358](https://github.com/emrys-health/afon/issues/358) Added command `cdktf-store` to push and pull cdktf state and plans to cloud storage
+- **security, configuration** — [#356](https://github.com/emrys-health/afon/issues/356) Extend command `config-vault` to support Azure and GCP
+- **security, configuration** — [#355](https://github.com/emrys-health/afon/issues/355) AWS:  Add command to set up service user
+- **security, configuration** — [#354](https://github.com/emrys-health/afon/issues/354) AWS: login, user setup and guide
+- **configuration, tech debt** — [#353](https://github.com/emrys-health/afon/issues/353) Make Spark cluster name configurable
+- **testing, smoke test** — [#352](https://github.com/emrys-health/afon/issues/352) Write smoke test results to `$AFON_HOME/smoke` and drop `--restrict-polaris`
+- **devops** — [#351](https://github.com/emrys-health/afon/issues/351) Add maven-release workflow to publish Maven artifacts to GitHub Packages
+- **security** — [#350](https://github.com/emrys-health/afon/issues/350) Fix desktop security vulnerability
+- **logging, security** — [#348](https://github.com/emrys-health/afon/issues/348) Spark Logging of query and user
+- **devops, configuration** — [#346](https://github.com/emrys-health/afon/issues/346) Use subdomains for the DNS names and manage DNS zones with `dns-*` commands
+- **devops** — [#342](https://github.com/emrys-health/afon/issues/342) Add GCP full TRE stack
+- **devops, configuration** — [#341](https://github.com/emrys-health/afon/pull/341) [#339] Refactor and enhance image building with CLI support
+- **configuration** — [#340](https://github.com/emrys-health/afon/issues/340) Refactor DB settings
+- **logging, security** — [#332](https://github.com/emrys-health/afon/issues/332) Trino: capture individual SQL statements
+- **community** — [#325](https://github.com/emrys-health/afon/issues/325) Open-source renamed `afon` repo
+- **logging, security** — [#323](https://github.com/emrys-health/afon/issues/323) Whitelisting is moving to YAML. Capture this as part of the deployment information
+- **devops, configuration** — [#277](https://github.com/emrys-health/afon/issues/277) GCP Polaris logs to be persisted
+- **security** — [#275](https://github.com/emrys-health/afon/issues/275) SmokeTest: check the Polaris database can only be connected from the cloud
+- **security, api** — [#243](https://github.com/emrys-health/afon/issues/243) Check cloud login status when running manage-stack operations
+- **security, devops, tech debt** — [#241](https://github.com/emrys-health/afon/issues/241) Prevent secrets being printed in clear in tofu's output and in afon log file
+- **devops** — [#236](https://github.com/emrys-health/afon/issues/236) Tofu re-plan of a freshly deployed aws-full stack replaces two Services
+
 ## 1.0-beta-8
 
 **Milestone:** [1.0-beta-8](https://github.com/emrys-health/afon/milestone/9)
