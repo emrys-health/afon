@@ -556,6 +556,9 @@ public class NetworkSmokeMain {
         List<ExecResult> results = new ArrayList<>();
         for (String domain : new SmokeConfig(properties).allowedDomains()) {
             CurlCommand command = CurlCommand.https(client, pod, domain, true);
+            if (!resolvesHere(domain)) {
+                command.withoutRetry(); // it may be down or not deployed, so retrying only delays the report of it not being checked
+            }
             results.addAll(leavingOutDownDomain(domain, command.run(), NetworkSmokeMain::resolvesHere));
         }
         return results;
