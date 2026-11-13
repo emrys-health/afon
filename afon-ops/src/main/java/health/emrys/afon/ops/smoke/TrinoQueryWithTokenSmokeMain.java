@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonUser;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -35,9 +36,20 @@ public class TrinoQueryWithTokenSmokeMain extends TrinoQuerySmokeMain {
     private final String username;
     private final String token;
 
-
     public TrinoQueryWithTokenSmokeMain(String username, String token) {
         this.username = username;
         this.token    = token;
     }
+
+    @Override
+    protected String clientUserName() {
+        logger.info("Executing query on behalf of {}", username);
+        return username;
+    }
+
+    @Override
+    protected String getTokenFor(AfonUser user) {
+        return token;
+    }
+
 }
