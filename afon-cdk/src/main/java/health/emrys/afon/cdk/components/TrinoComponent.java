@@ -16,9 +16,16 @@ import static health.emrys.afon.config.ConfigUtils.cloudToCatalog;
 
 /**
  * Trino, reading the cloud's catalogs from Polaris at the cloud's {@code POLARIS_DOMAIN_NAME}, with tokens from the cloud's
- * KeyCloak.
+ * KeyCloak, which may be the stack's own or, eg, that of the cloud's keycloak stack: Trino reads its signing keys from inside
+ * the cluster in the first case, from its domain name in the second.
  */
 public class TrinoComponent implements StackComponent {
+
+    /** So that the stack's KeyCloak, if it has one, is found. */
+    @Override
+    public List<Class<? extends StackComponent>> after() {
+        return List.of(KeycloakComponent.class);
+    }
 
     @Override
     public void deploy(StackContext context) {
@@ -29,7 +36,8 @@ public class TrinoComponent implements StackComponent {
         dependsOn.addAll(platform.getServiceDependables());
         new TrinoWorkloads(context.properties(), context.users(),
                            context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME),
-                           context.properties().getOidcDomainName(platform.cloud()))
+                           context.properties().getOidcDomainName(platform.cloud()),
+                           context.find(KeycloakComponent.class).isPresent())
             .deploy(context.stack(), platform.configureHelm(),
                     cloudToCatalog(platform.cloud(), new AfonCatalogs(context.properties())), dependsOn);
     }

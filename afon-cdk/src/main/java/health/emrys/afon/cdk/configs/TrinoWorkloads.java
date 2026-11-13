@@ -24,10 +24,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.internalRealmUrl;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.tokenEndpoint;
 import static health.emrys.afon.trino.TrinoServerConfiguration.CREDENTIAL_ENV;
 import static health.emrys.afon.trino.TrinoServerConfiguration.SHARED_SECRET_ENV;
+import static java.lang.String.format;
 
 /**
  * Cloud-agnostic deployment of Trino via its official Helm chart — the counterpart to
@@ -71,19 +74,24 @@ public class TrinoWorkloads {
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs             afonCatalogs;
     private final String                   realmUrl;
+    private final String                   keysUrl;
 
     /**
-     * @param oidcDomainName the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
-     *                       own token endpoint
+     * @param oidcDomainName    the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
+     *                          own token endpoint
+     * @param keyCloakInCluster whether that KeyCloak is deployed to Trino's cluster, by the same stack, rather than by
+     *                          another, eg the cloud's keycloak stack, see {@link #keysUrl(String, boolean)}
      */
     public TrinoWorkloads(AfonPropertyProvider properties,
                           AfonUserProvider users,
                           String polarisDomainName,
-                          String oidcDomainName) {
+                          String oidcDomainName,
+                          boolean keyCloakInCluster) {
         this.trinoConfig  = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
                                                                  tokenEndpoint(oidcDomainName, "https"));
         this.afonCatalogs = new AfonCatalogs(properties);
         this.realmUrl     = internalRealmUrl(oidcDomainName, "https");
+        this.keysUrl      = keysUrl(realmUrl, keyCloakInCluster);
     }
 
     /**
@@ -109,10 +117,10 @@ public class TrinoWorkloads {
                 "config", Map.of(
                     "authenticationType", "JWT",
                     "https", Map.of("enabled", true, "port", HTTPS_PORT, "keystore", Map.of("path", TLS_PATH + "/" + TLS_KEYSTORE))),
-                "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl))),
+                "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl, keysUrl))),
             Map.entry("additionalConfigProperties", List.of("internal-communication.shared-secret=${ENV:" + SHARED_SECRET_ENV + "}")),
             Map.entry("accessControl", noImpersonation()),
-            Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(realmUrl)))),
+            Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(keysUrl)))),
             Map.entry("coordinator", coordinatorSettings()),
             Map.entry("worker", nodeSettings()),
             Map.entry("service", Map.of("type", "ClusterIP", "port", TRINO_PORT)),
@@ -147,7 +155,11 @@ public class TrinoWorkloads {
                        .name("trino")
                        .chart(CdkUtils.vendoredChart(scope, "trinoChart", "trino-" + CHART_VERSION + ".tgz"))
                        .namespace(TRINO_NAMESPACE)
-                       .atomic(true)
+                       // Not waited for: the coordinator waits for the polaris realm's keys (see waitForKeys), but the
+                       // realm is only created by configure-users, after the apply, so a wait would time out on every
+                       // new KeyCloak.  The Trino smoke test waits for the coordinator to be ready instead.
+                       .atomic(false)
+                       .wait(false)
                        .timeout(600)
                        .values(List.of(valuesYaml))
                        .dependsOn(releaseDependsOn)
@@ -171,10 +183,11 @@ public class TrinoWorkloads {
      * over plain HTTP, and Trino takes none over it either.
      *
      * @param realmUrl the realm's URL, as the issuer of its tokens names it, eg {@code https://<oidc domain>/realms/polaris}
+     * @param keysUrl  where to read the realm's signing keys, see {@link #keysUrl(String, boolean)}
      */
-    static String jwtAuthenticationConfig(String realmUrl) {
+    static String jwtAuthenticationConfig(String realmUrl, String keysUrl) {
         return String.join("\n",
-                           "http-server.authentication.jwt.key-file=" + keysUrl(realmUrl),
+                           "http-server.authentication.jwt.key-file=" + keysUrl,
                            "http-server.authentication.jwt.required-issuer=" + realmUrl,
                            "http-server.authentication.jwt.principal-field=polaris_principal");
     }
@@ -221,23 +234,42 @@ public class TrinoWorkloads {
                            + "=\"$dir/cert.pem\"");
     }
 
-    /** The realm's signing keys (JWKS), with which the coordinator checks each client's token. */
-    static String keysUrl(String realmUrl) {
-        return realmUrl + "/protocol/openid-connect/certs";
+    /**
+     * Where the coordinator reads the realm's signing keys (JWKS), with which it checks each client's token.  The keys are the
+     * same whichever host serves them, and the tokens' issuer is checked against the public realm URL either way.
+     *
+     * <p>When KeyCloak is in the cluster, from its service, {@link #IN_CLUSTER_KEYS_URL}, not its public domain name, whose
+     * record the same apply only creates minutes after Trino starts: looking that name up before then has the cluster's resolver
+     * cache its absence, for the zone's negative TTL (15 minutes on Route53), for every pod, eg Polaris, which then cannot reach
+     * KeyCloak either.  It also keeps Trino off KeyCloak's load balancer and its allow-list.
+     *
+     * <p>When KeyCloak is elsewhere, eg deployed by the cloud's keycloak stack, there is no such service, so from its public
+     * domain name, which that stack has already created.
+     *
+     * @param realmUrl the realm's public URL, eg {@code https://<oidc domain>/realms/polaris}
+     */
+    static String keysUrl(String realmUrl, boolean keyCloakInCluster) {
+        return keyCloakInCluster ? IN_CLUSTER_KEYS_URL : realmUrl + JWKS_PATH;
     }
+
+    private static final String JWKS_PATH = "/protocol/openid-connect/certs";
+
+    /** The realm's signing keys at KeyCloak's service, in the cluster that has it, see {@link #keysUrl(String, boolean)}. */
+    static final String IN_CLUSTER_KEYS_URL = format("http://%s.default.svc.cluster.local:%d/realms/%s%s",
+                                                     CdkHelper.KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT, KEYCLOAK_REALM, JWKS_PATH);
 
     /**
      * Blocks the coordinator's start until the realm serves its signing keys, as {@code JupyterMfaConfig#waitForIssuer} does
      * oauth2-proxy's.
      *
      * <p>The coordinator reads the keys once, at startup, and fails to start if it cannot: nothing else makes Trino wait for
-     * KeyCloak, whose public hostname may not resolve, nor serve, until minutes after Trino is scheduled, eg on a new stack.
+     * KeyCloak, whose realm only exists once configure-users has run, after the apply, eg on a new stack.
      * Without this gate the coordinator crash-loops, and its back-off overruns the release's timeout, which, being atomic,
      * then uninstalls it.  Curl's {@code -f} treats a load balancer's 5xx as a failure too, so this waits for KeyCloak to
      * actually serve.  Unbounded: if the keys never come, the pod stays in {@code Init:0/1} with this container's log naming
      * what it waits for.
      */
-    static Map<String, Object> waitForKeys(String realmUrl) {
+    static Map<String, Object> waitForKeys(String keysUrl) {
         String script = String.join("\n",
                                     "until curl -sfo /dev/null \"$KEYS_URL\"; do",
                                     "  echo \"waiting for the OIDC realm's keys at $KEYS_URL\"",
@@ -248,7 +280,7 @@ public class TrinoWorkloads {
             "name", "wait-for-oidc-keys",
             "image", DockerImages.CURL_IMAGE,
             "command", List.of("sh", "-c", script),
-            "env", List.of(Map.of("name", "KEYS_URL", "value", keysUrl(realmUrl))));
+            "env", List.of(Map.of("name", "KEYS_URL", "value", keysUrl)));
     }
 
     /**

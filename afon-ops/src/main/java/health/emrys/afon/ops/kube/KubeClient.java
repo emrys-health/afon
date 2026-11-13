@@ -170,6 +170,35 @@ public class KubeClient implements AutoCloseable {
         return pod;
     }
 
+    /**
+     * Waits for the only pod whose name begins with the prefix to be ready, eg one that Helm installs without waiting for it.
+     *
+     * @return the ready pod
+     * @throws TimeoutException if it is not ready within the timeout
+     */
+    public V1Pod waitForOnlyPodBeginningWithToBeReady(String prefix, Duration timeout)
+        throws ApiException, TimeoutException, InterruptedException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (true) {
+            List<V1Pod> pods = listPodsBeginningWith(prefix);
+            if (pods.size() == 1 && isReady(pods.get(0))) {
+                return pods.get(0);
+            }
+            if (System.nanoTime() > deadline) {
+                throw new TimeoutException(format("No single ready pod starting '%s' after %s (%d such pods)",
+                                                  prefix, timeout, pods.size()));
+            }
+            logger.info("Waiting for the pod starting '{}' to be ready ({} such pods)", prefix, pods.size());
+            TimeUnit.SECONDS.sleep(10);
+        }
+    }
+
+    static boolean isReady(V1Pod pod) {
+        return pod.getStatus() != null && pod.getStatus().getConditions() != null
+               && pod.getStatus().getConditions().stream()
+                     .anyMatch(c -> "Ready".equals(c.getType()) && "True".equals(c.getStatus()));
+    }
+
     public static @Nullable String nameOfPod(V1Pod x) {
         return x.getMetadata().getName();
     }
