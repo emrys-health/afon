@@ -575,7 +575,7 @@ public class KeyCloakProvider implements IdentityProvider {
     public List<HttpResponse> configureMfa(String adminToken, String realm) throws IOException {
         List<HttpResponse> responses = new  ArrayList<>();
         responses.addAll(requireOtpForBrowserLogins(adminToken, realm));
-        responses.addAll(skipOtpForDirectGrants(adminToken, realm));
+//        responses.addAll(skipOtpForDirectGrants(adminToken, realm));
         responses.addAll(disableDirectGrants(adminToken, realm, ADMIN_CLI));
         responses.addAll(requireOtpForMfaClient(adminToken, realm));
         return responses;
