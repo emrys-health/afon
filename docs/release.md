@@ -56,8 +56,8 @@ so it needs no secrets, and handles both kinds of version:
   publishes it as the asset of a rolling `snapshot` pre-release, which each run replaces.  Anyone can download it from the repository's releases page, without a GitHub
   login: `https://github.com/emrys-health/afon/releases/download/snapshot/afon-<version>-cli.zip`.
 
-Running `release.sh` therefore triggers two runs of the workflow, one after the other (they share a concurrency
-group): one for the push of `main`, which publishes the next SNAPSHOT version as the `snapshot` release, and one for the
+Running `release.sh` therefore triggers two runs of the workflow, concurrently (the concurrency group is per ref, so a push
+to `main` can never cancel the pending run of the tag): one for the push of `main`, which publishes the next SNAPSHOT version as the `snapshot` release, and one for the
 pushed tag, which creates the GitHub Release.
 
 It can also be run from the Actions tab (`workflow_dispatch`) on a branch, eg `main` for a snapshot, or on a release tag.

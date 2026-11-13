@@ -32,9 +32,10 @@ on:
 permissions:
   contents: read
 
-# One release at a time, and never cancel one in flight.
+# One release per ref at a time, and never cancel one in flight.  The group is per ref, so that a push to main
+# cannot replace the pending run of a release tag (GitHub keeps only one pending run per group).
 concurrency:
-  group: cli-release
+  group: cli-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
