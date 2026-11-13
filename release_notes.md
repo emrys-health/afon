@@ -39,6 +39,9 @@
 - **Azure workload identity, as an alternative to the app secret ([#385](https://github.com/emrys-health/afon/issues/385)):**
   - New and optional, off by default, so no action is needed.  When the app registration of the env has a federated credential and no secret, set flag `AZURE_WORKLOAD_IDENTITY=true` in `secret-azure.properties` and leave `AZURE_APP_SECRET` blank.  Polaris then runs as an AKS workload identity and gets its token from the cluster.
   - The deployer needs the app registration role on the app, which an admin gives once with `afon-cli.sh azure-identity-admin grant [--deployer <deployer>]` (and takes back with `ungrant`), so that the build does not change hands.  Without it, the deploy fails fast after the cluster is created, saying why.  See [federated credential](docs/guides/azure/federated_credential.md).
+- **KeyCloak is now IP whitelisted ([#377](https://github.com/emrys-health/afon/issues/377)):**
+  - Only the public paths of KeyCloak are exposed, by the ALB (AWS) and Nginx (Azure, GCP); the admin paths are no longer reachable.  The new optional properties `AWS_KEYCLOAK_ALLOWED_CIDRS`, `AZURE_KEYCLOAK_ALLOWED_CIDRS` and `GCP_KEYCLOAK_ALLOWED_CIDRS` restrict who can reach those paths.  If omitted, KeyCloak is open to all, which `NetworkSmokeMain` flags in a prod-like env.
+  - KeyCloak is now configured through a Kubernetes tunnel, so the deployer needs access to the cluster.
 
 ## 1.0-beta-8
 
