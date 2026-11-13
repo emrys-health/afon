@@ -64,8 +64,6 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
     public static final String BROWSER_MFA_FLOW = "browser-mfa";
-    /** Alias of the copied direct-grant flow that this realm binds to, with its OTP step taken out. */
-    public static final String DIRECT_GRANT_NO_OTP_FLOW = "direct-grant-no-otp";
     /** Alias of the copied direct-grant flow that only {@link #MFA_CLIENT} binds to, with its OTP step forced on. */
     public static final String DIRECT_GRANT_MFA_FLOW = "direct-grant-mfa";
     /**

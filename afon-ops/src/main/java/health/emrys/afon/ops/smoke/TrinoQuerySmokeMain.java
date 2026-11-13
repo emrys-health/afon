@@ -66,7 +66,7 @@ public class TrinoQuerySmokeMain {
         return query(url, query, user, token);
     }
 
-    private String getTokenFor(AfonUser user) throws IOException {
+    protected String getTokenFor(AfonUser user) throws IOException {
         // The user's confidential client, of the same name and secret, as it takes no username/password
         String token = new KeyCloakProvider(properties.getOidcDomainName(cloud))
             .clientToken(user.username(), user.password());
@@ -106,12 +106,16 @@ public class TrinoQuerySmokeMain {
      * the others are users with no client of their own (see {@code ConfigureUsersMain#configureOidcUsers}).
      */
     private List<AfonUser> clientUsers() {
-        String         userId = properties.getValue(AfonProperty.USER_ID);
+        String         userId = clientUserName();
         List<AfonUser> users  = userProvider.getUsers().stream().filter(u -> u.username().equals(userId)).toList();
         if (users.isEmpty()) {
             throw new RuntimeException("Cannot run Trino tests. USER_ID " + userId + " is not a user in users.csv.");
         }
         return users;
+    }
+
+    protected String clientUserName() {
+        return properties.getValue(AfonProperty.USER_ID);
     }
 
     public static void main(String[] args) throws Exception {
@@ -187,7 +191,7 @@ public class TrinoQuerySmokeMain {
         return errors;
     }
 
-    private List<String> checkCallingTrinoForAllUsers() throws Exception {
+    protected List<String> checkCallingTrinoForAllUsers() throws Exception {
         List<String> errors = new ArrayList<>();
         try (KubeClient client = new KubeClient(properties)) {
             OffsetDateTime start    = OffsetDateTime.now();
