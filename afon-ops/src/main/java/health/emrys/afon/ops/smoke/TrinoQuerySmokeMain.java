@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -191,11 +192,15 @@ public class TrinoQuerySmokeMain {
         return errors;
     }
 
+    /** For the coordinator to start once the realm's keys are there: a slow JVM start, with restarts, as the chart's probe allows. */
+    static final Duration COORDINATOR_READY_TIMEOUT = Duration.ofMinutes(10);
+
     protected List<String> checkCallingTrinoForAllUsers() throws Exception {
         List<String> errors = new ArrayList<>();
         try (KubeClient client = new KubeClient(properties)) {
             OffsetDateTime start    = OffsetDateTime.now();
-            V1Pod          trinoPod = client.getOnlyPodBegginingWith("trino-coordinator");
+            // Helm installs Trino without waiting for it, as it starts only once configure-users has created the realm
+            V1Pod          trinoPod = client.waitForOnlyPodBeginningWithToBeReady("trino-coordinator", COORDINATOR_READY_TIMEOUT);
             errors.addAll(hitTrinoWithAllUsers(client, trinoPod));
 
             V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
