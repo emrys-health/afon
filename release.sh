@@ -74,6 +74,13 @@ echo "Pushing git refs"
 git push origin main
 git push origin $TAG
 
+if [ "$PERFORM" != "true" ]; then
+  # release:prepare leaves release.properties and the pom.xml.releaseBackup files for release:perform, which is not
+  # run here: clean them up so that the git tree is left clean
+  echo "Cleaning up the release files"
+  $MVN release:clean -P$PROFILES
+fi
+
 if [ "$UPLOAD" == "true" ]; then
   # the upload is usually done by GitHub's release workflow
   DISTRIBUTION_ZIP="$CWD/afon-distribution/target/afon-$VERSION-cli.zip"
