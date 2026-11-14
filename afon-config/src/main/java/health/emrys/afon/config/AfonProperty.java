@@ -40,8 +40,8 @@ public enum AfonProperty {
     AWS_ACCESS_KEY_ID("AWS_ACCESS_KEY_ID"),
     AWS_SECRET_ACCESS_KEY("AWS_SECRET_ACCESS_KEY"),
     /**
-     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
-     * stacks of the cloud, eg {@code <account>.dkr.ecr.<region>.amazonaws.com/emrys}.  Optional: the images cannot be signed without it.
+     * Container registry for the images that are not first-party, for the
+     * stacks of the cloud: {@code docker-image --sign} copies them to it and signs the copies, eg {@code <account>.dkr.ecr.<region>.amazonaws.com/emrys}.  Optional: the images cannot be signed without it.
      */
     AWS_IMAGE_REGISTRY("AWS_IMAGE_REGISTRY"),
     /**
@@ -120,8 +120,8 @@ public enum AfonProperty {
      */
     GCP_SECRETS_ENABLED("GCP_SECRETS_ENABLED"),
     /**
-     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
-     * stacks of the cloud, eg {@code <region>-docker.pkg.dev/<project>/emrys}.  Optional: the images cannot be signed without it.
+     * Container registry for the images that are not first-party, for the
+     * stacks of the cloud: {@code docker-image --sign} copies them to it and signs the copies, eg {@code <region>-docker.pkg.dev/<project>/emrys}.  Optional: the images cannot be signed without it.
      */
     GCP_IMAGE_REGISTRY("GCP_IMAGE_REGISTRY"),
     /**
@@ -171,8 +171,8 @@ public enum AfonProperty {
     AZURE_REGION("AZURE_REGION"),
     AZURE_RESOURCE_GROUP("AZURE_RESOURCE_GROUP"),
     /**
-     * Container registry that {@code docker-image --sign} mirrors the images that are not ours to, and signs the images in, for the
-     * stacks of the cloud, eg {@code <name>.azurecr.io/emrys}.  Optional: the images cannot be signed without it.
+     * Container registry for the images that are not first-party, for the
+     * stacks of the cloud: {@code docker-image --sign} copies them to it and signs the copies, eg {@code <name>.azurecr.io/emrys}.  Optional: the images cannot be signed without it.
      */
     AZURE_IMAGE_REGISTRY("AZURE_IMAGE_REGISTRY"),
     /**

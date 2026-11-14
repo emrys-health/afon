@@ -3,7 +3,7 @@ package health.emrys.afon.cdk.configs;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.CdkUtils;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -71,6 +71,7 @@ public class TrinoWorkloads {
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs             afonCatalogs;
     private final String                   realmUrl;
+    private final DockerImageResolver      images;
 
     /**
      * @param oidcDomainName the domain of the KeyCloak that issues Polaris' tokens, as Polaris answers HTTP 501 from its
@@ -79,7 +80,9 @@ public class TrinoWorkloads {
     public TrinoWorkloads(AfonPropertyProvider properties,
                           AfonUserProvider users,
                           String polarisDomainName,
-                          String oidcDomainName) {
+                          String oidcDomainName,
+                          DockerImageResolver images) {
+        this.images       = images;
         this.trinoConfig  = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
                                                                  tokenEndpoint(oidcDomainName, "https"));
         this.afonCatalogs = new AfonCatalogs(properties);
@@ -103,7 +106,7 @@ public class TrinoWorkloads {
                        @NonNull AfonCatalog id,
                        @NonNull List<? extends ITerraformDependable> dependsOn) {
         Map<String, Object> values = Map.ofEntries(
-            Map.entry("image", Map.of("tag", DockerImages.TRINO_IMAGE_TAG)),
+            Map.entry("image", Map.of("tag", images.tag("trino"))),
             Map.entry("server", Map.of(
                 "workers", WORKERS, // Integer type
                 "config", Map.of(
@@ -112,7 +115,7 @@ public class TrinoWorkloads {
                 "coordinatorExtraConfig", jwtAuthenticationConfig(realmUrl))),
             Map.entry("additionalConfigProperties", List.of("internal-communication.shared-secret=${ENV:" + SHARED_SECRET_ENV + "}")),
             Map.entry("accessControl", noImpersonation()),
-            Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(realmUrl)))),
+            Map.entry("initContainers", Map.of("coordinator", List.of(waitForKeys(realmUrl, images.curl())))),
             Map.entry("coordinator", coordinatorSettings()),
             Map.entry("worker", nodeSettings()),
             Map.entry("service", Map.of("type", "ClusterIP", "port", TRINO_PORT)),
@@ -237,7 +240,7 @@ public class TrinoWorkloads {
      * actually serve.  Unbounded: if the keys never come, the pod stays in {@code Init:0/1} with this container's log naming
      * what it waits for.
      */
-    static Map<String, Object> waitForKeys(String realmUrl) {
+    static Map<String, Object> waitForKeys(String realmUrl, String curlImage) {
         String script = String.join("\n",
                                     "until curl -sfo /dev/null \"$KEYS_URL\"; do",
                                     "  echo \"waiting for the OIDC realm's keys at $KEYS_URL\"",
@@ -246,7 +249,7 @@ public class TrinoWorkloads {
                                     "echo \"OIDC realm's keys reachable\"");
         return Map.of(
             "name", "wait-for-oidc-keys",
-            "image", DockerImages.CURL_IMAGE,
+            "image", curlImage,
             "command", List.of("sh", "-c", script),
             "env", List.of(Map.of("name", "KEYS_URL", "value", keysUrl(realmUrl))));
     }

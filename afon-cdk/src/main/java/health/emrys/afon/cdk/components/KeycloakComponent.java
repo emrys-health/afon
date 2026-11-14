@@ -16,7 +16,7 @@ public class KeycloakComponent implements StackComponent {
 
     @Override
     public void deploy(StackContext context) {
-        keyCloakConfig = new KeyCloakConfig(context.stack(), context.properties(), context.platform());
+        keyCloakConfig = new KeyCloakConfig(context.stack(), context.properties(), context.platform(), context.images());
         keyCloakConfig.configureHttpsAndDNS();
     }
 

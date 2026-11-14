@@ -29,7 +29,7 @@ public class TrinoComponent implements StackComponent {
         dependsOn.addAll(platform.getServiceDependables());
         new TrinoWorkloads(context.properties(), context.users(),
                            context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME),
-                           context.properties().getOidcDomainName(platform.cloud()))
+                           context.properties().getOidcDomainName(platform.cloud()), context.images())
             .deploy(context.stack(), platform.configureHelm(),
                     cloudToCatalog(platform.cloud(), new AfonCatalogs(context.properties())), dependsOn);
     }

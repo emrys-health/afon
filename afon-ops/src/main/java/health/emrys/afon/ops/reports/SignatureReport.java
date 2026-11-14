@@ -19,7 +19,7 @@ import java.util.Map;
  * job to keep: each image checked, and whether it has a signature that verifies with the public key.
  *
  * @param cloud     the cloud whose registry and public key were used
- * @param registry  the registry the images that are not ours were mirrored to
+ * @param registry  the registry the images that are not first-party were mirrored to
  * @param checkedAt when the images were checked
  * @param checks    the result for each image, in order
  */

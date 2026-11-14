@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudPlatform;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.cdk.HealthCheck;
 import health.emrys.afon.cdk.HttpsRoute;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -170,6 +170,7 @@ public class JupyterHubConfig {
     private final   List<GuacamoleConfig.Session> sessions;
     private final   AfonUserProvider              userProvider;
     protected final AfonPropertyProvider          properties;
+    private final   DockerImageResolver           images;
 
     /**
      * @param platform           the cloud to deploy to, whose own properties configure the hub, eg
@@ -183,7 +184,9 @@ public class JupyterHubConfig {
         CloudPlatform platform,
         AfonPropertyProvider properties,
         AfonUserProvider userProvider,
-        List<ITerraformDependable> issuerDependencies) {
+        List<ITerraformDependable> issuerDependencies,
+        DockerImageResolver images) {
+        this.images          = images;
         this.stack           = stack;
         this.platform        = platform;
         this.issuerDependencies = List.copyOf(issuerDependencies);
@@ -346,6 +349,7 @@ public class JupyterHubConfig {
         new GuacamoleConfig(
             stack,
             guacamoleDeps,
+            images,
             session -> emailToVncHost.get(session.username()),
             sessions,
             guacamoleDb,
@@ -448,7 +452,7 @@ public class JupyterHubConfig {
         DeploymentSpecTemplateSpecContainer hubContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("hub")
-            .image(DockerImages.JUPYTERHUB_HUB_IMAGE)
+            .image(images.jupyterhubHub())
             .command(List.of("jupyterhub"))
             .args(List.of("--config", CONFIG_MOUNT + "/" + CONFIG_FILE))
             .env(List.of(
@@ -525,7 +529,7 @@ public class JupyterHubConfig {
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("chp")
-            .image(DockerImages.JUPYTERHUB_PROXY_IMAGE)
+            .image(images.jupyterhubProxy())
             .command(List.of("configurable-http-proxy"))
             .args(List.of(
                 "--ip=0.0.0.0",
@@ -693,7 +697,7 @@ public class JupyterHubConfig {
                """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
-            DockerImages.PYSPARK_NOTEBOOK_IMAGE, SINGLEUSER_PORT,
+            images.pysparkNotebook(), SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
             pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
@@ -792,6 +796,7 @@ public class JupyterHubConfig {
             stack,
             deps,
             properties,
+            images,
             MFA_UPSTREAMS,
             properties.getOidcIssuerUrl(platform.cloud()),
             jupyterDomain(),

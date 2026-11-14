@@ -419,6 +419,25 @@ afon-cli.sh docker-image --verify --signatures --cloud aws keycloak    # one ima
 afon-cli.sh docker-image --verify --signatures --cloud aws --report signatures.md   # also writes a report, as Markdown, or JSON if named *.json
 ```
 
+##### Deploy the mirrored images
+
+With `<CLOUD>_IMAGE_REGISTRY` set, the stacks of the cloud pull the images that are not first-party from the registry, not from where
+`docker-images.yaml` has them, so that the signature, which is next to the copy that `--sign` made, is found next to the image of the pod:
+`quay.io/keycloak/keycloak:26.6.3@sha256:...` is deployed as `<registry>/keycloak/keycloak:26.6.3@sha256:...`, the same tag and digest.  It
+applies to every image the stacks deploy from the file, the Jobs, the Spark executors and the notebook image that the hub starts as much as the
+Deployments.  The path of the copy is that `--sign` gives it, as both use the same rule.
+
+Left where they are:
+- the `first-party` images, which are signed where they are;
+- the images with no digest, which cannot be copied at a digest or signed (Trino today, as only its tag is used, see its `unpinned` reason in
+  the file).  A warning names each when the stack is synthesised, as it is not verified;
+- the images that the Helm charts pull and the file does not list (`docker-image --charts` reports them), such as the charts' own.
+
+The registry is the property of the cloud of the stack, so a stack never uses the registry of another cloud.  Without it, nothing changes.
+
+**Run `docker-image --sign` before deploying with a registry**, as the stack pulls images that must already be in it: a pod whose image is not
+there stays in `ImagePullBackOff`.  `docker-image --verify --signatures` checks that every image is in the registry and signed.
+
 ##### Verify the signatures in the cluster
 
 The `Kyverno` component of the full stacks installs [Kyverno](https://kyverno.io) in the `kyverno` namespace, and applies two

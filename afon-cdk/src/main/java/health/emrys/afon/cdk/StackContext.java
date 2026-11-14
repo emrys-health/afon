@@ -20,6 +20,7 @@ public class StackContext {
     private final CloudPlatform                               platform;
     private final AfonPropertyProvider                        properties;
     private final AfonUserProvider                            users;
+    private DockerImageResolver                                images;
     private final Map<Class<? extends StackComponent>, StackComponent> deployed = new LinkedHashMap<>();
 
     public StackContext(TerraformStack stack, StackId stackId, CloudPlatform platform, AfonPropertyProvider properties,
@@ -49,6 +50,16 @@ public class StackContext {
 
     public AfonUserProvider users() {
         return users;
+    }
+
+    /**
+     * @return the references to deploy the Docker images by, in the image registry of the cloud of the stack if it has one
+     */
+    public DockerImageResolver images() {
+        if (images == null) {
+            images = DockerImageResolver.of(properties, stackId.cloud());
+        }
+        return images;
     }
 
     /**

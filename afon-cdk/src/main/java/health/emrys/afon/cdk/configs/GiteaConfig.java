@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudPlatform;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.release.Release;
@@ -74,7 +74,6 @@ public class GiteaConfig {
     public static final  String SSH_PORT  = "2222";
     private static final String CHART_FILE  = "gitea-12.7.0.tgz";
     /** The image the chart runs, by its appVersion, which must be kept in step with {@link #CHART_FILE}: see {@code docker-images.yaml}. */
-    private static final String GITEA_IMAGE = DockerImages.GITEA_IMAGE;
     /** Gitea requires an email, which {@code users.csv} does not; Gitea's own placeholder domain. */
     private static final String NO_EMAIL_DOMAIN = "noreply.localhost";
     private static final int    DB_PORT     = 5432;
@@ -98,6 +97,7 @@ public class GiteaConfig {
     private final AfonUserProvider     users;
     private final AfonCloud            cloud;
     private final String               clusterName;
+    private final DockerImageResolver  images;
 
     /**
      * @param users       the users Gitea is given, from {@code users.csv}
@@ -106,7 +106,9 @@ public class GiteaConfig {
     public GiteaConfig(@NonNull AfonPropertyProvider properties,
                        @NonNull AfonUserProvider users,
                        @NonNull AfonCloud cloud,
-                       @NonNull String clusterName) {
+                       @NonNull String clusterName,
+                       @NonNull DockerImageResolver images) {
+        this.images      = images;
         this.properties  = properties;
         this.users       = users;
         this.cloud       = cloud;
@@ -294,7 +296,7 @@ public class GiteaConfig {
     String values(Optional<String> claim) {
         Map<String, Object> createDatabase = Map.of(
             "name", "create-database",
-            "image", DockerImages.POSTGRES_ALPINE_IMAGE,
+            "image", images.postgresAlpine(),
             "command", List.of("sh", "-c", """
                 set -e
                 until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do echo 'waiting for postgres'; sleep 2; done
@@ -313,7 +315,7 @@ public class GiteaConfig {
         // Runs with the chart's configure-gitea, as it does, against the app.ini it leaves on the volume.
         Map<String, Object> createUsers = Map.of(
             "name", "create-users",
-            "image", GITEA_IMAGE,
+            "image", images.gitea(),
             "command", List.of("bash", "-c", """
                 set -euo pipefail
                 # The table's rows start with the user's id, unlike any log lines above it.

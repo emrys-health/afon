@@ -1,8 +1,10 @@
 package health.emrys.afon.ops.smoke;
 
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +40,20 @@ public class GuacamoleDbSmokeMain {
         this.properties = properties;
     }
 
+    /**
+     * @return the image to query with, in the image registry of the cloud, as the stacks pull theirs, if the cloud is that of {@code AFON_CLOUD},
+     * else as {@code docker-images.yaml} has it
+     */
+    private String postgresImage() {
+        String cloud = ConfigUtils.afonCloud();
+        for (AfonCloud candidate : AfonCloud.values()) {
+            if (candidate.toString().equalsIgnoreCase(cloud.trim())) {
+                return DockerImageResolver.of(properties, candidate).postgresAlpine();
+            }
+        }
+        return DockerImageResolver.asDefined().postgresAlpine();
+    }
+
     private void findAdmin() throws IOException, InterruptedException {
         GuacamoleConfig.DbConfig db        = GuacamoleConfig.DbConfig.create(properties);
         String                   guacadmin = "guacadmin";
@@ -46,7 +62,7 @@ public class GuacamoleDbSmokeMain {
         String                   pod       = "guacamole-db-smoke-" + System.currentTimeMillis();
         List<String> command = List.of(
             "kubectl", "run", pod, "--namespace", "default", "--rm", "-i", "--quiet", "--restart=Never",
-            "--pod-running-timeout=5m", "--image", DockerImages.POSTGRES_ALPINE_IMAGE,
+            "--pod-running-timeout=5m", "--image", postgresImage(),
             "--env", "PGHOST=" + db.host(),
             "--env", "PGPORT=" + db.port(),
             "--env", "PGDATABASE=" + db.database(),

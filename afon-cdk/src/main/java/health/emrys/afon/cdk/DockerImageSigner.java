@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Signs the images of a {@code docker-images.yaml} with cosign, at the digest they are pinned to.  The images that are not ours are first
+ * Signs the images of a {@code docker-images.yaml} with cosign, at the digest they are pinned to.  The images that are not first-party are first
  * mirrored to the registry of the stack at that digest, so that the signature, and what the cluster pulls, are in our registry.  The
  * signatures are not uploaded to a transparency log, so that the cluster, which verifies them with the public key alone, needs no access to one.
  * The flags are those of cosign 3, which refuses {@code --tlog-upload=false} unless the signing config it takes from TUF is switched off too,
@@ -20,7 +20,6 @@ import java.util.function.Consumer;
 public final class DockerImageSigner {
 
     private static final int COMMAND_TIMEOUT_SECONDS = 300;
-    private static final String FIRST_PARTY = "first-party";
     private static final File NULL_DEVICE = new File(System.getProperty("os.name", "").startsWith("Windows") ? "NUL" : "/dev/null");
 
     /**
@@ -39,7 +38,7 @@ public final class DockerImageSigner {
      *
      * @param name     the name of the image
      * @param source   the image at its pinned digest, as the images file has it
-     * @param signed   the image at its digest that was signed: the source if it is ours, else its copy in the registry
+     * @param signed   the image at its digest that was signed: the source if it is first-party, else its copy in the registry
      * @param mirrored whether it was copied to the registry
      */
     public record Signed(String name, String source, String signed, boolean mirrored) {
@@ -49,7 +48,7 @@ public final class DockerImageSigner {
      * What checking the signature of an image found.
      *
      * @param name  the name of the image
-     * @param image the image at its digest that was checked: the image if it is ours, else its copy in the registry
+     * @param image the image at its digest that was checked: the image if it is first-party, else its copy in the registry
      * @param error why it has no signature that verifies with the key, or {@code null} if it has one
      */
     public record Verified(String name, String image, String error) {
@@ -119,8 +118,8 @@ public final class DockerImageSigner {
         List<Signed> signed = new ArrayList<>();
         for (DockerImageDefinitions.Definition image : chosen) {
             String source = image.image() + "@" + image.digest();
-            boolean mirror = !FIRST_PARTY.equals(image.category());
-            String target = mirror ? mirrorRepository(registry, image.image()) : image.image();
+            boolean mirror = image.isMirrored(registry);
+            String target = image.repository(registry);
             if (mirror) {
                 commands.run(List.of("docker", "buildx", "imagetools", "create", "--tag", target + ":" + image.tag(), source));
                 String copy = resolver.digest(target + ":" + image.tag());
@@ -138,13 +137,13 @@ public final class DockerImageSigner {
     }
 
     /**
-     * Checks that every image has a signature that verifies with the public key, where {@link #sign} puts it: the image if it is ours, else its
+     * Checks that every image has a signature that verifies with the public key, where {@link #sign} puts it: the image if it is first-party, else its
      * copy in the registry.  Nothing is signed, copied or pushed, and the key is not needed, only the public key.  An image whose check fails
      * is reported with the reason, and the others are still checked.
      *
      * @param images    the images, as defined in the file
      * @param names     the images to check, or none for those that have a digest; a named image with no digest fails its check
-     * @param registry  the registry, with the path in it, that the images that are not ours were mirrored to
+     * @param registry  the registry, with the path in it, that the images that are not first-party were mirrored to
      * @param publicKey the public key, as the {@code <CLOUD>_COSIGN_PUBLIC_KEY} property holds it, see {@link PublicKeys}
      * @param commands  runs {@code cosign verify}
      * @return the result for each image, in the order of the file
@@ -173,8 +172,7 @@ public final class DockerImageSigner {
                         + (image.unpinned() != null ? image.unpinned() : "pin it with --pin")));
                     continue;
                 }
-                String target = (FIRST_PARTY.equals(image.category()) ? image.image() : mirrorRepository(registry, image.image()))
-                    + "@" + image.digest();
+                String target = image.repository(registry) + "@" + image.digest();
                 try {
                     commands.run(List.of("cosign", "verify", "--key", keyFile.toString(), "--insecure-ignore-tlog=true", target));
                     verified.add(new Verified(image.name(), target, null));
@@ -216,19 +214,10 @@ public final class DockerImageSigner {
     }
 
     /**
-     * @return the repository of the copy of an image in the registry: the path of the image under it, without the registry of the image,
-     * eg {@code quay.io/keycloak/keycloak} is {@code <registry>/keycloak/keycloak}
+     * @return the repository of the copy of an image in the registry, see {@link DockerImageDefinitions#mirrorRepository}
      */
     static String mirrorRepository(String registry, String image) {
-        String path = image;
-        int slash = image.indexOf('/');
-        if (slash > 0) {
-            String first = image.substring(0, slash);
-            if (first.contains(".") || first.contains(":") || first.equals("localhost")) {
-                path = image.substring(slash + 1);
-            }
-        }
-        return registry.replaceAll("/+$", "") + "/" + path;
+        return DockerImageDefinitions.mirrorRepository(registry, image);
     }
 
     /**

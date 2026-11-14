@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -35,7 +36,7 @@ class GiteaConfigValidationTest {
             @Override public AfonUser getUser(String username) { return null; }
             @Override public boolean isAuthorised(String username, String catalogName) { return false; }
         };
-        return new GiteaConfig(properties, provider, cloud, "full-x-cluster");
+        return new GiteaConfig(properties, provider, cloud, "full-x-cluster", DockerImageResolver.asDefined());
     }
 
     private static AfonUser user(String name, String password) {

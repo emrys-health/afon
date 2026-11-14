@@ -1,6 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.cdk.KubeConfigAspect;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
@@ -58,10 +58,12 @@ public class SparkWorkloads {
     public static final Map<String, String> WORKER_LABELS = Map.of(
         "spark-role", "worker");
 
-    private final SparkNames names;
+    private final SparkNames          names;
+    private final DockerImageResolver images;
 
-    public SparkWorkloads(SparkNames names) {
-        this.names = names;
+    public SparkWorkloads(SparkNames names, DockerImageResolver images) {
+        this.names  = names;
+        this.images = images;
     }
 
     /**
@@ -97,7 +99,7 @@ public class SparkWorkloads {
                     )
                 ),
                 "sparkConf", Map.of(
-                    "spark.kubernetes.container.image", DockerImages.SPARK_IMAGE,
+                    "spark.kubernetes.container.image", images.spark(),
                     "spark.master.ui.title", "Prod Spark Cluster",
                     "spark.master.rest.enabled", "true",
                     "spark.master.rest.host", "0.0.0.0",
@@ -206,7 +208,7 @@ public class SparkWorkloads {
      */
     private Map<String, String> sparkConfig() {
         var first = Map.of(
-            "spark.kubernetes.container.image", DockerImages.SPARK_IMAGE,
+            "spark.kubernetes.container.image", images.spark(),
             "spark.master.ui.title", "Prod Spark Cluster",
             "spark.master.rest.enabled", "true",
             "spark.master.rest.host", "0.0.0.0",

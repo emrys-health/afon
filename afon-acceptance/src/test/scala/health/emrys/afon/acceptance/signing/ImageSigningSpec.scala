@@ -148,7 +148,7 @@ class ImageSigningSpec extends SpecPretifier with GivenWhenThen with Eventually 
   }
 
   /**
-   * Signs the image the way `docker-image --sign` signs an image of ours.
+   * Signs the image the way `docker-image --sign` signs a first-party image.
    */
   private def sign(kind: KindHelper, name: String, digest: String, keyDir: Path): Unit = {
     val image = s"${kind.hostRegistry}/$name"

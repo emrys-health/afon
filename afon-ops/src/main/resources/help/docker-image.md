@@ -35,7 +35,7 @@ signing stops on an error: the cloud, registry and key reference, when, and each
 was signed, and whether it was copied, for a CI job to keep.  The signatures are not uploaded to a transparency log.
 
 --verify --signatures checks instead that the images have a signature that verifies with the public key of one cloud (--cloud <aws|azure|gcp> or
-else AFON_CLOUD), <CLOUD>_COSIGN_PUBLIC_KEY, in the place --sign puts it: the image itself if it is ours, else its copy in <CLOUD>_IMAGE_REGISTRY.  It runs
+else AFON_CLOUD), <CLOUD>_COSIGN_PUBLIC_KEY, in the place --sign puts it: the image itself if it is first-party, else its copy in <CLOUD>_IMAGE_REGISTRY.  It runs
 cosign verify, so it needs cosign and the registry, but not the private key or a cluster.  Without names it checks each image that has a digest; every image is
 checked even if one fails, and the exit code is 1, naming them with the reason (not signed, or signed with another key), if any does.  --report <file> writes
 the result, JSON if it is named *.json, Markdown if *.md, even when the check fails.

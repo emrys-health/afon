@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.config.AfonPropertyProvider;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +46,7 @@ class SparkNamesTest {
     @Test
     void destroyCommandsUseTheNameTheClusterWasCreatedWith() {
         // exercised through the waiting command, which names the pod
-        assertThat(new SparkWorkloads(new SparkNames("afon-spark")).waitForMasterCommand())
+        assertThat(new SparkWorkloads(new SparkNames("afon-spark"), DockerImageResolver.asDefined()).waitForMasterCommand())
             .contains("pod/afon-spark-master-0");
     }
 }

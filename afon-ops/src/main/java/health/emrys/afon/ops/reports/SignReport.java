@@ -19,7 +19,7 @@ import java.util.Map;
  * what was signed, with which key, and when, even when signing stopped on an error.
  *
  * @param cloud    the cloud whose key and registry were used
- * @param registry the registry the images that are not ours were mirrored to
+ * @param registry the registry the images that are not first-party were mirrored to
  * @param key      the reference of the cosign key that signed, not the key itself
  * @param signedAt when signing was done
  * @param signed   the images signed, in order

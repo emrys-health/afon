@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.CdkUtils;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.secret.Secret;
@@ -49,6 +49,7 @@ public class JupyterMfaConfig {
     public JupyterMfaConfig(Construct scope,
                      List<ITerraformDependable> dependsOn,
                      AfonPropertyProvider properties,
+                     DockerImageResolver images,
                      List<String> upstreamUrls,
                      String issuer,
                      String jupyterDomain,
@@ -90,7 +91,7 @@ public class JupyterMfaConfig {
         DeploymentSpecTemplateSpecContainer proxyContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("oauth2-proxy")
-            .image(DockerImages.OAUTH2_PROXY_IMAGE)
+            .image(images.oauth2Proxy())
             .args(proxyArgs)
             .env(List.of(
                 envFromSecret("OAUTH2_PROXY_CLIENT_ID", SECRET_NAME, "client-id"),
@@ -103,7 +104,7 @@ public class JupyterMfaConfig {
         deps.add(oauthSecret);
 
         CdkUtils.deploy(scope, deps, PROXY_LABELS, List.of(proxyContainer),
-                               List.of(waitForIssuer(issuer)), List.of(), "oauth2-proxy", "15m");
+                               List.of(waitForIssuer(issuer, images.curl())), List.of(), "oauth2-proxy", "15m");
 
         Service.Builder.create(scope, CdkHelper.PROXY_SERVICE_NAME)
                        .metadata(ServiceMetadata
@@ -142,7 +143,7 @@ public class JupyterMfaConfig {
      * {@code Init:0/1} with this container's log naming exactly what it is waiting for, which is a far
      * clearer failure than a crash loop.
      */
-    private static DeploymentSpecTemplateSpecInitContainer waitForIssuer(String issuer) {
+    private static DeploymentSpecTemplateSpecInitContainer waitForIssuer(String issuer, String curlImage) {
         String discoveryUrl = issuer.replaceAll("/+$", "") + "/.well-known/openid-configuration";
         String script = String.join("\n",
             "until curl -sfo /dev/null \"$DISCOVERY_URL\"; do",
@@ -153,7 +154,7 @@ public class JupyterMfaConfig {
         return DeploymentSpecTemplateSpecInitContainer
             .builder()
             .name("wait-for-issuer")
-            .image(DockerImages.CURL_IMAGE)
+            .image(curlImage)
             .command(List.of("sh", "-c", script))
             .env(List.of(DeploymentSpecTemplateSpecInitContainerEnv
                              .builder()

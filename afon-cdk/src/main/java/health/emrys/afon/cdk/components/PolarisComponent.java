@@ -78,7 +78,7 @@ public class PolarisComponent implements StackComponent {
         List<ITerraformDependable> polarisDependables = new ArrayList<>(platform.getDependables());
         // Polaris does OIDC discovery against the KeyCloak hostname, so must be ordered after its DNS record
         context.find(KeycloakComponent.class).ifPresent(keycloak -> polarisDependables.add(keycloak.dnsRecord()));
-        PolarisConfig polarisConfig = new PolarisConfig(context.stack(), "polaris", platform, context.properties()) {
+        PolarisConfig polarisConfig = new PolarisConfig(context.stack(), "polaris", platform, context.properties(), context.images()) {
             @Override
             protected Service configurePolarisService(Deployment polarisDeployment) {
                 return null; // the service is the stack's own
@@ -110,7 +110,7 @@ public class PolarisComponent implements StackComponent {
      */
     private void deployBehindClusterIp(StackContext context) {
         CloudPlatform platform = context.platform();
-        PolarisConfig polarisConfig = new PolarisConfig(context.stack(), "polaris", platform, context.properties());
+        PolarisConfig polarisConfig = new PolarisConfig(context.stack(), "polaris", platform, context.properties(), context.images());
         Service internalService = polarisConfig.deployPolaris(platform.getDependables());
         platform.exposeHttps(route(List.of(internalService)));
     }

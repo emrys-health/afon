@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.cdk.DockerImageResolver;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,7 +9,7 @@ class SparkWorkloadsTest {
 
     @Test
     void sparkConnectServerRegistersNoCatalogsOrCredentials() {
-        String command = new SparkWorkloads(new SparkNames("emrys")).startConnectCommand();
+        String command = new SparkWorkloads(new SparkNames("emrys"), DockerImageResolver.asDefined()).startConnectCommand();
 
         assertThat(command)
             .contains("org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -19,7 +20,7 @@ class SparkWorkloadsTest {
 
     @Test
     void sparkConnectWaitsForTheMasterToBeReadyAndFailsIfItIsNot() {
-        String command = new SparkWorkloads(new SparkNames("emrys")).waitForMasterCommand();
+        String command = new SparkWorkloads(new SparkNames("emrys"), DockerImageResolver.asDefined()).waitForMasterCommand();
 
         assertThat(command)
             .contains("kubectl get pod emrys-master-0")

@@ -45,7 +45,12 @@ public final class DockerImageDefinitions {
     static final String DEFAULT_RESOURCE = "/docker-images.yaml";
 
     private static final Logger logger = getLogger(DockerImageDefinitions.class);
-    private static final Set<String> CATEGORIES = Set.of("first-party", "upstream", "third-party");
+    /**
+     * The category of the images that we build, which are signed where they are, not mirrored.
+     */
+    public static final String FIRST_PARTY = "first-party";
+
+    private static final Set<String> CATEGORIES = Set.of(FIRST_PARTY, "upstream", "third-party");
     private static final Pattern DIGEST = Pattern.compile("sha256:[0-9a-f]{64}");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}]+)}");
 
@@ -60,6 +65,48 @@ public final class DockerImageDefinitions {
         public String reference() {
             return image + ":" + tag + (digest == null ? "" : "@" + digest);
         }
+
+        /**
+         * @param registry the image registry of the cloud, with the path in it, or blank if it has none
+         * @return whether the image is kept in the registry: it is, if there is one, unless the image is first-party, which is signed where it is, or has
+         * no digest, which cannot be mirrored or signed.  This is the one rule that {@code docker-image --sign}, which makes the copy, and
+         * the deployment, which pulls it, share.
+         */
+        public boolean isMirrored(String registry) {
+            return registry != null && !registry.isBlank() && !FIRST_PARTY.equals(category) && digest != null;
+        }
+
+        /**
+         * @param registry the image registry of the cloud, with the path in it, or blank if it has none
+         * @return the repository the image is pulled from: its copy in the registry if {@link #isMirrored mirrored}, else its own
+         */
+        public String repository(String registry) {
+            return isMirrored(registry) ? mirrorRepository(registry, image) : image;
+        }
+
+        /**
+         * @param registry the image registry of the cloud, with the path in it, or blank if it has none
+         * @return the reference to pull the image by from that cloud: as {@link #reference()}, in the repository of {@link #repository}
+         */
+        public String reference(String registry) {
+            return repository(registry) + ":" + tag + (digest == null ? "" : "@" + digest);
+        }
+    }
+
+    /**
+     * @return the repository of the copy of an image in the registry: the path of the image under it, without the registry of the image,
+     * eg {@code quay.io/keycloak/keycloak} is {@code <registry>/keycloak/keycloak}
+     */
+    static String mirrorRepository(String registry, String image) {
+        String path = image;
+        int slash = image.indexOf('/');
+        if (slash > 0) {
+            String first = image.substring(0, slash);
+            if (first.contains(".") || first.contains(":") || first.equals("localhost")) {
+                path = image.substring(slash + 1);
+            }
+        }
+        return registry.replaceAll("/+$", "") + "/" + path;
     }
 
     private DockerImageDefinitions() {

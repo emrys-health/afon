@@ -15,7 +15,7 @@ public class GitComponent implements StackComponent {
     @Override
     public void deploy(StackContext context) {
         CloudPlatform platform = context.platform();
-        GiteaConfig   gitea    = new GiteaConfig(context.properties(), context.users(), platform.cloud(), platform.clusterName());
+        GiteaConfig   gitea    = new GiteaConfig(context.properties(), context.users(), platform.cloud(), platform.clusterName(), context.images());
         // The repositories are kept on a volume that outlives the cluster, where the platform has them.
         Optional<RetainedVolumeClaim> claim = platform.retainedVolumeClaim("gitea", gitea.storageSize(), "default");
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.storageDependencies());

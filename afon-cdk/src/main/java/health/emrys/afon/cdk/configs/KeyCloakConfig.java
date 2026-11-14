@@ -2,7 +2,7 @@ package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudPlatform;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import health.emrys.afon.cdk.HealthCheck;
 import health.emrys.afon.cdk.HttpsRoute;
 import com.hashicorp.cdktf.ITerraformDependable;
@@ -91,13 +91,16 @@ public class KeyCloakConfig extends Construct {
             .build();
     protected final CloudPlatform cloudProvider;
     private final AfonPropertyProvider properties;
+    private final DockerImageResolver images;
     private ITerraformDependable dnsRecord;
 
     public KeyCloakConfig(
         @NonNull Construct scope,
         @NonNull AfonPropertyProvider properties,
-        @NonNull CloudPlatform cloudProvider) {
+        @NonNull CloudPlatform cloudProvider,
+        @NonNull DockerImageResolver images) {
         super(scope, APP_NAME + "_scope");
+        this.images = images;
         this.cloudProvider = cloudProvider;
         this.properties = properties;
 
@@ -224,7 +227,7 @@ public class KeyCloakConfig extends Construct {
         DeploymentSpecTemplateSpecContainer keyCloak = DeploymentSpecTemplateSpecContainer
             .builder()
             .name(APP_NAME)
-            .image(DockerImages.KEYCLOAK_IMAGE)
+            .image(images.keycloak())
             .args(args)
             .env(envs)
             .readinessProbe(readinessProbe)
@@ -242,7 +245,7 @@ public class KeyCloakConfig extends Construct {
         // KeyCloak creates its own schema on start, but not its database, without which it crash loops.
         List<DeploymentSpecTemplateSpecInitContainer> initContainers =
             POSTGRES.equalsIgnoreCase(properties.getValue(KEYCLOAK_DB))
-                ? List.of(createPostgresDatabase(PostgresUrl.parse(properties.getValue(KEYCLOAK_DB_URL))))
+                ? List.of(createPostgresDatabase(PostgresUrl.parse(properties.getValue(KEYCLOAK_DB_URL)), images.postgresAlpine()))
                 : List.of();
         Deployment app = CdkUtils.deploy(
             this,
@@ -296,7 +299,7 @@ public class KeyCloakConfig extends Construct {
      * Creates KeyCloak's database, if it does not already exist, as its own user, whose credentials come from
      * {@link #SECRET_NAME} just as KeyCloak's do.  Waits for Postgres first, so KeyCloak does not start before it.
      */
-    static DeploymentSpecTemplateSpecInitContainer createPostgresDatabase(PostgresUrl url) {
+    static DeploymentSpecTemplateSpecInitContainer createPostgresDatabase(PostgresUrl url, String postgresImage) {
         String script = String.join(
             "\n",
             "set -e",
@@ -314,7 +317,7 @@ public class KeyCloakConfig extends Construct {
         return DeploymentSpecTemplateSpecInitContainer
             .builder()
             .name("create-database")
-            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .image(postgresImage)
             .command(List.of("sh", "-c", script))
             .env(env)
             .build();

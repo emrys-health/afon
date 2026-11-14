@@ -27,6 +27,6 @@ public class SparkComponent implements StackComponent {
         CloudPlatform platform = context.platform();
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.add(context.require(SparkOperatorComponent.class).operatorReady());
-        new SparkWorkloads(SparkNames.from(context.properties())).deploy(context.stack(), platform.cloud(), dependsOn);
+        new SparkWorkloads(SparkNames.from(context.properties()), context.images()).deploy(context.stack(), platform.cloud(), dependsOn);
     }
 }

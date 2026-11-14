@@ -26,7 +26,7 @@ import java.util.List;
  * {@code docker-image --pin [--file <file>] [<name>...]} looks up the digests of its images in their registries and writes them to it,
  * and {@code docker-image --verify [--file <file>] [--report <file>] [<name>...]} only checks that they are those the tags point to, failing if not,
  * and {@code docker-image --verify --signatures [--cloud <cloud>] [--report <file>] [<name>...]} checks instead that they have a signature that verifies with the public key of the cloud,
- * and {@code docker-image --sign [--cloud <cloud>] [--report <file>] [<name>...]} signs them at their digests with the cosign key of the cloud, after mirroring those that are not ours
+ * and {@code docker-image --sign [--cloud <cloud>] [--report <file>] [<name>...]} signs them at their digests with the cosign key of the cloud, after mirroring those that are not first-party
  * to its registry, and {@code docker-image --public-key [--cloud <cloud>]} prints the public key of that key, as the property that Kyverno verifies the images with.
  */
 public class DockerImageMain {

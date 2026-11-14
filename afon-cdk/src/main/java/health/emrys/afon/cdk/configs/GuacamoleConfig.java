@@ -1,7 +1,7 @@
 package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.CdkUtils;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMap;
 import com.hashicorp.cdktf.providers.kubernetes.config_map.ConfigMapMetadata;
@@ -126,12 +126,13 @@ public class GuacamoleConfig {
 
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
+                    DockerImageResolver images,
                     String jupyterVncHost,
                     List<Session> sessions,
                     String theme
     ) {
         // All sessions live on the same (single) Jupyter pod, just on different VNC ports.
-        this(scope, dependsOn, session -> jupyterVncHost, sessions, theme);
+        this(scope, dependsOn, images, session -> jupyterVncHost, sessions, theme);
     }
 
     /**
@@ -141,11 +142,12 @@ public class GuacamoleConfig {
      */
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
+                    DockerImageResolver images,
                     Function<Session, String> hostResolver,
                     List<Session> sessions,
                     String theme
     ) {
-        this(scope, dependsOn, hostResolver, sessions, null, theme);
+        this(scope, dependsOn, images, hostResolver, sessions, null, theme);
     }
 
     /**
@@ -165,6 +167,7 @@ public class GuacamoleConfig {
      */
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
+                    DockerImageResolver images,
                     Function<Session, String> hostResolver,
                     List<Session> sessions,
                     String ssoUsernameHeader,
@@ -207,7 +210,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
             .builder()
             .name("guacamole-home-init")
-            .image(DockerImages.GUACAMOLE_IMAGE)
+            .image(images.guacamole())
             .command(List.of("sh", "-c", assemble.toString()))
             .volumeMount(List.of(
                 initVolumeMount("guacamole-config", "/tmp/guacamole-config", true),
@@ -218,7 +221,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("guacd")
-            .image(DockerImages.GUACD_IMAGE)
+            .image(images.guacd())
             .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                  .containerPort(GUACD_PORT)
                                                                  .protocol("TCP")
@@ -228,7 +231,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("guacamole")
-            .image(DockerImages.GUACAMOLE_IMAGE)
+            .image(images.guacamole())
             .env(List.of(
                 envVar("GUACD_HOSTNAME", "localhost"),
                 envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -308,6 +311,7 @@ public class GuacamoleConfig {
      */
     GuacamoleConfig(Construct scope,
                     List<ITerraformDependable> dependsOn,
+                    DockerImageResolver images,
                     Function<Session, String> hostResolver,
                     List<Session> sessions,
                     DbConfig db,
@@ -334,7 +338,7 @@ public class GuacamoleConfig {
         List<ITerraformDependable> jobDeps = new ArrayList<>(dependsOn);
         jobDeps.add(provisionCm);
         jobDeps.add(dbSecret);
-        JobV1 dbInit = buildDbInitJob(scope, jobDeps, db);
+        JobV1 dbInit = buildDbInitJob(scope, jobDeps, db, images);
 
         ConfigMap themeCm = buildThemeConfigMap(scope, theme);
 
@@ -345,7 +349,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecInitContainer initContainer = DeploymentSpecTemplateSpecInitContainer
             .builder()
             .name("guacamole-home-init")
-            .image(DockerImages.GUACAMOLE_IMAGE)
+            .image(images.guacamole())
             .command(List.of(
                 "sh", "-c",
                 "set -e; mkdir -p /etc/guacamole/extensions; "
@@ -358,7 +362,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacdContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("guacd")
-            .image(DockerImages.GUACD_IMAGE)
+            .image(images.guacd())
             .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                  .containerPort(GUACD_PORT)
                                                                  .protocol("TCP")
@@ -371,7 +375,7 @@ public class GuacamoleConfig {
         DeploymentSpecTemplateSpecContainer guacamoleContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("guacamole")
-            .image(DockerImages.GUACAMOLE_IMAGE)
+            .image(images.guacamole())
             .env(List.of(
                 envVar("GUACD_HOSTNAME", "localhost"),
                 envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
@@ -483,12 +487,13 @@ public class GuacamoleConfig {
      */
     private static JobV1 buildDbInitJob(Construct scope,
                                         List<ITerraformDependable> dependsOn,
-                                        DbConfig db
+                                        DbConfig db,
+                                        DockerImageResolver images
     ) {
         JobV1SpecTemplateSpecInitContainer schemaGen = JobV1SpecTemplateSpecInitContainer
             .builder()
             .name("schema-gen")
-            .image(DockerImages.GUACAMOLE_IMAGE)
+            .image(images.guacamole())
             .command(List.of("sh", "-c", "/opt/guacamole/bin/initdb.sh --postgresql > /sql/001-schema.sql"))
             .volumeMount(List.of(JobV1SpecTemplateSpecInitContainerVolumeMount.builder()
                                                                               .name("sql")
@@ -511,7 +516,7 @@ public class GuacamoleConfig {
         JobV1SpecTemplateSpecContainer dbInit = JobV1SpecTemplateSpecContainer
             .builder()
             .name("db-init")
-            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .image(images.postgresAlpine())
             .command(List.of("sh", "-c", script))
             .env(List.of(
                 jobEnv("PGHOST", db.host()),

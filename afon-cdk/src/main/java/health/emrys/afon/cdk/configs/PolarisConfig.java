@@ -3,7 +3,7 @@ package health.emrys.afon.cdk.configs;
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudProvider;
 import health.emrys.afon.cdk.azure.AzureWorkloadIdentity;
-import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.DockerImageResolver;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.kubernetes.deployment.*;
 import com.hashicorp.cdktf.providers.kubernetes.job_v1.JobV1;
@@ -75,15 +75,18 @@ public class PolarisConfig extends Construct {
     private final ServiceSpecPort     polarisManagementSpecPort;
     private final Map<String, String> polarisLabels;
     private final CloudProvider       cloudProvider;
+    private final DockerImageResolver images;
     /** The client ID of the app, if the Polaris pod authenticates by AKS workload identity, else null */
     private final String              workloadIdentityClientId;
 
     public PolarisConfig(@NonNull Construct scope,
                          @NonNull String id,
                          CloudProvider cloudProvider,
-                         AfonPropertyProvider properties
+                         AfonPropertyProvider properties,
+                         DockerImageResolver images
     ) {
         super(scope, id);
+        this.images = images;
         this.cloudProvider = cloudProvider;
         this.workloadIdentityClientId = AfonCloud.AZURE.toString().equalsIgnoreCase(cloudProvider.getId())
                                         && AzureWorkloadIdentity.isEnabled(properties)
@@ -121,7 +124,8 @@ public class PolarisConfig extends Construct {
             properties.getValue(POLARIS_DB_HOST),
             polarisDbName(properties, cloudProvider.getId()),
             properties.getValue(POLARIS_ID),
-            properties.getValue(POLARIS_DB_USERNAME));
+            properties.getValue(POLARIS_DB_USERNAME),
+            images);
 
         polarisSpecPort           = ServiceSpecPort.builder()
                                                    .name("web")
@@ -172,7 +176,8 @@ public class PolarisConfig extends Construct {
                                         String host,
                                         String dbName,
                                         String polarisId,
-                                        String dbUser
+                                        String dbUser,
+                                        DockerImageResolver images
     ) {
         String stateDir      = "/state";
         String bootstrapFlag = stateDir + "/already-bootstrapped";
@@ -192,7 +197,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecInitContainer dbCreate = JobV1SpecTemplateSpecInitContainer
             .builder()
             .name("db-create")
-            .image(DockerImages.POSTGRES_ALPINE_IMAGE)
+            .image(images.postgresAlpine())
             .command(List.of("sh", "-c", createDbScript))
             .env(List.of(
                 initJobEnv("PGHOST", host),
@@ -221,7 +226,7 @@ public class PolarisConfig extends Construct {
         JobV1SpecTemplateSpecContainer bootstrap = JobV1SpecTemplateSpecContainer
             .builder()
             .name("bootstrap")
-            .image(DockerImages.POLARIS_ADMIN_TOOL_IMAGE)
+            .image(images.polarisAdminTool())
             .command(List.of("sh", "-c", bootstrapScript))
             .env(List.of(
                 jobEnv("POLARIS_PERSISTENCE_TYPE", "relational-jdbc"),
@@ -462,7 +467,7 @@ public class PolarisConfig extends Construct {
         DeploymentSpecTemplateSpecContainer polarisContainer = DeploymentSpecTemplateSpecContainer
             .builder()
             .name("polaris")
-            .image(DockerImages.POLARIS_IMAGE)
+            .image(images.polaris())
             .command(commands)
             .volumeMount(mounts)
             .readinessProbe(readinessProbe)
