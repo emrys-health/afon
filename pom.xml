@@ -85,6 +85,7 @@
     <modules>
         <module>afon-logging</module>
         <module>afon-config</module>
+        <module>afon-project</module>
         <module>afon-iceberg</module>
         <module>afon-polaris</module>
         <module>afon-rest</module>

@@ -1,0 +1,56 @@
+package health.emrys.afon.project;
+
+import health.emrys.afon.config.AfonCloud;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+
+/**
+ * The projects of the tests are templates, which every test renders for the cloud it is run on: {@code ${cloud}} is the cloud in lower case,
+ * as in {@code cloud: azure} or {@code azure-full}, and {@code ${CLOUD}} in upper case, as in {@code AZURE_JUPYTER_DOMAIN_NAME}.  No cloud is
+ * special to the code, so no test has one of its own: each is run on all of them.
+ */
+final class ProjectFixtures {
+
+    /** The example project, a template. */
+    static final Path EXAMPLE = Path.of("src/test/resources/project.yaml");
+
+    private ProjectFixtures() {
+    }
+
+    /**
+     * @return the cloud in lower case, as it is in {@code cloud: azure} and the ids of its stacks
+     */
+    static String lower(AfonCloud cloud) {
+        return cloud.toString().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * @return the template, for the cloud
+     */
+    static String render(String template, AfonCloud cloud) {
+        return template.replace("${cloud}", lower(cloud)).replace("${CLOUD}", cloud.name());
+    }
+
+    /**
+     * @return the example project, for the cloud
+     */
+    static String example(AfonCloud cloud) {
+        try {
+            return render(Files.readString(EXAMPLE), cloud);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @return the file that the example project, for the cloud, is written to
+     */
+    static Path writeExample(Path file, AfonCloud cloud) throws IOException {
+        Files.createDirectories(file.getParent());
+        return Files.writeString(file, example(cloud));
+    }
+}

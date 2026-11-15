@@ -84,6 +84,8 @@ public enum AfonProperty {
      * outlive the cluster.  Optional: no logs are shipped when unset.
      */
     AWS_POLARIS_LOG_BUCKET("AWS_POLARIS_LOG_BUCKET"),
+    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    AWS_AUDIT_BUCKET("AWS_AUDIT_BUCKET"),
     /** S3 bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
     AWS_GITEA_BUCKET("AWS_GITEA_BUCKET"),
 
@@ -160,6 +162,8 @@ public enum AfonProperty {
      * not shipped without it.
      */
     GCP_POLARIS_LOG_BUCKET("GCP_POLARIS_LOG_BUCKET"),
+    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    GCP_AUDIT_BUCKET("GCP_AUDIT_BUCKET"),
     /**
      * GKE node pool, as comma-separated {@code key:value} pairs, eg {@code machineType:e2-standard-4,nodeCount:1}, see
      * {@code GcpCloudProvider}.  Optional: the defaults of each key when unset.
@@ -238,6 +242,8 @@ public enum AfonProperty {
      */
     AZURE_KEYCLOAK_EXTERNAL("AZURE_KEYCLOAK_EXTERNAL"),
     AZURE_POLARIS_LOG_BUCKET("AZURE_POLARIS_LOG_BUCKET"),
+    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    AZURE_AUDIT_BUCKET("AZURE_AUDIT_BUCKET"),
 
     // OIDC provider (client-facing; any IdentityProvider implementation)
     OIDC_DOMAIN_NAME("OIDC_DOMAIN_NAME"),
@@ -245,6 +251,26 @@ public enum AfonProperty {
     /** Issuer URL of the KeyCloak of any cloud without its own.  Optional: derived from the domain name when unset. */
     OIDC_ISSUER_URL("OIDC_ISSUER_URL"),
     OIDC_EMAIL_DOMAIN("OIDC_EMAIL_DOMAIN"),
+    /** The client of the project's TRE, eg {@code cvd-2026-0007-tre}, whose audience the TRE's consumers require.  Set for a project. */
+    OIDC_AUDIENCE("OIDC_AUDIENCE"),
+    /** The client of the project's Git, eg {@code cvd-2026-0007-git}, whose audience its Git requires.  Set for a project. */
+    OIDC_GIT_AUDIENCE("OIDC_GIT_AUDIENCE"),
+    /** The {@code acr} value that proves MFA, which every consumer of a project's tokens requires.  Set for a project. */
+    OIDC_ACR("OIDC_ACR"),
+    /** The claim of a token naming its project, a list of exactly one.  Optional: {@code project} when unset. */
+    OIDC_PROJECT_CLAIM("OIDC_PROJECT_CLAIM"),
+    /** The claim of a token naming its user, by their immutable id.  Optional: {@code polaris_principal} when unset. */
+    OIDC_USER_CLAIM("OIDC_USER_CLAIM"),
+
+    // Project (set by manage-project from project.yaml, see FileProjectProvider)
+    /** The project's immutable id, eg {@code cvd-2026-0007}, which names its clients, group and principal role.  Set for a project. */
+    PROJECT_ID("PROJECT_ID"),
+    /** The domain of the project's Git.  Set for a project. */
+    GIT_DOMAIN_NAME("GIT_DOMAIN_NAME"),
+    /** The time of the nightly teardown of the project's TRE, as {@code HH:mm}.  Optional: the TRE is not torn down nightly when unset. */
+    TRE_TEARDOWN_TIME("TRE_TEARDOWN_TIME"),
+    /** The time zone of {@link #TRE_TEARDOWN_TIME}.  Optional: {@code Europe/London} when unset. */
+    TRE_TEARDOWN_TIME_ZONE("TRE_TEARDOWN_TIME_ZONE"),
 
     // Keycloak (self-hosted OIDC provider deployment, via KeyCloakConfig)
     KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME("KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME"),

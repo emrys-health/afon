@@ -177,7 +177,7 @@ public class ScriptMain {
      * {@code java.class.path} instead reflects exactly what was passed to {@code -jar} at JVM
      * startup, which is unaffected by how the jar's contents get loaded afterward.
      */
-    private static String afonCliDir() {
+    public static String afonCliDir() {
         String override = System.getenv("AFON_CLI_DIR");
         if (override != null && !override.isBlank()) {
             return override;

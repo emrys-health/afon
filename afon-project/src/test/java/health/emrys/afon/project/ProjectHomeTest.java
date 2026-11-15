@@ -1,0 +1,72 @@
+package health.emrys.afon.project;
+
+import health.emrys.afon.config.AfonCloud;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ProjectHomeTest {
+
+    @TempDir
+    Path afonHome;
+
+    /** The home of the Afon, with an env and the project of the example on the cloud. */
+    private AfonProject makeHome(AfonCloud cloud) throws IOException {
+        AfonProject project = FileProjectProvider.parse(ProjectFixtures.example(cloud));
+        Files.createDirectories(afonHome.resolve("config-dev"));
+        Files.createDirectories(afonHome.resolve("config-cvd-2026-0007"));
+        Files.createDirectories(afonHome.resolve("cdktf-cvd-2026-0007"));
+        Files.createDirectories(afonHome.resolve("cdktf-dev"));
+        Files.createSymbolicLink(afonHome.resolve("config"), afonHome.resolve("config-dev"));
+        Files.createSymbolicLink(afonHome.resolve("cdktf"), afonHome.resolve("cdktf-dev"));
+        Files.createDirectories(afonHome.resolve("cosign"));
+        Files.createDirectories(afonHome.resolve("logs"));
+        Files.createDirectories(afonHome.resolve("projects/cvd-2026-0007"));
+        return project;
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void pointsConfigAndCdktfAtTheProjectsAndSharesTheRest(AfonCloud cloud) throws IOException {
+        AfonProject project = makeHome(cloud);
+        Path home = ProjectHome.prepare(afonHome, project);
+
+        assertThat(home).isEqualTo(afonHome.resolve("projects/cvd-2026-0007/home"));
+        assertThat(home.resolve("config").toRealPath()).isEqualTo(afonHome.resolve("config-cvd-2026-0007").toRealPath());
+        assertThat(home.resolve("cdktf").toRealPath()).isEqualTo(afonHome.resolve("cdktf-cvd-2026-0007").toRealPath());
+        assertThat(home.resolve("cosign").toRealPath()).isEqualTo(afonHome.resolve("cosign").toRealPath());
+        assertThat(home.resolve("logs")).exists();
+        // not the other envs; the projects are shared, so that a command of the home finds its project file
+        assertThat(home.resolve("config-dev")).doesNotExist();
+        assertThat(home.resolve("cdktf-dev")).doesNotExist();
+        assertThat(home.resolve("projects/cvd-2026-0007").toRealPath()).isEqualTo(afonHome.resolve("projects/cvd-2026-0007").toRealPath());
+        // the active env of the deployer is left as it was
+        assertThat(afonHome.resolve("config").toRealPath()).isEqualTo(afonHome.resolve("config-dev").toRealPath());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void makesItAgainWithoutTouchingWhatTheLinksPointTo(AfonCloud cloud) throws IOException {
+        AfonProject project = makeHome(cloud);
+        Files.writeString(afonHome.resolve("config-cvd-2026-0007/afon.properties"), "A=1\n");
+        ProjectHome.prepare(afonHome, project);
+        Path home = ProjectHome.prepare(afonHome, project);
+        assertThat(home.resolve("config/afon.properties")).hasContent("A=1\n");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesAProjectThatIsNotConfigured(AfonCloud cloud) throws IOException {
+        AfonProject project = makeHome(cloud);
+        Files.delete(afonHome.resolve("cdktf-cvd-2026-0007"));
+        assertThatThrownBy(() -> ProjectHome.prepare(afonHome, project)).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("run manage-project configure cvd-2026-0007");
+    }
+}

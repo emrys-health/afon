@@ -17,6 +17,7 @@
            access   the access, forbidden and external table specs of every cloud   (tags Access, Forbidden, External)  } on by default:
            users    the onboarding of users                                         (tag Users)                          } with none of the
            signing  the signing and verification of images, in a kind cluster      (tag Signing)                        } profiles active, all
+           project  the projects of the central identity, in a KeyCloak container  (tag Project)                        } the specs of these four are run
            aws      the access specs of AWS                                         (tag Aws)                            ] to select only these,
            azure    the access specs of Azure                                       (tag Azure)                          ] when activated, eg
            gcp      the access specs of GCP                                         (tag Gcp)                            ] -Paws,users
@@ -38,6 +39,8 @@
         <acceptance.users.tags.on>${acceptance.tags.package}.Users</acceptance.users.tags.on>
         <acceptance.users.suites.on>health.emrys.afon.acceptance.users</acceptance.users.suites.on>
         <acceptance.signing.tags.on>${acceptance.tags.package}.Signing</acceptance.signing.tags.on>
+        <acceptance.project.tags.on>${acceptance.tags.package}.Project</acceptance.project.tags.on>
+        <acceptance.project.suites.on>health.emrys.afon.acceptance.project</acceptance.project.suites.on>
         <acceptance.signing.suites.on>health.emrys.afon.acceptance.signing</acceptance.signing.suites.on>
 
         <acceptance.access.tags>none</acceptance.access.tags>
@@ -52,6 +55,8 @@
         <acceptance.users.suites>none</acceptance.users.suites>
         <acceptance.signing.tags>none</acceptance.signing.tags>
         <acceptance.signing.suites>none</acceptance.signing.suites>
+        <acceptance.project.tags>none</acceptance.project.tags>
+        <acceptance.project.suites>none</acceptance.project.suites>
     </properties>
 
     <dependencies>
@@ -116,8 +121,8 @@
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
                 <configuration>
-                    <tagsToInclude>${acceptance.access.tags},${acceptance.aws.tags},${acceptance.azure.tags},${acceptance.gcp.tags},${acceptance.users.tags},${acceptance.signing.tags}</tagsToInclude>
-                    <wildcardSuites>${acceptance.access.suites},${acceptance.aws.suites},${acceptance.azure.suites},${acceptance.gcp.suites},${acceptance.users.suites},${acceptance.signing.suites}</wildcardSuites>
+                    <tagsToInclude>${acceptance.access.tags},${acceptance.aws.tags},${acceptance.azure.tags},${acceptance.gcp.tags},${acceptance.users.tags},${acceptance.signing.tags},${acceptance.project.tags}</tagsToInclude>
+                    <wildcardSuites>${acceptance.access.suites},${acceptance.aws.suites},${acceptance.azure.suites},${acceptance.gcp.suites},${acceptance.users.suites},${acceptance.signing.suites},${acceptance.project.suites}</wildcardSuites>
                 </configuration>
             </plugin>
         </plugins>
@@ -179,6 +184,17 @@
             <properties>
                 <acceptance.signing.tags>${acceptance.signing.tags.on}</acceptance.signing.tags>
                 <acceptance.signing.suites>${acceptance.signing.suites.on}</acceptance.signing.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- The projects of the central identity, in a KeyCloak container, on by default -->
+            <id>project</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <acceptance.project.tags>${acceptance.project.tags.on}</acceptance.project.tags>
+                <acceptance.project.suites>${acceptance.project.suites.on}</acceptance.project.suites>
             </properties>
         </profile>
     </profiles>

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.project.AfonProject;
 import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.rest.RestClient;
 import health.emrys.afon.security.IdentityProvider;
@@ -932,6 +933,449 @@ public class KeyCloakProvider implements IdentityProvider {
             throw new IOException(format("Could not create KeyCloak %s: HTTP %d", what, code));
         }
         return response;
+    }
+
+    // ---- Projects: a client per project, and a group ----
+
+    /** The Gitea provider name that its OIDC callback path is under, {@code /user/oauth2/<name>/callback}. */
+    static final String GITEA_AUTH_NAME = "keycloak";
+    /** The user attribute holding the principal name that the user's tokens carry, {@code afon:<user id>}. */
+    static final String PRINCIPAL_ATTRIBUTE = "polaris_principal";
+    /** The prefix of a principal made of an external user, eg {@code afon:<user id>}, as the Providers name it. */
+    public static final String PRINCIPAL_PREFIX = "afon:";
+    private static final List<String> INVITATION_ACTIONS = List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
+    private static final String AUDIENCE_MAPPER_PREFIX = "aud-";
+
+    /**
+     * The exact redirect URIs of the project's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
+     * the remote desktop are served under.
+     */
+    static List<String> treRedirectUris(AfonProject project) {
+        String property = project.cloud().name() + "_JUPYTER_DOMAIN_NAME";
+        String domain = project.tre().domains().get(property);
+        if (domain == null) {
+            throw new IllegalArgumentException(format(
+                "stacks.tre.domains has no %s, which the redirect URIs of the project's TRE client are made from", property));
+        }
+        return callbackURIs(domain);
+    }
+
+    /**
+     * The exact redirect URI of the project's Git client: Gitea's OIDC callback.
+     */
+    static List<String> gitRedirectUris(AfonProject project) {
+        return List.of(format("https://%s/user/oauth2/%s/callback", project.git().domain(), GITEA_AUTH_NAME));
+    }
+
+    @Override
+    public String ensureUser(String email, String firstName, String lastName) {
+        String username = email.toLowerCase(Locale.ROOT);
+        try {
+            String token = adminToken();
+            ensurePrincipalInUserProfile(token);
+            String id = userId(token, KEYCLOAK_REALM, username);
+            boolean created = id == null;
+            if (created) {
+                Map<String, Object> user = new LinkedHashMap<>();
+                user.put("username", username);
+                user.put("email", username);
+                user.put("enabled", true);
+                user.put("emailVerified", false);
+                if (firstName != null && !firstName.isBlank()) {
+                    user.put("firstName", firstName);
+                }
+                if (lastName != null && !lastName.isBlank()) {
+                    user.put("lastName", lastName);
+                }
+                user.put("requiredActions", INVITATION_ACTIONS);
+                postJson(token, format("/admin/realms/%s/users", KEYCLOAK_REALM), mapper.writeValueAsString(user), "user " + username);
+                id = userId(token, KEYCLOAK_REALM, username);
+                if (id == null) {
+                    throw new IOException(format("KeyCloak made user '%s' but does not list them", username));
+                }
+            }
+            setPrincipalAttribute(token, id);
+            if (created) {
+                invite(token, id, username);
+            }
+            return id;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to make KeyCloak user " + username, e);
+        }
+    }
+
+    /**
+     * Declares {@link #PRINCIPAL_ATTRIBUTE} in the realm's user profile, readable and writable by an admin only, so that a user cannot
+     * set their own principal.  KeyCloak 24 and later silently drops an attribute that the user profile does not declare, so without
+     * this the user would have no principal, and no token would carry the claim.  Idempotent.
+     */
+    private void ensurePrincipalInUserProfile(String token) throws IOException {
+        String uri = format("/admin/realms/%s/users/profile", KEYCLOAK_REALM);
+        Map<String, Object> profile = getMap(token, uri, "the user profile");
+        List<Map<String, Object>> attributes = new ArrayList<>();
+        Object existing = profile.get("attributes");
+        if (existing instanceof List<?> list) {
+            for (Object attribute : list) {
+                if (attribute instanceof Map<?, ?> map) {
+                    if (PRINCIPAL_ATTRIBUTE.equals(map.get("name"))) {
+                        return;
+                    }
+                    Map<String, Object> copy = new LinkedHashMap<>();
+                    map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+                    attributes.add(copy);
+                }
+            }
+        }
+        attributes.add(new LinkedHashMap<>(Map.of(
+            "name", PRINCIPAL_ATTRIBUTE,
+            "multivalued", false,
+            "permissions", Map.of("view", List.of("admin"), "edit", List.of("admin")))));
+        profile.put("attributes", attributes);
+        if (isFailure(putJson(token, uri, mapper.writeValueAsString(profile), "the user profile"))) {
+            throw new IOException("Could not declare " + PRINCIPAL_ATTRIBUTE + " in the user profile of realm " + KEYCLOAK_REALM);
+        }
+        logger.info("Declared {} in the user profile of realm {}", PRINCIPAL_ATTRIBUTE, KEYCLOAK_REALM);
+    }
+
+    /**
+     * Gives the user the attribute that a protocol mapper puts in the user claim of their tokens, {@code afon:<user id>},
+     * so that Polaris' default principal mapper, which reads the claim as it is, yields the Provider's principal name: the
+     * immutable id, never a username, which can change or be reused.
+     */
+    private void setPrincipalAttribute(String token, String id) throws IOException {
+        String uri = format("/admin/realms/%s/users/%s", KEYCLOAK_REALM, id);
+        Map<String, Object> user = getMap(token, uri, "user " + id);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        Object existing = user.get("attributes");
+        if (existing instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> attributes.put(String.valueOf(key), value));
+        }
+        List<String> wanted = List.of(PRINCIPAL_PREFIX + id);
+        if (wanted.equals(attributes.get(PRINCIPAL_ATTRIBUTE))) {
+            return;
+        }
+        attributes.put(PRINCIPAL_ATTRIBUTE, wanted);
+        user.put("attributes", attributes);
+        if (isFailure(putJson(token, uri, mapper.writeValueAsString(user), "the principal of user " + id))) {
+            throw new IOException("Could not set the principal attribute of KeyCloak user " + id);
+        }
+    }
+
+    /**
+     * Sends the invitation email.  It needs SMTP configured on the realm, so that a failure is a warning: the user exists
+     * and can be invited again.
+     */
+    private void invite(String token, String id, String username) throws IOException {
+        String uri = format("/admin/realms/%s/users/%s/execute-actions-email", KEYCLOAK_REALM, id);
+        HttpResponse response = putJson(token, uri, mapper.writeValueAsString(INVITATION_ACTIONS), "the invitation of " + username);
+        if (isFailure(response)) {
+            logger.warn("Could not send the invitation email to {} (HTTP {}): is SMTP configured on the realm?", username,
+                        response.getCode());
+        }
+    }
+
+    @Override
+    public Optional<String> findUser(String email) {
+        try {
+            return Optional.ofNullable(userId(adminToken(), KEYCLOAK_REALM, email.toLowerCase(Locale.ROOT)));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to look up KeyCloak user " + email, e);
+        }
+    }
+
+    @Override
+    public void ensureProject(AfonProject project, Map<String, String> publicKeys) {
+        String id = project.id().value();
+        AfonProject.Identity identity = project.identity();
+        try {
+            String token = adminToken();
+            String realm = KEYCLOAK_REALM;
+            ensurePrincipalInUserProfile(token);
+            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project), jwks(publicKeys, "tre"));
+            // a project with no Git of its own has Git deployed with its TRE, so no Git client
+            String git = project.git() == null ? null
+                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), jwks(publicKeys, "git"));
+            List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
+            project.providers().forEach(provider -> treAudiences.add(provider.audience()));
+            convergeProjectClient(token, realm, tre, identity.treClient(), id, identity, treAudiences);
+            if (git != null) {
+                convergeProjectClient(token, realm, git, identity.gitClient(), id, identity, List.of(identity.gitClient()));
+            }
+            String group = ensureGroup(token, realm, id);
+            grantRole(token, realm, group, tre, id);
+            if (git != null) {
+                grantRole(token, realm, group, git, id);
+            }
+            logger.info("KeyCloak project {} has client {}{}, and a group of the same name as the project", id, identity.treClient(),
+                        git == null ? "" : " and " + identity.gitClient());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to make KeyCloak project " + id, e);
+        }
+    }
+
+    /**
+     * @return the JWK set that a client authenticates against: the key given, which is a JWK set or a single JWK
+     */
+    private String jwks(Map<String, String> publicKeys, String client) throws IOException {
+        String key = publicKeys.get(client);
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("No public key for the " + client + " client");
+        }
+        var node = mapper.readTree(key);
+        if (node.has("d") || node.has("p") || node.has("q")) {
+            throw new IllegalArgumentException(
+                "The " + client + " key holds private key material: give the public key only, as the private key stays with the TRE operator");
+        }
+        return node.has("keys") ? key : mapper.writeValueAsString(Map.of("keys", List.of(node)));
+    }
+
+    /**
+     * Makes, or converges, a project's client: standard flow only (no direct grants, service accounts or implicit flow), with
+     * PKCE, full scope off so that no role but its own reaches a token, and authenticating by {@code private_key_jwt}.
+     *
+     * @return the client's internal UUID
+     */
+    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String jwks)
+        throws IOException {
+        String json = mapper.writeValueAsString(Map.ofEntries(
+            Map.entry("clientId", clientId),
+            Map.entry("enabled", true),
+            Map.entry("protocol", "openid-connect"),
+            Map.entry("publicClient", false),
+            Map.entry("clientAuthenticatorType", "client-jwt"),
+            Map.entry("standardFlowEnabled", true),
+            Map.entry("directAccessGrantsEnabled", false),
+            Map.entry("serviceAccountsEnabled", false),
+            Map.entry("implicitFlowEnabled", false),
+            Map.entry("fullScopeAllowed", false),
+            Map.entry("redirectUris", redirectUris),
+            Map.entry("webOrigins", List.of("+")),
+            Map.entry("attributes", Map.of(
+                "use.jwks.string", "true",
+                "jwks.string", jwks,
+                "pkce.code.challenge.method", "S256"))));
+        HttpResponse created = postJson(token, format("/admin/realms/%s/clients", realm), json, "project client " + clientId);
+        String uuid = clientUuid(token, realm, clientId);
+        if (uuid == null) {
+            throw new IOException(format("KeyCloak made client %s but does not list it", clientId));
+        }
+        if (created.getCode() == HttpStatus.SC_CONFLICT
+            && isFailure(putJson(token, format("/admin/realms/%s/clients/%s", realm, uuid), json, "project client " + clientId))) {
+            throw new IOException("Could not update KeyCloak project client " + clientId);
+        }
+        return uuid;
+    }
+
+    /**
+     * Gives the client the role that marks a member of the project, and the mappers of its tokens' claims.  The role is named
+     * by the project's id, so that the mapper, which puts the names of the roles in a claim, puts the project's id in it.
+     * The mapper is limited to the client's own roles, so a token of this client names this project and no other, even for
+     * a user on several projects, and a token of a non-member lacks the claim, whatever grant issued it.  The {@code roles}
+     * scope, which would add other clients' audiences, is taken off.
+     */
+    private void convergeProjectClient(String token, String realm, String uuid, String clientId, String projectId,
+                                       AfonProject.Identity identity, List<String> audiences) throws IOException {
+        ensureRole(token, realm, uuid, projectId);
+        removeDefaultScope(token, realm, uuid, "roles");
+        upsertMapper(token, realm, uuid, Map.of(
+            "name", "project",
+            "protocol", "openid-connect",
+            "protocolMapper", "oidc-usermodel-client-role-mapper",
+            "config", Map.of(
+                "usermodel.clientRoleMapping.clientId", clientId,
+                "claim.name", identity.projectClaim(),
+                "multivalued", "true",
+                "jsonType.label", "String",
+                "access.token.claim", "true",
+                "id.token.claim", "false",
+                "userinfo.token.claim", "false")));
+        upsertMapper(token, realm, uuid, Map.of(
+            "name", identity.userClaim(),
+            "protocol", "openid-connect",
+            "protocolMapper", "oidc-usermodel-attribute-mapper",
+            "config", Map.of(
+                "user.attribute", PRINCIPAL_ATTRIBUTE,
+                "claim.name", identity.userClaim(),
+                "jsonType.label", "String",
+                "access.token.claim", "true",
+                "id.token.claim", "false",
+                "userinfo.token.claim", "false")));
+        Set<String> wanted = new LinkedHashSet<>();
+        for (String audience : audiences) {
+            String name = AUDIENCE_MAPPER_PREFIX + audience;
+            wanted.add(name);
+            upsertMapper(token, realm, uuid, Map.of(
+                "name", name,
+                "protocol", "openid-connect",
+                "protocolMapper", "oidc-audience-mapper",
+                "config", Map.of(
+                    "included.custom.audience", audience,
+                    "access.token.claim", "true",
+                    "id.token.claim", "false",
+                    "introspection.token.claim", "true")));
+        }
+        // a Provider no longer in the project loses its audience
+        for (Map<String, Object> existing : projectMappers(token, realm, uuid)) {
+            String name = String.valueOf(existing.get("name"));
+            if (name.startsWith(AUDIENCE_MAPPER_PREFIX) && !wanted.contains(name)) {
+                restClient.delete(format("/admin/realms/%s/clients/%s/protocol-mappers/models/%s", realm, uuid, existing.get("id")), token);
+                logger.info("Removed the audience mapper {} of client {}", name, clientId);
+            }
+        }
+    }
+
+    private List<Map<String, Object>> projectMappers(String token, String realm, String uuid) throws IOException {
+        return getList(token, format("/admin/realms/%s/clients/%s/protocol-mappers/models", realm, uuid), "the mappers of client " + uuid);
+    }
+
+    /**
+     * Makes the mapper, or converges it if one of its name exists, as a mapper POSTed again would be left as it was.
+     */
+    private void upsertMapper(String token, String realm, String uuid, Map<String, Object> mapper) throws IOException {
+        Optional<Map<String, Object>> existing = projectMappers(token, realm, uuid).stream()
+                                                                                    .filter(m -> mapper.get("name").equals(m.get("name")))
+                                                                                    .findFirst();
+        String base = format("/admin/realms/%s/clients/%s/protocol-mappers/models", realm, uuid);
+        if (existing.isEmpty()) {
+            postJson(token, base, this.mapper.writeValueAsString(mapper), "mapper " + mapper.get("name"));
+            return;
+        }
+        Map<String, Object> converged = new LinkedHashMap<>(mapper);
+        converged.put("id", existing.get().get("id"));
+        String id = String.valueOf(existing.get().get("id"));
+        if (isFailure(putJson(token, base + "/" + id, this.mapper.writeValueAsString(converged), "mapper " + mapper.get("name")))) {
+            throw new IOException("Could not update KeyCloak mapper " + mapper.get("name"));
+        }
+    }
+
+    private void removeDefaultScope(String token, String realm, String uuid, String scopeName) throws IOException {
+        List<Map<String, Object>> scopes = getList(token, format("/admin/realms/%s/client-scopes", realm), "the client scopes");
+        for (Map<String, Object> scope : scopes) {
+            if (scopeName.equals(scope.get("name"))) {
+                HttpResponse response = restClient.delete(
+                    format("/admin/realms/%s/clients/%s/default-client-scopes/%s", realm, uuid, scope.get("id")), token);
+                if (isFailure(response) && response.getCode() != HttpStatus.SC_NOT_FOUND) {
+                    throw new IOException(format("Could not take scope %s off KeyCloak client %s: HTTP %d", scopeName, uuid,
+                                                 response.getCode()));
+                }
+            }
+        }
+    }
+
+    private void ensureRole(String token, String realm, String uuid, String role) throws IOException {
+        postJson(token, format("/admin/realms/%s/clients/%s/roles", realm, uuid),
+                 mapper.writeValueAsString(Map.of("name", role)), "role " + role);
+    }
+
+    private String ensureGroup(String token, String realm, String name) throws IOException {
+        String found = groupId(token, realm, name);
+        if (found != null) {
+            return found;
+        }
+        postJson(token, format("/admin/realms/%s/groups", realm), mapper.writeValueAsString(Map.of("name", name)), "group " + name);
+        found = groupId(token, realm, name);
+        if (found == null) {
+            throw new IOException(format("KeyCloak made group %s but does not list it", name));
+        }
+        return found;
+    }
+
+    private String groupId(String token, String realm, String name) throws IOException {
+        List<Map<String, Object>> groups = getList(token, format("/admin/realms/%s/groups?exact=true&search=%s", realm,
+                                                                  URLEncoder.encode(name, StandardCharsets.UTF_8)), "group " + name);
+        return groups.stream().filter(group -> name.equals(group.get("name"))).map(group -> (String) group.get("id")).findFirst().orElse(null);
+    }
+
+    /** Assigns the group the client's role, which KeyCloak leaves as it is if the group has it. */
+    private void grantRole(String token, String realm, String groupId, String clientUuid, String role) throws IOException {
+        Map<String, Object> representation = getMap(token, format("/admin/realms/%s/clients/%s/roles/%s", realm, clientUuid, role), "role " + role);
+        HttpResponse response = restClient.post(format("/admin/realms/%s/groups/%s/role-mappings/clients/%s", realm, groupId, clientUuid),
+                                                mapper.writeValueAsString(List.of(representation)), token);
+        if (isFailure(response)) {
+            throw new IOException(format("Could not give group %s the role %s: HTTP %d", groupId, role, response.getCode()));
+        }
+    }
+
+    @Override
+    public void addMember(AfonProject project, String userId) {
+        try {
+            String token = adminToken();
+            String group = requireGroup(token, project);
+            HttpResponse response = putJson(token, format("/admin/realms/%s/users/%s/groups/%s", KEYCLOAK_REALM, userId, group), "",
+                                            "membership of " + userId + " in " + project.id());
+            if (isFailure(response)) {
+                throw new IOException(format("Could not add user %s to group %s: HTTP %d", userId, project.id(), response.getCode()));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to add a member to project " + project.id(), e);
+        }
+    }
+
+    @Override
+    public void removeMember(AfonProject project, String userId) {
+        try {
+            String token = adminToken();
+            String group = requireGroup(token, project);
+            HttpResponse response = restClient.delete(format("/admin/realms/%s/users/%s/groups/%s", KEYCLOAK_REALM, userId, group), token);
+            if (isFailure(response) && response.getCode() != HttpStatus.SC_NOT_FOUND) {
+                throw new IOException(format("Could not remove user %s from group %s: HTTP %d", userId, project.id(), response.getCode()));
+            }
+            // ends their sessions in the central identity; a token already issued lasts until it expires
+            HttpResponse logout = restClient.post(format("/admin/realms/%s/users/%s/logout", KEYCLOAK_REALM, userId), "", token);
+            if (isFailure(logout)) {
+                throw new IOException(format("Could not end the sessions of user %s: HTTP %d", userId, logout.getCode()));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to remove a member from project " + project.id(), e);
+        }
+    }
+
+    private String requireGroup(String token, AfonProject project) throws IOException {
+        String group = groupId(token, KEYCLOAK_REALM, project.id().value());
+        if (group == null) {
+            throw new IOException(format("KeyCloak has no group for project %s: make it with manage-identity create", project.id()));
+        }
+        return group;
+    }
+
+    @Override
+    public void closeProject(AfonProject project) {
+        String clientId = project.identity().treClient();
+        try {
+            String token = adminToken();
+            String uuid = clientUuid(token, KEYCLOAK_REALM, clientId);
+            if (uuid == null) {
+                logger.info("No KeyCloak client {} to close", clientId);
+                return;
+            }
+            String uri = format("/admin/realms/%s/clients/%s", KEYCLOAK_REALM, uuid);
+            Map<String, Object> client = getMap(token, uri, "client " + clientId);
+            client.put("enabled", false);
+            if (isFailure(putJson(token, uri, mapper.writeValueAsString(client), "client " + clientId))) {
+                throw new IOException("Could not disable KeyCloak client " + clientId);
+            }
+            logger.info("Closed KeyCloak client {}: no token is issued for project {}", clientId, project.id());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to close project " + project.id(), e);
+        }
+    }
+
+    private Map<String, Object> getMap(String token, String uri, String what) throws IOException {
+        return restClient.get(uri, token, response -> {
+            if (response.getCode() != HttpStatus.SC_OK) {
+                throw new IOException(format("Could not read KeyCloak %s: HTTP %d", what, response.getCode()));
+            }
+            return mapper.readValue(response.getEntity().getContent(), LinkedHashMap.class);
+        });
+    }
+
+    private List<Map<String, Object>> getList(String token, String uri, String what) throws IOException {
+        return restClient.get(uri, token, response -> {
+            if (response.getCode() != HttpStatus.SC_OK) {
+                throw new IOException(format("Could not read KeyCloak %s: HTTP %d", what, response.getCode()));
+            }
+            return mapper.readValue(response.getEntity().getContent(), List.class);
+        });
     }
 
     /**

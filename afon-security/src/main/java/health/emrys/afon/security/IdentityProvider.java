@@ -1,11 +1,14 @@
 package health.emrys.afon.security;
 
 import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.project.AfonProject;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public interface IdentityProvider {
 
@@ -88,6 +91,45 @@ public interface IdentityProvider {
     List<HttpResponse> configureMfa(String adminToken, String realm) throws IOException;
 
     HttpResponse createUser(String adminToken, String realm, AfonUser user) throws IOException;
+
+    /**
+     * Makes a researcher in the central identity, once, with no password: they are sent an invitation email whose required
+     * actions are to verify the email, set a password and enrol a second factor.  Idempotent: an existing user is left as
+     * they are.  The user's token names them by the immutable id returned, never by their email.
+     *
+     * @return the user's immutable id
+     */
+    String ensureUser(String email, String firstName, String lastName);
+
+    /**
+     * @return the immutable id of the user with this email, if there is one
+     */
+    Optional<String> findUser(String email);
+
+    /**
+     * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client
+     * for the TRE, whose tokens carry the audiences of the project's Provider catalogs, and one for Git, whose tokens carry
+     * no Provider audience.  Each authenticates by {@code private_key_jwt} with the public key it is given, and each token
+     * names the one project it is for, only when the user is a member of the project's group.
+     *
+     * @param publicKeys the public key (a JWK or a JWK set) of each client, by {@code tre} and {@code git}
+     */
+    void ensureProject(AfonProject project, Map<String, String> publicKeys);
+
+    /**
+     * Adds the user to the project's group, so that they can get a token for the project.
+     */
+    void addMember(AfonProject project, String userId);
+
+    /**
+     * Removes the user from the project's group and ends their sessions.  A token already issued lasts until it expires.
+     */
+    void removeMember(AfonProject project, String userId);
+
+    /**
+     * Closes the project's TRE client, so that no token is issued for it.  A token already issued lasts until it expires.
+     */
+    void closeProject(AfonProject project);
 
     /**
      * Convenience check used by callers to wait until the provider is serving requests.
