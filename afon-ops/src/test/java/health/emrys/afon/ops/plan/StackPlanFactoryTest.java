@@ -71,6 +71,15 @@ class StackPlanFactoryTest {
         return new Step(call, call, () -> {});
     });
 
+    /**
+     * The step waiting for the stack's Polaris and KeyCloak, then for the cluster to reach the domains the stack serves: not Jupyter's, if it has no Jupyter.
+     */
+    private static String waitForPolarisAndKeycloakIn(String cloud, boolean jupyter) {
+        String suffix = cloud.equals("aws") ? "" : "-" + cloud;
+        return "waitForPolarisAndKeycloakIn(" + cloud + ",[oauth.example, polaris" + suffix + ".example"
+               + (jupyter ? ", jupyter" + suffix + ".example" : "") + "])";
+    }
+
     private List<String> derived(StackAction action, String stackId) {
         return factory.steps(action, StackId.parse(stackId), ops, false).stream().map(Step::getName).toList();
     }
@@ -87,16 +96,16 @@ class StackPlanFactoryTest {
         // a stack with Polaris ends with Polaris restricted, but admits nobody to it, as there is no setup
         assertThat(derived(DEPLOY, "aws-polaris")).containsExactly(
             login("aws"), deleteConflicting("aws-polaris"), "checkKeyCloakAnswers(aws)", "deployStack(aws-polaris)",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)", "whitelistPolaris(aws,false)");
+            waitForPolarisAndKeycloakIn("aws", false), "deployComplete(aws-polaris)", "whitelistPolaris(aws,false)");
         assertThat(derived(DEPLOY, "aws-full")).containsExactly(
             login("aws"), deleteConflicting("aws-full"),
             "deployStack(aws-full)",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-full)", "whitelistPolaris(aws,false)");
+            waitForPolarisAndKeycloakIn("aws", true), "deployComplete(aws-full)", "whitelistPolaris(aws,false)");
         for (String cloud : List.of("azure", "gcp")) {
             String stack = cloud + "-polaris";
             assertThat(derived(DEPLOY, stack)).containsExactly(
                 login(cloud), deleteConflicting(stack), "checkKeyCloakAnswers(" + cloud + ")", "deployStack(" + stack + ")",
-                "waitForPolarisAndKeycloakIn(" + cloud + ")", "deployComplete(" + stack + ")", "whitelistPolaris(" + cloud + ",false)");
+                waitForPolarisAndKeycloakIn(cloud, false), "deployComplete(" + stack + ")", "whitelistPolaris(" + cloud + ",false)");
         }
     }
 
@@ -107,7 +116,7 @@ class StackPlanFactoryTest {
         assertThat(derived(DEPLOY, "azure-full")).containsExactly(
             login("azure"), deleteConflicting("azure-full"),
             "deployCluster(azure-full)", "ensureFederatedCredential(azure-full)", "deployStackAfterCluster(azure-full)",
-            "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "whitelistPolaris(azure,false)");
+            waitForPolarisAndKeycloakIn("azure", true), "deployComplete(azure-full)", "whitelistPolaris(azure,false)");
         assertThat(derived(SETUP, "azure-polaris")).contains(
             "deployCluster(azure-polaris)", "ensureFederatedCredential(azure-polaris)", "deployStackAfterCluster(azure-polaris)")
             .doesNotContain("deployStack(azure-polaris)");
@@ -133,20 +142,20 @@ class StackPlanFactoryTest {
         // Polaris is reached through a port-forward to its pod by default, so nobody is admitted to it, and it ends restricted
         assertThat(derived(SETUP, "aws-polaris")).containsExactly(
             login("aws"), deleteConflicting("aws-polaris"), "checkKeyCloakAnswers(aws)", "deployStack(aws-polaris)",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)", "configureOidcUsersFor(aws)",
+            waitForPolarisAndKeycloakIn("aws", false), "deployComplete(aws-polaris)", "configureOidcUsersFor(aws)",
             "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "setupComplete(aws-polaris)",
             "whitelistPolaris(aws,false)");
         assertThat(derived(SETUP, "aws-full")).containsExactly(
             login("aws"), deleteConflicting("aws-full"),
             "deployStack(aws-full)",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
+            waitForPolarisAndKeycloakIn("aws", true), "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
             "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runSparkWritingTo(aws,aws)",
             "setupComplete(aws-full)", "whitelistPolaris(aws,false)");
         for (String cloud : List.of("azure", "gcp")) {
             String stack = cloud + "-polaris";
             assertThat(derived(SETUP, stack)).containsExactly(
                 login(cloud), deleteConflicting(stack), "checkKeyCloakAnswers(" + cloud + ")", "deployStack(" + stack + ")",
-                "waitForPolarisAndKeycloakIn(" + cloud + ")", "deployComplete(" + stack + ")", "configureOidcUsersFor(" + cloud + ")",
+                waitForPolarisAndKeycloakIn(cloud, false), "deployComplete(" + stack + ")", "configureOidcUsersFor(" + cloud + ")",
                 "createAllCatalogsFor(" + cloud + ")", "configurePolarisUsersOnAllCatalogsFor(" + cloud + ")", "setupComplete(" + stack + ")",
                 "whitelistPolaris(" + cloud + ",false)");
         }
@@ -158,7 +167,7 @@ class StackPlanFactoryTest {
         // after the deploy, before the first step calling Polaris, and again restricted at the end
         assertThat(derived(SETUP, "aws-polaris")).containsExactly(
             login("aws"), deleteConflicting("aws-polaris"), "checkKeyCloakAnswers(aws)", "deployStack(aws-polaris)",
-            "waitForPolarisAndKeycloakIn(aws)", "deployComplete(aws-polaris)", "whitelistPolaris(aws,true)",
+            waitForPolarisAndKeycloakIn("aws", false), "deployComplete(aws-polaris)", "whitelistPolaris(aws,true)",
             "configureOidcUsersFor(aws)", "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)",
             "setupComplete(aws-polaris)", "whitelistPolaris(aws,false)");
         // the caller is taken off again even if a step fails in between, as if by a finally
@@ -267,10 +276,10 @@ class StackPlanFactoryTest {
     void stacksComposedOfComponentsAreManagedLikeTheOthers() {
         assertThat(derived(DEPLOY, "azure-full")).containsExactly(
             login("azure"), deleteConflicting("azure-full"), "deployStack(azure-full)",
-            "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "whitelistPolaris(azure,false)");
+            waitForPolarisAndKeycloakIn("azure", true), "deployComplete(azure-full)", "whitelistPolaris(azure,false)");
         assertThat(derived(SETUP, "azure-full")).containsExactly(
             login("azure"), deleteConflicting("azure-full"), "deployStack(azure-full)",
-            "waitForPolarisAndKeycloakIn(azure)", "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
+            waitForPolarisAndKeycloakIn("azure", true), "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
             "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "runSparkWritingTo(azure,azure)",
             "setupComplete(azure-full)", "whitelistPolaris(azure,false)");
     }

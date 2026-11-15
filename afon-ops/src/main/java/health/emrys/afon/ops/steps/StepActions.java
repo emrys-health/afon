@@ -15,6 +15,8 @@ import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.ExecResult;
+import health.emrys.afon.ops.kube.tools.DnsResolver;
 import health.emrys.afon.ops.kube.tools.KeyCloakTunnel;
 import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
@@ -1173,8 +1175,9 @@ public class StepActions {
      * of the stack or an external one: Polaris deployed before its KeyCloak is reachable, eg before its DNS record exists, fails
      * to initialise its OIDC tenant and answers every call carrying a token with a 500 "OIDC Server is not available".  A call with
      * a dummy bearer token needs no credentials, which are not configured yet: a Polaris that reaches its OIDC server rejects
-     * the token with a 401, whereas one that cannot answers with a 5xx.  Gives up after the timeout, saying so, leaving what needs
-     * Polaris to fail with its own error.
+     * the token with a 401, whereas one that cannot answers with a 5xx.
+     *
+     * @throws IllegalStateException if Polaris still does not reach it after the timeout, saying why
      *
      * @param pauseMs how long to wait between the requests
      */
@@ -1207,9 +1210,8 @@ public class StepActions {
                             reported = elapsed;
                         }
                         if (elapsed + pauseMs >= timeout) {
-                            logger.warn("Timed out waiting for Polaris to reach its OIDC server after {}: {}",
-                                        formatDuration(timeout), problem[0]);
-                            return;
+                            throw new IllegalStateException(format("Polaris still does not reach its OIDC server after %s: it %s",
+                                                                   formatDuration(timeout), problem[0]));
                         }
                         Thread.sleep(pauseMs);
                     }
@@ -1230,6 +1232,40 @@ public class StepActions {
         } catch (IOException e) {
             return "cannot be reached: " + e;
         }
+    }
+
+    /**
+     * Waits until the cluster of the current kubectl context reaches the public domains of its own services, from a Polaris pod, see
+     * {@link DnsResolver}: a lookup made from inside the cluster before a domain's record existed stays failed there for minutes, which
+     * fails whatever calls the domain first, eg Trino fetching its tokens from KeyCloak.
+     *
+     * @throws IllegalStateException if a domain is still not reached after the timeout, naming each and why
+     */
+    public Step waitOnClusterReachingDomains(AfonCloud cloud, AfonPropertyProvider properties, List<String> domains, long timeout) {
+        return new Step(
+                "wait_on_cluster_reaching_domains_for_cloud_" + cloud,
+                "wait until the cluster reaches its own domains for cloud `" + cloud + "`",
+                () -> {
+                    try (KubeClient client = new KubeClient(properties)) {
+                        client.requireContextOf(cloud);
+                        String pod = client.runningPodWithLabel(StepOperations.POLARIS_POD_LABEL).orElseThrow(() -> new IllegalStateException(
+                            "No running pod with the label " + StepOperations.POLARIS_POD_LABEL + " in the kubectl context '" + client.getContext() + "'"));
+                        logger.info("Waiting for the cluster to reach {} from {} (until timeout of {})", domains, pod, formatDuration(timeout));
+                        DnsResolver resolver = new DnsResolver(client, pod);
+                        Map<String, ExecResult> unreached = resolver.waitUntilReachable(domains, Duration.ofMillis(timeout));
+                        if (!unreached.isEmpty()) {
+                            logger.error(resolver.diagnose(domains));
+                            StringBuilder message = new StringBuilder(format(
+                                "The cluster still does not reach %s after %s, though they may resolve from outside: a lookup made before "
+                                + "their records existed is probably cached in the cluster, for up to the SOA minimum of the zone (see the log for the cluster's DNS).",
+                                unreached.keySet(), formatDuration(timeout)));
+                            unreached.forEach((domain, result) -> message.append(format("%n  %s: curl exit %d %s", domain, result.exitCode(),
+                                                                                       result.stderr().strip())));
+                            throw new IllegalStateException(message.toString());
+                        }
+                        logger.info("The cluster reaches {}", domains);
+                    }
+                });
     }
 
     public Step waitOnDNS(String domain, long timeout) {
@@ -1257,7 +1293,8 @@ public class StepActions {
                         }
                     }
                     if (!resolved) {
-                        logger.warn("Timed out waiting on DNS for domain {} after {}", domain, formatDuration(timeout));
+                        throw new IllegalStateException(format("The domain %s still does not resolve after %s: its DNS record is missing or not yet propagated",
+                                                               domain, formatDuration(timeout)));
                     }
                 });
     }
@@ -1266,7 +1303,9 @@ public class StepActions {
     /**
      * Waits until the URL answers a GET with 200, eg the discovery document of a KeyCloak that has just been deployed: its
      * DNS record resolving does not mean it serves, as its pod takes minutes to be ready, answered meanwhile with 502 or 503
-     * by the ingress.  Gives up after the timeout, saying so, leaving whatever needs it to fail with its own error.
+     * by the ingress.
+     *
+     * @throws IllegalStateException if it still does not answer after the timeout, saying why
      *
      * @param pauseMs how long to wait between the requests
      */
@@ -1290,8 +1329,7 @@ public class StepActions {
                             reported = elapsed;
                         }
                         if (elapsed + pauseMs >= timeout) {
-                            logger.warn("Timed out waiting for {} to answer after {}: it {}", url, formatDuration(timeout), problem);
-                            return;
+                            throw new IllegalStateException(format("%s still does not answer after %s: it %s", url, formatDuration(timeout), problem));
                         }
                         try {
                             Thread.sleep(pauseMs);

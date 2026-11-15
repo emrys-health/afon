@@ -207,6 +207,16 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
+    public Step waitOnClusterReachingDomains(AfonCloud cloud, AfonPropertyProvider properties, List<String> domains, long timeout) {
+        return new Step("wait_on_cluster_reaching_domains_for_cloud_" + cloud, "Wait until the cluster reaches its own domains", () -> {
+            out.println(format("Wait until a pod in the cluster reaches the domains of KeyCloak, Polaris and Jupyter, until timeout of %s: "
+                               + "a lookup of a domain made before its record existed may stay failed in the cluster for minutes.%n",
+                               DurationUtils.formatDuration(timeout)));
+            out.flush();
+        });
+    }
+
+    @Override
     public Step waitOnPolarisUsingOidc(AfonCloud cloud, AfonPropertyProvider properties, long timeout, long pauseMs) {
         return new Step("wait_on_polaris_using_oidc_for_cloud_" + cloud, "Wait until Polaris reaches its OIDC server", () -> {
             out.println(format("Wait until Polaris answers a call with an invalid token with a 401, not a 500 \"OIDC Server is not available\", until timeout of %s.%n",

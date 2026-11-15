@@ -21,12 +21,20 @@ import static health.emrys.afon.config.ConfigUtils.cloudToCatalog;
 public class TrinoComponent implements StackComponent {
 
     @Override
+    public List<Class<? extends StackComponent>> after() {
+        return List.of(KeycloakComponent.class);
+    }
+
+    @Override
     public void deploy(StackContext context) {
         CloudPlatform platform = context.platform();
         // Trino only needs the cluster reachable, not the Spark operator.  The chart also creates a Service, which
         // fires the cloud's mutating webhooks, if it has any, which the service dependables wait for.
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.addAll(platform.getServiceDependables());
+        // Trino fetches its tokens from the KeyCloak hostname, so, like Polaris, it is ordered after its DNS record: else its wait for
+        // the realm's keys looks the name up before the record exists, which the cluster's DNS caches as a failure for minutes
+        context.find(KeycloakComponent.class).ifPresent(keycloak -> dependsOn.add(keycloak.dnsRecord()));
         new TrinoWorkloads(context.properties(), context.users(),
                            context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME),
                            context.properties().getOidcDomainName(platform.cloud()), context.images())

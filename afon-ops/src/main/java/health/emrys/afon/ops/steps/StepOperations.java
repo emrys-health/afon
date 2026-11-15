@@ -310,11 +310,15 @@ public class StepOperations {
         return stackId.toString().replace('-', '_');
     }
 
-    public Step waitForPolarisAndKeycloakIn(AfonCloud cloud) {
+    /**
+     * @param domains the public domain names the stack serves, which the cluster is waited for to reach
+     */
+    public Step waitForPolarisAndKeycloakIn(AfonCloud cloud, List<String> domains) {
         return Step.sequence(format("wait_on_polaris_and_keycloak_for_cloud_%s", cloud),
-                format("wait on DNS for Polaris and KeyCloak, and for Polaris to reach KeyCloak, for cloud `%s`", cloud),
+                format("wait on DNS for Polaris and KeyCloak, for Polaris to reach KeyCloak, and for the cluster to reach its own domains, for cloud `%s`", cloud),
                 waitForPolaris(cloud), waitForKeyCloak(cloud),
-                actions.waitOnPolarisUsingOidc(cloud, properties, dnsWaitTimeout(), KEYCLOAK_POLL_MILLIS));
+                actions.waitOnPolarisUsingOidc(cloud, properties, dnsWaitTimeout(), KEYCLOAK_POLL_MILLIS),
+                actions.waitOnClusterReachingDomains(cloud, properties, domains, dnsWaitTimeout()));
     }
 
     private Step waitForPolaris(AfonCloud cloud) {

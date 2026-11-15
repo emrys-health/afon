@@ -72,10 +72,12 @@ class StepActionsCheckAnswersTest {
     }
 
     @Test
-    void givesUpAtTheTimeoutWithoutFailing() throws Throwable {
+    void failsAtTheTimeoutSayingWhatDidNotAnswer() {
         long start = System.currentTimeMillis();
 
-        actions.waitOnAnswer(url("/broken"), 300, 50).getFunction().run();
+        assertThatThrownBy(() -> actions.waitOnAnswer(url("/broken"), 300, 50).getFunction().run())
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("/broken").hasMessageContaining("still does not answer")
+            .hasMessageContaining("503");
 
         org.assertj.core.api.Assertions.assertThat(System.currentTimeMillis() - start).isBetween(250L, 5_000L);
     }

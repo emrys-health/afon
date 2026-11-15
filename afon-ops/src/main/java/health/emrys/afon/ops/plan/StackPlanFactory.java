@@ -228,13 +228,25 @@ public class StackPlanFactory {
     }
 
     /**
+     * @return the public domain names the stack serves, ie those of its components, and the OIDC one, which may be another stack's: not
+     * those of components it does not deploy, whose records do not exist
+     */
+    private List<String> domainsOf(List<StackComponent> components, AfonCloud cloud, AfonPropertyProvider properties) {
+        List<String> domains = new ArrayList<>();
+        domains.add(properties.getOidcDomainName(cloud));
+        components.forEach(component -> registry.of(component).domains(cloud, properties)
+                                                .forEach(property -> domains.add(properties.getValue(property, ""))));
+        return domains.stream().filter(domain -> domain != null && !domain.isBlank()).distinct().toList();
+    }
+
+    /**
      * The step waiting for what the components of the stack expose: the union of what each needs.
      */
     private Step wait(List<StackComponent> components, StepOperations ops, AfonCloud cloud) {
         Set<Endpoint> endpoints = EnumSet.noneOf(Endpoint.class);
         components.forEach(component -> endpoints.addAll(registry.of(component).waitsFor()));
         if (endpoints.contains(Endpoint.POLARIS)) {
-            return ops.waitForPolarisAndKeycloakIn(cloud);
+            return ops.waitForPolarisAndKeycloakIn(cloud, domainsOf(components, cloud, ops.properties()));
         }
         return ops.waitForKeyCloak(cloud);
     }
