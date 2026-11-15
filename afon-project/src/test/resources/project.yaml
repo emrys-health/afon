@@ -1,7 +1,8 @@
 # A template: ${cloud} and ${CLOUD} are the project's cloud, in lower and upper case, as the tests give it, so that no cloud is special.
 project:
-  id: cvd-2026-0007
+  id: xyz-yyyy-nnnn
   cloud: ${cloud}
+  egressIp: 203.0.113.10
 
 identity:
   issuerUrl: https://id.example.org/realms/polaris
@@ -9,24 +10,24 @@ identity:
 
 providers:
   - id: nuh
-    polarisUri: https://polaris.nuh.example/api/catalog
-    warehouse: cvd-2026-0007
+    catalogUri: https://polaris.nuh.example/api/catalog
+    catalogName: xyz-yyyy-nnnn
     audience: provider-nuh
-    bucket: nuh-cvd-2026-0007
+    bucket: nuh-xyz-yyyy-nnnn
   - id: ucl
-    polarisUri: https://polaris.ucl.example/api/catalog
-    warehouse: cvd-2026-0007
+    catalogUri: https://polaris.ucl.example/api/catalog
+    catalogName: xyz-yyyy-nnnn
     audience: provider-ucl
-    bucket: ucl-cvd-2026-0007
+    bucket: ucl-xyz-yyyy-nnnn
 
 stacks:
   create:
-    auditBucket: cvd-2026-0007-audit
-    gitBucket: cvd-2026-0007-gitea
+    auditBucket: xyz-yyyy-nnnn-audit
+    gitBucket: xyz-yyyy-nnnn-gitea
   git:
-    domain: git.cvd-2026-0007.example.org
+    domain: git.xyz-yyyy-nnnn.example.org
   tre:
     domains:
-      ${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.cvd-2026-0007.example.org
+      ${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.xyz-yyyy-nnnn.example.org
     lifetime:
       teardown: "22:00"

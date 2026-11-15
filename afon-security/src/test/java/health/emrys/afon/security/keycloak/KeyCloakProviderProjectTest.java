@@ -2,7 +2,7 @@ package health.emrys.afon.security.keycloak;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import health.emrys.afon.project.AfonProject;
+import health.emrys.afon.project.TreProject;
 import health.emrys.afon.project.FileProjectProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,18 +35,18 @@ class KeyCloakProviderProjectTest {
      * {@code ${CLOUD}} in upper case.  No cloud is special, so every test is run on every cloud.
      */
     private static final String TEMPLATE = """
-        project: {id: cvd-2026-0007, cloud: ${cloud}}
+        project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         providers:
-          - {id: nuh, polarisUri: "https://p.example/api", warehouse: w, audience: provider-nuh, bucket: b}
+          - {id: nuh, catalogUri: "https://p.example/api", catalogName: w, audience: provider-nuh, bucket: b}
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
           git: {domain: git.example.org}
           tre: {domains: {${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.example.org}}
         """;
 
-    private static AfonProject project(AfonCloud cloud) {
-        return FileProjectProvider.parse(render(TEMPLATE, cloud));
+    private static TreProject project(AfonCloud cloud) {
+        return (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud));
     }
 
     private static String render(String template, AfonCloud cloud) {
@@ -77,12 +77,12 @@ class KeyCloakProviderProjectTest {
             } else if (call.equals("GET /admin/realms/polaris/client-scopes")) {
                 reply(exchange, 200, "[{\"id\":\"roles-id\",\"name\":\"roles\"},{\"id\":\"email-id\",\"name\":\"email\"}]");
             } else if (call.equals("GET /admin/realms/polaris/groups")) {
-                reply(exchange, 200, groupMade ? "[{\"id\":\"gid\",\"name\":\"cvd-2026-0007\"}]" : "[]");
+                reply(exchange, 200, groupMade ? "[{\"id\":\"gid\",\"name\":\"xyz-yyyy-nnnn\"}]" : "[]");
             } else if (call.equals("POST /admin/realms/polaris/groups")) {
                 groupMade = true;
                 reply(exchange, 201, "");
             } else if (path.matches("/admin/realms/polaris/clients/[^/]+/roles/[^/]+") && call.startsWith("GET")) {
-                reply(exchange, 200, "{\"id\":\"rid\",\"name\":\"cvd-2026-0007\"}");
+                reply(exchange, 200, "{\"id\":\"rid\",\"name\":\"xyz-yyyy-nnnn\"}");
             } else if (call.equals("GET /admin/realms/polaris/users")) {
                 reply(exchange, 200, "[{\"id\":\"the-user-id\",\"username\":\"alice@uni.example\"}]");
             } else if (call.startsWith("GET")) {
@@ -123,41 +123,41 @@ class KeyCloakProviderProjectTest {
     void makesTheTwoClientsTheGroupAndTheClaims(AfonCloud cloud) {
         provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
 
-        String treClient = bodyOf("POST /admin/realms/polaris/clients", "cvd-2026-0007-tre");
+        String treClient = bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-tre");
         assertThat(treClient).contains("\"clientAuthenticatorType\":\"client-jwt\"", "\"fullScopeAllowed\":false",
                                        "\"directAccessGrantsEnabled\":false", "\"serviceAccountsEnabled\":false",
                                        "https://jupyter.example.org/hub/oauth_callback", "use.jwks.string");
         // a single JWK is wrapped as a JWK set
         assertThat(treClient).contains("keys");
-        assertThat(bodyOf("POST /admin/realms/polaris/clients", "cvd-2026-0007-git"))
+        assertThat(bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-git"))
             .contains("https://git.example.org/user/oauth2/keycloak/callback");
-        assertThat(requests).contains("DELETE /admin/realms/polaris/clients/uuid-cvd-2026-0007-tre/default-client-scopes/roles-id",
-                                      "DELETE /admin/realms/polaris/clients/uuid-cvd-2026-0007-git/default-client-scopes/roles-id");
+        assertThat(requests).contains("DELETE /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/default-client-scopes/roles-id",
+                                      "DELETE /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-git/default-client-scopes/roles-id");
         assertThat(requests).doesNotContain(
-            "DELETE /admin/realms/polaris/clients/uuid-cvd-2026-0007-tre/default-client-scopes/email-id");
+            "DELETE /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/default-client-scopes/email-id");
 
         // the project claim comes from the client's own roles, the audiences from mappers
-        assertThat(bodyOf("POST /admin/realms/polaris/clients/uuid-cvd-2026-0007-tre/protocol-mappers/models", "client-role-mapper"))
-            .contains("\"usermodel.clientRoleMapping.clientId\":\"cvd-2026-0007-tre\"", "\"claim.name\":\"project\"");
-        bodyOf("POST /admin/realms/polaris/clients/uuid-cvd-2026-0007-tre/protocol-mappers/models", "provider-nuh");
+        assertThat(bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "client-role-mapper"))
+            .contains("\"usermodel.clientRoleMapping.clientId\":\"xyz-yyyy-nnnn-tre\"", "\"claim.name\":\"project\"");
+        bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "provider-nuh");
         // the Git client carries no Provider audience
         assertThat(bodies.stream().filter(b -> b.contains("provider-nuh"))).hasSize(1);
 
         assertThat(requests).contains("POST /admin/realms/polaris/groups",
-                                      "POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-cvd-2026-0007-tre",
-                                      "POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-cvd-2026-0007-git");
+                                      "POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-tre",
+                                      "POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-git");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void makesOnlyTheTreClientForAProjectWithNoGitOfItsOwn(AfonCloud cloud) {
-        AfonProject noGit = FileProjectProvider.parse(render(TEMPLATE, cloud).replace(", gitBucket: gitea", "")
+        TreProject noGit = (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud).replace(", gitBucket: gitea", "")
                                                                            .replace("  git: {domain: git.example.org}\n", ""));
         provider.ensureProject(noGit, Map.of("tre", JWK));
-        bodyOf("POST /admin/realms/polaris/clients", "cvd-2026-0007-tre");
-        assertThat(bodies.stream().filter(b -> b.contains("cvd-2026-0007-git"))).isEmpty();
-        assertThat(requests).contains("POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-cvd-2026-0007-tre")
-                            .doesNotContain("POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-cvd-2026-0007-git");
+        bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-tre");
+        assertThat(bodies.stream().filter(b -> b.contains("xyz-yyyy-nnnn-git"))).isEmpty();
+        assertThat(requests).contains("POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-tre")
+                            .doesNotContain("POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-git");
     }
 
     @ParameterizedTest
@@ -178,7 +178,7 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAProjectWithoutAJupyterDomainForItsRedirectUris(AfonCloud cloud) {
-        AfonProject noDomain = FileProjectProvider.parse(render(TEMPLATE, cloud).replace("tre: {domains: {${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.example.org}}".replace("${CLOUD}", cloud.name()), "tre: {}"));
+        TreProject noDomain = (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud).replace("tre: {domains: {${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.example.org}}".replace("${CLOUD}", cloud.name()), "tre: {}"));
         assertThatThrownBy(() -> provider.ensureProject(noDomain, Map.of("tre", JWK, "git", JWK)))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining(cloud.name() + "_JUPYTER_DOMAIN_NAME");
     }
@@ -204,15 +204,15 @@ class KeyCloakProviderProjectTest {
     @EnumSource(AfonCloud.class)
     void failsToAddAMemberToAProjectThatIsNotMade(AfonCloud cloud) {
         assertThatThrownBy(() -> provider.addMember(project(cloud), "the-user-id"))
-            .hasRootCauseMessage("KeyCloak has no group for project cvd-2026-0007: make it with manage-identity create");
+            .hasRootCauseMessage("KeyCloak has no group for project xyz-yyyy-nnnn: make it with manage-identity create");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void closesTheTreClientOnly(AfonCloud cloud) {
         provider.closeProject(project(cloud));
-        assertThat(bodyOf("PUT /admin/realms/polaris/clients/uuid-cvd-2026-0007-tre", "\"enabled\":false")).isNotEmpty();
-        assertThat(requests).doesNotContain("PUT /admin/realms/polaris/clients/uuid-cvd-2026-0007-git");
+        assertThat(bodyOf("PUT /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre", "\"enabled\":false")).isNotEmpty();
+        assertThat(requests).doesNotContain("PUT /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-git");
     }
 
     @ParameterizedTest

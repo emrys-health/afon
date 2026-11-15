@@ -63,6 +63,8 @@ public class GenerateScriptMains {
 
         new ScriptEntry("db", "DbWhitelistMain", "db/whitelist.sh"),
 
+        new ScriptEntry("project", "ProjectKeyMain", "project/key.sh"),
+
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
@@ -145,6 +147,7 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
         new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh"),
         new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh"),
+        new ScriptEntry("kube", "KubeKeycloakWhitelistMain", "kube/keycloak-whitelist.sh"),
 
         new ScriptEntry("signing", "SigningPublicKeyMain", "signing/public-key.sh"),
         new ScriptEntry("signing", "SigningReportMain", "signing/report.sh"),

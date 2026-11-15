@@ -5,7 +5,7 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.Project
 import health.emrys.afon.cdk.DockerImages
 import health.emrys.afon.config.AfonCloud
-import health.emrys.afon.project.{AfonProject, FileProjectProvider}
+import health.emrys.afon.project.{FileProjectProvider, TreProject}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.scalatest.GivenWhenThen
@@ -73,10 +73,10 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
     Map("tre" -> jwk("tre"), "git" -> jwk("git")).asJava
   }
 
-  private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): AfonProject = {
+  private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): TreProject = {
     val git = if (ownGit) s"\n         |  git: {domain: git.$id.example.org}" else ""
     val catalogs = providers.map(name =>
-      s"  - {id: $name, polarisUri: 'https://polaris.$name.example/api', warehouse: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
+      s"  - {id: $name, catalogUri: 'https://polaris.$name.example/api', catalogName: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
     FileProjectProvider.parse(
       s"""project: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
@@ -85,7 +85,7 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
          |stacks:
          |  create: {auditBucket: $id-audit, gitBucket: $id-git}$git
          |  tre: {domains: {${cloud.name}_JUPYTER_DOMAIN_NAME: jupyter.$id.example.org}}
-         |""".stripMargin)
+         |""".stripMargin).asInstanceOf[TreProject]
   }
 
   private def admin(): String = provider.adminToken()

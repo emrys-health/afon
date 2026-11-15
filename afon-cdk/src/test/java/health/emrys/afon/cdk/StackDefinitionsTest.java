@@ -9,6 +9,9 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import health.emrys.afon.config.AfonCloud;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,6 +35,31 @@ class StackDefinitionsTest {
     private List<Class<?>> componentsOf(String stackId) {
         return StackDefinitions.get(StackId.parse(stackId)).components().apply(properties)
                                .stream().<Class<?>>map(StackComponent::getClass).toList();
+    }
+
+    /**
+     * A stack deployed by a project pins its egress IP whatever its definition says: the project is an env of its own, with its own
+     * {@code <CLOUD>_EGRESS_IP}, so the identity stack, which no other env's stacks can hold the address with, takes the project's.
+     */
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aStackDeployedByAProjectPinsItsEgressIpWhateverItsDefinitionSays(AfonCloud cloud) {
+        FilePropertyProvider config = new FilePropertyProvider("../templates/config");
+        StackDefinition identity = StackDefinitions.withRole(cloud, StackRole.IDENTITY).orElseThrow();
+        StackDefinition tre = StackDefinitions.withRole(cloud, StackRole.TRE).orElseThrow();
+
+        // as the definition says, outside a project
+        assertThat(identity.pinsEgressIp(config)).isEqualTo(identity.pinnedEgressIp()).isFalse();
+        assertThat(tre.pinsEgressIp(config)).isEqualTo(tre.pinnedEgressIp());
+
+        // in a project, both do
+        config.setValue(health.emrys.afon.config.AfonProperty.PROJECT_ID, "a-project");
+        assertThat(identity.pinsEgressIp(config)).isTrue();
+        assertThat(tre.pinsEgressIp(config)).isTrue();
+
+        // an empty id is no project
+        config.setValue(health.emrys.afon.config.AfonProperty.PROJECT_ID, " ");
+        assertThat(identity.pinsEgressIp(config)).isFalse();
     }
 
     @Test

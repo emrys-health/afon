@@ -1,7 +1,7 @@
 package health.emrys.afon.security;
 
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.project.AfonProject;
+import health.emrys.afon.project.TreProject;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 
@@ -114,22 +114,22 @@ public interface IdentityProvider {
      *
      * @param publicKeys the public key (a JWK or a JWK set) of each client, by {@code tre} and {@code git}
      */
-    void ensureProject(AfonProject project, Map<String, String> publicKeys);
+    void ensureProject(TreProject project, Map<String, String> publicKeys);
 
     /**
      * Adds the user to the project's group, so that they can get a token for the project.
      */
-    void addMember(AfonProject project, String userId);
+    void addMember(TreProject project, String userId);
 
     /**
      * Removes the user from the project's group and ends their sessions.  A token already issued lasts until it expires.
      */
-    void removeMember(AfonProject project, String userId);
+    void removeMember(TreProject project, String userId);
 
     /**
      * Closes the project's TRE client, so that no token is issued for it.  A token already issued lasts until it expires.
      */
-    void closeProject(AfonProject project);
+    void closeProject(TreProject project);
 
     /**
      * Convenience check used by callers to wait until the provider is serving requests.

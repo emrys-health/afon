@@ -44,15 +44,18 @@ check_store_options(){
   fi
 }
 
-# Sets the env of the objects: the global one, given by --env or --cdktf-env, else the one that the cdktf symlink points to.
+# Sets the env of the objects: the global one, given by --env or --cdktf-env, else the one that the cdktf dir is, or points to: cdktf-<env>.
 resolve_store_env(){
   # The env and the cdktf dir are set by the command, which has already switched the cdktf symlink to
   # cdktf-<env> when given an env.
   AFON_HOME="${AFON_HOME:-$HOME/.afon}"
   CDKTF_STORE_DIR="${CDKTF_DIR:-$AFON_HOME/cdktf}"
   STORE_ENV="${CDKTF_ENV:-}"
-  if [ -z "$STORE_ENV" ] && [ -L "$CDKTF_STORE_DIR" ]; then
-    STORE_ENV=$(basename "$(readlink "$CDKTF_STORE_DIR")")
+  if [ -z "$STORE_ENV" ]; then
+    # the dir is a symlink to cdktf-<env>, as the active one is, or is cdktf-<env> itself, as that of a project is, given by --cdktf
+    local TARGET="$CDKTF_STORE_DIR"
+    [ ! -L "$TARGET" ] || TARGET=$(readlink "$TARGET")
+    STORE_ENV=$(basename "$TARGET")
     if [[ "$STORE_ENV" == cdktf-* ]]; then
       STORE_ENV="${STORE_ENV#cdktf-}"
     else
@@ -147,14 +150,19 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 # Prints the value of a property of the config of the env, which may be set in terms of others, eg
 # ${ENV_NAME}afonstorageaccount.  The config dir of the env is read rather than via the config symlink, which may not
-# point to it, eg to pull into a new env.  Prints nothing if there is none.
+# point to it, eg to pull into a new env, unless it is that of the env, as it is in the home of a project.  Prints nothing if there is none.
 config_property(){
   local PROPERTY="$1" CLOUD_NAME="$2" FILE
+  local DIR="$AFON_HOME/config-$STORE_ENV"
+  # In the home of a project, the config dir is config, a symlink to config-<project>, which is not in that home
+  if [ ! -d "$DIR" ] && [ -L "$AFON_HOME/config" ] && [ "$(basename "$(readlink "$AFON_HOME/config")")" = "config-$STORE_ENV" ]; then
+    DIR="$AFON_HOME/config"
+  fi
   (
     set +eu
     set -a
     for FILE in afon.properties "afon-$CLOUD_NAME.properties" ; do {
-      [ -f "$AFON_HOME/config-$STORE_ENV/$FILE" ] && source "$AFON_HOME/config-$STORE_ENV/$FILE" > /dev/null 2>&1
+      [ -f "$DIR/$FILE" ] && source "$DIR/$FILE" > /dev/null 2>&1
     } done
     printf '%s' "${!PROPERTY:-}"
   )

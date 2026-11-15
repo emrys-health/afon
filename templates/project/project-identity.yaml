@@ -1,0 +1,18 @@
+# The central identity: the one Keycloak that signs users in for every project, deployed by a project of its own.  Made by
+#   afon-cli.sh manage-project init ${id} --role identity ${cloud}
+# Complete what is in <angle brackets>, then check it, configure it and bring it up:
+#   afon-cli.sh manage-project validate ${id}
+#   afon-cli.sh manage-project configure ${id}
+#   afon-cli.sh manage-project up ${id}
+# See docs/projects.md.
+project:
+  id: ${id}
+  cloud: ${cloud}
+  role: identity
+  # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
+  env: ${env}
+  # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>
+  egressIp: <egress-ip>
+
+# the nodes of its cluster, which runs Keycloak only: adjust to the quota of the subscription
+${cluster}

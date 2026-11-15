@@ -10,7 +10,8 @@
 # Then <stack-id>, --region, --account and --project are not given: each cloud uses its config or defaults.
 #
 # The env and the cdktf dir are the global ones (--env, --cdktf-env, AFON_ENV, AFON_CDKTF_ENV,
-# --cdktf, AFON_CDKTF).  Without a global env, the env is the one that the <afon-home>/cdktf symlink points to.
+# --cdktf, AFON_CDKTF).  Without a global env, the env is the one that the <afon-home>/cdktf symlink points to, or, if the cdktf dir is
+# not a symlink, as that of a project is, the <env> of its name cdktf-<env>: the project's state is stored apart from that of the env it is made from.
 #
 # What is stored, for each stack of the cdktf dir, or just for the <stack-id> given, eg aws-keycloak:
 #   terraform.<stack-id>.tfstate            the tofu state

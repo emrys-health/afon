@@ -251,11 +251,14 @@ public enum AfonProperty {
     /** Issuer URL of the KeyCloak of any cloud without its own.  Optional: derived from the domain name when unset. */
     OIDC_ISSUER_URL("OIDC_ISSUER_URL"),
     OIDC_EMAIL_DOMAIN("OIDC_EMAIL_DOMAIN"),
-    /** The client of the project's TRE, eg {@code cvd-2026-0007-tre}, whose audience the TRE's consumers require.  Set for a project. */
+    /** The client of the project's TRE, eg {@code xyz-yyyy-nnnn-tre}, whose audience the TRE's consumers require.  Set for a project. */
     OIDC_AUDIENCE("OIDC_AUDIENCE"),
-    /** The client of the project's Git, eg {@code cvd-2026-0007-git}, whose audience its Git requires.  Set for a project. */
+    /** The client of the project's Git, eg {@code xyz-yyyy-nnnn-git}, whose audience its Git requires.  Set for a project. */
     OIDC_GIT_AUDIENCE("OIDC_GIT_AUDIENCE"),
-    /** The {@code acr} value that proves MFA, which every consumer of a project's tokens requires.  Set for a project. */
+    /**
+     * The value of the {@code acr} (authentication context class reference) claim of a token, which says how strongly the user authenticated,
+     * that proves a second factor (MFA), eg {@code mfa}, and which every consumer of a project's tokens requires.  Set for a project.
+     */
     OIDC_ACR("OIDC_ACR"),
     /** The claim of a token naming its project, a list of exactly one.  Optional: {@code project} when unset. */
     OIDC_PROJECT_CLAIM("OIDC_PROJECT_CLAIM"),
@@ -263,7 +266,7 @@ public enum AfonProperty {
     OIDC_USER_CLAIM("OIDC_USER_CLAIM"),
 
     // Project (set by manage-project from project.yaml, see FileProjectProvider)
-    /** The project's immutable id, eg {@code cvd-2026-0007}, which names its clients, group and principal role.  Set for a project. */
+    /** The project's immutable id, eg {@code xyz-yyyy-nnnn}, which names its clients, group and principal role.  Set for a project. */
     PROJECT_ID("PROJECT_ID"),
     /** The domain of the project's Git.  Set for a project. */
     GIT_DOMAIN_NAME("GIT_DOMAIN_NAME"),
@@ -273,6 +276,12 @@ public enum AfonProperty {
     TRE_TEARDOWN_TIME_ZONE("TRE_TEARDOWN_TIME_ZONE"),
 
     // Keycloak (self-hosted OIDC provider deployment, via KeyCloakConfig)
+    /**
+     * The kubeconfig of the cluster whose Keycloak the stacks configure through a port-forward, when it is not the cluster that they
+     * deploy, ie when they use the Keycloak of another project, which a project's config names for the TRE.  Optional: the cluster of the
+     * stack when unset.
+     */
+    KEYCLOAK_KUBECONFIG("KEYCLOAK_KUBECONFIG"),
     KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME("KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME"),
     KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD"),
     KEYCLOAK_DB("KEYCLOAK_DB"),

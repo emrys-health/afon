@@ -1,9 +1,13 @@
 package health.emrys.afon.ops.project;
 
+import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
+import health.emrys.afon.ops.kube.tools.KeyCloakTunnel;
 import health.emrys.afon.project.AfonProject;
 import health.emrys.afon.project.ProjectException;
 import health.emrys.afon.project.FileProjectProvider;
+import health.emrys.afon.project.TreProject;
 import health.emrys.afon.project.ProjectEnv;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
@@ -18,7 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 /**
  * Manages a project's place in the central identity, the one Keycloak that issues the tokens of every project:
@@ -50,6 +54,7 @@ public class ManageIdentityMain {
     private static final String PUBLIC_KEYS = "--public-keys";
     private static final String FIRST_NAME = "--first-name";
     private static final String LAST_NAME = "--last-name";
+    private static final String KUBECONFIG = "--kubeconfig";
 
     private static final String USAGE = String.join(System.lineSeparator(),
         "Usage: manage-identity <action> <project> [<args>], where <action> is one of:",
@@ -60,16 +65,37 @@ public class ManageIdentityMain {
         "                                  makes the researcher if absent, adds them to the project's group, prints their user id",
         "  remove-member <email>           removes the researcher from the group and ends their sessions",
         "  close                           closes the project's TRE client, so that no token is issued for it",
-        "<project> is the id of the project, eg cvd-2026-0007, whose file the deployer writes in its own dir,",
+        "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
+        "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
+        "  config, which that of a project that names its identity project has: run in its home, eg manage-project run <project> manage-identity ...;",
+        "  else Keycloak is reached at its OIDC domain name, which must admit this machine",
+        "<project> is the id of the project, which is left out in the home of the project, whose config has it: manage-project run <project> manage-identity <action>, eg xyz-yyyy-nnnn, whose file the deployer writes in its own dir,",
         "  <afon-home>/" + FileProjectProvider.PROJECTS_DIR + "/<project>/" + FileProjectProvider.FILE);
 
-    private final Function<AfonProject, IdentityProvider> identity;
+    /**
+     * Opens a tunnel to Keycloak in the cluster of a kubeconfig, and calls with its endpoint, which it closes when the call returns; or calls with
+     * no endpoint, ie for Keycloak at its OIDC domain name, if there is no tunnel to open.
+     */
+    @FunctionalInterface
+    interface Tunnel {
+        /** @param kubeConfig the kubeconfig of the cluster with Keycloak in it, or {@code null} for the one that the config names, if any */
+        void run(AfonCloud cloud, Path kubeConfig, KeyCloakTunnel.Call call) throws Exception;
+    }
+
+    /** The identity at the endpoint, ie {@code host:port}, or at its OIDC domain name if the endpoint is {@code null}. */
+    private final BiFunction<TreProject, String, IdentityProvider> identity;
+    private final Tunnel tunnel;
+    /** The id of the project whose home this runs in, or {@code null}: what {@code <project>} is if it is left out. */
+    private final java.util.function.Supplier<String> defaultProject;
     private final PrintStream out;
     private final PrintStream err;
     private final Path afonHome;
 
-    ManageIdentityMain(Function<AfonProject, IdentityProvider> identity, PrintStream out, PrintStream err, Path afonHome) {
+    ManageIdentityMain(BiFunction<TreProject, String, IdentityProvider> identity, Tunnel tunnel, java.util.function.Supplier<String> defaultProject,
+                       PrintStream out, PrintStream err, Path afonHome) {
         this.identity = identity;
+        this.tunnel = tunnel;
+        this.defaultProject = defaultProject;
         this.out = out;
         this.err = err;
         this.afonHome = afonHome;
@@ -89,7 +115,7 @@ public class ManageIdentityMain {
         List<String> positional = new ArrayList<>();
         for (int i = 1; i < args.length; i++) {
             if (args[i].startsWith("--")) {
-                if (!List.of(PUBLIC_KEYS, FIRST_NAME, LAST_NAME).contains(args[i]) || i + 1 >= args.length) {
+                if (!List.of(PUBLIC_KEYS, FIRST_NAME, LAST_NAME, KUBECONFIG).contains(args[i]) || i + 1 >= args.length) {
                     return usage("Unknown option, or no value for " + args[i]);
                 }
                 options.put(args[i], args[++i]);
@@ -98,18 +124,33 @@ public class ManageIdentityMain {
             }
         }
         String action = args[0];
-        if (positional.isEmpty()) {
+        // <project> is left out in the home of a project, whose config has its id
+        int withoutProject = switch (action) {
+            case "create", "close" -> 0;
+            case "add-member", "remove-member" -> 1;
+            default -> -1;
+        };
+        String project;
+        List<String> rest;
+        if (positional.size() == withoutProject) {
+            project = defaultProject.get();
+            if (project == null || project.isBlank()) {
+                return usage(action + " takes a <project>, unless it is run in the home of one: manage-project run <project> manage-identity " + action);
+            }
+            rest = positional;
+        } else if (positional.isEmpty()) {
             return usage(action + " takes a <project>");
+        } else {
+            project = positional.get(0);
+            rest = positional.subList(1, positional.size());
         }
-        String project = positional.get(0);
-        List<String> rest = positional.subList(1, positional.size());
         return switch (action) {
-            case "create" -> rest.isEmpty() ? with(project, p -> create(p, options)) : usage("create takes " + PUBLIC_KEYS + " <dir>, and no other argument");
-            case "add-member" -> rest.size() == 1 ? with(project, p -> addMember(p, rest.get(0), options))
+            case "create" -> rest.isEmpty() ? with(project, options, (p, e) -> create(p, e, options)) : usage("create takes " + PUBLIC_KEYS + " <dir>, and no other argument");
+            case "add-member" -> rest.size() == 1 ? with(project, options, (p, e) -> addMember(p, e, rest.get(0), options))
                                                   : usage("add-member takes one <email>");
-            case "remove-member" -> rest.size() == 1 ? with(project, p -> removeMember(p, rest.get(0)))
+            case "remove-member" -> rest.size() == 1 ? with(project, options, (p, e) -> removeMember(p, e, rest.get(0)))
                                                      : usage("remove-member takes one <email>");
-            case "close" -> rest.isEmpty() ? with(project, this::close) : usage("close takes no argument");
+            case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
     }
@@ -121,13 +162,14 @@ public class ManageIdentityMain {
     }
 
     private interface Action {
-        void run(AfonProject project) throws IOException;
+        /** @param endpoint where Keycloak is reached, or {@code null} for its OIDC domain name */
+        void run(TreProject project, String endpoint) throws IOException;
     }
 
     /**
      * Loads the project, then runs the action on it, reporting a failure as the status rather than a stack trace.
      */
-    private int with(String project, Action action) {
+    private int with(String project, Map<String, String> options, Action action) {
         FileProjectProvider provider;
         try {
             provider = FileProjectProvider.forProject(afonHome, project);
@@ -139,18 +181,32 @@ public class ManageIdentityMain {
             return 1;
         }
         try {
-            action.run(provider.getProject());
+            AfonProject loaded = provider.getProject();
+            if (!(loaded instanceof TreProject tre)) {
+                err.printf("Project %s is the central identity itself: it has no clients, group or members, and its stack is deployed by manage-project up%n", loaded.id());
+                return 1;
+            }
+            Path kubeConfig = options.containsKey(KUBECONFIG) ? Path.of(options.get(KUBECONFIG)) : null;
+            if (kubeConfig != null && !Files.isRegularFile(kubeConfig)) {
+                err.printf("No kubeconfig %s: write it with the update-kube-config script of the cloud for the central identity's stack%n", kubeConfig);
+                return 1;
+            }
+            tunnel.run(tre.cloud(), kubeConfig, endpoint -> action.run(tre, endpoint));
             return 0;
         } catch (ProjectException | IllegalStateException | IllegalArgumentException | IOException e) {
             err.println(e.getMessage());
             return 1;
-        } catch (RuntimeException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            err.println("Interrupted");
+            return 1;
+        } catch (Exception e) {
             err.println(e.getMessage() + (e.getCause() == null ? "" : ": " + e.getCause().getMessage()));
             return 1;
         }
     }
 
-    private void create(AfonProject project, Map<String, String> options) throws IOException {
+    private void create(TreProject project, String endpoint, Map<String, String> options) throws IOException {
         Path dir = options.containsKey(PUBLIC_KEYS) ? Path.of(options.get(PUBLIC_KEYS))
                                                     : FileProjectProvider.keysDir(afonHome, project.id().value());
         Map<String, String> keys = new LinkedHashMap<>();
@@ -158,7 +214,7 @@ public class ManageIdentityMain {
         if (project.git() != null) {
             keys.put("git", read(dir.resolve("git.jwk")));
         }
-        identity.apply(project).ensureProject(project, keys);
+        identity.apply(project, endpoint).ensureProject(project, keys);
         out.printf("Project %s is made in the central identity: client %s%s, and a group %s%n", project.id(),
                    project.identity().treClient(), project.git() == null ? "" : " and " + project.identity().gitClient(), project.id());
     }
@@ -170,15 +226,15 @@ public class ManageIdentityMain {
         return Files.readString(key, StandardCharsets.UTF_8);
     }
 
-    private void addMember(AfonProject project, String email, Map<String, String> options) {
-        IdentityProvider provider = identity.apply(project);
+    private void addMember(TreProject project, String endpoint, String email, Map<String, String> options) {
+        IdentityProvider provider = identity.apply(project, endpoint);
         String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME));
         provider.addMember(project, userId);
         out.println(userId);
     }
 
-    private void removeMember(AfonProject project, String email) throws IOException {
-        IdentityProvider provider = identity.apply(project);
+    private void removeMember(TreProject project, String endpoint, String email) throws IOException {
+        IdentityProvider provider = identity.apply(project, endpoint);
         Optional<String> userId = provider.findUser(email);
         if (userId.isEmpty()) {
             throw new IOException("No user " + email + " in the central identity");
@@ -187,21 +243,37 @@ public class ManageIdentityMain {
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
     }
 
-    private void close(AfonProject project) {
-        identity.apply(project).closeProject(project);
+    private void close(TreProject project, String endpoint) {
+        identity.apply(project, endpoint).closeProject(project);
         out.printf("Closed the TRE client %s of project %s%n", project.identity().treClient(), project.id());
     }
 
     /**
      * @return the KeyCloak of the project's cloud, at that cloud's OIDC domain, with the admin credentials of the config that this runs in
      */
-    private static IdentityProvider identityOf(AfonProject project) {
+    private static IdentityProvider identityOf(TreProject project, String endpoint) {
         OpsPropertyProvider properties = new OpsPropertyProvider();
-        return new KeyCloakProvider(properties, properties.getOidcDomainName(project.cloud()));
+        return new KeyCloakProvider(properties, endpoint != null ? endpoint : properties.getOidcDomainName(project.cloud()));
+    }
+
+    private static void tunnel(AfonCloud cloud, Path kubeConfig, KeyCloakTunnel.Call call) throws Exception {
+        OpsPropertyProvider properties = new OpsPropertyProvider();
+        if (kubeConfig != null) {
+            KeyCloakTunnel.run(cloud, properties, kubeConfig, call);
+            return;
+        }
+        // the cluster of Keycloak that the config of a project names, if any; else it is reached at its OIDC domain name, which must admit this machine
+        String configured = properties.getValue(AfonProperty.KEYCLOAK_KUBECONFIG, "");
+        if (configured == null || configured.isBlank()) {
+            call.run(null);
+        } else {
+            KeyCloakTunnel.run(cloud, properties, call);
+        }
     }
 
     public static void main(String[] args) {
-        int status = new ManageIdentityMain(ManageIdentityMain::identityOf, System.out, System.err,
+        int status = new ManageIdentityMain(ManageIdentityMain::identityOf, ManageIdentityMain::tunnel,
+                                             () -> new OpsPropertyProvider().getValue(AfonProperty.PROJECT_ID, ""), System.out, System.err,
                                              ProjectEnv.defaultAfonHome()).run(args);
         if (status != 0) {
             System.exit(status);

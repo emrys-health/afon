@@ -1,0 +1,39 @@
+# A trusted research environment, which signs its users in with the central identity.  Made by
+#   afon-cli.sh manage-project init ${id} --role tre ${cloud}
+# Complete what is in <angle brackets>, then check it, configure it and bring it up:
+#   afon-cli.sh manage-project validate ${id}
+#   afon-cli.sh manage-project plan ${id}
+#   afon-cli.sh manage-project configure ${id}
+#   afon-cli.sh manage-project up ${id}
+# The private key of its TRE client is made by: afon-cli.sh project-key ${id} tre
+# See docs/projects.md.
+project:
+  id: ${id}
+  cloud: ${cloud}
+  # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
+  env: ${env}
+
+identity:
+  # the identity project that deploys the central identity, so that up can reach its admin API for the registration
+  project: <identity-project>
+  issuerUrl: https://<identity-domain>/realms/polaris
+  # the authentication context class reference that proves a second factor
+  acr: mfa
+
+# the Data Providers' project catalogs, one entry each
+providers:
+  - id: <provider>
+    catalogUri: https://<provider-domain>/api/catalog
+    catalogName: <catalog>
+    audience: <provider-audience>
+    bucket: <provider-bucket>
+
+stacks:
+  create:
+    auditBucket: ${id}-audit
+  tre:
+    domains:
+      ${CLOUD}_JUPYTER_DOMAIN_NAME: <jupyter-domain>
+
+# the nodes of its cluster: adjust to the quota of the subscription
+${cluster}

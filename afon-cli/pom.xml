@@ -170,6 +170,7 @@
                                             <directory>${project.basedir}/../templates</directory>
                                             <includes>
                                                 <include>config/**</include>
+                                                <include>project/**</include>
                                             </includes>
                                         </resource>
                                     </resources>

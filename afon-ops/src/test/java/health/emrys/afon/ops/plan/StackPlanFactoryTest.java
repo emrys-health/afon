@@ -12,6 +12,12 @@ import health.emrys.afon.ops.steps.StackFilter;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
+import health.emrys.afon.config.StackRole;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonCloudProperty;
+import health.emrys.afon.config.AfonCloud;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
@@ -467,6 +473,25 @@ class StackPlanFactoryTest {
         filters.clear();
         factory.steps(DEPLOY, StackId.parse("azure-polaris"), recording, false);
         assertThat(filters.get(0).refusal().apply("azure-full").reason()).doesNotContain("egress IP");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theIdentityStackOfAProjectHoldsTheEgressIpOfTheProject(AfonCloud cloud) {
+        AfonProperty egressIp = AfonCloudProperty.EGRESS_IP.forCloud(cloud).orElseThrow();
+        StackId identity = StackDefinitions.withRole(cloud, StackRole.IDENTITY).orElseThrow().id();
+        properties.setValue(egressIp, "203.0.113.7");
+
+        // outside a project it never holds it, as the stacks that serve users do
+        assertThat(factory.heldResources(identity, properties)).doesNotContain(egressIp);
+
+        // in a project it does, as the project is an env of its own
+        properties.setValue(AfonProperty.PROJECT_ID, "a-project");
+        assertThat(factory.heldResources(identity, properties)).contains(egressIp);
+
+        // but an address that the project does not name is not held
+        properties.setValue(egressIp, "");
+        assertThat(factory.heldResources(identity, properties)).doesNotContain(egressIp);
     }
 
     @Test

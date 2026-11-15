@@ -16,6 +16,7 @@ import java.util.Locale;
 final class ProjectTemplates {
 
     private static final Path EXAMPLE = Path.of("../afon-project/src/test/resources/project.yaml");
+    private static final Path IDENTITY_EXAMPLE = Path.of("../afon-project/src/test/resources/identity-project.yaml");
 
     private ProjectTemplates() {
     }
@@ -37,6 +38,26 @@ final class ProjectTemplates {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * @return the example identity project, for the cloud
+     */
+    static String identityExample(AfonCloud cloud) {
+        try {
+            return render(Files.readString(IDENTITY_EXAMPLE), cloud);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @return the example identity project, for the cloud, written as the project of the dir {@code <home>/projects/<project>}
+     */
+    static Path writeIdentity(Path home, String project, AfonCloud cloud) throws IOException {
+        Path file = home.resolve("projects").resolve(project).resolve("project.yaml");
+        Files.createDirectories(file.getParent());
+        return Files.writeString(file, identityExample(cloud));
     }
 
     /**

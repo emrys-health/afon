@@ -339,8 +339,8 @@ public class StackPlanFactory {
 
     /**
      * @return the exclusive resources the stack holds: those of its components, eg the domain name of its Polaris, and the
-     * pinned egress IP, eg {@code AWS_EGRESS_IP}, if it pins it, ie the ones that are configured, as a stack without a pinned
-     * egress IP gets its own
+     * pinned egress IP, eg {@code AWS_EGRESS_IP}, if it pins it, which a stack deployed by a project always does, ie the ones that
+     * are configured, as a stack without a pinned egress IP gets its own
      */
     public Set<AfonProperty> heldResources(StackId stackId, AfonPropertyProvider properties) {
         StackDefinition definition = StackDefinitions.get(stackId);
@@ -348,7 +348,7 @@ public class StackPlanFactory {
         for (StackComponent component : definition.componentsFor(properties)) {
             resources.addAll(registry.of(component).domains(stackId.cloud(), properties));
         }
-        if (definition.pinnedEgressIp()) {
+        if (definition.pinsEgressIp(properties)) {
             // the clouds that can pin it have the property, eg AWS_EGRESS_IP, the others none
             AfonCloudProperty.EGRESS_IP.forCloud(stackId.cloud()).ifPresent(resources::add);
         }

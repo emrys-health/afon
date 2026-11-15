@@ -45,8 +45,8 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void namesTheProjectEnvsAfterTheProject(AfonCloud cloud) throws IOException {
         AfonProject project = on(cloud).project();
-        assertThat(ProjectEnv.configDir(home, project)).isEqualTo(home.resolve("config-cvd-2026-0007"));
-        assertThat(ProjectEnv.cdktfDir(home, project)).isEqualTo(home.resolve("cdktf-cvd-2026-0007"));
+        assertThat(ProjectEnv.configDir(home, project)).isEqualTo(home.resolve("config-xyz-yyyy-nnnn"));
+        assertThat(ProjectEnv.cdktfDir(home, project)).isEqualTo(home.resolve("cdktf-xyz-yyyy-nnnn"));
     }
 
     @ParameterizedTest
@@ -56,14 +56,14 @@ class ProjectEnvTest {
         String file = "afon-" + lower(cloud) + ".properties";
         var derived = ProjectEnv.derive(on(cloud).project());
         assertThat(derived.keySet()).containsExactly("afon.properties", file);
-        assertThat(derived.get("afon.properties")).containsEntry("PROJECT_ID", "cvd-2026-0007")
-            .containsEntry("OIDC_AUDIENCE", "cvd-2026-0007-tre").containsEntry("OIDC_GIT_AUDIENCE", "cvd-2026-0007-git")
+        assertThat(derived.get("afon.properties")).containsEntry("PROJECT_ID", "xyz-yyyy-nnnn")
+            .containsEntry("OIDC_AUDIENCE", "xyz-yyyy-nnnn-tre").containsEntry("OIDC_GIT_AUDIENCE", "xyz-yyyy-nnnn-git")
             .containsEntry("OIDC_PROJECT_CLAIM", "project").containsEntry("OIDC_USER_CLAIM", "polaris_principal")
-            .containsEntry("GIT_DOMAIN_NAME", "git.cvd-2026-0007.example.org").containsEntry("TRE_TEARDOWN_TIME", "22:00")
+            .containsEntry("GIT_DOMAIN_NAME", "git.xyz-yyyy-nnnn.example.org").containsEntry("TRE_TEARDOWN_TIME", "22:00")
             .containsEntry("TRE_TEARDOWN_TIME_ZONE", "Europe/London");
         assertThat(derived.get(file)).containsEntry(prefix + "KEYCLOAK_EXTERNAL", "true")
-            .containsEntry(prefix + "AUDIT_BUCKET", "cvd-2026-0007-audit").containsEntry(prefix + "GITEA_BUCKET", "cvd-2026-0007-gitea")
-            .containsEntry(prefix + "JUPYTER_DOMAIN_NAME", "jupyter.cvd-2026-0007.example.org");
+            .containsEntry(prefix + "AUDIT_BUCKET", "xyz-yyyy-nnnn-audit").containsEntry(prefix + "EGRESS_IP", "203.0.113.10").containsEntry(prefix + "GITEA_BUCKET", "xyz-yyyy-nnnn-gitea")
+            .containsEntry(prefix + "JUPYTER_DOMAIN_NAME", "jupyter.xyz-yyyy-nnnn.example.org");
         // only what belongs to the project's cloud goes in its file
         assertThat(derived.get(file).keySet()).allMatch(name -> name.startsWith(prefix));
     }
@@ -74,8 +74,8 @@ class ProjectEnvTest {
         OnCloud setup = on(cloud);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
 
-        assertThat(config).isEqualTo(home.resolve("config-cvd-2026-0007"));
-        assertThat(home.resolve("cdktf-cvd-2026-0007")).isDirectory();
+        assertThat(config).isEqualTo(home.resolve("config-xyz-yyyy-nnnn"));
+        assertThat(home.resolve("cdktf-xyz-yyyy-nnnn")).isDirectory();
         assertThat(config.resolve("secret.properties")).hasContent("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n");
         assertThat(config.resolve("project.yaml")).hasSameTextualContentAs(setup.projectFile());
         // the env is left as it was
@@ -83,11 +83,11 @@ class ProjectEnvTest {
 
         AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
         assertThat(properties.getValue(ENV_NAME)).isEqualTo("dev");
-        assertThat(properties.getValue(PROJECT_ID)).isEqualTo("cvd-2026-0007");
+        assertThat(properties.getValue(PROJECT_ID)).isEqualTo("xyz-yyyy-nnnn");
         assertThat(properties.getValue(OIDC_ISSUER_URL)).isEqualTo("https://id.example.org/realms/polaris");
         assertThat(properties.getValue(AfonProperty.valueOf(cloud.name() + "_KEYCLOAK_EXTERNAL"))).isEqualTo("true");
         assertThat(properties.getValue(AfonProperty.valueOf(cloud.name() + "_REGION"))).isEqualTo("a-region");
-        assertThat(properties.getCloudValue(cloud, AfonCloudProperty.AUDIT_BUCKET)).isEqualTo("cvd-2026-0007-audit");
+        assertThat(properties.getCloudValue(cloud, AfonCloudProperty.AUDIT_BUCKET)).isEqualTo("xyz-yyyy-nnnn-audit");
     }
 
     @ParameterizedTest
@@ -109,14 +109,14 @@ class ProjectEnvTest {
         String file = "afon-" + lower(cloud) + ".properties";
         Files.delete(setup.envConfig().resolve(file));
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
-        assertThat(config.resolve(file)).content().contains(cloud.name() + "_AUDIT_BUCKET=cvd-2026-0007-audit");
+        assertThat(config.resolve(file)).content().contains(cloud.name() + "_AUDIT_BUCKET=xyz-yyyy-nnnn-audit");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void derivesNothingOfGitFromAProjectWithNoGitOfItsOwn(AfonCloud cloud) {
-        String yaml = ProjectFixtures.example(cloud).replace("    gitBucket: cvd-2026-0007-gitea\n", "")
-                                     .replace("  git:\n    domain: git.cvd-2026-0007.example.org\n", "");
+        String yaml = ProjectFixtures.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", "")
+                                     .replace("  git:\n    domain: git.xyz-yyyy-nnnn.example.org\n", "");
         var derived = ProjectEnv.derive(FileProjectProvider.parse(yaml));
         assertThat(derived.get("afon.properties")).doesNotContainKeys("GIT_DOMAIN_NAME", "OIDC_GIT_AUDIENCE").containsKey("OIDC_AUDIENCE");
         assertThat(derived.values().stream().flatMap(m -> m.keySet().stream())).doesNotContain(cloud.name() + "_GITEA_BUCKET")
@@ -125,8 +125,55 @@ class ProjectEnvTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
+    void derivesTheNodePoolOfTheClusterAndLeavesItToTheEnvWhenTheProjectNamesNone(AfonCloud cloud) {
+        String file = "afon-" + lower(cloud) + ".properties";
+        assertThat(ProjectEnv.derive(ProjectFixtures.tre(ProjectFixtures.example(cloud))).get(file).keySet())
+            .noneMatch(k -> k.endsWith("_NODE_POOL"));
+        if (cloud == AfonCloud.AWS) {
+            return;
+        }
+        String pool = cloud == AfonCloud.AZURE ? "vmSize: Standard_D2s_v3, nodeCount: 2" : "machineType: e2-standard-4, nodeCount: 2";
+        String property = cloud == AfonCloud.AZURE ? "AZURE_AKS_NODE_POOL" : "GCP_GKE_NODE_POOL";
+        String expected = cloud == AfonCloud.AZURE ? "vmSize:Standard_D2s_v3,nodeCount:2" : "machineType:e2-standard-4,nodeCount:2";
+        assertThat(ProjectEnv.derive(ProjectFixtures.tre(ProjectFixtures.example(cloud) + "cluster: {nodePool: {" + pool + "}}\n")).get(file))
+            .containsEntry(property, expected);
+        assertThat(ProjectEnv.derive(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud) + "cluster: {nodePool: {" + pool + "}}\n")).get(file))
+            .containsEntry(property, expected);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void namesTheKubeconfigOfTheIdentityProjectsClusterForTheKeycloakItConfigures(AfonCloud cloud, @TempDir Path home) throws IOException {
+        Path envConfig = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n");
+        String yaml = ProjectFixtures.example(cloud).replace("identity:\n", "identity:\n  project: central-identity\n");
+        Path file = Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn")).resolve("project.yaml");
+        Files.writeString(file, yaml);
+        // the identity project is made first
+        assertThatThrownBy(() -> ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file))
+            .isInstanceOf(ProjectException.class).hasMessageContaining("identity.project names central-identity, which has no file");
+        Path identityFile = Files.createDirectories(home.resolve("projects/central-identity")).resolve("project.yaml");
+        Files.writeString(identityFile, ProjectFixtures.identityExample(cloud));
+        Path config = ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file);
+        assertThat(config.resolve("afon.properties")).content()
+            .contains("KEYCLOAK_KUBECONFIG=" + home.resolve("cdktf-central-identity/kube/" + lower(cloud) + "-keycloak.config"));
+        // a project that names none has none
+        Path other = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("xyz-yyyy-nnnn", "abc-def")), envConfig, home, file);
+        assertThat(other.resolve("afon.properties")).content().doesNotContain("KEYCLOAK_KUBECONFIG");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesTheEgressIpToTheEnvWhenTheProjectNamesNone(AfonCloud cloud) {
+        String yaml = ProjectFixtures.example(cloud).replace("  egressIp: 203.0.113.10\n", "");
+        var derived = ProjectEnv.derive(FileProjectProvider.parse(yaml));
+        assertThat(derived.values().stream().flatMap(m -> m.keySet().stream())).doesNotContain(cloud.name() + "_EGRESS_IP");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
     void refusesAValueAShellCouldNotSourceSafely(AfonCloud cloud) {
-        AfonProject unsafe = FileProjectProvider.parse(ProjectFixtures.example(cloud).replace("git.cvd-2026-0007.example.org", "x; rm -rf ~"));
+        AfonProject unsafe = ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("git.xyz-yyyy-nnnn.example.org", "x; rm -rf ~"));
         assertThatThrownBy(() -> ProjectEnv.derive(unsafe)).isInstanceOf(ProjectException.class).hasMessageContaining("GIT_DOMAIN_NAME");
     }
 
@@ -153,5 +200,33 @@ class ProjectEnvTest {
         OnCloud setup = on(cloud);
         assertThatThrownBy(() -> ProjectEnv.configure(setup.project(), home.resolve("missing"), home, setup.projectFile()))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void derivesOnlyWhatTheIdentityProjectDeploysItselfWith(AfonCloud cloud) {
+        String prefix = cloud.name() + "_";
+        var derived = ProjectEnv.derive(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)));
+        assertThat(derived.get("afon.properties")).containsOnlyKeys("PROJECT_ID").containsEntry("PROJECT_ID", "central-identity");
+        // the project's own egress IP, which the identity's stack pins, as it is deployed by a project, and the domain; and no external identity
+        assertThat(derived.get("afon-" + lower(cloud) + ".properties")).containsOnlyKeys(prefix + "EGRESS_IP", prefix + "OIDC_DOMAIN_NAME")
+            .containsEntry(prefix + "EGRESS_IP", "203.0.113.20").containsEntry(prefix + "OIDC_DOMAIN_NAME", "oidc.example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresTheIdentityProjectFromTheEnvLikeAnyOther(AfonCloud cloud) throws IOException {
+        Path file = home.resolve("identity.yaml");
+        Files.writeString(file, ProjectFixtures.identityExample(cloud));
+        AfonProject project = new FileProjectProvider(file).getProject();
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Path config = ProjectEnv.configure(project, env, home, file);
+        assertThat(config).isEqualTo(home.resolve("config-central-identity"));
+        assertThat(home.resolve("cdktf-central-identity")).isDirectory();
+        AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+        assertThat(properties.getValue(PROJECT_ID)).isEqualTo("central-identity");
+        assertThat(properties.getCloudValue(cloud, AfonCloudProperty.EGRESS_IP)).isEqualTo("203.0.113.20");
+        assertThat(properties.getOidcDomainName(cloud)).isEqualTo("oidc.example.org");
     }
 }

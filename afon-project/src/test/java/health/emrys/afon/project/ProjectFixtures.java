@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * The projects of the tests are templates, which every test renders for the cloud it is run on: {@code ${cloud}} is the cloud in lower case,
  * as in {@code cloud: azure} or {@code azure-full}, and {@code ${CLOUD}} in upper case, as in {@code AZURE_JUPYTER_DOMAIN_NAME}.  No cloud is
@@ -18,7 +20,28 @@ final class ProjectFixtures {
     /** The example project, a template. */
     static final Path EXAMPLE = Path.of("src/test/resources/project.yaml");
 
+    /** The example of the identity project, a template. */
+    static final Path IDENTITY_EXAMPLE = Path.of("src/test/resources/identity-project.yaml");
+
     private ProjectFixtures() {
+    }
+
+    /**
+     * @return the TRE project that the text defines
+     */
+    static TreProject tre(String yaml) {
+        AfonProject project = FileProjectProvider.parse(yaml);
+        assertThat(project).isInstanceOf(TreProject.class);
+        return (TreProject) project;
+    }
+
+    /**
+     * @return the identity project that the text defines
+     */
+    static IdentityProject identity(String yaml) {
+        AfonProject project = FileProjectProvider.parse(yaml);
+        assertThat(project).isInstanceOf(IdentityProject.class);
+        return (IdentityProject) project;
     }
 
     /**
@@ -41,6 +64,17 @@ final class ProjectFixtures {
     static String example(AfonCloud cloud) {
         try {
             return render(Files.readString(EXAMPLE), cloud);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @return the example identity project, for the cloud
+     */
+    static String identityExample(AfonCloud cloud) {
+        try {
+            return render(Files.readString(IDENTITY_EXAMPLE), cloud);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

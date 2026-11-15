@@ -1,0 +1,82 @@
+package health.emrys.afon.project;
+
+import health.emrys.afon.config.AfonCloud;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * The templates of a {@value FileProjectProvider#FILE}, one for each role, {@code project-<role>.yaml} in the {@code templates/project} dir of the
+ * Afon distribution, which the deployer completes.  What is in {@code <angle brackets>} is what only the deployer knows, so the file
+ * is not valid until it is replaced.  The templates are written once, for every cloud: {@code ${id}}, {@code ${cloud}}, {@code ${CLOUD}},
+ * {@code ${env}} and {@code ${cluster}}, the cluster's nodes, are replaced.
+ */
+public final class ProjectTemplate {
+
+    /** Where the templates are in the Afon distribution, from its dir. */
+    public static final String DIR = "templates/project";
+
+    private static final Pattern VARIABLE = Pattern.compile("\\$\\{([A-Za-z]+)}");
+
+    private ProjectTemplate() {
+    }
+
+    /**
+     * @param dir  the dir of the templates
+     * @param env  the env whose config the project is made from, or {@code null} to leave it for the deployer
+     * @return the project file for the project, from the template of the role, to complete
+     * @throws IllegalArgumentException if the template of the role is not there, or has a variable that is not known
+     */
+    public static String render(@NonNull Path dir, @NonNull ProjectRole role, @NonNull AfonCloud cloud, @NonNull String id, @Nullable String env) {
+        Path file = dir.resolve("project-" + role.value() + ".yaml");
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("No template " + file);
+        }
+        String template;
+        try {
+            template = Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read the template " + file, e);
+        }
+        Matcher variables = VARIABLE.matcher(template);
+        StringBuilder result = new StringBuilder();
+        while (variables.find()) {
+            String value = switch (variables.group(1)) {
+                case "id" -> id;
+                case "cloud" -> cloud.toString().toLowerCase(Locale.ROOT);
+                case "CLOUD" -> cloud.name();
+                case "env" -> env == null ? "<env>" : env;
+                case "cluster" -> cluster(role, cloud);
+                default -> throw new IllegalArgumentException("The template " + file + " has the variable " + variables.group(0) + ", which is not known");
+            };
+            variables.appendReplacement(result, Matcher.quoteReplacement(value));
+        }
+        variables.appendTail(result);
+        return result.toString();
+    }
+
+    /**
+     * @return the section of the nodes of the cluster: what the role needs, the identity running Keycloak only, or none on a cloud with no node
+     * pool property
+     */
+    static String cluster(ProjectRole role, AfonCloud cloud) {
+        boolean identity = role == ProjectRole.IDENTITY;
+        return switch (cloud) {
+            case AZURE -> pool("vmSize", identity ? "Standard_D2s_v3" : "Standard_D4s_v6", 2);
+            case GCP -> pool("machineType", identity ? "e2-standard-2" : "e2-standard-4", 2);
+            case AWS -> "# AWS has no node pool property: the nodes are those of the env";
+        };
+    }
+
+    private static String pool(String sizeKey, String size, int count) {
+        return "cluster:\n  nodePool:\n    " + sizeKey + ": " + size + "\n    nodeCount: " + count;
+    }
+}

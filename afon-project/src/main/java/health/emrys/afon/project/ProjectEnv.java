@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static health.emrys.afon.config.AfonProperty.*;
@@ -41,9 +42,9 @@ public final class ProjectEnv {
     static final String BLOCK_HEADER = "# --- Derived from project.yaml by manage-project: do not edit, configure it again ---";
 
     /**
-     * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $} or the like.
+     * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $}, {@code ;} or the like, but the {@code ,} of a node pool.
      */
-    private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@\\[\\]+-]+");
+    private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@,\\[\\]+-]+");
 
     private ProjectEnv() {
     }
@@ -79,13 +80,62 @@ public final class ProjectEnv {
      * @throws ProjectException if a value cannot be written to a properties file that a shell sources
      */
     public static Map<String, Map<String, String>> derive(AfonProject project) {
+        return derive(project, null);
+    }
+
+    /**
+     * As {@link #derive(AfonProject)}, with the kubeconfig of the identity project's cluster, which a TRE project's stacks configure its
+     * Keycloak through, or {@code null} if it names none.
+     */
+    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig) {
         AfonCloud cloud = project.cloud();
         String prefix = cloud.name() + "_";
         Map<String, String> common = new LinkedHashMap<>();
         Map<String, String> cloudSpecific = new LinkedHashMap<>();
-        AfonProject.Identity identity = project.identity();
-
         common.put(PROJECT_ID.getName(), project.id().value());
+        if (identityKubeconfig != null) {
+            common.put(KEYCLOAK_KUBECONFIG.getName(), identityKubeconfig.toString());
+        }
+        if (project.egressIp() != null) {
+            cloudSpecific.put(prefix + "EGRESS_IP", project.egressIp());
+        }
+        if (!project.nodePool().isEmpty()) {
+            String property = switch (cloud) {
+                case AZURE -> AZURE_AKS_NODE_POOL.getName();
+                case GCP -> GCP_GKE_NODE_POOL.getName();
+                case AWS -> throw new ProjectException(FileProjectProvider.FILE, List.of("cluster.nodePool is not available on aws"));
+            };
+            cloudSpecific.put(property, project.nodePool().entrySet().stream().map(e -> e.getKey() + ":" + e.getValue())
+                                              .collect(Collectors.joining(",")));
+        }
+        if (project instanceof IdentityProject identity) {
+            // it deploys the identity, so it uses no other: nothing of the clients, the Providers or the TRE, and no external identity
+            if (identity.domain() != null) {
+                cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", identity.domain());
+            }
+        } else {
+            deriveTre((TreProject) project, prefix, common, cloudSpecific);
+        }
+
+        List<String> problems = new ArrayList<>();
+        for (Map<String, String> properties : List.of(common, cloudSpecific)) {
+            properties.forEach((name, value) -> {
+                if (!SAFE_VALUE.matcher(value).matches()) {
+                    problems.add(String.format("%s '%s' has a character that a properties file sourced by a shell cannot hold", name, value));
+                }
+            });
+        }
+        if (!problems.isEmpty()) {
+            throw new ProjectException(FileProjectProvider.FILE, problems);
+        }
+        Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
+        byFile.put(COMMON_FILE, common);
+        byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
+        return byFile;
+    }
+
+    private static void deriveTre(TreProject project, String prefix, Map<String, String> common, Map<String, String> cloudSpecific) {
+        TreProject.Identity identity = project.identity();
         common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
         common.put(OIDC_AUDIENCE.getName(), identity.treClient());
         if (identity.gitClient() != null) {
@@ -108,22 +158,6 @@ public final class ProjectEnv {
             cloudSpecific.put(prefix + "GITEA_BUCKET", project.create().gitBucket());
         }
         project.tre().domains().forEach((property, domain) -> (property.startsWith(prefix) ? cloudSpecific : common).put(property, domain));
-
-        List<String> problems = new ArrayList<>();
-        for (Map<String, String> properties : List.of(common, cloudSpecific)) {
-            properties.forEach((name, value) -> {
-                if (!SAFE_VALUE.matcher(value).matches()) {
-                    problems.add(String.format("%s '%s' has a character that a properties file sourced by a shell cannot hold", name, value));
-                }
-            });
-        }
-        if (!problems.isEmpty()) {
-            throw new ProjectException(FileProjectProvider.FILE, problems);
-        }
-        Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
-        byFile.put(COMMON_FILE, common);
-        byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
-        return byFile;
     }
 
     /**
@@ -141,7 +175,7 @@ public final class ProjectEnv {
         if (!Files.isDirectory(envConfig)) {
             throw new IllegalArgumentException("The config dir " + envConfig + " is not a directory");
         }
-        Map<String, Map<String, String>> derived = derive(project);
+        Map<String, Map<String, String>> derived = derive(project, identityKubeconfig(project, afonHome));
         Path target = configDir(afonHome, project);
         if (envConfig.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
             throw new IllegalArgumentException("The config dir " + envConfig + " is that of the project itself: name another env for it to be made from");
@@ -157,6 +191,27 @@ public final class ProjectEnv {
             throw new UncheckedIOException("Cannot configure project " + project.id() + ": the config env is " + target, e);
         }
         return target;
+    }
+
+    /**
+     * @return the kubeconfig of the cluster of the identity project that the project names, where its stack writes it, or {@code null} if it names none
+     * @throws ProjectException if the identity project has no file, or is not an identity project
+     */
+    static Path identityKubeconfig(AfonProject project, Path afonHome) {
+        if (!(project instanceof TreProject tre) || tre.identity().project() == null) {
+            return null;
+        }
+        String id = tre.identity().project();
+        FileProjectProvider provider = FileProjectProvider.forProject(afonHome, id);
+        if (!provider.exists()) {
+            throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                "identity.project names %s, which has no file %s: make it first, as the project that deploys the central identity", id, provider.file())));
+        }
+        if (!(provider.getProject() instanceof IdentityProject identity)) {
+            throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                "identity.project names %s, which is not an identity project", id)));
+        }
+        return cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config");
     }
 
     private static void copyTree(Path from, Path to) throws IOException {

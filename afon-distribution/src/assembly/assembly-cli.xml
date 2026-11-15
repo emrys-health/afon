@@ -52,6 +52,7 @@
       <outputDirectory>/templates</outputDirectory>
       <includes>
         <include>config/**</include>
+        <include>project/**</include>
       </includes>
     </fileSet>
     <fileSet>

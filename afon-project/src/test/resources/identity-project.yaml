@@ -1,0 +1,10 @@
+# A template: ${cloud} and ${CLOUD} are the project's cloud, in lower and upper case, as the tests give it, so that no cloud is special.
+project:
+  id: central-identity
+  cloud: ${cloud}
+  role: identity
+  egressIp: 203.0.113.20
+
+stacks:
+  identity:
+    domain: oidc.example.org

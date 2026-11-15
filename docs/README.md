@@ -40,6 +40,7 @@ If you are looking to deploy the data fabric, the easiest way to do so is throug
 - [Cloud infrastructure](./cloud.md)
 - [DNS Configuration](./dns_config.md)
 - [Deploying stacks](./stacks.md)
+- [Projects: the central identity and TREs](./projects.md)
 - [Configuring catalogs](./catalogs.md)
 
 ## How to use

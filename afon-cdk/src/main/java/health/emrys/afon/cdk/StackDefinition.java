@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk;
 
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.StackRole;
@@ -32,6 +33,16 @@ public record StackDefinition(StackId id,
     public StackDefinition(StackId id, boolean pinnedEgressIp,
                            Function<AfonPropertyProvider, List<StackComponent>> components) {
         this(id, null, pinnedEgressIp, components, Set.of());
+    }
+
+    /**
+     * @return whether the stack pins its egress IP to {@code <CLOUD>_EGRESS_IP} for the config: if its definition says so, or if it is
+     * deployed by a project, ie the config has a {@code PROJECT_ID}.  A project is an env of its own, with its own cdktf and its own
+     * {@code <CLOUD>_EGRESS_IP}, so what it deploys, eg the central identity's stack, never competes for the address with the stack of
+     * another env, and the address that the project names is the one that its cluster leaves from.
+     */
+    public boolean pinsEgressIp(AfonPropertyProvider properties) {
+        return pinnedEgressIp || !properties.getValue(AfonProperty.PROJECT_ID, "").isBlank();
     }
 
     /**

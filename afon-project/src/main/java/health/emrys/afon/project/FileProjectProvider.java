@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,16 +28,30 @@ import java.util.Set;
  * {@code <afon-home>/projects/<project>/project.yaml}, see {@link #forProject}.  The file is read, strictly, and validated when the
  * project is first asked for, and read once.  Its format, see {@link AfonProject}:
  * <pre>
- * project:   {id, cloud, env}      env is the env whose config it is made from, eg dev for config-dev: the active one if not given;
+
+ * project:   {id, cloud, role, env, egressIp}      role is identity or tre (the default), see {@link ProjectRole}, and decides the rest;
+ *                                   env is the env whose config it is made from, eg dev for config-dev: the active one if not given;
+ *                                   egressIp is the address its cluster leaves from, which the Providers allowlist: the env's if not given;
  *                                   where it deploys (region, account, node pools, names) comes from that config
- * identity:  {issuerUrl, acr, clients: {tre, git}, projectClaim, userClaim}     clients default to &lt;project&gt;-tre and &lt;project&gt;-git,
+ * cluster:   {nodePool: {vmSize, nodeCount}}      optional: the nodes of its cluster, with the keys of the cloud's node pool property
+ *                                   (Azure vmSize and nodeCount, GCP machineType and nodeCount, none on AWS): the env's if not given
+ * identity:  {issuerUrl, acr, clients: {tre, git}, projectClaim, userClaim, project}     project is the id of the identity project;
+ *                                   acr is the authentication context class reference that
+ *                                   proves MFA, eg mfa; clients default to &lt;project&gt;-tre and &lt;project&gt;-git,
  *                                                                              the claims to project and polaris_principal
- * providers: [{id, polarisUri, warehouse, audience, bucket, cloud}]     cloud defaults to the project's
+ * providers: [{id, catalogUri, catalogName, audience, bucket, cloud}]     cloud defaults to the project's
  * stacks:
  *   create:  {auditBucket, gitBucket}     gitBucket is optional: the config the project is made from says if it is not given
  *   git:     {domain}                     optional: without it Git is deployed with the TRE, and has no client
  *   tre:     {stack, domains: {&lt;PROPERTY&gt;: &lt;domain&gt;}, lifetime: {teardown, timeZone}}     stack defaults to &lt;cloud&gt;-full
  * </pre>
+ * A project with the role {@code identity} deploys the central identity, and has only {@code project} and
+ * <pre>
+ * stacks:
+ *   identity: {stack, domain}                  stack defaults to &lt;cloud&gt;-keycloak; domain is {@code <CLOUD>_OIDC_DOMAIN_NAME}, the env's if not given
+ * </pre>
+ * no {@code identity}, {@code providers}, {@code create}, {@code git} or {@code tre}.
+ * <p>
  * Reading is strict: an unknown key is a problem, as a misspelt one would otherwise be ignored silently, and every problem
  * found is reported together, see {@link ProjectException}.
  */
@@ -186,29 +201,146 @@ public class FileProjectProvider implements AfonProjectProvider {
             } catch (RuntimeException e) {
                 throw new ProjectException(source, List.of("not valid YAML: " + e.getMessage()));
             }
-            Map<String, Object> top = map(root, "", Set.of("project", "identity", "providers", "stacks"));
-            Map<String, Object> project = map(top.get("project"), "project", Set.of("id", "cloud", "env"));
+            ProjectRole role = role(root);
+            boolean identityRole = role == ProjectRole.IDENTITY;
+            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "stacks") : Set.of("project", "cluster", "identity", "providers", "stacks"));
+            Map<String, Object> project = map(top.get("project"), "project", Set.of("id", "cloud", "role", "env", "egressIp"));
             AfonProject.ProjectId id = id(project);
             AfonCloud cloud = cloud(string(project, "project.cloud"), "project.cloud");
             String env = env(project);
+            String egressIp = egressIp(project);
+            Map<String, String> nodePool = nodePool(map(top.get("cluster"), "cluster", Set.of("nodePool")), cloud);
 
-            Map<String, Object> stacks = map(top.get("stacks"), "stacks", Set.of("create", "git", "tre"));
+            Map<String, Object> stacks = map(top.get("stacks"), "stacks", identityRole ? Set.of("identity") : Set.of("create", "git", "tre"));
+            if (identityRole) {
+                if (!problems.isEmpty()) {
+                    throw new ProjectException(source, problems);
+                }
+                IdentityProject identityProject = identityProject(id, cloud, env, egressIp, nodePool,
+                                                                  map(stacks.get("identity"), "stacks.identity", Set.of("stack", "domain")));
+                if (!problems.isEmpty()) {
+                    throw new ProjectException(source, problems);
+                }
+                return identityProject;
+            }
             boolean ownGit = stacks.get("git") != null;
-            AfonProject.Identity identity = identity(map(top.get("identity"), "identity",
-                                                          Set.of("issuerUrl", "acr", "clients", "projectClaim", "userClaim")), id, ownGit);
-            List<AfonProject.Provider> providers = providers(top.get("providers"), cloud);
+            TreProject.Identity identity = identity(map(top.get("identity"), "identity",
+                                                          Set.of("issuerUrl", "acr", "clients", "projectClaim", "userClaim", "project")), id, ownGit);
+            List<TreProject.Provider> providers = providers(top.get("providers"), cloud);
 
             Map<String, Object> create = map(stacks.get("create"), "stacks.create", Set.of("auditBucket", "gitBucket"));
             Map<String, Object> git = map(stacks.get("git"), "stacks.git", Set.of("domain"));
-            AfonProject.Create createStack = new AfonProject.Create(string(create, "stacks.create.auditBucket"),
+            TreProject.Create createStack = new TreProject.Create(string(create, "stacks.create.auditBucket"),
                                                                     optional(create, "stacks.create.gitBucket", null));
-            AfonProject.Git gitStack = ownGit ? new AfonProject.Git(string(git, "stacks.git.domain")) : null;
-            AfonProject.Tre treStack = tre(map(stacks.get("tre"), "stacks.tre", Set.of("stack", "domains", "lifetime")), cloud);
+            TreProject.Git gitStack = ownGit ? new TreProject.Git(string(git, "stacks.git.domain")) : null;
+            TreProject.Tre treStack = tre(map(stacks.get("tre"), "stacks.tre", Set.of("stack", "domains", "lifetime")), cloud);
 
             if (!problems.isEmpty()) {
                 throw new ProjectException(source, problems);
             }
-            return new AfonProject(id, cloud, env, identity, providers, createStack, gitStack, treStack);
+            return new TreProject(id, cloud, env, egressIp, nodePool, identity, providers, createStack, gitStack, treStack);
+        }
+
+        /**
+         * @return the role the file gives the project, {@link ProjectRole#TRE} if it gives none, or, noting a problem, if it gives one that
+         * is not a role, so that the rest is read as for a TRE project, which is what a project mostly is
+         */
+        private ProjectRole role(Object root) {
+            Object project = root instanceof Map<?, ?> top ? top.get("project") : null;
+            Object value = project instanceof Map<?, ?> map ? map.get("role") : null;
+            if (value == null || String.valueOf(value).isBlank()) {
+                return ProjectRole.TRE;
+            }
+            return ProjectRole.of(String.valueOf(value).trim()).orElseGet(() -> {
+                problems.add(String.format("project.role '%s' is not a role of a project: one of %s", value,
+                                           Arrays.stream(ProjectRole.values()).map(ProjectRole::value).toList()));
+                return ProjectRole.TRE;
+            });
+        }
+
+        /**
+         * @return the identity project, whose stack is {@code <cloud>-keycloak} if it names none, which the stacks file may define otherwise: it is
+         * looked up when the project runs, as for a TRE's
+         */
+        private IdentityProject identityProject(AfonProject.ProjectId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
+                                                Map<String, Object> identity) {
+            String name = optional(identity, "stacks.identity.stack", cloud == null ? null : cloud + "-keycloak");
+            StackId stack = null;
+            if (name != null) {
+                try {
+                    stack = StackId.parse(name);
+                    if (cloud != null && stack.cloud() != cloud) {
+                        problems.add(String.format("stacks.identity.stack '%s' is not on the project's cloud, %s", name, cloud));
+                    }
+                } catch (IllegalArgumentException e) {
+                    problems.add("stacks.identity.stack: " + e.getMessage());
+                }
+            }
+            return new IdentityProject(id, cloud, env, egressIp, nodePool, stack, optional(identity, "stacks.identity.domain", null));
+        }
+
+        /**
+         * @return the id of the identity project that the TRE project names, or {@code null} if it names none or, noting a problem, not an id
+         */
+        private String identityProjectId(Map<String, Object> identity) {
+            String id = optional(identity, "identity.project", null);
+            if (id == null) {
+                return null;
+            }
+            try {
+                return new AfonProject.ProjectId(id).value();
+            } catch (IllegalArgumentException e) {
+                problems.add("identity.project: " + e.getMessage());
+                return null;
+            }
+        }
+
+        private static final java.util.regex.Pattern IPV4 =
+            java.util.regex.Pattern.compile("(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}");
+
+        /**
+         * @return the address the project's cluster leaves from, or {@code null} if it is not given or, noting a problem, not an IPv4 address,
+         * which is what the static IPs of the clouds that pin one are
+         */
+        /**
+         * @return the node pool of the cluster, whose keys are those of the cloud's node pool property, each with a value that the property
+         * takes: a number of nodes is a whole number of at least 1; empty if there is none
+         */
+        private Map<String, String> nodePool(Map<String, Object> cluster, AfonCloud cloud) {
+            Map<String, Object> pool = map(cluster.get("nodePool"), "cluster.nodePool", null);
+            Map<String, String> result = new LinkedHashMap<>();
+            if (pool.isEmpty() || cloud == null) {
+                return result;
+            }
+            Set<String> keys = AfonProject.NODE_POOL_KEYS.get(cloud);
+            if (keys.isEmpty()) {
+                problems.add(String.format("cluster.nodePool is not available on %s, which has no node pool property: the config the project is made from has the nodes",
+                                           cloud.toString().toLowerCase(Locale.ROOT)));
+                return result;
+            }
+            pool.forEach((key, value) -> {
+                String text = value == null ? "" : String.valueOf(value).trim();
+                if (!keys.contains(key)) {
+                    problems.add(String.format("cluster.nodePool.%s is not a known key on %s, expected one of %s", key,
+                                               cloud.toString().toLowerCase(Locale.ROOT), new java.util.TreeSet<>(keys)));
+                } else if (text.isEmpty() || text.matches(".*[,;:\\s].*")) {
+                    problems.add(String.format("cluster.nodePool.%s '%s' is not a value, it has a separator or a space", key, text));
+                } else if (key.equals("nodeCount") && !text.matches("[1-9][0-9]*")) {
+                    problems.add(String.format("cluster.nodePool.nodeCount '%s' is not a number of nodes, a whole number of at least 1", text));
+                } else {
+                    result.put(key, text);
+                }
+            });
+            return result;
+        }
+
+        private String egressIp(Map<String, Object> project) {
+            String egressIp = optional(project, "project.egressIp", null);
+            if (egressIp != null && !IPV4.matcher(egressIp).matches()) {
+                problems.add(String.format("project.egressIp '%s' is not an IPv4 address, eg the one that azure-egress-ip create prints", egressIp));
+                return null;
+            }
+            return egressIp;
         }
 
         /**
@@ -255,7 +387,7 @@ public class FileProjectProvider implements AfonProjectProvider {
         /**
          * @param ownGit whether the project has a Git of its own, which has a client: without, Git is deployed with the TRE
          */
-        private AfonProject.Identity identity(Map<String, Object> identity, AfonProject.ProjectId id, boolean ownGit) {
+        private TreProject.Identity identity(Map<String, Object> identity, AfonProject.ProjectId id, boolean ownGit) {
             Map<String, Object> clients = map(identity.get("clients"), "identity.clients", Set.of("tre", "git"));
             String tre = optional(clients, "identity.clients.tre", id == null ? null : id + "-tre");
             String git = ownGit ? optional(clients, "identity.clients.git", id == null ? null : id + "-git") : null;
@@ -266,13 +398,14 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (issuer != null && !issuer.startsWith("https://")) {
                 problems.add("identity.issuerUrl must be an https URL, as every consumer pins it");
             }
-            return new AfonProject.Identity(issuer, string(identity, "identity.acr"), tre, git,
-                                            optional(identity, "identity.projectClaim", AfonProject.Identity.DEFAULT_PROJECT_CLAIM),
-                                            optional(identity, "identity.userClaim", AfonProject.Identity.DEFAULT_USER_CLAIM));
+            return new TreProject.Identity(issuer, string(identity, "identity.acr"), tre, git,
+                                            optional(identity, "identity.projectClaim", TreProject.Identity.DEFAULT_PROJECT_CLAIM),
+                                            optional(identity, "identity.userClaim", TreProject.Identity.DEFAULT_USER_CLAIM),
+                                            identityProjectId(identity));
         }
 
-        private List<AfonProject.Provider> providers(Object node, AfonCloud projectCloud) {
-            List<AfonProject.Provider> providers = new ArrayList<>();
+        private List<TreProject.Provider> providers(Object node, AfonCloud projectCloud) {
+            List<TreProject.Provider> providers = new ArrayList<>();
             if (node == null) {
                 problems.add("providers is missing: a project reads the data of at least one Provider");
                 return providers;
@@ -285,20 +418,20 @@ public class FileProjectProvider implements AfonProjectProvider {
             for (int i = 0; i < list.size(); i++) {
                 String path = "providers[" + i + "]";
                 Map<String, Object> provider = map(list.get(i), path,
-                                                   Set.of("id", "polarisUri", "warehouse", "audience", "bucket", "cloud"));
+                                                   Set.of("id", "catalogUri", "catalogName", "audience", "bucket", "cloud"));
                 String id = string(provider, path + ".id");
                 if (id != null && !ids.add(id)) {
                     problems.add(String.format("%s.id '%s' is used by another provider", path, id));
                 }
                 String cloudName = optional(provider, path + ".cloud", projectCloud == null ? null : projectCloud.toString());
-                providers.add(new AfonProject.Provider(id, string(provider, path + ".polarisUri"),
-                                                       string(provider, path + ".warehouse"), string(provider, path + ".audience"),
+                providers.add(new TreProject.Provider(id, string(provider, path + ".catalogUri"),
+                                                       string(provider, path + ".catalogName"), string(provider, path + ".audience"),
                                                        string(provider, path + ".bucket"), cloud(cloudName, path + ".cloud")));
             }
             return providers;
         }
 
-        private AfonProject.Tre tre(Map<String, Object> tre, AfonCloud cloud) {
+        private TreProject.Tre tre(Map<String, Object> tre, AfonCloud cloud) {
             String stackName = optional(tre, "stacks.tre.stack", cloud == null ? null : cloud + "-full");
             StackId stack = null;
             if (stackName != null) {
@@ -324,7 +457,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (teardown != null && !teardown.matches("([01]\\d|2[0-3]):[0-5]\\d")) {
                 problems.add(String.format("stacks.tre.lifetime.teardown '%s' is not a time as HH:mm, eg 22:00", teardown));
             }
-            return new AfonProject.Tre(stack, domainsByProperty, teardown,
+            return new TreProject.Tre(stack, domainsByProperty, teardown,
                                        optional(lifetime, "stacks.tre.lifetime.timeZone", DEFAULT_TIME_ZONE));
         }
 

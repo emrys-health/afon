@@ -55,9 +55,9 @@ public class ComposedStack extends TerraformStack {
 
     private static CloudPlatform platformOf(TerraformStack stack, StackDefinition definition, AfonPropertyProvider properties) {
         return switch (definition.id().cloud()) {
-            case AWS -> AwsCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinnedEgressIp());
-            case AZURE -> AzureCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinnedEgressIp());
-            case GCP -> GcpCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinnedEgressIp());
+            case AWS -> AwsCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinsEgressIp(properties));
+            case AZURE -> AzureCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinsEgressIp(properties));
+            case GCP -> GcpCloudProvider.bootstrap(stack, definition.id(), properties, definition.pinsEgressIp(properties));
         };
     }
 

@@ -48,8 +48,18 @@ public class KubeClient implements AutoCloseable {
     private final AfonPropertyProvider properties;
     private final ApiClient            apiClient;
     private       ApiClient            execApiClient;
+    private final String               kubeConfigPath;
 
     public KubeClient(AfonPropertyProvider properties) {
+        this(properties, ConfigUtils.opsKubeConfigPath());
+    }
+
+    /**
+     * Acts on the cluster of the kube config, whatever {@code KUBECONFIG}, and the stack that the ops commands act on, say, eg that
+     * of another project's stack.
+     */
+    public KubeClient(AfonPropertyProvider properties, String kubeConfigPath) {
+        this.kubeConfigPath = kubeConfigPath;
         this.properties  = properties;
         this.clusterName = properties.getValue(CLUSTER_NAME);
         this.apiClient   = buildClient(properties);
@@ -57,7 +67,6 @@ public class KubeClient implements AutoCloseable {
     }
 
     protected ApiClient buildClient(AfonPropertyProvider properties) {
-        String kubeConfigPath = ConfigUtils.opsKubeConfigPath();
         try {
             FileReader reader     = new FileReader(kubeConfigPath);
             KubeConfig kubeConfig = KubeConfig.loadKubeConfig(reader);
@@ -123,7 +132,6 @@ public class KubeClient implements AutoCloseable {
      * @return the name of the current context of the kube config, ie that of the cluster that kubectl, and this client, act on
      */
     public String getContext() {
-        String kubeConfigPath = ConfigUtils.opsKubeConfigPath();
         try (FileReader reader = new FileReader(kubeConfigPath)) {
             return KubeConfig.loadKubeConfig(reader).getCurrentContext();
         } catch (IOException e) {

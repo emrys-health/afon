@@ -6,15 +6,19 @@ import health.emrys.afon.ops.kube.KubeClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 
+import static health.emrys.afon.config.AfonProperty.KEYCLOAK_KUBECONFIG;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
 /**
  * Reaches the admin side of KeyCloak, ie its admin REST API and the {@code master} realm, through a port-forward to its pod, as its
  * ingress may only admit {@code <CLOUD>_KEYCLOAK_ALLOWED_CIDRS} to it, which need not include this machine.
  *
- * <p>The pod is looked for in the cluster of the current kubectl context, which must be that of the cloud. If none runs there, as
+ * <p>The pod is looked for in the cluster of {@code KEYCLOAK_KUBECONFIG} if the config names one, as a project's does for the Keycloak of
+ * its identity project, else in the cluster of the current kubectl context, which must be that of the cloud. If none runs there, as
  * when the stacks use the KeyCloak of another stack, eg with {@code <CLOUD>_KEYCLOAK_EXTERNAL=true}, KeyCloak is reached through
  * its public domain name instead, so this machine must then be admitted to it.
  *
@@ -48,7 +52,23 @@ public final class KeyCloakTunnel {
      * @throws IllegalStateException if the current kubectl context is not the cluster of the cloud
      */
     public static void run(AfonCloud cloud, AfonPropertyProvider properties, Call call) throws Exception {
-        try (KubeClient client = new KubeClient(properties)) {
+        String configured = properties.getValue(KEYCLOAK_KUBECONFIG, "");
+        Path kubeConfig = configured == null || configured.isBlank() ? null : Path.of(configured.trim());
+        if (kubeConfig != null && !Files.isRegularFile(kubeConfig)) {
+            throw new IllegalStateException("No kubeconfig " + kubeConfig + ", which KEYCLOAK_KUBECONFIG names for the cluster of Keycloak: write it with the "
+                                            + "update-kube-config script of the cloud for the stack of the identity project");
+        }
+        run(cloud, properties, kubeConfig, call);
+    }
+
+    /**
+     * As {@link #run(AfonCloud, AfonPropertyProvider, Call)}, in the cluster of the kube config, if given, rather than the one that
+     * {@code KUBECONFIG} or the stack says, eg the identity project's, which is not that of the project that runs this.
+     *
+     * @param kubeConfig the kube config of the cluster with KeyCloak in it, or {@code null} for the one that the ops commands act on
+     */
+    public static void run(AfonCloud cloud, AfonPropertyProvider properties, Path kubeConfig, Call call) throws Exception {
+        try (KubeClient client = kubeConfig == null ? new KubeClient(properties) : new KubeClient(properties, kubeConfig.toString())) {
             client.requireContextOf(cloud);
             Optional<String> pod = client.runningPodWithLabel(POD_LABEL);
             if (pod.isEmpty()) {

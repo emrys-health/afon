@@ -81,4 +81,15 @@ class KeyCloakProviderTokenRetryTest {
             .hasMessageContaining("code: 401");
         assertThat(requests).hasValue(1);
     }
+
+    @Test
+    void saysThatThisMachineIsNotAdmittedWhenTheIngressAnswersForbidden() {
+        failureCode = 403;
+        succeedFrom = Integer.MAX_VALUE;
+
+        assertThatThrownBy(() -> provider.adminToken()).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("refused this machine (403 Forbidden)").hasMessageContaining("kube-keycloak-whitelist")
+            .hasMessageContaining("code: 403");
+        assertThat(requests).hasValue(1);
+    }
 }

@@ -432,7 +432,25 @@ The other callers of the restricted paths must be listed, or KeyCloak refuses th
 - the **clusters of other stacks** that call the admin API of this KeyCloak, if any: list their egress IPs. Those that only log users
   in or check tokens, eg with `<CLOUD>_KEYCLOAK_EXTERNAL=true`, use the open paths and need not be listed.
 
-There is no `kube-…-whitelist` command for KeyCloak: change the property and redeploy.
+On Azure and GCP, `kube-keycloak-whitelist` shows, sets or removes the restriction of the cluster that kubectl points at, live, as
+`kube-polaris-whitelist` does for Polaris: by the annotation of `keycloak-ingress`, which the next deploy sets again as the config says. It is
+how to let this machine call the admin API, eg to run `manage-identity` outside a project, without listing it in the config. A project needs none
+of it: `manage-project up`, and `manage-project run <project> manage-identity`, reach Keycloak through a port-forward to its pod, see
+[Projects](projects.md):
+
+```shell
+afon-cli.sh azure-update-kube-config identity
+afon-cli.sh kube-keycloak-whitelist azure show
+CALLER_PREFIX=24 afon-cli.sh kube-keycloak-whitelist azure set --caller   # its /24, if its address differs at every connection
+afon-cli.sh kube-keycloak-whitelist azure set --caller    # the configured CIDRs, the cluster's own addresses, and this machine
+afon-cli.sh kube-keycloak-whitelist azure set             # the configured CIDRs and the cluster's own addresses: this machine is off
+afon-cli.sh kube-keycloak-whitelist azure remove          # no restriction, until the next deploy
+afon-cli.sh kube-keycloak-whitelist azure show --stack azure-keycloak   # the cluster of that stack, by its kubeconfig, not the current context
+```
+
+`set` also takes the CIDRs to restrict it to, `set [--caller] <cidrs>`, in place of the configured ones. If nothing is configured Keycloak is
+open to all, as the deploy leaves it, so `set` takes the restriction off, and `--caller` does too, saying that there is none to admit this machine to. On AWS
+the restriction is the listener rules of the ALB, which only a deploy sets: change the property and redeploy.
 
 ## Volumes that outlive the cluster
 

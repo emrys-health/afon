@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.project.AfonProject;
+import health.emrys.afon.project.TreProject;
 import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.rest.RestClient;
 import health.emrys.afon.security.IdentityProvider;
@@ -275,6 +275,14 @@ public class KeyCloakProvider implements IdentityProvider {
         for (int attempt = 1; ; attempt++) {
             try {
                 return restClient.postForm(path, form, HttpResponses::parseAccessToken);
+            } catch (IllegalStateException e) {
+                if (e.getMessage() != null && e.getMessage().contains("code: 403")) {
+                    throw new IllegalStateException(format(
+                        "KeyCloak refused this machine (403 Forbidden) at %s: its admin API only admits the addresses of its allowed CIDRs. "
+                            + "Admit this machine with 'afon-cli.sh kube-keycloak-whitelist <cloud> set --caller --stack <stack>'. %s",
+                        path, e.getMessage()), e);
+                }
+                throw e;
             } catch (IOException e) {
                 if (attempt >= tokenAttempts) {
                     throw e;
@@ -950,7 +958,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * The exact redirect URIs of the project's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
      * the remote desktop are served under.
      */
-    static List<String> treRedirectUris(AfonProject project) {
+    static List<String> treRedirectUris(TreProject project) {
         String property = project.cloud().name() + "_JUPYTER_DOMAIN_NAME";
         String domain = project.tre().domains().get(property);
         if (domain == null) {
@@ -963,7 +971,7 @@ public class KeyCloakProvider implements IdentityProvider {
     /**
      * The exact redirect URI of the project's Git client: Gitea's OIDC callback.
      */
-    static List<String> gitRedirectUris(AfonProject project) {
+    static List<String> gitRedirectUris(TreProject project) {
         return List.of(format("https://%s/user/oauth2/%s/callback", project.git().domain(), GITEA_AUTH_NAME));
     }
 
@@ -1084,9 +1092,9 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void ensureProject(AfonProject project, Map<String, String> publicKeys) {
+    public void ensureProject(TreProject project, Map<String, String> publicKeys) {
         String id = project.id().value();
-        AfonProject.Identity identity = project.identity();
+        TreProject.Identity identity = project.identity();
         try {
             String token = adminToken();
             String realm = KEYCLOAK_REALM;
@@ -1174,7 +1182,7 @@ public class KeyCloakProvider implements IdentityProvider {
      * scope, which would add other clients' audiences, is taken off.
      */
     private void convergeProjectClient(String token, String realm, String uuid, String clientId, String projectId,
-                                       AfonProject.Identity identity, List<String> audiences) throws IOException {
+                                       TreProject.Identity identity, List<String> audiences) throws IOException {
         ensureRole(token, realm, uuid, projectId);
         removeDefaultScope(token, realm, uuid, "roles");
         upsertMapper(token, realm, uuid, Map.of(
@@ -1297,7 +1305,7 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void addMember(AfonProject project, String userId) {
+    public void addMember(TreProject project, String userId) {
         try {
             String token = adminToken();
             String group = requireGroup(token, project);
@@ -1312,7 +1320,7 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void removeMember(AfonProject project, String userId) {
+    public void removeMember(TreProject project, String userId) {
         try {
             String token = adminToken();
             String group = requireGroup(token, project);
@@ -1330,7 +1338,7 @@ public class KeyCloakProvider implements IdentityProvider {
         }
     }
 
-    private String requireGroup(String token, AfonProject project) throws IOException {
+    private String requireGroup(String token, TreProject project) throws IOException {
         String group = groupId(token, KEYCLOAK_REALM, project.id().value());
         if (group == null) {
             throw new IOException(format("KeyCloak has no group for project %s: make it with manage-identity create", project.id()));
@@ -1339,7 +1347,7 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void closeProject(AfonProject project) {
+    public void closeProject(TreProject project) {
         String clientId = project.identity().treClient();
         try {
             String token = adminToken();
