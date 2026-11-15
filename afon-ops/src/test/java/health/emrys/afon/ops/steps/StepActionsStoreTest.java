@@ -110,4 +110,41 @@ class StepActionsStoreTest {
 
         assertThat(runs).hasSize(2);
     }
+
+    private static RuntimeException scriptFailing(String consoleLastLine) {
+        return new RuntimeException("Failed to run script cdktf/store.sh",
+                                    new RuntimeException("Program [afon-cli-scripts.sh] failed with Exception: , last 7000 lines of console:\nRunning delete of x\n"
+                                                         + consoleLastLine));
+    }
+
+    @Test
+    void saysWhyTheScriptFailedInTheWarning() {
+        failure = scriptFailing("No env: give --env or --cdktf-env, or switch to one with cdktf-switch");
+        java.io.PrintStream stderr = System.err;
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        System.setErr(new java.io.PrintStream(captured));
+        try {
+            actions.pushStateToStore(StackId.parse("aws-full"));
+        } finally {
+            System.setErr(stderr);
+        }
+        assertThat(captured.toString()).contains("WARNING: Could not run cdktf-store push: No env: give --env or --cdktf-env, or switch to one with cdktf-switch",
+                                                 "afon-cli.sh cdktf-store push current aws-full --force --cloud aws")
+            .doesNotContain("out of date");
+    }
+
+    @Test
+    void thereIsNoWarningWhenThereIsNothingStoredToDelete() {
+        failure = scriptFailing("No snapshot of env central-identity tagged current with files of stack azure-keycloak");
+        java.io.PrintStream stderr = System.err;
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        System.setErr(new java.io.PrintStream(captured));
+        try {
+            actions.deleteStateFromStore(StackId.parse("azure-keycloak"));
+        } finally {
+            System.setErr(stderr);
+        }
+        assertThat(runs).containsExactly("delete current azure-keycloak --cloud azure");
+        assertThat(captured.toString()).isEmpty();
+    }
 }

@@ -326,7 +326,7 @@ class ManageProjectMainTest {
         configure();
         assertThat(command.run(new String[]{"down", PROJECT})).isZero();
         assertThat(ran).containsExactly(inProject("manage-stack", "delete", c + "-full"), inProject("manage-stack", "delete", c + "-git"));
-        assertThat(out.toString()).contains("Left as they are", "manage-identity close xyz-yyyy-nnnn");
+        assertThat(out.toString()).contains("Left as they are", "manage-project run xyz-yyyy-nnnn manage-identity close");
     }
 
     @ParameterizedTest
@@ -404,6 +404,8 @@ class ManageProjectMainTest {
         String c = lower(cloud);
         assertThat(command.run(new String[]{"down", "central-identity"})).isZero();
         assertThat(ran).containsExactly(inIdentity("manage-stack", "delete", c + "-keycloak"));
+        // the identity has no clients or group to close: what is left is the projects registered in it, which must register again
+        assertThat(out.toString()).contains("Left as they are", "then run their register stage").doesNotContain("manage-identity close");
         ran.clear();
         assertThat(command.run(new String[]{"nightly", "central-identity"})).isZero();
         assertThat(ran).isEmpty();

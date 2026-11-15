@@ -387,8 +387,13 @@ public class ManageProjectMain {
             }
         }
         if (action.equals("down")) {
-            out.println("Left as they are: the project's buckets, and its clients and group in the central identity, until it is closed:"
-                        + " manage-identity close " + project.id());
+            if (project instanceof IdentityProject) {
+                out.println("Left as they are: the reserved egress IP, if the project names one, and the project's config and cdktf dirs.  The projects that"
+                            + " used this identity are registered in it no more: bring it up again, then run their register stage");
+            } else {
+                out.println("Left as they are: the project's buckets, and its clients and group in the central identity, until it is closed:"
+                            + " manage-project run " + project.id() + " manage-identity close");
+            }
         }
         return 0;
     }

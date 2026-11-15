@@ -803,12 +803,34 @@ public class StepActions {
         try {
             runStoreScript(args);
         } catch (RuntimeException e) {
-            String message = String.format("Could not run cdktf-store %s: the stored state is out of date.  "
-                                           + "Fix the cause, eg log in to the cloud, and run it by hand: afon-cli.sh cdktf-store %s",
-                                           args[0], String.join(" ", args));
+            String reason = reasonOf(e);
+            if (args[0].equals("delete") && reason.contains("No snapshot of env")) {
+                // nothing was stored, eg the stack was deployed before its state was stored: there is nothing to delete
+                logger.info("Nothing to delete from the store: {}", reason);
+                return;
+            }
+            String message = String.format("Could not run cdktf-store %s: %s.  Fix the cause, eg log in to the cloud, and run it by hand: "
+                                           + "afon-cli.sh cdktf-store %s", args[0], reason, String.join(" ", args));
             logger.warn(message, e);
             System.err.println("WARNING: " + message);
         }
+    }
+
+    /**
+     * @return what the script said last, which is why it failed, else what the exception says
+     */
+    static String reasonOf(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            int console = message == null ? -1 : message.indexOf("lines of console:");
+            if (console >= 0) {
+                String[] lines = message.substring(console + "lines of console:".length()).strip().split("\\R");
+                if (lines.length > 0 && !lines[lines.length - 1].isBlank()) {
+                    return lines[lines.length - 1].strip();
+                }
+            }
+        }
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
     }
 
     /**
