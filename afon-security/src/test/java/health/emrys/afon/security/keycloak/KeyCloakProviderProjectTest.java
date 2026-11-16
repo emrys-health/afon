@@ -38,7 +38,7 @@ class KeyCloakProviderProjectTest {
         project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         providers:
-          - {id: nuh, catalogUri: "https://p.example/api", catalogName: w, audience: provider-nuh, bucket: b}
+          - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
           git: {domain: git.example.org}
@@ -84,7 +84,7 @@ class KeyCloakProviderProjectTest {
             } else if (path.matches("/admin/realms/polaris/clients/[^/]+/roles/[^/]+") && call.startsWith("GET")) {
                 reply(exchange, 200, "{\"id\":\"rid\",\"name\":\"xyz-yyyy-nnnn\"}");
             } else if (call.equals("GET /admin/realms/polaris/users")) {
-                reply(exchange, 200, "[{\"id\":\"the-user-id\",\"username\":\"alice@uni.example\"}]");
+                reply(exchange, 200, "[{\"id\":\"the-user-id\",\"username\":\"alice@tre.example\"}]");
             } else if (call.startsWith("GET")) {
                 reply(exchange, 200, "{}".equals(path) ? "{}" : (path.endsWith("/models") ? "[]" : "{\"attributes\":{}}"));
             } else {
@@ -139,9 +139,9 @@ class KeyCloakProviderProjectTest {
         // the project claim comes from the client's own roles, the audiences from mappers
         assertThat(bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "client-role-mapper"))
             .contains("\"usermodel.clientRoleMapping.clientId\":\"xyz-yyyy-nnnn-tre\"", "\"claim.name\":\"project\"");
-        bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "provider-nuh");
+        bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "provider-data1");
         // the Git client carries no Provider audience
-        assertThat(bodies.stream().filter(b -> b.contains("provider-nuh"))).hasSize(1);
+        assertThat(bodies.stream().filter(b -> b.contains("provider-data1"))).hasSize(1);
 
         assertThat(requests).contains("POST /admin/realms/polaris/groups",
                                       "POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-tre",
@@ -236,14 +236,14 @@ class KeyCloakProviderProjectTest {
             } else if (call.equals("GET /admin/realms/polaris/users/profile")) {
                 reply(exchange, 200, "{\"attributes\":[{\"name\":\"username\"}]}");
             } else if (call.equals("GET /admin/realms/polaris/users/the-user-id")) {
-                reply(exchange, 200, "{\"username\":\"alice@uni.example\"}");
+                reply(exchange, 200, "{\"username\":\"alice@tre.example\"}");
             } else {
                 reply(exchange, call.startsWith("POST") ? 201 : 204, "");
             }
         });
-        assertThat(provider.ensureUser("Alice@Uni.Example", "Alice", "A")).isEqualTo("the-user-id");
+        assertThat(provider.ensureUser("Alice@Tre.Example", "Alice", "A")).isEqualTo("the-user-id");
         assertThat(users).singleElement().satisfies(body -> assertThat(body).contains(
-            "\"username\":\"alice@uni.example\"", "VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP").doesNotContain("password\""));
+            "\"username\":\"alice@tre.example\"", "VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP").doesNotContain("password\""));
         assertThat(bodyOf("PUT /admin/realms/polaris/users/the-user-id", "afon:the-user-id")).contains("polaris_principal");
         assertThat(requests).contains("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email");
         // KeyCloak drops an attribute that the user profile does not declare, so it is declared, for admins only

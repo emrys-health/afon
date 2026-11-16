@@ -1320,6 +1320,28 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
+    public Map<String, String> members(TreProject project) {
+        try {
+            String token = adminToken();
+            String group = requireGroup(token, project);
+            Map<String, String> members = new LinkedHashMap<>();
+            int first = 0;
+            int page = 100;
+            while (true) {
+                List<Map<String, Object>> users = getList(token, format("/admin/realms/%s/groups/%s/members?first=%d&max=%d", KEYCLOAK_REALM, group, first, page),
+                                                          "members of group " + project.id());
+                users.forEach(user -> members.put(String.valueOf(user.get("id")), String.valueOf(user.get("email"))));
+                if (users.size() < page) {
+                    return members;
+                }
+                first += page;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to list the members of project " + project.id(), e);
+        }
+    }
+
+    @Override
     public void removeMember(TreProject project, String userId) {
         try {
             String token = adminToken();

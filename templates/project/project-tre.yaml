@@ -31,6 +31,11 @@ providers:
     audience: <provider-audience>
     bucket: <provider-bucket>
 
+# the project's researchers, who up makes the members of its group in the central identity, and no others (one not listed is removed): an email, or
+# {email, firstName, lastName}.  Without the key, its group is left as it is, for manage-identity add-member; with [], it is emptied
+# members:
+#   - <researcher-email>
+
 stacks:
   create:
     auditBucket: ${id}-audit

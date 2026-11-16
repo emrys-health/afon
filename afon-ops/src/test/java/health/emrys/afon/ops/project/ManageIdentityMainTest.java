@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -81,6 +82,45 @@ class ManageIdentityMainTest {
         assertThat(out.toString()).contains("xyz-yyyy-nnnn-tre", "xyz-yyyy-nnnn-git");
     }
 
+    private void listMembers(AfonCloud cloud, String members) throws Exception {
+        setUp(cloud);
+        Path file = home.resolve("projects/" + PROJECT + "/project.yaml");
+        Files.writeString(file, Files.readString(file) + members);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void syncsTheGroupToTheMembersTheFileLists(AfonCloud cloud) throws Exception {
+        listMembers(cloud, "members:\n  - ada@example.org\n  - {email: grace@example.org, firstName: Grace, lastName: Hopper}\n");
+        when(identity.members(any(TreProject.class))).thenReturn(Map.of("id-ada", "ada@example.org", "id-old", "old@example.org"));
+        when(identity.ensureUser("ada@example.org", null, null)).thenReturn("id-ada");
+        when(identity.ensureUser("grace@example.org", "Grace", "Hopper")).thenReturn("id-grace");
+        assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
+        verify(identity, never()).addMember(any(TreProject.class), eq("id-ada"));
+        verify(identity).addMember(any(TreProject.class), eq("id-grace"));
+        verify(identity).removeMember(any(TreProject.class), eq("id-old"));
+        assertThat(out.toString()).contains("Added grace@example.org (id-grace)", "Removed old@example.org (id-old)", "has 2 members");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void emptiesTheGroupOfAFileWithNoMembers(AfonCloud cloud) throws Exception {
+        listMembers(cloud, "members: []\n");
+        when(identity.members(any(TreProject.class))).thenReturn(Map.of("id-old", "old@example.org"));
+        assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
+        verify(identity).removeMember(any(TreProject.class), eq("id-old"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesTheGroupAsItIsIfTheFileListsNoMembers(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
+        verify(identity, never()).members(any(TreProject.class));
+        verify(identity, never()).removeMember(any(TreProject.class), any());
+        assertThat(out.toString()).contains("lists no members");
+    }
+
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     @SuppressWarnings("unchecked")
@@ -135,8 +175,8 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void addsAMemberMakingTheUserAndPrintsTheirId(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.ensureUser("alice@uni.example", "Alice", null)).thenReturn("the-user-id");
-        assertThat(command.run(new String[]{"add-member", PROJECT, "alice@uni.example", "--first-name", "Alice"})).isZero();
+        when(identity.ensureUser("alice@tre.example", "Alice", null)).thenReturn("the-user-id");
+        assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example", "--first-name", "Alice"})).isZero();
         verify(identity).addMember(any(TreProject.class), eq("the-user-id"));
         assertThat(out.toString().trim()).isEqualTo("the-user-id");
     }
@@ -145,8 +185,8 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void removesAMemberByEmail(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.findUser("alice@uni.example")).thenReturn(Optional.of("the-user-id"));
-        assertThat(command.run(new String[]{"remove-member", PROJECT, "alice@uni.example"})).isZero();
+        when(identity.findUser("alice@tre.example")).thenReturn(Optional.of("the-user-id"));
+        assertThat(command.run(new String[]{"remove-member", PROJECT, "alice@tre.example"})).isZero();
         verify(identity).removeMember(any(TreProject.class), eq("the-user-id"));
     }
 
@@ -154,9 +194,9 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void failsToRemoveAnUnknownUser(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.findUser("bob@uni.example")).thenReturn(Optional.empty());
-        assertThat(command.run(new String[]{"remove-member", PROJECT, "bob@uni.example"})).isEqualTo(1);
-        assertThat(err.toString()).contains("No user bob@uni.example");
+        when(identity.findUser("bob@tre.example")).thenReturn(Optional.empty());
+        assertThat(command.run(new String[]{"remove-member", PROJECT, "bob@tre.example"})).isEqualTo(1);
+        assertThat(err.toString()).contains("No user bob@tre.example");
     }
 
     @ParameterizedTest

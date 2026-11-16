@@ -122,6 +122,11 @@ public interface IdentityProvider {
     void addMember(TreProject project, String userId);
 
     /**
+     * @return the members of the project's group, by their immutable id, with their email
+     */
+    Map<String, String> members(TreProject project);
+
+    /**
      * Removes the user from the project's group and ends their sessions.  A token already issued lasts until it expires.
      */
     void removeMember(TreProject project, String userId);

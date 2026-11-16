@@ -173,11 +173,11 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
     get(s"/admin/realms/$KEYCLOAK_REALM/groups/$group/members").elements().asScala.map(_.get("id").asText()).toSeq
   }
 
-  "A project in the central identity" should {
+  "A project using a central identity provider" should {
 
     "have a client for its TRE and one for its Git, which take no password and authenticate by key" in {
       Given("a project made in KeyCloak")
-      val project = projectOf("cfg-2026-0001", Seq("nuh"))
+      val project = projectOf("cfg-2026-0001", Seq("data1"))
       provider.ensureProject(project, publicKeys())
 
       Then("each client takes the browser flow only, with no direct grants, service accounts or full scope, and authenticates by a key")
@@ -199,9 +199,9 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
 
     "have only a TRE client when Git is deployed with the TRE" in {
       Given("a project with no Git of its own")
-      val project = projectOf("cfg-2026-0009", Seq("nuh"), ownGit = false)
+      val project = projectOf("cfg-2026-0009", Seq("data1"), ownGit = false)
       provider.ensureProject(project, Map("tre" -> publicKeys().get("tre")).asJava)
-      val ivy = provider.ensureUser("ivy@uni.example", "Ivy", "I")
+      val ivy = provider.ensureUser("ivy@tre.example", "Ivy", "I")
       provider.addMember(project, ivy)
 
       Then("it has a TRE client, whose token names the project, and no Git client")
@@ -217,7 +217,7 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       runScript("project/key.sh", afonHome, id, "tre")
       val publicKey = Files.readString(afonHome.resolve(s"projects/$id/keys/tre.jwk"))
       val privateKey = privateKeyOf(afonHome.resolve(s"keys/$id/tre.pem"))
-      provider.ensureProject(projectOf(id, Seq("nuh"), ownGit = false), Map("tre" -> publicKey).asJava)
+      provider.ensureProject(projectOf(id, Seq("data1"), ownGit = false), Map("tre" -> publicKey).asJava)
       // the token endpoint of a realm answers plain http from this machine only if the realm does not require https of it
       adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
       val redirectUri = s"https://jupyter.$id.example.org/oauth2/callback"
@@ -238,10 +238,10 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
 
     "give a member a token naming the project, and a non-member none" in {
       Given("a project with a Provider, a member, and a user who is not a member")
-      val project = projectOf("cfg-2026-0002", Seq("nuh"))
+      val project = projectOf("cfg-2026-0002", Seq("data1"))
       provider.ensureProject(project, publicKeys())
-      val alice = provider.ensureUser("alice@uni.example", "Alice", "A")
-      val bob = provider.ensureUser("bob@uni.example", "Bob", "B")
+      val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
+      val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
       provider.addMember(project, alice)
 
       When("a token is issued to each for the project's TRE client")
@@ -251,7 +251,7 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       Then("the member's token names the project, once, and the user by their immutable id, with the project's audiences")
       assert(values(aliceToken.get("project")) == Seq("cfg-2026-0002"))
       assert(aliceToken.get("polaris_principal").asText == s"afon:$alice")
-      assert(values(aliceToken.get("aud")).toSet == Set("cfg-2026-0002-tre", "provider-nuh"))
+      assert(values(aliceToken.get("aud")).toSet == Set("cfg-2026-0002-tre", "provider-data1"))
 
       And("the non-member's token names no project")
       assert(values(bobToken.get("project")).isEmpty)
@@ -261,64 +261,84 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       assert(values(tokenOf("cfg-2026-0002-git", alice).get("project")) == Seq("cfg-2026-0002"))
     }
 
-    "keep the projects of one user apart" in {
-      Given("two projects, and a user who is a member of both, and another of the first only")
-      val one = projectOf("cfg-2026-0003", Seq("nuh"))
-      val two = projectOf("cfg-2026-0004", Seq("ucl"))
-      provider.ensureProject(one, publicKeys())
-      provider.ensureProject(two, publicKeys())
-      val dana = provider.ensureUser("dana@uni.example", "Dana", "D")
-      val erin = provider.ensureUser("erin@uni.example", "Erin", "E")
-      provider.addMember(one, dana)
-      provider.addMember(two, dana)
-      provider.addMember(one, erin)
+    "give each user the projects they are a member of, and no other" in {
+      Given("two projects, alice a member of both, bob of the first only, and rob of the second only")
+      val project1 = projectOf("cfg-2026-0007", Seq("data1"))
+      val project2 = projectOf("cfg-2026-0008", Seq("data2"))
+      provider.ensureProject(project1, publicKeys())
+      provider.ensureProject(project2, publicKeys())
+      val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
+      val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
+      val rob = provider.ensureUser("rob@tre.example", "Rob", "R")
+      provider.addMember(project1, alice)
+      provider.addMember(project2, alice)
+      provider.addMember(project1, bob)
+      provider.addMember(project2, rob)
 
-      Then("a token of each project's client names that project alone, with its own Provider's audience")
-      val first = tokenOf("cfg-2026-0003-tre", dana)
-      val second = tokenOf("cfg-2026-0004-tre", dana)
-      assert(values(first.get("project")) == Seq("cfg-2026-0003"))
-      assert(values(second.get("project")) == Seq("cfg-2026-0004"))
-      assert(values(first.get("aud")).toSet == Set("cfg-2026-0003-tre", "provider-nuh"))
-      assert(values(second.get("aud")).toSet == Set("cfg-2026-0004-tre", "provider-ucl"))
+      Then("the group of each project has its members, and no others")
+      assert(groupMembers("cfg-2026-0007").toSet == Set(alice, bob))
+      assert(groupMembers("cfg-2026-0008").toSet == Set(alice, rob))
+      assert(provider.members(project1).keySet.asScala.toSet == Set(alice, bob))
+      assert(provider.members(project2).keySet.asScala.toSet == Set(alice, rob))
 
-      And("the user of the first project only has no project in a token of the second")
-      assert(values(tokenOf("cfg-2026-0003-tre", erin).get("project")) == Seq("cfg-2026-0003"))
-      assert(values(tokenOf("cfg-2026-0004-tre", erin).get("project")).isEmpty)
+      And("a token of each project's client names that project for its members, and none for the others")
+      def projectsOf(clientId: String, user: String) = values(tokenOf(clientId, user).get("project"))
+      assert(projectsOf("cfg-2026-0007-tre", alice) == Seq("cfg-2026-0007"))
+      assert(projectsOf("cfg-2026-0008-tre", alice) == Seq("cfg-2026-0008"))
+      assert(projectsOf("cfg-2026-0007-tre", bob) == Seq("cfg-2026-0007"))
+      assert(projectsOf("cfg-2026-0008-tre", bob).isEmpty)
+      assert(projectsOf("cfg-2026-0007-tre", rob).isEmpty)
+      assert(projectsOf("cfg-2026-0008-tre", rob) == Seq("cfg-2026-0008"))
+
+      And("a user who is a member of both gets, for each project, the audiences of that project's own Provider")
+      assert(values(tokenOf("cfg-2026-0007-tre", alice).get("aud")).toSet == Set("cfg-2026-0007-tre", "provider-data1"))
+      assert(values(tokenOf("cfg-2026-0008-tre", alice).get("aud")).toSet == Set("cfg-2026-0008-tre", "provider-data2"))
+
+      When("alice is removed from the first project")
+      provider.removeMember(project1, alice)
+      Then("she is still a member of the second, and bob and rob are as they were")
+      assert(projectsOf("cfg-2026-0007-tre", alice).isEmpty)
+      assert(projectsOf("cfg-2026-0008-tre", alice) == Seq("cfg-2026-0008"))
+      assert(groupMembers("cfg-2026-0007").toSet == Set(bob))
+      assert(groupMembers("cfg-2026-0008").toSet == Set(alice, rob))
     }
 
     "follow the Providers of the project when it is made again" in {
       Given("a project with one Provider, and a member")
-      val before = projectOf("cfg-2026-0005", Seq("nuh"))
+      val before = projectOf("cfg-2026-0005", Seq("data1"))
       provider.ensureProject(before, publicKeys())
-      val frank = provider.ensureUser("frank@uni.example", "Frank", "F")
+      val frank = provider.ensureUser("frank@tre.example", "Frank", "F")
       provider.addMember(before, frank)
-      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-nuh"))
+      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data1"))
 
       When("it is made again with another Provider added")
-      provider.ensureProject(projectOf("cfg-2026-0005", Seq("nuh", "ucl")), publicKeys())
+      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data1", "data2")), publicKeys())
       Then("its token carries the audience of both")
-      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-nuh", "provider-ucl"))
+      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data1", "provider-data2"))
 
       When("it is made again with the first Provider gone")
-      provider.ensureProject(projectOf("cfg-2026-0005", Seq("ucl")), publicKeys())
+      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data2")), publicKeys())
       Then("its token no longer carries the audience of the first, and the member is still a member")
-      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-ucl"))
+      assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data2"))
       assert(values(tokenOf("cfg-2026-0005-tre", frank).get("project")) == Seq("cfg-2026-0005"))
     }
 
     "stop naming the project for a member who is removed, and issue no token once it is closed" in {
       Given("a project with a member")
-      val project = projectOf("cfg-2026-0006", Seq("nuh"))
+      val project = projectOf("cfg-2026-0006", Seq("data1"))
       provider.ensureProject(project, publicKeys())
-      val gina = provider.ensureUser("gina@uni.example", "Gina", "G")
-      provider.addMember(project, gina)
-      assert(groupMembers("cfg-2026-0006").contains(gina))
+      val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
+      provider.addMember(project, alice)
+      assert(groupMembers("cfg-2026-0006").contains(alice))
+      And("the provider lists the group's members by id, with their email")
+      assert(provider.members(project).get(alice) == "alice@tre.example")
 
       When("the member is removed")
-      provider.removeMember(project, gina)
+      provider.removeMember(project, alice)
       Then("they are out of the group, and their token names no project")
-      assert(!groupMembers("cfg-2026-0006").contains(gina))
-      assert(values(tokenOf("cfg-2026-0006-tre", gina).get("project")).isEmpty)
+      assert(!groupMembers("cfg-2026-0006").contains(alice))
+      assert(values(tokenOf("cfg-2026-0006-tre", alice).get("project")).isEmpty)
+      assert(!provider.members(project).containsKey(alice))
 
       When("the project is closed")
       provider.closeProject(project)
@@ -329,15 +349,15 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
 
     "make a user once, with no password, to be invited" in {
       When("a user is made twice")
-      val first = provider.ensureUser("hana@uni.example", "Hana", "H")
-      val second = provider.ensureUser("hana@uni.example", "Hana", "H")
+      val first = provider.ensureUser("bob@tre.example", "Bob", "B")
+      val second = provider.ensureUser("bob@tre.example", "Bob", "B")
       Then("it is the same user, with the actions of an invitation and no credentials")
       assert(first == second)
-      assert(provider.findUser("hana@uni.example").orElse("") == first)
+      assert(provider.findUser("bob@tre.example").orElse("") == first)
       val user = get(s"/admin/realms/$KEYCLOAK_REALM/users/$first")
       assert(values(user.get("requiredActions")).toSet == Set("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"))
       assert(get(s"/admin/realms/$KEYCLOAK_REALM/users/$first/credentials").size() == 0)
-      assert(!provider.findUser("nobody@uni.example").isPresent)
+      assert(!provider.findUser("nobody@tre.example").isPresent)
     }
   }
 }

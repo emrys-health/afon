@@ -42,6 +42,8 @@ import java.util.Set;
  *                                   proves MFA, eg mfa; clients default to &lt;project&gt;-tre and &lt;project&gt;-git,
  *                                                                              the claims to project and polaris_principal
  * providers: [{id, catalogUri, catalogName, audience, bucket, cloud}]     cloud defaults to the project's
+ * members:   [email | {email, firstName, lastName}]     the project's researchers, which up makes its group have, and no others; none, if
+ *            the key is left out, so that its group is not managed by the file
  * stacks:
  *   create:  {auditBucket, gitBucket}     gitBucket is optional: the config the project is made from says if it is not given
  *   git:     {domain}                     optional: without it Git is deployed with the TRE, and has no client
@@ -205,7 +207,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             }
             ProjectRole role = role(root);
             boolean identityRole = role == ProjectRole.IDENTITY;
-            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "dns", "stacks") : Set.of("project", "cluster", "dns", "identity", "providers", "stacks"));
+            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "dns", "stacks") : Set.of("project", "cluster", "dns", "identity", "providers", "members", "stacks"));
             Map<String, Object> project = map(top.get("project"), "project", Set.of("id", "cloud", "role", "env", "egressIp"));
             AfonProject.ProjectId id = id(project);
             AfonCloud cloud = cloud(string(project, "project.cloud"), "project.cloud");
@@ -231,6 +233,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             TreProject.Identity identity = identity(map(top.get("identity"), "identity",
                                                           Set.of("issuerUrl", "acr", "clients", "projectClaim", "userClaim", "project")), id, ownGit);
             List<TreProject.Provider> providers = providers(top.get("providers"), cloud);
+            List<TreProject.Member> members = members(top.get("members"));
 
             Map<String, Object> create = map(stacks.get("create"), "stacks.create", Set.of("auditBucket", "gitBucket"));
             Map<String, Object> git = map(stacks.get("git"), "stacks.git", Set.of("domain"));
@@ -242,7 +245,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (!problems.isEmpty()) {
                 throw new ProjectException(source, problems);
             }
-            TreProject treProject = new TreProject(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, providers, createStack, gitStack, treStack);
+            TreProject treProject = new TreProject(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, providers, members, createStack, gitStack, treStack);
             checkClusterNames(treProject);
             return treProject;
         }
@@ -456,6 +459,41 @@ public class FileProjectProvider implements AfonProjectProvider {
                                                        string(provider, path + ".bucket"), cloud(cloudName, path + ".cloud")));
             }
             return providers;
+        }
+
+        /**
+         * @return the members, each an email or a mapping with an {@code email} and optionally a {@code firstName} and a {@code lastName}, or
+         * {@code null} if there is no {@code members}: an empty list is a project with no members, which is not the same
+         */
+        private List<TreProject.Member> members(Object node) {
+            if (node == null) {
+                return null;
+            }
+            if (!(node instanceof List<?> list)) {
+                problems.add("members must be a list, which may be empty");
+                return null;
+            }
+            List<TreProject.Member> members = new ArrayList<>();
+            Set<String> emails = new LinkedHashSet<>();
+            for (int i = 0; i < list.size(); i++) {
+                String path = "members[" + i + "]";
+                Map<String, Object> entry = list.get(i) instanceof Map<?, ?>
+                    ? map(list.get(i), path, Set.of("email", "firstName", "lastName"))
+                    : new LinkedHashMap<>(Map.of("email", list.get(i) == null ? "" : list.get(i)));
+                String email = string(entry, path + ".email");
+                if (email == null) {
+                    continue;
+                }
+                email = email.toLowerCase(java.util.Locale.ROOT);
+                if (!email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+                    problems.add(String.format("%s '%s' is not an email", path + ".email", email));
+                } else if (!emails.add(email)) {
+                    problems.add(String.format("%s '%s' is listed twice", path + ".email", email));
+                } else {
+                    members.add(new TreProject.Member(email, optional(entry, path + ".firstName", null), optional(entry, path + ".lastName", null)));
+                }
+            }
+            return members;
         }
 
         private TreProject.Tre tre(Map<String, Object> tre, AfonCloud cloud) {

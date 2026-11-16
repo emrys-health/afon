@@ -23,7 +23,7 @@ class FileProjectProviderTest {
         project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         providers:
-          - {id: nuh, catalogUri: "https://p.example/api", catalogName: w, audience: provider-nuh, bucket: b}
+          - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
           git: {domain: git.example.org}
@@ -94,7 +94,7 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void reportsEveryProblemAtOnce(AfonCloud cloud) {
-        ProjectException e = invalid(valid(cloud).replace("xyz-yyyy-nnnn", "CVD_1").replace("audience: provider-nuh, ", ""));
+        ProjectException e = invalid(valid(cloud).replace("xyz-yyyy-nnnn", "CVD_1").replace("audience: provider-data1, ", ""));
         assertThat(e.problems()).anyMatch(p -> p.startsWith("project.id")).anyMatch(p -> p.equals("providers[0].audience is required"));
     }
 
@@ -109,8 +109,41 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void rejectsDuplicateProviderIds(AfonCloud cloud) {
-        String twice = valid(cloud).replace("bucket: b}", "bucket: b}\n  - {id: nuh, catalogUri: \"https://q\", catalogName: w, audience: a, bucket: c}");
-        assertThat(invalid(twice).problems()).contains("providers[1].id 'nuh' is used by another provider");
+        String twice = valid(cloud).replace("bucket: b}", "bucket: b}\n  - {id: data1, catalogUri: \"https://q\", catalogName: w, audience: a, bucket: c}");
+        assertThat(invalid(twice).problems()).contains("providers[1].id 'data1' is used by another provider");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void hasNoMembersToManageIfTheFileListsNone(AfonCloud cloud) {
+        assertThat(((TreProject) FileProjectProvider.parse(valid(cloud))).members()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void readsMembersAsEmailsOrMappings(AfonCloud cloud) {
+        String yaml = valid(cloud) + "members:\n  - Ada@Example.org\n  - {email: grace@example.org, firstName: Grace, lastName: Hopper}\n";
+        assertThat(((TreProject) FileProjectProvider.parse(yaml)).members()).containsExactly(
+            new TreProject.Member("ada@example.org", null, null), new TreProject.Member("grace@example.org", "Grace", "Hopper"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void readsAnEmptyListOfMembersAsNoMembers(AfonCloud cloud) {
+        assertThat(((TreProject) FileProjectProvider.parse(valid(cloud) + "members: []\n")).members()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void rejectsMembersThatAreNotEmailsOrAreListedTwice(AfonCloud cloud) {
+        String yaml = valid(cloud) + "members: [ada@example.org, nobody, ADA@example.org]\n";
+        assertThat(invalid(yaml).problems()).contains("members[1].email 'nobody' is not an email", "members[2].email 'ada@example.org' is listed twice");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void rejectsMembersThatAreNotAList(AfonCloud cloud) {
+        assertThat(invalid(valid(cloud) + "members: ada@example.org\n").problems()).contains("members must be a list, which may be empty");
     }
 
     @ParameterizedTest

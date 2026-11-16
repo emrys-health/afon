@@ -7,6 +7,7 @@ import health.emrys.afon.project.IdentityProject;
 import health.emrys.afon.project.ProjectPlan;
 import health.emrys.afon.project.ProjectPlan.Stage;
 import health.emrys.afon.project.ProjectPlan.StageId;
+import health.emrys.afon.project.TreProject;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,7 +25,8 @@ import java.util.function.Predicate;
  *   <li>{@code register}: {@code manage-identity create}, in the project's home like the rest, so that it uses the config that the project is
  *       made from, that of its env, and its Keycloak admin credentials, never those of whichever env is active.  If the project names the
  *       identity project, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project, so that
- *       no address is admitted to it;</li>
+ *       no address is admitted to it.  If the file lists {@code members}, {@code manage-identity sync-members} follows, which makes the group of
+ *       the project have those, and no others;</li>
  *   <li>{@code identity}, {@code git} and {@code tre}: {@code manage-stack setup} or {@code delete} of the stack, the identity's being that of the
  *       project with the identity role.</li>
  * </ul>
@@ -108,7 +110,7 @@ final class ProjectCommands {
                     }
                     commands.add(new Command(stage.id(), List.of(), run, null));
                 }
-                case REGISTER -> commands.add(register(id, cloud, identityProject, identityKubeconfig));
+                case REGISTER -> commands.add(register(id, cloud, project instanceof TreProject tre && tre.members() != null, identityProject, identityKubeconfig));
                 case IDENTITY, GIT -> commands.add(stackCommand(plan, stage, "setup", stacks));
                 case TRE -> commands.add(withIdentityKubeconfig(stackCommand(plan, stage, "setup", stacks), cloud, identityProject));
             }
@@ -122,14 +124,22 @@ final class ProjectCommands {
      * identity project, whose kubeconfig the stage before it writes, in the identity project's own home.  Nothing is admitted to, so there is
      * nothing to take off afterwards, even if the registration fails, and nothing is left running: the tunnel lives as long as the command.
      */
-    private static Command register(String id, String cloud, IdentityProject identityProject, Path identityKubeconfig) {
+    private static Command register(String id, String cloud, boolean syncs, IdentityProject identityProject, Path identityKubeconfig) {
         if (identityProject == null) {
-            return Command.of(StageId.REGISTER, id, "manage-identity", "create", id);
+            List<Invocation> run = new ArrayList<>(List.of(new Invocation(id, List.of("manage-identity", "create", id))));
+            if (syncs) {
+                run.add(new Invocation(id, List.of("manage-identity", "sync-members", id)));
+            }
+            return new Command(StageId.REGISTER, List.of(), run, null);
         }
         String stack = identityProject.stack().toString();
+        List<Invocation> run = new ArrayList<>(List.of(new Invocation(id, List.of("manage-identity", "create", id, "--kubeconfig", identityKubeconfig.toString()))));
+        if (syncs) {
+            run.add(new Invocation(id, List.of("manage-identity", "sync-members", id, "--kubeconfig", identityKubeconfig.toString())));
+        }
         return new Command(StageId.REGISTER,
             List.of(new Invocation(identityProject.id().value(), List.of(cloud + "-update-kube-config", stack))),
-            List.of(new Invocation(id, List.of("manage-identity", "create", id, "--kubeconfig", identityKubeconfig.toString()))),
+            run,
             null);
     }
 

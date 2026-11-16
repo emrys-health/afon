@@ -274,6 +274,19 @@ class ManageProjectMainTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
+    void syncsTheMembersAfterTheRegistrationIfTheFileListsThem(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        Path file = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
+        Files.writeString(file, Files.readString(file) + "members:\n  - ada@example.org\n");
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT})).isZero();
+        assertThat(ran).containsSubsequence(inProject("manage-identity", "create", PROJECT), inProject("manage-identity", "sync-members", PROJECT),
+                                           inProject("manage-stack", "setup", c + "-full"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
     void runsTheGitStageToo_onceItsStackIsDefined(AfonCloud cloud) throws Exception {
         setUp(cloud);
         String c = lower(cloud);

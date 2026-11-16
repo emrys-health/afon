@@ -9,16 +9,16 @@ identity:
   acr: mfa
 
 providers:
-  - id: nuh
-    catalogUri: https://polaris.nuh.example/api/catalog
+  - id: data1
+    catalogUri: https://polaris.data1.example/api/catalog
     catalogName: xyz-yyyy-nnnn
-    audience: provider-nuh
-    bucket: nuh-xyz-yyyy-nnnn
-  - id: ucl
-    catalogUri: https://polaris.ucl.example/api/catalog
+    audience: provider-data1
+    bucket: data1-xyz-yyyy-nnnn
+  - id: data2
+    catalogUri: https://polaris.data2.example/api/catalog
     catalogName: xyz-yyyy-nnnn
-    audience: provider-ucl
-    bucket: ucl-xyz-yyyy-nnnn
+    audience: provider-data2
+    bucket: data2-xyz-yyyy-nnnn
 
 stacks:
   create:

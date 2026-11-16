@@ -30,6 +30,7 @@ import java.util.function.BiFunction;
  * manage-identity create &lt;project&gt; [--public-keys &lt;dir&gt;]
  * manage-identity add-member &lt;project&gt; &lt;email&gt; [--first-name &lt;name&gt;] [--last-name &lt;name&gt;]
  * manage-identity remove-member &lt;project&gt; &lt;email&gt;
+ * manage-identity sync-members &lt;project&gt;
  * manage-identity close &lt;project&gt;
  * </pre>
  * <ul>
@@ -40,6 +41,9 @@ import java.util.function.BiFunction;
  *   <li>{@code add-member} makes the researcher in the central identity if absent, with an invitation email, adds them to the
  *       project's group, and prints their user id, which each Provider whose contract names them makes their principal from;</li>
  *   <li>{@code remove-member} removes the researcher from the group and ends their sessions;</li>
+ *   <li>{@code sync-members} makes the project's group have the members that the project's file lists, and no others: it adds those that are
+ *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A file with no {@code members} leaves the
+ *       group as it is; one with an empty list empties it;</li>
  *   <li>{@code close} closes the project's TRE client, so that no token is issued for it.</li>
  *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
  *       {@code <afon-home>/projects/<project>/project.yaml}, see {@link FileProjectProvider#forProject}.</li>
@@ -64,6 +68,7 @@ public class ManageIdentityMain {
         "  add-member <email> [" + FIRST_NAME + " <name>] [" + LAST_NAME + " <name>]",
         "                                  makes the researcher if absent, adds them to the project's group, prints their user id",
         "  remove-member <email>           removes the researcher from the group and ends their sessions",
+        "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others (none listed: left as it is)",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -126,7 +131,7 @@ public class ManageIdentityMain {
         String action = args[0];
         // <project> is left out in the home of a project, whose config has its id
         int withoutProject = switch (action) {
-            case "create", "close" -> 0;
+            case "create", "close", "sync-members" -> 0;
             case "add-member", "remove-member" -> 1;
             default -> -1;
         };
@@ -150,6 +155,7 @@ public class ManageIdentityMain {
                                                   : usage("add-member takes one <email>");
             case "remove-member" -> rest.size() == 1 ? with(project, options, (p, e) -> removeMember(p, e, rest.get(0)))
                                                      : usage("remove-member takes one <email>");
+            case "sync-members" -> rest.isEmpty() ? with(project, options, this::syncMembers) : usage("sync-members takes no argument");
             case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
@@ -241,6 +247,31 @@ public class ManageIdentityMain {
         }
         provider.removeMember(project, userId.get());
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
+    }
+
+    private void syncMembers(TreProject project, String endpoint) {
+        if (project.members() == null) {
+            out.printf("Project %s lists no members: its group is left as it is%n", project.id());
+            return;
+        }
+        IdentityProvider provider = identity.apply(project, endpoint);
+        Map<String, String> current = provider.members(project);
+        Map<String, String> wanted = new LinkedHashMap<>();
+        for (TreProject.Member member : project.members()) {
+            String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName());
+            wanted.put(userId, member.email());
+            if (!current.containsKey(userId)) {
+                provider.addMember(project, userId);
+                out.printf("Added %s (%s) to project %s%n", member.email(), userId, project.id());
+            }
+        }
+        current.forEach((userId, email) -> {
+            if (!wanted.containsKey(userId)) {
+                provider.removeMember(project, userId);
+                out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId, project.id());
+            }
+        });
+        out.printf("Project %s has %d member%s%n", project.id(), wanted.size(), wanted.size() == 1 ? "" : "s");
     }
 
     private void close(TreProject project, String endpoint) {
