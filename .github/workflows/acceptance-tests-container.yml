@@ -8,15 +8,32 @@ name: acceptance-tests-container
 # let it ask for the host's, so the commands run in a `docker run --network host` step instead, with the runner's docker socket: the containers
 # the specs start are then siblings on the host, as when they are run from a shell on it.
 #
+# Like the smoke tests, it needs the config of an env: pulled from the vault of a cloud, with `config-vault pull <tag> --force`, after a login to
+# the cloud by OIDC (a short-lived token, no stored credentials), so the specs find their config properties.  The login is that of the GitHub
+# environment smoke-tests-<cloud>, which the cloud trusts, so that nothing needs setting up for the spike; see docs/github_workflows.md.  The config
+# is on the runner, in a directory that the container has, so that it can be masked in the log, which is public, and is removed at the end.
+#
 # What it tries:
 #   project  the projects of the central identity, in a KeyCloak container (profile project, the package of the specs of the containers only:
 #            the project profile selects the specs that use a cloud's tools too, which need its login)
 #   signing  the signing and verification of images, in a kind cluster, which drives the docker client: the base image has none, so a static
 #            build of the client is put in it for the run
-# No cloud and no config are used, so none of the repository's secrets are.
 on:
   workflow_dispatch:
     inputs:
+      cloud:
+        description: "The cloud whose vault holds the config, and whose login is used"
+        type: choice
+        options: [aws, azure, gcp]
+        default: aws
+      config_env:
+        description: "The config env, ie the env of the snapshot in the vault (blank for the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys3)"
+        type: string
+        default: ""
+      config_tag:
+        description: "The tag of the config snapshot in the vault (blank for the repository variable SMOKE_TESTS_CONFIG_TAG, else current)"
+        type: string
+        default: ""
       specs:
         description: "The specs to run"
         type: choice
@@ -34,8 +51,9 @@ on:
 permissions:
   contents: read
 
+# Never two at once for a cloud: they share its config and its stores.
 concurrency:
-  group: acceptance-tests-container
+  group: acceptance-tests-container-${{ inputs.cloud }}
   cancel-in-progress: false
 
 env:
@@ -75,15 +93,98 @@ jobs:
   spike:
     needs: resolve
     runs-on: ubuntu-latest
+    # The environment holds the variables of the cloud's login, and is the subject that the cloud's OIDC trust is limited to.
+    environment: smoke-tests-${{ inputs.cloud }}
     timeout-minutes: 90
+    permissions:
+      contents: read
+      # For the OIDC token that the cloud login exchanges.
+      id-token: write
     defaults:
       run:
         shell: bash
     env:
       IMAGE: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
+      CLOUD: ${{ inputs.cloud }}
+      CONFIG_ENV: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys3' }}
+      CONFIG_TAG: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
+      # The environment's variables of the login, see docs/github_workflows.md: secrets of the environment, or the variables of the ones set up before.
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME || vars.AZURE_KEY_VAULT_NAME }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID }}
+      # On the runner, mounted in the container: the config, which the specs find in $AFON_HOME/config.
+      AFON_DIR: ${{ runner.temp }}/afon
+
     steps:
+      - name: Check the environment
+        # The identifiers of the login, which are set in this step only: AWS_ROLE_ARN would otherwise be read by the aws cli in the later steps.
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT || vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          case "$CLOUD" in
+            aws)   NAMES="AWS_ROLE_ARN AWS_REGION" ;;
+            azure) NAMES="AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_KEY_VAULT_NAME" ;;
+            gcp)   NAMES="GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID" ;;
+          esac
+          MISSING=""
+          for NAME in $NAMES; do
+            [ -n "${!NAME:-}" ] || MISSING="$MISSING $NAME"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::The GitHub environment smoke-tests-$CLOUD has no value for:$MISSING, see docs/github_workflows.md"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Each login is OIDC: a short-lived token for the identity that smoke-tests-<cloud> is trusted for, see docs/github_workflows.md.
+      - name: Log in to AWS
+        if: ${{ inputs.cloud == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - name: Log in to Azure
+        if: ${{ inputs.cloud == 'azure' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to GCP
+        if: ${{ inputs.cloud == 'gcp' }}
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT || vars.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Log in to the gcloud cli
+        if: ${{ inputs.cloud == 'gcp' }}
+        run: |
+          set -euo pipefail
+          gcloud auth login --cred-file="${{ steps.gcp-auth.outputs.credentials_file_path }}" --quiet
+          gcloud config set project "$GCP_PROJECT_ID"
+
+      - name: Check the cloud login
+        run: |
+          set -euo pipefail
+          case "$CLOUD" in
+            aws)   aws sts get-caller-identity ;;
+            azure) az account show --output none ;;
+            gcp)   gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q . ;;
+          esac
 
       # The maven repository of the container, kept between runs: the build downloads the dependencies of every module.
       - name: Cache the maven repository
@@ -108,6 +209,79 @@ jobs:
           # --entrypoint bash: the image's own makes a user and runs the command through `su`, which splits a script given to `bash -c`
           docker run --rm --entrypoint bash "$IMAGE" -c 'java -version 2>&1 | head -1; mvn -version | head -1; kind version; command -v docker || echo "no docker client"'
 
+      # What every command in the container is given, which the steps after this one source.  The host network, so that localhost is the host's, and
+      # the docker socket, so that the containers of the specs are the host's.  As root, which the docker socket needs, and with bash as the
+      # entrypoint.  The workspace is mounted, so that the reports are where the next steps look, and the config dir, which holds the config the
+      # specs find in AFON_HOME.  What the cloud login left, in the environment of the job or in files, is given too: AWS in its variables, Azure and
+      # GCP in the files of their clis.
+      - name: Prepare the container command
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2/repository" "$AFON_DIR"
+          chmod 700 "$AFON_DIR"
+          {
+            echo 'afon_docker() {'
+            echo '  local script="$1"; shift'
+            echo '  local cloud_args=()'
+            echo '  case "$CLOUD" in'
+            echo '    aws) cloud_args=(-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION -e AWS_DEFAULT_REGION) ;;'
+            echo '    azure) cloud_args=(-v "$HOME/.azure":/root/.azure) ;;'
+            echo '    gcp) cloud_args=(-v "$HOME/.config/gcloud":/root/.config/gcloud -e GOOGLE_APPLICATION_CREDENTIALS -v "$GOOGLE_APPLICATION_CREDENTIALS":"$GOOGLE_APPLICATION_CREDENTIALS":ro) ;;'
+            echo '  esac'
+            echo '  docker run --rm --network host --user root --entrypoint bash \'
+            echo '    -v /var/run/docker.sock:/var/run/docker.sock \'
+            echo '    -v "$GITHUB_WORKSPACE":/work -w /work \'
+            echo '    -v "$HOME/.m2":/root/.m2 \'
+            echo '    -v "$AFON_DIR":/tmp/afon \'
+            echo '    "${cloud_args[@]}" \'
+            echo '    -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION \'
+            echo '    -e CLOUD -e CONFIG_ENV -e CONFIG_TAG -e AZURE_KEY_VAULT_NAME -e GCP_PROJECT_ID \'
+            echo '    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \'
+            echo '    -e TESTCONTAINERS_HOST_OVERRIDE=localhost -e AFON_HOME=/tmp/afon -e AFON_CLI_DIR=/work \'
+            echo '    "$@" "$IMAGE" -c "$script"'
+            echo '}'
+          } > "$RUNNER_TEMP/afon-docker.sh"
+
+      # The snapshot of the config, from the vault of the cloud, as the smoke tests pull it, into the config dir of the runner.  The launcher of
+      # the scripts is that of the repository, which is the cli's, without the jar, as a script of the cloud needs none.
+      - name: Pull the config from the vault
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/afon-docker.sh"
+          afon_docker '
+            set -euo pipefail
+            ARGS=()
+            case "$CLOUD" in
+              aws)   ARGS=(--region "$AWS_REGION") ;;
+              azure) [ -z "$AZURE_KEY_VAULT_NAME" ] || ARGS=(--vault "$AZURE_KEY_VAULT_NAME") ;;
+              gcp)   ARGS=(--project "$GCP_PROJECT_ID") ;;
+            esac
+            /work/afon-cli/src/main/scripts/afon-cli-scripts.sh --home /tmp/afon --cloud "$CLOUD" --env "$CONFIG_ENV" \
+              config-vault pull "$CONFIG_TAG" --force "${ARGS[@]}"
+            # What the container wrote belongs to the runner user, which the steps on the runner read and remove
+            chmod -R go-rwx /tmp/afon
+            chown -R "$HOST_UID:$HOST_GID" /tmp/afon
+          '
+
+      # GitHub masks the secrets it knows of, and these are unknown to it: without this, a value that is printed is in the public log.
+      - name: Mask the secrets of the config
+        run: |
+          set -euo pipefail
+          mask() {
+            local value="$1"
+            value="${value%$'\r'}"; value="${value#\"}"; value="${value%\"}"
+            # Short values (true, a port) would mask the log into unreadability.
+            if [ "${#value}" -ge 8 ]; then echo "::add-mask::$value"; fi
+          }
+          for FILE in "$AFON_DIR/config-$CONFIG_ENV"/secret*.properties "$AFON_DIR/config-$CONFIG_ENV"/catalogs*.properties; do
+            [ -f "$FILE" ] || continue
+            while IFS= read -r LINE || [ -n "$LINE" ]; do
+              case "$LINE" in \#*|"") continue ;; esac
+              mask "${LINE#*=}"
+              mask "$LINE"
+            done < "$FILE"
+          done
+
       # What the specs are given, in the profiles of afon-acceptance/pom.xml.  The project specs of the clouds are left out by selecting the package of
       # the specs of the containers only.
       - name: Choose the specs
@@ -124,35 +298,32 @@ jobs:
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
           echo "Maven arguments: $ARGS"
 
-      # The host network, so that localhost is the host's, and the docker socket, so that the containers of the specs are the host's.  As root, which
-      # the docker socket needs, and with bash as the entrypoint, as the image's makes a user and runs the command through `su`.  The workspace is
-      # mounted, so that the reports are where the next steps look.
+      - name: Validate afon config
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/afon-docker.sh"
+          afon_docker '/work/afon-cli/src/main/scripts/afon-cli-scripts.sh --home /tmp/afon --cloud "$CLOUD" config-validate'
+
       - name: Run the specs in the container
         env:
           ARGS: ${{ steps.specs.outputs.args }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.m2/repository"
-          docker run --rm --network host --user root --entrypoint bash \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$GITHUB_WORKSPACE":/work -w /work \
-            -v "$HOME/.m2":/root/.m2 \
-            -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION -e ARGS \
-            -e TESTCONTAINERS_HOST_OVERRIDE=localhost \
-            -e AFON_HOME=/tmp/afon \
-            "$IMAGE" -c '
-              set -euo pipefail
-              mkdir -p /tmp/afon/config
-              # The docker client that the signing test drives, if the image has none.
-              if ! command -v docker > /dev/null 2>&1; then
-                curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLIENT_VERSION}.tgz" \
-                  | tar -xz --strip-components=1 -C /usr/local/bin docker/docker
-              fi
-              docker version --format "client {{.Client.Version}}, daemon {{.Server.Version}}"
-              # The modules that the specs need are installed first, without their tests, as the scalatest plugin of the acceptance module is the one run.
-              mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install
-              mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test $ARGS
-            '
+          source "$RUNNER_TEMP/afon-docker.sh"
+          afon_docker '
+            set -euo pipefail
+            # Whatever happens, what the container wrote belongs to the runner user, as the checkout and the cache of the maven repository are removed and read as it
+            trap '"'"'chown -R "$HOST_UID:$HOST_GID" /work /root/.m2 /tmp/afon 2>/dev/null || true'"'"' EXIT
+            # The docker client that the signing test drives, if the image has none.
+            if ! command -v docker > /dev/null 2>&1; then
+              curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLIENT_VERSION}.tgz" \
+                | tar -xz --strip-components=1 -C /usr/local/bin docker/docker
+            fi
+            docker version --format "client {{.Client.Version}}, daemon {{.Server.Version}}"
+            # The modules that the specs need are installed first, without their tests, as the scalatest plugin of the acceptance module is the one run.
+            mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install
+            mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test $ARGS
+          ' -e ARGS
 
       # What the specs left in docker, to see whether they cleaned up.
       - name: Show the containers left
@@ -160,6 +331,7 @@ jobs:
         run: |
           docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}'
 
+      # Only the reports: the logs carry config values, and the artifacts of a public repo are public.
       - name: Upload the reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -167,3 +339,8 @@ jobs:
           name: afon-acceptance-container-reports-${{ github.run_id }}
           path: afon-acceptance/target/surefire-reports/**
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove afon config
+        if: ${{ always() }}
+        run: rm -rf "$AFON_DIR" "$RUNNER_TEMP/afon-docker.sh"
