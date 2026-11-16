@@ -30,6 +30,37 @@ The credential of the app for the Polaris pod is:
 
 The deployer needs no credential: they log in as themselves, with `afon-cli.sh azure-login`.
 
+## How it works
+
+The federated credential is a trust rule stored on the app registration, and the deployer's role only lets it write that rule.  There are three pieces:
+
+1. **The deployer writes the trust rule.**  The deployer's own `az` login, eg its email, runs `afon-cli.sh azure-identity-admin approve`, which creates the credential, or replaces that of a previous build of the cluster, with `az ad app federated-credential create/update`. 
+ The rule holds the issuer of the cluster, the subject `system:serviceaccount:default:polaris` and the audience.
+   - The issuer is read from the cluster itself, with `az aks show ... oidcIssuerProfile.issuerUrl`.
+   - The `ensure_federated_credential_<stack>` step triggers it, by running `afon-cli.sh azure-identity true <stack-id>`.
+   - The app registration role is what permits the write.
+2. **The cluster can issue tokens.**  The AKS cluster has the OIDC issuer enabled (`oidcIssuerEnabled`) and workload identity enabled (`workloadIdentityEnabled`), set by the `AzureCloudProvider`.
+3. **The Polaris pod asks for a token.**  The `PolarisConfig` creates the service account `polaris`, annotated with the client ID of the app (`azure.workload.identity/client-id`), and puts the label `azure.workload.identity/use: "true"` on the pod.
+
+At runtime the pod presents a token signed by the cluster to Entra ID, which matches it against the trust rule and returns an access token for the app.  The deployer's identity plays no part at that point.
+
+### Who issues the token
+
+The cluster does, not Entra ID, which only verifies it:
+- The **OIDC issuer** is the cluster as an identity: the `iss` URL, which is `https://<region>.oic.prod-aks.azure.com/<tenant>/<id>/`, and the public keys published at it.  The API server signs the token of the service account with the cluster's key.  That is why the issuer is new when a cluster is rebuilt, and its credential must be replaced.
+- The **workload identity webhook**, enabled by `workloadIdentityEnabled`, does not generate the token.  It changes the pods that ask for it with the label `azure.workload.identity/use: "true"`: it adds a projected volume with the token and sets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_FEDERATED_TOKEN_FILE` and `AZURE_AUTHORITY_HOST`.  The client ID comes from the annotation of the service account.  A pod without the label gets nothing.
+- The **kubelet** keeps the projected token fresh, as it is short-lived.
+- **Entra ID** verifies the signature with the keys of the issuer, and that the issuer, the subject and the audience match a federated credential of the app, and only then exchanges the token for an access token of the app.
+
+Without the injected token, Polaris would use `AZURE_CLIENT_SECRET`, the app secret.
+
+### The app credential and Keycloak are separate
+
+- **Keycloak** (OIDC) authenticates the callers of Polaris, ie who may ask it for something: users, Spark, notebooks.  It has nothing to do with Azure.
+- **The app credential**, the secret or the injected token, is used by Polaris at runtime for every storage operation, not only to start it.  Polaris acts as the service principal of the app, with the roles Storage Blob Delegator on the storage account and Storage Blob Data Contributor on the containers: it gets a user delegation key and vends short-lived SAS credentials to the clients that need storage access.
+
+So the credential vending is done by Polaris with the identity of the app, while Keycloak decides who may ask for it, and neither replaces the other.  With workload identity the token is renewed, so storage access carries on past the lifetime of one token.
+
 ## Step by step
 
 ### Once, by the admin
