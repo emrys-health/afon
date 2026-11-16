@@ -34,34 +34,35 @@ import static java.lang.String.format;
 public class CdkHelper {
 
     public static final String KEYCLOAK_INGRESS_NAME = "keycloak-ingress";
-    public static final String KEYCLOAK_HTTPS_INGRESS_NAME = "keycloak-https-ingress";
     public static final String KEYCLOAK_SERVICE_NAME = "keycloak-service";
-    public static final int    PROXY_PORT     = 4180;
-    public static final String PROXY_SERVICE_NAME = "oauth2-proxy";
-    public static final String POLARIS_INGRESS_NAME = "polaris-ingress";
-    /** Name of the cert-manager ClusterIssuer, which the ingress refers to and a restored TLS secret must be annotated with. */
-    public static final String CLUSTER_ISSUER_NAME = "letsencrypt-prod";
+    public static final int    PROXY_PORT            = 4180;
+    public static final String PROXY_SERVICE_NAME    = "oauth2-proxy";
+    public static final String POLARIS_INGRESS_NAME  = "polaris-ingress";
+    /**
+     * Name of the cert-manager ClusterIssuer, which the ingress refers to and a restored TLS secret must be annotated with.
+     */
+    public static final String CLUSTER_ISSUER_NAME   = "letsencrypt-prod";
 
     /**
      * The namespace of the nginx ingress controller, and the Cilium labels selecting its pods, which the pods that call what it
      * exposes need to be allowed to reach, as the address of its load balancer is that of a service of the cluster.
      */
-    public static final String NGINX_INGRESS_NAMESPACE = "ingress-nginx";
-    public static final Map<String, String> NGINX_INGRESS_POD_LABELS = Map.of(
+    public static final String              NGINX_INGRESS_NAMESPACE    = "ingress-nginx";
+    public static final Map<String, String> NGINX_INGRESS_POD_LABELS   = Map.of(
         "k8s:io.kubernetes.pod.namespace", NGINX_INGRESS_NAMESPACE,
         "k8s:app.kubernetes.io/name", "ingress-nginx");
-    public static final String JUPYTER_INGRESS_NAME = "jupyter-ingress";
-    public static final String JUPYTER_SERVICE_NAME = "jupyter-web";
-    public static final String SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
-    public static final String TRINO_SERVICE_NAME = "trino";
+    public static final String              JUPYTER_INGRESS_NAME       = "jupyter-ingress";
+    public static final String              JUPYTER_SERVICE_NAME       = "jupyter-web";
+    public static final String              SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
+    public static final String              TRINO_SERVICE_NAME         = "trino";
 
-    public static final String NO_POLARIS_FINALIZERS = finalizeIngress(POLARIS_INGRESS_NAME);
+    public static final String                     NO_POLARIS_FINALIZERS      = finalizeIngress(POLARIS_INGRESS_NAME);
     public static final List<LocalExecProvisioner> POLARIS_PROVISIONERS
-            = uponDestroyRun(NO_POLARIS_FINALIZERS);
-    public static final String NO_KEYCLOAK_FINALIZERS = finalizeIngress(KEYCLOAK_INGRESS_NAME);
-    public static final String NO_JUPYTER_FINALIZERS = finalizeIngress(JUPYTER_INGRESS_NAME);
-    public static final String NO_JUPYTER_LB_FINALIZERS = finalizeService(JUPYTER_SERVICE_NAME);
-    public static final String NO_INSTALLATION_FINALIZERS = finalizeInstallation("default");
+                                                                              = uponDestroyRun(NO_POLARIS_FINALIZERS);
+    public static final String                     NO_KEYCLOAK_FINALIZERS     = finalizeIngress(KEYCLOAK_INGRESS_NAME);
+    public static final String                     NO_JUPYTER_FINALIZERS      = finalizeIngress(JUPYTER_INGRESS_NAME);
+    public static final String                     NO_JUPYTER_LB_FINALIZERS   = finalizeService(JUPYTER_SERVICE_NAME);
+    public static final String                     NO_INSTALLATION_FINALIZERS = finalizeInstallation("default");
 
     public static String finalizeIngress(String service) {
         return format("kubectl patch ingress %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge", service);
@@ -74,7 +75,7 @@ public class CdkHelper {
     public static String finalizeIngress(String service, String namespace) {
         return format(
             "kubectl patch ingress %s -n %s -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"
-                + " 2>/dev/null || true",
+            + " 2>/dev/null || true",
             service, namespace);
     }
 
@@ -97,7 +98,8 @@ public class CdkHelper {
                                                     Map<String, String> labels,
                                                     String serviceName,
                                                     List<ServiceSpecPort> ports,
-                                                    Construct scope) {
+                                                    Construct scope
+    ) {
         return clusterIpService(dependsOn, labels, serviceName, ports, scope, Map.of());
     }
 
@@ -106,7 +108,8 @@ public class CdkHelper {
                                                     String serviceName,
                                                     List<ServiceSpecPort> ports,
                                                     Construct scope,
-                                                    Map<String, String> annotations) {
+                                                    Map<String, String> annotations
+    ) {
         return typedService("ClusterIP", dependsOn, labels, serviceName, ports, scope, annotations);
     }
 
@@ -121,7 +124,8 @@ public class CdkHelper {
                                                    Map<String, String> labels,
                                                    String serviceName,
                                                    List<ServiceSpecPort> ports,
-                                                   Construct scope) {
+                                                   Construct scope
+    ) {
         return typedService("NodePort", dependsOn, labels, serviceName, ports, scope, Map.of());
     }
 
@@ -131,7 +135,8 @@ public class CdkHelper {
                                                  String serviceName,
                                                  List<ServiceSpecPort> ports,
                                                  Construct scope,
-                                                 Map<String, String> annotations) {
+                                                 Map<String, String> annotations
+    ) {
         return Service.Builder
             .create(scope, serviceName)
             .metadata(ServiceMetadata
@@ -153,7 +158,8 @@ public class CdkHelper {
         Construct construct,
         HelmProvider helmProvider,
         final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
-        Map<String, String> annotations) {
+        Map<String, String> annotations
+    ) {
         var builder = Release.Builder
             .create(construct, "nginx-ingress")
             .provider(helmProvider)
@@ -251,7 +257,8 @@ public class CdkHelper {
         String tlsSecretName,
         int port,
         String internalService,
-        String ingressName) {
+        String ingressName
+    ) {
         this.domainName      = domainName;
         this.tlsSecretName   = tlsSecretName;
         this.port            = port;
@@ -260,7 +267,9 @@ public class CdkHelper {
         this.ingressName     = ingressName;
     }
 
-    /** Restricts an nginx ingress to the given comma-separated source CIDRs; absent means open to all. */
+    /**
+     * Restricts an nginx ingress to the given comma-separated source CIDRs; absent means open to all.
+     */
     public static final String WHITELIST_SOURCE_RANGE_ANNOTATION = "nginx.ingress.kubernetes.io/whitelist-source-range";
 
     /**
@@ -271,7 +280,8 @@ public class CdkHelper {
     public IngressV1 createIngress(
         List<TerraformResource> dependencies,
         Optional<List<LocalExecProvisioner>> ingressProvisioners,
-        List<String> inboundCidrs) {
+        List<String> inboundCidrs
+    ) {
         Map<String, String> annotations = new HashMap<>(Map.of("cert-manager.io/cluster-issuer", CLUSTER_ISSUER_NAME));
         if (!inboundCidrs.isEmpty()) {
             annotations.put(WHITELIST_SOURCE_RANGE_ANNOTATION, String.join(",", inboundCidrs));
@@ -296,7 +306,8 @@ public class CdkHelper {
         Map<String, String> annotations,
         List<String> paths,
         List<TerraformResource> dependencies,
-        Optional<List<LocalExecProvisioner>> ingressProvisioners) {
+        Optional<List<LocalExecProvisioner>> ingressProvisioners
+    ) {
         IngressV1SpecRuleHttpPathBackendServicePort port = IngressV1SpecRuleHttpPathBackendServicePort
             .builder()
             .number(this.port)
@@ -360,7 +371,8 @@ public class CdkHelper {
     public Release installCertManager(
         Construct construct,
         HelmProvider helmProvider,
-        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn) {
+        final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn
+    ) {
         return installCertManager(construct, helmProvider, dependsOn, List.of());
     }
 
@@ -375,7 +387,8 @@ public class CdkHelper {
         Construct construct,
         HelmProvider helmProvider,
         final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
-        List<String> extraCreateCommands) {
+        List<String> extraCreateCommands
+    ) {
         return installCertManager(construct, helmProvider, dependsOn, domainName, extraCreateCommands);
     }
 
@@ -388,7 +401,8 @@ public class CdkHelper {
         HelmProvider helmProvider,
         final java.util.List<? extends com.hashicorp.cdktf.ITerraformDependable> dependsOn,
         String domainName,
-        List<String> extraCreateCommands) {
+        List<String> extraCreateCommands
+    ) {
         String clusterIssuerYaml = format(
             """
             kubectl apply -f - <<'YAML'
