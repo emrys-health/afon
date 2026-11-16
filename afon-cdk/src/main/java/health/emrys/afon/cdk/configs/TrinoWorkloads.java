@@ -70,6 +70,14 @@ public class TrinoWorkloads {
     /** The key of {@link #TLS_SECRET_NAME} holding the private key and the certificate, which Trino serves. */
     private static final String TLS_KEYSTORE    = "trino.pem";
     private static final String TLS_PATH        = "/etc/trino/tls";
+    /**
+     * The labels of the coordinator's pod, as the chart's {@code trino} Service selects it: its {@code trino.selectorLabels}, the
+     * chart's name and the release's, both {@code trino}, and the component.  The workers carry the first two only.
+     */
+    public static final Map<String, String> COORDINATOR_LABELS = Map.of(
+        "app.kubernetes.io/name", "trino",
+        "app.kubernetes.io/instance", "trino",
+        "app.kubernetes.io/component", "coordinator");
 
     private final TrinoServerConfiguration trinoConfig;
     private final AfonCatalogs             afonCatalogs;

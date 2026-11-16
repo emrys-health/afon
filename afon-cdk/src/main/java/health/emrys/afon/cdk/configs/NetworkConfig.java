@@ -198,8 +198,9 @@ public class NetworkConfig {
         // just a podSelector is scoped to the policy's own namespace, so this is exactly "these two
         // pods in default, nothing else": Guacamole (streams the pod's VNC desktop) and the
         // JupyterHub hub (the single-user server must register with it or the spawn times out).
-        // Gitea is reachable too, on its own ports, see createGiteaEgressPolicy.
-        // Everything else in the namespace -- Polaris, Keycloak, Trino, the monitoring stack, other
+        // Gitea is reachable too, on its own ports, see createGiteaEgressPolicy, and so is the Trino
+        // coordinator, on its HTTPS port, see createTrinoEgressPolicy.
+        // Everything else in the namespace -- Polaris, Keycloak, the Trino workers, the monitoring stack, other
         // users' notebooks -- is dropped.
         // Guacamole is deliberately absent. guacd dials the notebook's VNC port, so the desktop
         // pixels travel back on a connection Guacamole itself opened; conntrack permits those
@@ -220,7 +221,8 @@ public class NetworkConfig {
                                    .to(allowedNamespacePeers)
                                    .build(),
             createSparkConnectorEgressPolicy(),
-            createGiteaEgressPolicy());
+            createGiteaEgressPolicy(),
+            createTrinoEgressPolicy());
         networkPolicyFor(USER_POD_LABELS, egress);
 
         if (gke) {
@@ -594,6 +596,23 @@ public class NetworkConfig {
             .ports(List.of(
                 NetworkPolicySpecEgressPorts.builder().protocol("TCP").port(GiteaConfig.HTTP_PORT).build(),
                 NetworkPolicySpecEgressPorts.builder().protocol("TCP").port(GiteaConfig.SSH_PORT).build()))
+            .build();
+    }
+
+    /**
+     * Egress to the Trino coordinator, on its HTTPS port only, as that is the only one on which it takes a client (see
+     * {@code TrinoWorkloads#coordinatorSettings}): its HTTP port is for the probes and the workers.  Selected on the labels the
+     * {@code trino} Service selects on, which a ClusterIP is translated to before egress is evaluated, the Service's HTTPS port
+     * being the pod's own, so a notebook calls {@code https://trino:8443}, a name the certificate holds.  The
+     * workers are left out, as a client only ever talks to the coordinator.  Being an ordinary {@link NetworkPolicy}, it
+     * applies alongside the CiliumNetworkPolicy on AWS and Azure, whose allows add to it, as well as on GKE.
+     */
+    static @NonNull NetworkPolicySpecEgress createTrinoEgressPolicy() {
+        return NetworkPolicySpecEgress
+            .builder()
+            .to(List.of(podEgressTo(TrinoWorkloads.COORDINATOR_LABELS)))
+            .ports(List.of(
+                NetworkPolicySpecEgressPorts.builder().protocol("TCP").port(String.valueOf(TrinoWorkloads.HTTPS_PORT)).build()))
             .build();
     }
 

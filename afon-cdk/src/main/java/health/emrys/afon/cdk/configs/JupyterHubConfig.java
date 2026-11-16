@@ -131,6 +131,12 @@ public class JupyterHubConfig {
     private static final String SINGLEUSER_LABEL_KEY   = "afon-role";
     private static final String SINGLEUSER_LABEL_VALUE = "jupyter-singleuser";
 
+    /** The variable of a notebook pod naming the file of the Trino coordinator's certificate, which it is to trust. */
+    static final String TRINO_CA_CERT_ENV = "TRINO_CA_CERT";
+
+    /** Where a notebook pod has the Trino coordinator's certificate, as {@link TrinoWorkloads#TLS_CA_KEY}. */
+    static final String TRINO_CA_DIR = "/etc/trino-tls";
+
 
     /**
      * Upstreams the oauth2-proxy MFA gate fronts, on a single domain, both behind the same OIDC/MFA
@@ -635,7 +641,14 @@ public class JupyterHubConfig {
                c.KubeSpawner.k8s_api_request_retry_timeout = 120
                # One in-pod VNC session per single-user server (see start-vnc.sh in the image). Its
                # password, JUPYTER_VNC_PASSWORD, is the user's own, so is set by the auth_state hook below.
-               c.KubeSpawner.environment = {'JUPYTER_VNC_SESSIONS': '1'}
+               c.KubeSpawner.environment = {'JUPYTER_VNC_SESSIONS': '1', '%20$s': '%22$s/%21$s'}
+               # The certificate of the Trino coordinator, which is self-signed (see TrinoWorkloads#createCertificateCommand),
+               # so that a notebook can trust https://trino:8443, eg with trino.dbapi.connect(..., verify=os.environ['%20$s']).
+               # Only its certificate: the Secret holds the coordinator's private key too, which no notebook may read.  Optional,
+               # as a stack without Trino has no such Secret, and a pod that mounted it otherwise would never start.
+               c.KubeSpawner.volumes = [{'name': 'trino-tls', 'secret': {
+                   'secretName': '%23$s', 'optional': True, 'items': [{'key': '%21$s', 'path': '%21$s'}]}}]
+               c.KubeSpawner.volume_mounts = [{'name': 'trino-tls', 'mountPath': '%22$s', 'readOnly': True}]
                # Stamp every spawned pod so the egress NetworkPolicy (NetworkConfig) selects it. The
                # per-user guacamole-user label is added on top of this by the auth_state hook below.
                c.KubeSpawner.extra_labels = {'%14$s': '%15$s'}
@@ -705,7 +718,8 @@ public class JupyterHubConfig {
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
             SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
             pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL,
-            vncSecretName(""), VNC_PASSWORD_KEY);
+            vncSecretName(""), VNC_PASSWORD_KEY,
+            TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME);
     }
 
     /**
