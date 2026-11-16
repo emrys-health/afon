@@ -111,7 +111,8 @@ readable by its owner only, to `~/.afon/keys/project1/tre.pem`:
 afon-cli.sh project-key project1 tre
 ```
 
-Keep the private key in the secret store of the TRE's cloud, and delete that copy: Afon never reads it.
+Keep the private key in the secret store of the TRE's cloud, and delete that copy: Afon never reads it. See [Key-based
+authentication](#key-based-authentication) for what the key is for.
 
 **2. Reserve its egress IP**, as for the identity, so that it leaves from an address of its own, and the env's
 `AZURE_EGRESS_IP` stays free for a deployment of the env itself. One address serves the outbound traffic of one cluster,
@@ -135,6 +136,7 @@ It has the minimum a TRE project needs:
 - the `acr` (authentication context class reference) value that proves a second factor;
 - one Data Provider catalog, here the Polaris of the env itself;
 - an audit bucket;
+- at least one member;
 - the identity project that deploys the identity.
 
 ```yaml
@@ -161,6 +163,9 @@ cluster:
     vmSize: Standard_D4s_v6
     nodeCount: 2
 
+members:
+  - alice@tre.example
+
 stacks:
   create:
     auditBucket: project1-audit
@@ -171,8 +176,9 @@ The TRE's domains are not defined in the file: they are derived from the env's (
 `create` stage, but have to be delegated from the parent domain before the TRE can get its certificates. Either `up` does
 it, or you stop after `create`, delegate, and run the rest.
 
-**Automatic delegation.** If the parent domain, `emrys2.click`, is a Route 53 hosted zone of your AWS account, add this
-to the project's file, and `up` runs `dns-delegate --route53` after it makes the zones, so that it need not stop:
+**Automatic delegation.** If the parent domain, `emrys2.click`, is a Route 53 hosted zone of your AWS account, set this
+in the project's file, where the template has `delegation: none`, and `up` runs `dns-delegate --route53` after it makes
+the zones, so that it need not stop:
 
 ```yaml
 dns:
@@ -183,7 +189,8 @@ It needs the `aws` CLI and credentials, even if the project is on Azure or GCP. 
 into the hosted zone of its closest parent domain, replacing the one that is there, so it is safe to repeat. It fails,
 and `up` stops at `create`, if there is no such zone: then delegate by hand. If a domain of `stacks.tre.domains` is
 itself a registered domain, it has no parent zone, so `route53` would change its nameservers at the registrar, and
-whatever DNS it used before would stop answering for it. Keep `manual` for such a domain. The default is `manual`.
+whatever DNS it used before would stop answering for it. Keep `manual` for such a domain. The default, also for `none` or
+no value, is `manual`.
 
 **By hand**, stop after `create`, delegate, and run the rest:
 
@@ -283,6 +290,9 @@ cluster:
   nodePool:
     vmSize: Standard_D4s_v6
     nodeCount: 2
+
+members:
+  - alice@tre.example
 
 stacks:
   create:
@@ -394,10 +404,10 @@ name, which are set only when the researcher is first made in the central identi
 
 ```yaml
 members:
-  - alice@example.org
-  - email: alice@example.org
-    firstName: Alice
-    lastName: Hopper
+  - alice@tre.example
+  - email: bob@tre.example
+    firstName: Bob
+    lastName: Hope
 ```
 
 `up` makes the project's group have these members, and no others, in its `register` stage, after the project's clients
@@ -409,10 +419,29 @@ and group are made: `manage-identity sync-members`, which you can also run by ha
   expires). The file is the authority: so a member added by hand with `add-member` is removed by the next sync unless it
   is listed.
 
-A file with no `members` key leaves the group as it is, to be managed by hand; `members: []` empties it. To change the
-members, edit the list and run `afon-cli.sh manage-project up <project> --from register --until register`, or
+A project has at least one member: `init` writes `members: []`, which `validate` and `up` refuse until a member is added,
+so that a project is never brought up that nobody can sign in to. To change the members, edit the list and run
+`afon-cli.sh manage-project up <project> --from register --until register`, or
 `manage-project run <project> manage-identity sync-members`; a new member needs no redeploy. The emails are compared in
 lower case. Whether a Provider's contract names a member is for the Provider, not the file.
+
+## Key-based authentication
+
+- **Who creates the keys.** The project's deployer creates the key pair: `afon-cli.sh project-key <project> tre`. The
+  public key goes to the identity provider when the project is registered, from the `keys` dir of the project's home. The
+  private key stays with the TRE.
+- **What it authenticates.** It is per-client: one pair for its TRE client, and another for its Git client if it has one.
+  It authenticates the client, the TRE itself, to the identity provider's token endpoint with a signed assertion
+  (`private_key_jwt`), instead of a client secret. It is the TRE proving "I am `<project>-tre`", not a member proving who
+  they are.
+- **How members authenticate.** Each member signs in as themselves, in the browser flow, with their own password and a
+  second factor. Their email is only their identifier: it is their username in the identity provider, and `sync-members`
+  uses it to find or create their account. The first time, they get an invitation email to verify the email, set a
+  password and enrol the second factor.
+
+When a member signs in, the identity provider redirects the browser back to the TRE with a code. The TRE's client
+exchanges that code for the token, and that exchange is where it presents the key. The token carries the project claim
+only if the member is in the project's group.
 
 ## Taking down the projects
 
@@ -424,9 +453,9 @@ afon-cli.sh manage-project run project1 manage-identity close
 afon-cli.sh manage-project down idp
 ```
 
-The TRE projects are taken down independently, and the shared identity last, as every project uses it. `down` deletes
-the stacks, the last first. The reserved IP, the buckets and the projects' config and cdktf dirs are left, as an address
-may be on somebody's allow-list.
+The TRE projects are taken down independently, and the shared identity last, as every project uses it. `down` deletes the
+stacks, the last first. The reserved IP, the buckets and the projects' config and cdktf dirs are left, as an address may
+be on somebody's allow-list.
 
 `manage-identity close` disables the project's TRE client, so that no token is issued for it. Its group and members stay.
 To open the project again, run `create`, which makes the client enabled again:

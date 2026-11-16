@@ -20,14 +20,13 @@ import java.util.Map;
  * @param dnsDelegation how the DNS zones of its domains are delegated, see {@link AfonProject#dnsDelegation()}
  * @param identity  how the project uses the central identity that issues its tokens
  * @param providers the Data Providers' project catalogs, reached directly
- * @param members   the project's researchers, which {@code up} makes the project's group have, and no others; or {@code null} if the file has no
- *                  {@code members}, ie the project's members are not managed by it, and {@code up} leaves its group as it is
+ * @param members   the project's researchers, at least one, which {@code up} makes the project's group have, and no others
  * @param create    what outlives the nightly teardown
  * @param git       the project's own Git, or {@code null} if Git is deployed with the TRE, as it is by the stacks of a TRE that declare it
  * @param tre       the project's TRE
  */
 public record TreProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
-                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<Provider> providers, @Nullable List<Member> members, @NonNull Create create, @Nullable Git git,
+                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<Provider> providers, @NonNull List<Member> members, @NonNull Create create, @Nullable Git git,
                          @NonNull Tre tre) implements AfonProject {
 
     @Override

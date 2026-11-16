@@ -42,8 +42,8 @@ import java.util.function.BiFunction;
  *       project's group, and prints their user id, which each Provider whose contract names them makes their principal from;</li>
  *   <li>{@code remove-member} removes the researcher from the group and ends their sessions;</li>
  *   <li>{@code sync-members} makes the project's group have the members that the project's file lists, and no others: it adds those that are
- *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A file with no {@code members} leaves the
- *       group as it is; one with an empty list empties it;</li>
+ *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A project has at least one member, so
+ *       the group is never emptied by it;</li>
  *   <li>{@code close} closes the project's TRE client, so that no token is issued for it.</li>
  *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
  *       {@code <afon-home>/projects/<project>/project.yaml}, see {@link FileProjectProvider#forProject}.</li>
@@ -68,7 +68,7 @@ public class ManageIdentityMain {
         "  add-member <email> [" + FIRST_NAME + " <name>] [" + LAST_NAME + " <name>]",
         "                                  makes the researcher if absent, adds them to the project's group, prints their user id",
         "  remove-member <email>           removes the researcher from the group and ends their sessions",
-        "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others (none listed: left as it is)",
+        "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -250,10 +250,6 @@ public class ManageIdentityMain {
     }
 
     private void syncMembers(TreProject project, String endpoint) {
-        if (project.members() == null) {
-            out.printf("Project %s lists no members: its group is left as it is%n", project.id());
-            return;
-        }
         IdentityProvider provider = identity.apply(project, endpoint);
         Map<String, String> current = provider.members(project);
         Map<String, String> wanted = new LinkedHashMap<>();

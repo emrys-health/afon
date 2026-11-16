@@ -42,8 +42,7 @@ import java.util.Set;
  *                                   proves MFA, eg mfa; clients default to &lt;project&gt;-tre and &lt;project&gt;-git,
  *                                                                              the claims to project and polaris_principal
  * providers: [{id, catalogUri, catalogName, audience, bucket, cloud}]     cloud defaults to the project's
- * members:   [email | {email, firstName, lastName}]     the project's researchers, which up makes its group have, and no others; none, if
- *            the key is left out, so that its group is not managed by the file
+ * members:   [email | {email, firstName, lastName}]     the project's researchers, at least one, which up makes its group have, and no others
  * stacks:
  *   create:  {auditBucket, gitBucket}     gitBucket is optional: the config the project is made from says if it is not given
  *   git:     {domain}                     optional: without it Git is deployed with the TRE, and has no client
@@ -353,11 +352,12 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return how the zones of the project's domains are delegated: manual unless the file says route53
+         * @return how the zones of the project's domains are delegated: manual unless the file says route53; {@code none}, or no value, is
+         * manual: no automatic delegation
          */
         private DnsDelegation dnsDelegation(Map<String, Object> dns) {
             String value = optional(dns, "dns.delegation", DnsDelegation.MANUAL.value());
-            return DnsDelegation.of(value).orElseGet(() -> {
+            return DnsDelegation.of(value.equals("none") ? DnsDelegation.MANUAL.value() : value).orElseGet(() -> {
                 problems.add(String.format("dns.delegation '%s' is not a way to delegate the DNS zones: one of %s", value,
                                            Arrays.stream(DnsDelegation.values()).map(DnsDelegation::value).toList()));
                 return DnsDelegation.MANUAL;
@@ -462,16 +462,17 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return the members, each an email or a mapping with an {@code email} and optionally a {@code firstName} and a {@code lastName}, or
-         * {@code null} if there is no {@code members}: an empty list is a project with no members, which is not the same
+         * @return the members, each an email or a mapping with an {@code email} and optionally a {@code firstName} and a {@code lastName}; a project
+         * has at least one, so none, or an empty list, is a problem
          */
         private List<TreProject.Member> members(Object node) {
-            if (node == null) {
-                return null;
+            if (node == null || node instanceof List<?> none && none.isEmpty()) {
+                problems.add("members is required: a project has at least one member, by email");
+                return List.of();
             }
             if (!(node instanceof List<?> list)) {
-                problems.add("members must be a list, which may be empty");
-                return null;
+                problems.add("members must be a list of at least one member");
+                return List.of();
             }
             List<TreProject.Member> members = new ArrayList<>();
             Set<String> emails = new LinkedHashSet<>();

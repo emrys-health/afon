@@ -20,6 +20,8 @@ providers:
     audience: provider-data2
     bucket: data2-xyz-yyyy-nnnn
 
+members: [ada@example.org]
+
 stacks:
   create:
     auditBucket: xyz-yyyy-nnnn-audit

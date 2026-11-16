@@ -31,10 +31,12 @@ providers:
     audience: <provider-audience>
     bucket: <provider-bucket>
 
-# the project's researchers, who up makes the members of its group in the central identity, and no others (one not listed is removed): an email, or
-# {email, firstName, lastName}.  Without the key, its group is left as it is, for manage-identity add-member; with [], it is emptied
-# members:
-#   - <researcher-email>
+# the project's researchers, at least one, who up makes the members of its group in the central identity, and no others (one not listed is
+# removed): an email, or {email, firstName, lastName}, the names being set only when the researcher is first made in the identity
+# a project is not valid until it has one, eg
+#   - alice@tre.example
+#   - {email: bob@tre.example, firstName: Bob, lastName: Hope}
+members: []
 
 stacks:
   create:
@@ -45,10 +47,13 @@ stacks:
   #   domains:
   #     ${CLOUD}_JUPYTER_DOMAIN_NAME: <jupyter-domain>
 
-# to have up delegate the DNS zones of its domains from the Route 53 hosted zone of the parent domain, in the current AWS account, so that it need not
-# stop for you to, uncomment (the default is manual: dns-delegate shows the NS records to add to the parent zone)
-# dns:
-#   delegation: route53
+# how the DNS zones of its domains are delegated from the parent domain: manual (or none, or no value), where you delegate by hand: up does not
+# stop, so run it with --until create, add the NS records that dns-delegate shows to the parent zone, then run the rest; or route53, where
+# up writes them to the Route 53 hosted zone of the parent domain, in the current AWS account, and runs through
+dns:
+  delegation: none
 
-# the nodes of its cluster: adjust to the quota of the subscription
-${cluster}
+# the nodes of its cluster: adjust to the quota of the subscription (AWS has no node pool property, so there the nodes are those of
+# the env)
+cluster:
+  nodePool: ${nodePool}

@@ -53,6 +53,7 @@ abstract class AbstractProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier 
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |providers:
          |  - {id: p, catalogUri: 'https://polaris.example/api', catalogName: $id, audience: provider-p, bucket: b}
+         |members: [ada@example.org]
          |stacks:
          |  create: {auditBucket: $id-audit}
          |""".stripMargin)

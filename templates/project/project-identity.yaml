@@ -14,10 +14,13 @@ project:
   # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>
   egressIp: <egress-ip>
 
-# to have up delegate the DNS zone of its domain from the Route 53 hosted zone of the parent domain, in the current AWS account, uncomment
-# (the default is manual: dns-delegate shows the NS records to add to the parent zone)
-# dns:
-#   delegation: route53
+# how the DNS zone of its domain is delegated from the parent domain: manual (or none, or no value), where you delegate by hand: up does not
+# stop, so run it with --until create, add the NS records that dns-delegate shows to the parent zone, then run the rest; or route53, where
+# up writes them to the Route 53 hosted zone of the parent domain, in the current AWS account, and runs through
+dns:
+  delegation: none
 
-# the nodes of its cluster, which runs Keycloak only: adjust to the quota of the subscription
-${cluster}
+# the nodes of its cluster, which runs Keycloak only: adjust to the quota of the subscription (AWS has no node pool property, so
+# there the nodes are those of the env)
+cluster:
+  nodePool: ${nodePool}

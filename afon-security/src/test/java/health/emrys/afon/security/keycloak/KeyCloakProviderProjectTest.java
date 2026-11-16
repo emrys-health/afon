@@ -39,6 +39,7 @@ class KeyCloakProviderProjectTest {
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         providers:
           - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
+        members: [ada@example.org]
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
           git: {domain: git.example.org}

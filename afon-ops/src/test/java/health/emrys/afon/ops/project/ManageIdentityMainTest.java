@@ -85,7 +85,7 @@ class ManageIdentityMainTest {
     private void listMembers(AfonCloud cloud, String members) throws Exception {
         setUp(cloud);
         Path file = home.resolve("projects/" + PROJECT + "/project.yaml");
-        Files.writeString(file, Files.readString(file) + members);
+        Files.writeString(file, Files.readString(file).replace("members: [ada@example.org]\n", members));
     }
 
     @ParameterizedTest
@@ -100,25 +100,6 @@ class ManageIdentityMainTest {
         verify(identity).addMember(any(TreProject.class), eq("id-grace"));
         verify(identity).removeMember(any(TreProject.class), eq("id-old"));
         assertThat(out.toString()).contains("Added grace@example.org (id-grace)", "Removed old@example.org (id-old)", "has 2 members");
-    }
-
-    @ParameterizedTest
-    @EnumSource(AfonCloud.class)
-    void emptiesTheGroupOfAFileWithNoMembers(AfonCloud cloud) throws Exception {
-        listMembers(cloud, "members: []\n");
-        when(identity.members(any(TreProject.class))).thenReturn(Map.of("id-old", "old@example.org"));
-        assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
-        verify(identity).removeMember(any(TreProject.class), eq("id-old"));
-    }
-
-    @ParameterizedTest
-    @EnumSource(AfonCloud.class)
-    void leavesTheGroupAsItIsIfTheFileListsNoMembers(AfonCloud cloud) throws Exception {
-        setUp(cloud);
-        assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
-        verify(identity, never()).members(any(TreProject.class));
-        verify(identity, never()).removeMember(any(TreProject.class), any());
-        assertThat(out.toString()).contains("lists no members");
     }
 
     @ParameterizedTest

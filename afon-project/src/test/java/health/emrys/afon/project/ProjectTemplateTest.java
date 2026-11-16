@@ -23,7 +23,7 @@ class ProjectTemplateTest {
 
     /** The deployer's part: every placeholder replaced, the address by an address. */
     private static String completed(String file) {
-        return file.replace("<egress-ip>", "203.0.113.30").replaceAll("<[a-z-]+>", "example");
+        return file.replace("members: []", "members: [ada@example.org]").replace("<egress-ip>", "203.0.113.30").replaceAll("<[a-z-]+>", "example");
     }
 
     @ParameterizedTest
@@ -55,6 +55,15 @@ class ProjectTemplateTest {
         assertThat(project.tre().domains()).isEmpty();
         assertThat(project.nodePool()).isEqualTo(cloud == AfonCloud.AWS ? java.util.Map.of() : cloud == AfonCloud.AZURE
             ? java.util.Map.of("vmSize", "Standard_D4s_v6", "nodeCount", "2") : java.util.Map.of("machineType", "e2-standard-4", "nodeCount", "2"));
+    }
+
+    @Test
+    void isValidYamlAsItIsWritten() throws Exception {
+        for (ProjectRole role : ProjectRole.values()) {
+            String template = java.nio.file.Files.readString(TEMPLATES.resolve("project-" + role.value() + ".yaml"));
+            Object parsed = new org.yaml.snakeyaml.Yaml().load(template);
+            assertThat(parsed instanceof java.util.Map).isTrue();
+        }
     }
 
     @ParameterizedTest

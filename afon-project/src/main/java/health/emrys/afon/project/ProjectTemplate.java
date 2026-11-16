@@ -17,7 +17,8 @@ import java.util.regex.Pattern;
  * The templates of a {@value FileProjectProvider#FILE}, one for each role, {@code project-<role>.yaml} in the {@code templates/project} dir of the
  * Afon distribution, which the deployer completes.  What is in {@code <angle brackets>} is what only the deployer knows, so the file
  * is not valid until it is replaced.  The templates are written once, for every cloud: {@code ${id}}, {@code ${cloud}}, {@code ${CLOUD}},
- * {@code ${env}} and {@code ${cluster}}, the cluster's nodes, are replaced.
+ * {@code ${env}} and {@code ${nodePool}}, the cluster's nodes, are replaced.  A variable is a whole value, never a section, so
+ * that a template is valid YAML as it is written, as a plain value, and an editor can check it.
  */
 public final class ProjectTemplate {
 
@@ -54,7 +55,7 @@ public final class ProjectTemplate {
                 case "cloud" -> cloud.toString().toLowerCase(Locale.ROOT);
                 case "CLOUD" -> cloud.name();
                 case "env" -> env == null ? "<env>" : env;
-                case "cluster" -> cluster(role, cloud);
+                case "nodePool" -> nodePool(role, cloud);
                 default -> throw new IllegalArgumentException("The template " + file + " has the variable " + variables.group(0) + ", which is not known");
             };
             variables.appendReplacement(result, Matcher.quoteReplacement(value));
@@ -64,19 +65,19 @@ public final class ProjectTemplate {
     }
 
     /**
-     * @return the section of the nodes of the cluster: what the role needs, the identity running Keycloak only, or none on a cloud with no node
-     * pool property
+     * @return the node pool of the cluster, as a flow mapping: what the role needs, the identity running Keycloak only, or empty on a cloud with
+     * no node pool property
      */
-    static String cluster(ProjectRole role, AfonCloud cloud) {
+    static String nodePool(ProjectRole role, AfonCloud cloud) {
         boolean identity = role == ProjectRole.IDENTITY;
         return switch (cloud) {
             case AZURE -> pool("vmSize", identity ? "Standard_D2s_v3" : "Standard_D4s_v6", 2);
             case GCP -> pool("machineType", identity ? "e2-standard-2" : "e2-standard-4", 2);
-            case AWS -> "# AWS has no node pool property: the nodes are those of the env";
+            case AWS -> "{}";
         };
     }
 
     private static String pool(String sizeKey, String size, int count) {
-        return "cluster:\n  nodePool:\n    " + sizeKey + ": " + size + "\n    nodeCount: " + count;
+        return "{" + sizeKey + ": " + size + ", nodeCount: " + count + "}";
     }
 }

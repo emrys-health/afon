@@ -268,17 +268,16 @@ class ManageProjectMainTest {
             inProject("db-whitelist", c),
             inProject("dns-create-zones", c, c + "-full"),
             inProject("manage-identity", "create", PROJECT),
+            inProject("manage-identity", "sync-members", PROJECT),
             inProject("manage-stack", "setup", c + "-full"));
         assertThat(home.resolve("projects/xyz-yyyy-nnnn/home/config")).isSymbolicLink();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void syncsTheMembersAfterTheRegistrationIfTheFileListsThem(AfonCloud cloud) throws Exception {
+    void syncsTheMembersAfterTheRegistration(AfonCloud cloud) throws Exception {
         setUp(cloud);
         String c = lower(cloud);
-        Path file = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
-        Files.writeString(file, Files.readString(file) + "members:\n  - ada@example.org\n");
         configure();
         assertThat(command.run(new String[]{"up", PROJECT})).isZero();
         assertThat(ran).containsSubsequence(inProject("manage-identity", "create", PROJECT), inProject("manage-identity", "sync-members", PROJECT),
@@ -300,6 +299,7 @@ class ManageProjectMainTest {
             inProject("dns-create-zones", c, c + "-git"),
             inProject("dns-create-zones", c, c + "-full"),
             inProject("manage-identity", "create", PROJECT),
+            inProject("manage-identity", "sync-members", PROJECT),
             inProject("manage-stack", "setup", c + "-git"),
             inProject("manage-stack", "setup", c + "-full"));
     }
@@ -517,6 +517,7 @@ class ManageProjectMainTest {
             inProject(c + "-create", c + "-full"), inProject("db-whitelist", c), inProject("dns-create-zones", c, c + "-full"),
             inCentralIdentity(c + "-update-kube-config", c + "-keycloak"),
             inProject("manage-identity", "create", PROJECT, "--kubeconfig", kubeconfig),
+            inProject("manage-identity", "sync-members", PROJECT, "--kubeconfig", kubeconfig),
             // the TRE's stacks configure that Keycloak too, through the kubeconfig that the config names
             inCentralIdentity(c + "-update-kube-config", c + "-keycloak"),
             inProject("manage-stack", "setup", c + "-full"));
@@ -809,7 +810,8 @@ class ManageProjectMainTest {
         // and the rest is run from there
         ran.clear();
         assertThat(command.run(new String[]{"up", PROJECT, "--from", "register"})).isZero();
-        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT), inProject("manage-stack", "setup", c + "-full"));
+        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT), inProject("manage-identity", "sync-members", PROJECT),
+                                          inProject("manage-stack", "setup", c + "-full"));
     }
 
     @ParameterizedTest
@@ -818,7 +820,7 @@ class ManageProjectMainTest {
         setUp(cloud);
         configure();
         assertThat(command.run(new String[]{"up", PROJECT, "--from", "register", "--until", "register"})).isZero();
-        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT));
+        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT), inProject("manage-identity", "sync-members", PROJECT));
         assertThat(out.toString()).contains("[1/1] register:", "Continue with: manage-project up xyz-yyyy-nnnn --from tre");
     }
 
