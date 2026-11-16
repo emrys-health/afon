@@ -7,7 +7,6 @@ import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

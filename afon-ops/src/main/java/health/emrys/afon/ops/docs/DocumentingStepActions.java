@@ -8,6 +8,7 @@ import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.DurationUtils;
 import health.emrys.afon.ops.steps.StackFilter;
+import health.emrys.afon.ops.synth.PlanGuards;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepActions;
 import org.jspecify.annotations.NonNull;
@@ -78,6 +79,17 @@ public class DocumentingStepActions extends StepActions {
 
     public DocumentingStepActions(OutputStream out) {
         this.out = new PrintWriter(out);
+        // documenting must not call the cloud: the guard looks up the VPCs of the stack in AWS
+        this.planGuards = new PlanGuards() {
+            @Override
+            public void checkNoOrphanAwsVpc(Path stackDir, Path tfState) {
+            }
+        };
+    }
+
+    /** Documenting does not run {@code az}, so it does not say who deploys. */
+    @Override
+    protected void logAzureDeployer() {
     }
 
     /**

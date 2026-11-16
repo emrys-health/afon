@@ -550,7 +550,7 @@ public class StepActions {
      * failure to grant it a role, eg cluster admin, is read against who is deploying.  Informational only: if the identity
      * cannot be read, eg because {@code az} is not logged in, it is logged and the deployment goes on.
      */
-    private void logAzureDeployer() {
+    protected void logAzureDeployer() {
         try {
             // read from the process directly, as the output given to run() is pumped asynchronously, and may still be empty
             Process process = new ProcessBuilder("az", "account", "show", "--query", "[user.type, user.name]", "--output", "tsv")
