@@ -1,0 +1,169 @@
+name: acceptance-tests-container
+
+# SPIKE: runs the acceptance specs that need only docker, in the afon-base image, on a GitHub-hosted runner, to see whether that works before
+# the specs that use a cloud are moved there too.  acceptance-tests.yml, which runs them on the self-hosted runner, is left as it is.
+#
+# The specs assume that localhost is the Docker host: KeyCloak is bound at a fixed localhost:8080, Trino runs in host network mode and reaches
+# it there, and the kind cluster is reached at localhost:<port>.  A `container:` job puts the job in a network of its own, and GitHub does not
+# let it ask for the host's, so the commands run in a `docker run --network host` step instead, with the runner's docker socket: the containers
+# the specs start are then siblings on the host, as when they are run from a shell on it.
+#
+# What it tries:
+#   project  the projects of the central identity, in a KeyCloak container (profile project, the package of the specs of the containers only:
+#            the project profile selects the specs that use a cloud's tools too, which need its login)
+#   signing  the signing and verification of images, in a kind cluster, which drives the docker client: the base image has none, so a static
+#            build of the client is put in it for the run
+# No cloud and no config are used, so none of the repository's secrets are.
+on:
+  workflow_dispatch:
+    inputs:
+      specs:
+        description: "The specs to run"
+        type: choice
+        options: [project, signing, project and signing]
+        default: project
+      image_tag:
+        description: "The tag of the afon-base image, eg 1.0-SNAPSHOT (blank for the project version of the ref)"
+        type: string
+        default: ""
+      image:
+        description: "The afon-base image, without its tag"
+        type: string
+        default: emryshealth/afon-base
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acceptance-tests-container
+  cancel-in-progress: false
+
+env:
+  # The client that the signing test drives, as kind does, which the base image lacks; the daemon is the runner's.
+  DOCKER_CLIENT_VERSION: "27.3.1"
+  # As acceptance-tests.yml: no afon output on the console of the job, which is public, and room for javac to open the spark jars.
+  AFON_LOGGING_CONSOLE: "OFF"
+  MAVEN_OPTS: -Xmx3g
+
+jobs:
+  # The tag of the image: the project version, which the Docker workflow tags the images of the build with.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        if: ${{ inputs.image_tag == '' }}
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: pom.xml
+          sparse-checkout-cone-mode: false
+
+      - name: Determine the image tag
+        id: tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
+          fi
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Running in the image ${{ inputs.image }}:$IMAGE_TAG"
+
+  spike:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      IMAGE: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The maven repository of the container, kept between runs: the build downloads the dependencies of every module.
+      - name: Cache the maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: acceptance-container-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: acceptance-container-m2-
+
+      - name: Show the runner
+        run: |
+          set -euo pipefail
+          docker version
+          free -h
+          df -h /
+          nproc
+
+      - name: Pull the image
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE"
+          # --entrypoint bash: the image's own makes a user and runs the command through `su`, which splits a script given to `bash -c`
+          docker run --rm --entrypoint bash "$IMAGE" -c 'java -version 2>&1 | head -1; mvn -version | head -1; kind version; command -v docker || echo "no docker client"'
+
+      # What the specs are given, in the profiles of afon-acceptance/pom.xml.  The project specs of the clouds are left out by selecting the package of
+      # the specs of the containers only.
+      - name: Choose the specs
+        id: specs
+        env:
+          SPECS: ${{ inputs.specs }}
+        run: |
+          set -euo pipefail
+          case "$SPECS" in
+            project)               ARGS="-Pproject -Dacceptance.project.suites.on=health.emrys.afon.acceptance.project" ;;
+            signing)               ARGS="-Psigning" ;;
+            "project and signing") ARGS="-Pproject,signing -Dacceptance.project.suites.on=health.emrys.afon.acceptance.project" ;;
+          esac
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+          echo "Maven arguments: $ARGS"
+
+      # The host network, so that localhost is the host's, and the docker socket, so that the containers of the specs are the host's.  As root, which
+      # the docker socket needs, and with bash as the entrypoint, as the image's makes a user and runs the command through `su`.  The workspace is
+      # mounted, so that the reports are where the next steps look.
+      - name: Run the specs in the container
+        env:
+          ARGS: ${{ steps.specs.outputs.args }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2/repository"
+          docker run --rm --network host --user root --entrypoint bash \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$GITHUB_WORKSPACE":/work -w /work \
+            -v "$HOME/.m2":/root/.m2 \
+            -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION -e ARGS \
+            -e TESTCONTAINERS_HOST_OVERRIDE=localhost \
+            -e AFON_HOME=/tmp/afon \
+            "$IMAGE" -c '
+              set -euo pipefail
+              mkdir -p /tmp/afon/config
+              # The docker client that the signing test drives, if the image has none.
+              if ! command -v docker > /dev/null 2>&1; then
+                curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLIENT_VERSION}.tgz" \
+                  | tar -xz --strip-components=1 -C /usr/local/bin docker/docker
+              fi
+              docker version --format "client {{.Client.Version}}, daemon {{.Server.Version}}"
+              # The modules that the specs need are installed first, without their tests, as the scalatest plugin of the acceptance module is the one run.
+              mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install
+              mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test $ARGS
+            '
+
+      # What the specs left in docker, to see whether they cleaned up.
+      - name: Show the containers left
+        if: ${{ always() }}
+        run: |
+          docker ps -a --format 'table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}'
+
+      - name: Upload the reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: afon-acceptance-container-reports-${{ github.run_id }}
+          path: afon-acceptance/target/surefire-reports/**
+          if-no-files-found: warn
