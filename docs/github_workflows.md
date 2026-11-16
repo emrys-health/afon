@@ -35,6 +35,10 @@ images, with the config env of the repository variable `SMOKE_TESTS_CONFIG_ENV`,
 the tag of its config snapshot in the vault, the variable `SMOKE_TESTS_CONFIG_TAG`, else `current`.  They can also be run by hand (`workflow_dispatch`), with the inputs `config_env`, `config_tag`
 and `image_tag`.  To deactivate the trigger, comment out the `workflow_run` block of the three callers.
 
+The [acceptance-tests-container](../.github/workflows/acceptance-tests-container.yml) workflow, which runs the acceptance specs in the `afon-base` image
+(see [Acceptance tests](acceptance_tests.md#in-the-container-on-github)), logs in with the same environments, `smoke-tests-<cloud>`, and reads the
+same repository variables `SMOKE_TESTS_CONFIG_ENV` and `SMOKE_TESTS_CONFIG_TAG`. An environment of its own would need another trust rule per cloud.
+
 ### Where the secrets are
 
 - **Cloud credentials: none are stored.**  The job logs in with a short-lived OIDC token (see [GitHub as the identity provider](#github-as-the-identity-provider)) as the identity that the GitHub environment

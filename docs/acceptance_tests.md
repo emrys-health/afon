@@ -127,6 +127,32 @@ takes a `cloud` input (`all`, `aws`, `azure` or `gcp`) which maps to the `--clou
 Because the specs write to shared buckets and catalogs, the workflow uses a `concurrency` group so that
 only one run executes at a time.
 
+### In the container, on GitHub
+
+The [acceptance-tests-container](../.github/workflows/acceptance-tests-container.yml) workflow runs specs in the `afon-base` image on a
+**GitHub-hosted runner**, which has the tools of the clouds, the docker client and the rest. It is run by hand (`workflow_dispatch`), and leaves
+[acceptance-tests](../.github/workflows/acceptance-tests.yml) as it is. Its inputs:
+
+| Input | Meaning |
+|---|---|
+| `cloud` | the cloud to log in to (`aws`, `azure` or `gcp`), and whose vault the config is pulled from |
+| `config_env` | the env of the config snapshot, else the repository variable `SMOKE_TESTS_CONFIG_ENV`, else `emrys2`. Give it explicitly if that variable is `emrys3`, which is reserved for CI |
+| `config_tag` | the tag of the snapshot, else the repository variable `SMOKE_TESTS_CONFIG_TAG`, else `current` |
+| `specs` | `project`, `signing` or `project and signing` (the default) |
+| `image`, `image_tag` | the `afon-base` image, and its tag (the project version of the ref by default) |
+
+The job logs in to the cloud by OIDC, with the GitHub environment `smoke-tests-<cloud>` that the smoke tests use, so that it has no stored credentials
+and needs no setup of its own, see [GitHub workflows](github_workflows.md#smoke-tests-workflows). It then pulls the config from the vault
+(`config-vault pull`) and masks its secrets, as the log is public. The specs run in a container of the image started with `docker run --network host`
+and the runner's docker socket, as `afon-docker.sh` does (see [above](#in-the-container-before-a-commit)), because they assume that `localhost` is the Docker host.
+The specs selected are those of the Maven profiles: `-Pidentity` for `project` (the Keycloak specs, which need docker only) and `-Psigning`, both for
+`project and signing`. The log of the specs goes to `afon.log` in the logs dir of the afon home, not to the console, and at the end it is pushed to
+the cloud's logs store under the tag `<run id>-<attempt>` (`logs-store`), the reports are uploaded as an artifact, and the config is removed
+from the runner.
+
+Runs of the same cloud do not overlap (concurrency group `acceptance-tests-container-<cloud>`), as they share its config and stores. The
+specs that use the clouds' tools (`-Pcloud`) are not run by it yet.
+
 ### Runner requirements
 
 The runner must have a Docker daemon reachable by the runner user, since the specs start KeyCloak,

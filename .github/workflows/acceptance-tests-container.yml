@@ -1,7 +1,7 @@
 name: acceptance-tests-container
 
-# SPIKE: runs the acceptance specs that need only docker, in the afon-base image, on a GitHub-hosted runner, to see whether that works before
-# the specs that use a cloud are moved there too.  acceptance-tests.yml, which runs them on the self-hosted runner, is left as it is.
+# Runs the acceptance tests in container, in the afon-base image, on a GitHub-hosted runner.  acceptance-tests.yml, which runs them on the
+# self-hosted runner, is left as it is.
 #
 # The specs assume that localhost is the Docker host: KeyCloak is bound at a fixed localhost:8080, Trino runs in host network mode and reaches
 # it there, and the kind cluster is reached at localhost:<port>.  A `container:` job puts the job in a network of its own, and GitHub does not
@@ -9,11 +9,15 @@ name: acceptance-tests-container
 # the specs start are then siblings on the host, as when they are run from a shell on it.
 #
 # Like the smoke tests, it needs the config of an env: pulled from the vault of a cloud, with `config-vault pull <tag> --force`, after a login to
-# the cloud by OIDC (a short-lived token, no stored credentials), so the specs find their config properties.  The login is that of the GitHub
-# environment smoke-tests-<cloud>, which the cloud trusts, so that nothing needs setting up for the spike; see docs/github_workflows.md.  The config
-# is on the runner, in a directory that the container has, so that it can be masked in the log, which is public, and is removed at the end.
+# the cloud by OIDC (a short-lived token, no stored credentials), so the specs find their config properties.
 #
-# What it tries:
+# We are using the GitHub environment smoke-tests-<cloud>, which the cloud trusts and which already has what the login needs; see docs/github_workflows.md.
+# The environment is reused instead of creating a new acceptance-tests-<cloud>, as that would need a trust rule per cloud for another subject.
+# The environment is created with the same variables, and the setup scripts (github-cloud-identity, github-cloud-env) and the name is conventional.
+# The config is on the runner, in a directory that the container has, so that it can be masked in the log, which is
+# public, and is removed at the end.
+#
+# What it runs:
 #   project  the projects of the central identity, in a KeyCloak container (profile identity: the profile project runs the specs of the clouds
 #            too, which use its tools and need its login)
 #   signing  the signing and verification of images, in a kind cluster, which drives the docker client: the base image has none, so a static
@@ -27,7 +31,7 @@ on:
         options: [aws, azure, gcp]
         default: aws
       config_env:
-        description: "The config env, ie the env of the snapshot in the vault (blank for emrys2: emrys3 is that of the smoke tests)"
+        description: "The config env, ie the env of the snapshot in the vault (blank for the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys2)"
         type: string
         default: ""
       config_tag:
@@ -106,8 +110,8 @@ jobs:
     env:
       IMAGE: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
       CLOUD: ${{ inputs.cloud }}
-      CONFIG_ENV: ${{ inputs.config_env || vars.ACCEPTANCE_CONFIG_ENV || 'emrys2' }}
-      CONFIG_TAG: ${{ inputs.config_tag || vars.ACCEPTANCE_CONFIG_TAG || 'current' }}
+      CONFIG_ENV: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys2' }}
+      CONFIG_TAG: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
       # The environment's variables of the login, see docs/github_workflows.md: secrets of the environment, or the variables of the ones set up before.
       AWS_REGION: ${{ vars.AWS_REGION }}
       AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME || vars.AZURE_KEY_VAULT_NAME }}
