@@ -112,8 +112,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME || vars.AZURE_KEY_VAULT_NAME }}
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID }}
-      # On the runner, mounted in the container: the config, which the specs find in $AFON_HOME/config.
-      AFON_DIR: ${{ runner.temp }}/afon
 
     steps:
       - name: Check the environment
@@ -143,6 +141,11 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v7
+
+      # On the runner, mounted in the container: the config, which the specs find in $AFON_HOME/config.  Set from RUNNER_TEMP in a step, as the
+      # runner context is not available where the env of a job is given.
+      - name: Locate the config dir
+        run: echo "AFON_DIR=$RUNNER_TEMP/afon" >> "$GITHUB_ENV"
 
       # Each login is OIDC: a short-lived token for the identity that smoke-tests-<cloud> is trusted for, see docs/github_workflows.md.
       - name: Log in to AWS
