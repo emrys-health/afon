@@ -28,6 +28,9 @@ class ProjectEnvTest {
     @TempDir
     Path home;
 
+    /** The account of the config the project is made from, on each cloud: the names of the project's resources depend on it. */
+    static final String ACCOUNTS = "AZURE_SUBSCRIPTION=sub-1\nAWS_ACCOUNT_ID=111111111111\nGCP_PROJECT_ID=gcp-proj\n";
+
     /** The example project on a cloud, in a file, with the config of the env it is made from, which has the properties of that cloud. */
     private record OnCloud(AfonProject project, Path projectFile, Path envConfig) {
     }
@@ -35,7 +38,7 @@ class ProjectEnvTest {
     private OnCloud on(AfonCloud cloud) throws IOException {
         Path file = ProjectFixtures.writeExample(home.resolve("project-" + lower(cloud) + ".yaml"), cloud);
         Path env = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\nPROJECT_ID=\nOIDC_ISSUER_URL=https://[OIDC_DOMAIN_NAME]/realms/polaris");
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + "PROJECT_ID=\nOIDC_ISSUER_URL=https://[OIDC_DOMAIN_NAME]/realms/polaris");
         Files.writeString(env.resolve("afon-" + lower(cloud) + ".properties"), cloud.name() + "_REGION=a-region\n" + cloud.name() + "_KEYCLOAK_EXTERNAL=false\n");
         Files.writeString(env.resolve("secret.properties"), "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n");
         return new OnCloud(new FileProjectProvider(file).getProject(), file, env);
@@ -145,18 +148,18 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void namesTheKubeconfigOfTheIdentityProjectsClusterForTheKeycloakItConfigures(AfonCloud cloud, @TempDir Path home) throws IOException {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n");
-        String yaml = ProjectFixtures.example(cloud).replace("identity:\n", "identity:\n  project: central-identity\n");
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
+        String yaml = ProjectFixtures.example(cloud).replace("identity:\n", "identity:\n  project: idp\n");
         Path file = Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn")).resolve("project.yaml");
         Files.writeString(file, yaml);
         // the identity project is made first
         assertThatThrownBy(() -> ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file))
-            .isInstanceOf(ProjectException.class).hasMessageContaining("identity.project names central-identity, which has no file");
-        Path identityFile = Files.createDirectories(home.resolve("projects/central-identity")).resolve("project.yaml");
+            .isInstanceOf(ProjectException.class).hasMessageContaining("identity.project names idp, which has no file");
+        Path identityFile = Files.createDirectories(home.resolve("projects/idp")).resolve("project.yaml");
         Files.writeString(identityFile, ProjectFixtures.identityExample(cloud));
         Path config = ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file);
         assertThat(config.resolve("afon.properties")).content()
-            .contains("KEYCLOAK_KUBECONFIG=" + home.resolve("cdktf-central-identity/kube/" + lower(cloud) + "-keycloak.config"));
+            .contains("KEYCLOAK_KUBECONFIG=" + home.resolve("cdktf-idp/kube/" + lower(cloud) + "-keycloak.config"));
         // a project that names none has none
         Path other = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("xyz-yyyy-nnnn", "abc-def")), envConfig, home, file);
         assertThat(other.resolve("afon.properties")).content().doesNotContain("KEYCLOAK_KUBECONFIG");
@@ -207,7 +210,7 @@ class ProjectEnvTest {
     void derivesOnlyWhatTheIdentityProjectDeploysItselfWith(AfonCloud cloud) {
         String prefix = cloud.name() + "_";
         var derived = ProjectEnv.derive(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)));
-        assertThat(derived.get("afon.properties")).containsOnlyKeys("PROJECT_ID").containsEntry("PROJECT_ID", "central-identity");
+        assertThat(derived.get("afon.properties")).containsOnlyKeys("PROJECT_ID").containsEntry("PROJECT_ID", "idp");
         // the project's own egress IP, which the identity's stack pins, as it is deployed by a project, and the domain; and no external identity
         assertThat(derived.get("afon-" + lower(cloud) + ".properties")).containsOnlyKeys(prefix + "EGRESS_IP", prefix + "OIDC_DOMAIN_NAME")
             .containsEntry(prefix + "EGRESS_IP", "203.0.113.20").containsEntry(prefix + "OIDC_DOMAIN_NAME", "oidc.example.org");
@@ -220,12 +223,12 @@ class ProjectEnvTest {
         Files.writeString(file, ProjectFixtures.identityExample(cloud));
         AfonProject project = new FileProjectProvider(file).getProject();
         Path env = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
         Path config = ProjectEnv.configure(project, env, home, file);
-        assertThat(config).isEqualTo(home.resolve("config-central-identity"));
-        assertThat(home.resolve("cdktf-central-identity")).isDirectory();
+        assertThat(config).isEqualTo(home.resolve("config-idp"));
+        assertThat(home.resolve("cdktf-idp")).isDirectory();
         AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
-        assertThat(properties.getValue(PROJECT_ID)).isEqualTo("central-identity");
+        assertThat(properties.getValue(PROJECT_ID)).isEqualTo("idp");
         assertThat(properties.getCloudValue(cloud, AfonCloudProperty.EGRESS_IP)).isEqualTo("203.0.113.20");
         assertThat(properties.getOidcDomainName(cloud)).isEqualTo("oidc.example.org");
     }

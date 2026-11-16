@@ -17,6 +17,7 @@ import java.util.Map;
  * @param env       the env whose config the project is made from, or {@code null} for the active config
  * @param egressIp  the address that the project's cluster leaves from, or {@code null}, see {@link AfonProject#egressIp()}
  * @param nodePool  the nodes of its cluster, see {@link AfonProject#nodePool()}
+ * @param dnsDelegation how the DNS zones of its domains are delegated, see {@link AfonProject#dnsDelegation()}
  * @param identity  how the project uses the central identity that issues its tokens
  * @param providers the Data Providers' project catalogs, reached directly
  * @param create    what outlives the nightly teardown
@@ -24,7 +25,7 @@ import java.util.Map;
  * @param tre       the project's TRE
  */
 public record TreProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
-                         @NonNull Map<String, String> nodePool, @NonNull Identity identity, @NonNull List<Provider> providers, @NonNull Create create, @Nullable Git git,
+                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<Provider> providers, @NonNull Create create, @Nullable Git git,
                          @NonNull Tre tre) implements AfonProject {
 
     @Override

@@ -16,7 +16,10 @@ import java.math.BigInteger
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest}
-import java.security.KeyPairGenerator
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.{KeyFactory, KeyPairGenerator, PrivateKey, Signature}
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 import java.util.Base64
@@ -97,6 +100,60 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
     mapper.readTree(response.body())
   }
 
+  private def adminPut(path: String, json: String): Unit = {
+    val request = HttpRequest.newBuilder(URI.create(baseUrl + path)).header("Authorization", "Bearer " + admin())
+      .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(json)).build()
+    val response = http.send(request, BodyHandlers.ofString())
+    assert(response.statusCode() / 100 == 2, s"PUT $path: HTTP ${response.statusCode()} ${response.body()}")
+  }
+
+  /** Runs a script of the repository, with the Afon home given, and says what it printed. */
+  private def runScript(script: String, afonHome: Path, args: String*): String = {
+    val path = Path.of("..", "scripts").resolve(script).toAbsolutePath.normalize().toString
+    val builder = new ProcessBuilder((Seq("bash", path) ++ args).asJava).redirectErrorStream(true)
+    builder.environment().put("AFON_HOME", afonHome.toString)
+    val process = builder.start()
+    val output = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+    assert(process.waitFor() == 0, s"$script ${args.mkString(" ")}: $output")
+    output
+  }
+
+  /** The private key of a PEM, whichever form openssl made it in, which openssl itself turns into the PKCS#8 that Java reads. */
+  private def privateKeyOf(pem: Path): PrivateKey = {
+    val process = new ProcessBuilder("openssl", "pkcs8", "-topk8", "-nocrypt", "-in", pem.toString, "-outform", "DER").start()
+    val der = process.getInputStream.readAllBytes()
+    assert(process.waitFor() == 0, s"openssl could not read $pem")
+    KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der))
+  }
+
+  /** The assertion by which a client authenticates to the token endpoint, a JWT signed with its private key. */
+  private def clientAssertion(clientId: String, key: PrivateKey): String = {
+    def b64(bytes: Array[Byte]) = Base64.getUrlEncoder.withoutPadding().encodeToString(bytes)
+    val now = System.currentTimeMillis() / 1000
+    val header = b64(s"""{"alg":"RS256","typ":"JWT","kid":"$clientId"}""".getBytes(StandardCharsets.UTF_8))
+    val payload = b64(s"""{"iss":"$clientId","sub":"$clientId","aud":"$baseUrl/realms/$KEYCLOAK_REALM","jti":"${java.util.UUID.randomUUID()}","iat":$now,"exp":${now + 60}}"""
+                        .getBytes(StandardCharsets.UTF_8))
+    val signature = Signature.getInstance("SHA256withRSA")
+    signature.initSign(key)
+    signature.update(s"$header.$payload".getBytes(StandardCharsets.UTF_8))
+    s"$header.$payload.${b64(signature.sign())}"
+  }
+
+  /**
+   * What the token endpoint answers a client that presents a code that was never issued, with the assertion: KeyCloak authenticates the client before it
+   * looks at the code, so that an answer about the code means that the client was authenticated, and one about the client that it was not.
+   */
+  private def tokenEndpointAnswer(clientId: String, assertion: String, redirectUri: String): (Int, String) = {
+    def enc(value: String) = java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)
+    val form = Seq("grant_type" -> "authorization_code", "code" -> "never-issued", "redirect_uri" -> redirectUri, "client_id" -> clientId,
+                   "client_assertion_type" -> "urn:ietf:params:oauth:client-assertion-type:jwt-bearer", "client_assertion" -> assertion)
+      .map { case (k, v) => s"${enc(k)}=${enc(v)}" }.mkString("&")
+    val request = HttpRequest.newBuilder(URI.create(s"$baseUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/token"))
+      .header("Content-Type", "application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(form)).build()
+    val response = http.send(request, BodyHandlers.ofString())
+    (response.statusCode(), mapper.readTree(response.body()).path("error").asText())
+  }
+
   private def clientUuid(clientId: String): String =
     get(s"/admin/realms/$KEYCLOAK_REALM/clients?clientId=$clientId").get(0).get("id").asText()
 
@@ -151,6 +208,32 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       assert(values(tokenOf("cfg-2026-0009-tre", ivy).get("project")) == Seq("cfg-2026-0009"))
       val found = get(s"/admin/realms/$KEYCLOAK_REALM/clients?clientId=cfg-2026-0009-git")
       assert(found.size() == 0)
+    }
+
+    "authenticate a client by the key that project-key made, and refuse a key that is not its own" in {
+      Given("the key pair of the TRE client of a project, made by the project-key script, whose public key the identity is given")
+      val id = "cfg-2026-0010"
+      val afonHome = Files.createTempDirectory("afon-home")
+      runScript("project/key.sh", afonHome, id, "tre")
+      val publicKey = Files.readString(afonHome.resolve(s"projects/$id/keys/tre.jwk"))
+      val privateKey = privateKeyOf(afonHome.resolve(s"keys/$id/tre.pem"))
+      provider.ensureProject(projectOf(id, Seq("nuh"), ownGit = false), Map("tre" -> publicKey).asJava)
+      // the token endpoint of a realm answers plain http from this machine only if the realm does not require https of it
+      adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
+      val redirectUri = s"https://jupyter.$id.example.org/oauth2/callback"
+
+      When("the client presents an assertion signed with its private key")
+      val authenticated = tokenEndpointAnswer(s"$id-tre", clientAssertion(s"$id-tre", privateKey), redirectUri)
+      Then("it is authenticated, and what the endpoint refuses is the code, which was never issued")
+      assert(authenticated == ((400, "invalid_grant")), authenticated.toString)
+
+      When("it presents an assertion signed with another key")
+      val other = KeyPairGenerator.getInstance("RSA")
+      other.initialize(2048)
+      val refused = tokenEndpointAnswer(s"$id-tre", clientAssertion(s"$id-tre", other.generateKeyPair().getPrivate), redirectUri)
+      Then("it is not authenticated")
+      assert(refused._1 == 401 || refused._2.contains("client"), refused.toString)
+      assert(refused != authenticated)
     }
 
     "give a member a token naming the project, and a non-member none" in {

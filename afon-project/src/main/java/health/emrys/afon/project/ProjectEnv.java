@@ -3,6 +3,7 @@ package health.emrys.afon.project;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.ConfigUtils;
+import health.emrys.afon.config.FilePropertyProvider;
 import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
@@ -14,9 +15,13 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -88,6 +93,16 @@ public final class ProjectEnv {
      * Keycloak through, or {@code null} if it names none.
      */
     public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig) {
+        return derive(project, identityKubeconfig, null);
+    }
+
+    /**
+     * As {@link #derive(AfonProject, Path)}, with the names of the project's resources, which depend on the config the project is made from, if
+     * it is given, see {@link ProjectNames}.
+     *
+     * @param env the config the project is made from, with its references resolved, or {@code null} for no names
+     */
+    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig, Properties env) {
         AfonCloud cloud = project.cloud();
         String prefix = cloud.name() + "_";
         Map<String, String> common = new LinkedHashMap<>();
@@ -117,20 +132,27 @@ public final class ProjectEnv {
             deriveTre((TreProject) project, prefix, common, cloudSpecific);
         }
 
-        List<String> problems = new ArrayList<>();
-        for (Map<String, String> properties : List.of(common, cloudSpecific)) {
-            properties.forEach((name, value) -> {
-                if (!SAFE_VALUE.matcher(value).matches()) {
-                    problems.add(String.format("%s '%s' has a character that a properties file sourced by a shell cannot hold", name, value));
-                }
-            });
-        }
-        if (!problems.isEmpty()) {
-            throw new ProjectException(FileProjectProvider.FILE, problems);
-        }
         Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
         byFile.put(COMMON_FILE, common);
         byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
+        if (env != null) {
+            // the names of the project's resources go first, so that what the file says is not overridden by them
+            ProjectNames.derive(project, env, project.env()).forEach((file, names) -> {
+                Map<String, String> explicit = byFile.getOrDefault(file, Map.of());
+                Map<String, String> merged = new LinkedHashMap<>(names);
+                merged.putAll(explicit);
+                byFile.put(file, merged);
+            });
+        }
+        List<String> problems = new ArrayList<>();
+        byFile.values().forEach(properties -> properties.forEach((name, value) -> {
+            if (!SAFE_VALUE.matcher(value).matches()) {
+                problems.add(String.format("%s '%s' has a character that a properties file sourced by a shell cannot hold", name, value));
+            }
+        }));
+        if (!problems.isEmpty()) {
+            throw new ProjectException(FileProjectProvider.FILE, problems);
+        }
         return byFile;
     }
 
@@ -175,16 +197,19 @@ public final class ProjectEnv {
         if (!Files.isDirectory(envConfig)) {
             throw new IllegalArgumentException("The config dir " + envConfig + " is not a directory");
         }
-        Map<String, Map<String, String>> derived = derive(project, identityKubeconfig(project, afonHome));
         Path target = configDir(afonHome, project);
         if (envConfig.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
             throw new IllegalArgumentException("The config dir " + envConfig + " is that of the project itself: name another env for it to be made from");
         }
+        // the config the project is made from, with its references resolved, which the names of the project's resources depend on (the account)
+        Properties envProperties = envProperties(envConfig);
+        Map<String, Map<String, String>> derived = derive(project, identityKubeconfig(project, afonHome), envProperties);
         try {
             copyTree(envConfig, target);
             for (Map.Entry<String, Map<String, String>> file : derived.entrySet()) {
                 append(target.resolve(file.getKey()), file.getValue());
             }
+            reevaluateDependents(target, derived);
             Files.copy(projectFile, target.resolve(FileProjectProvider.FILE), StandardCopyOption.REPLACE_EXISTING);
             Files.createDirectories(cdktfDir(afonHome, project));
         } catch (IOException e) {
@@ -212,6 +237,51 @@ public final class ProjectEnv {
                 "identity.project names %s, which is not an identity project", id)));
         }
         return cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config");
+    }
+
+    /**
+     * @return the properties of the config dir that the names of a project's resources are made from, with their references resolved
+     */
+    public static Properties envProperties(Path envConfig) {
+        return new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs")).getProperties();
+    }
+
+    /** A line of a properties file that sets a property in terms of others, eg {@code AZURE_GITEA_BUCKET=${AZURE_STORAGE_ACCOUNT}-gitea}. */
+    private static final Pattern DEPENDENT = Pattern.compile("^([A-Za-z0-9_]+)=(.*\\$\\{([A-Za-z0-9_.]+)}.*)$");
+
+    /**
+     * A shell sourcing a properties file evaluates {@code ${NAME}} where it reads it, so a property set in terms of one that the derived block
+     * overrides, further down, would keep the value of the env, while the Java side, which resolves the references after reading it all, would
+     * see the new one.  Such a line is therefore written again, after the derived block, until none depends on a derived property.
+     */
+    private static void reevaluateDependents(Path configDir, Map<String, Map<String, String>> derived) throws IOException {
+        Set<String> names = new LinkedHashSet<>();
+        derived.values().forEach(properties -> names.addAll(properties.keySet()));
+        Map<String, List<String>> repeated = new LinkedHashMap<>();
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (String file : derived.keySet()) {
+                Path path = configDir.resolve(file);
+                if (!Files.exists(path)) {
+                    continue;
+                }
+                for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+                    Matcher dependent = DEPENDENT.matcher(line);
+                    if (dependent.matches() && !derived.getOrDefault(file, Map.of()).containsKey(dependent.group(1))
+                        && Pattern.compile("\\$\\{(" + String.join("|", names) + ")}").matcher(dependent.group(2)).find()
+                        && !repeated.computeIfAbsent(file, f -> new ArrayList<>()).contains(line)) {
+                        repeated.get(file).add(line);
+                        grew |= names.add(dependent.group(1));
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, List<String>> file : repeated.entrySet()) {
+            Files.writeString(configDir.resolve(file.getKey()), "# --- Set in terms of the above, so evaluated again after them ---\n"
+                                                                  + String.join("\n", file.getValue()) + "\n",
+                              StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        }
     }
 
     private static void copyTree(Path from, Path to) throws IOException {

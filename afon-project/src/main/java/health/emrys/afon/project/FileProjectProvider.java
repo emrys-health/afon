@@ -33,6 +33,8 @@ import java.util.Set;
  *                                   env is the env whose config it is made from, eg dev for config-dev: the active one if not given;
  *                                   egressIp is the address its cluster leaves from, which the Providers allowlist: the env's if not given;
  *                                   where it deploys (region, account, node pools, names) comes from that config
+ * dns:       {delegation}                          optional: manual, the default, or route53, to have up delegate the zones of its domains from the Route 53
+ *                                   hosted zone of the parent domain, in the current AWS account, rather than by hand
  * cluster:   {nodePool: {vmSize, nodeCount}}      optional: the nodes of its cluster, with the keys of the cloud's node pool property
  *                                   (Azure vmSize and nodeCount, GCP machineType and nodeCount, none on AWS): the env's if not given
  * identity:  {issuerUrl, acr, clients: {tre, git}, projectClaim, userClaim, project}     project is the id of the identity project;
@@ -203,24 +205,26 @@ public class FileProjectProvider implements AfonProjectProvider {
             }
             ProjectRole role = role(root);
             boolean identityRole = role == ProjectRole.IDENTITY;
-            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "stacks") : Set.of("project", "cluster", "identity", "providers", "stacks"));
+            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "dns", "stacks") : Set.of("project", "cluster", "dns", "identity", "providers", "stacks"));
             Map<String, Object> project = map(top.get("project"), "project", Set.of("id", "cloud", "role", "env", "egressIp"));
             AfonProject.ProjectId id = id(project);
             AfonCloud cloud = cloud(string(project, "project.cloud"), "project.cloud");
             String env = env(project);
             String egressIp = egressIp(project);
             Map<String, String> nodePool = nodePool(map(top.get("cluster"), "cluster", Set.of("nodePool")), cloud);
+            DnsDelegation dnsDelegation = dnsDelegation(map(top.get("dns"), "dns", Set.of("delegation")));
 
             Map<String, Object> stacks = map(top.get("stacks"), "stacks", identityRole ? Set.of("identity") : Set.of("create", "git", "tre"));
             if (identityRole) {
                 if (!problems.isEmpty()) {
                     throw new ProjectException(source, problems);
                 }
-                IdentityProject identityProject = identityProject(id, cloud, env, egressIp, nodePool,
+                IdentityProject identityProject = identityProject(id, cloud, env, egressIp, nodePool, dnsDelegation,
                                                                   map(stacks.get("identity"), "stacks.identity", Set.of("stack", "domain")));
                 if (!problems.isEmpty()) {
                     throw new ProjectException(source, problems);
                 }
+                checkClusterNames(identityProject);
                 return identityProject;
             }
             boolean ownGit = stacks.get("git") != null;
@@ -238,7 +242,17 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (!problems.isEmpty()) {
                 throw new ProjectException(source, problems);
             }
-            return new TreProject(id, cloud, env, egressIp, nodePool, identity, providers, createStack, gitStack, treStack);
+            TreProject treProject = new TreProject(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, providers, createStack, gitStack, treStack);
+            checkClusterNames(treProject);
+            return treProject;
+        }
+
+        /** The project's id is in the name of its clusters, which each cloud limits. */
+        private void checkClusterNames(AfonProject project) {
+            List<String> tooLong = ProjectNames.clusterNameProblems(project);
+            if (!tooLong.isEmpty()) {
+                throw new ProjectException(source, tooLong);
+            }
         }
 
         /**
@@ -263,6 +277,7 @@ public class FileProjectProvider implements AfonProjectProvider {
          * looked up when the project runs, as for a TRE's
          */
         private IdentityProject identityProject(AfonProject.ProjectId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
+                                                DnsDelegation dnsDelegation,
                                                 Map<String, Object> identity) {
             String name = optional(identity, "stacks.identity.stack", cloud == null ? null : cloud + "-keycloak");
             StackId stack = null;
@@ -276,7 +291,7 @@ public class FileProjectProvider implements AfonProjectProvider {
                     problems.add("stacks.identity.stack: " + e.getMessage());
                 }
             }
-            return new IdentityProject(id, cloud, env, egressIp, nodePool, stack, optional(identity, "stacks.identity.domain", null));
+            return new IdentityProject(id, cloud, env, egressIp, nodePool, dnsDelegation, stack, optional(identity, "stacks.identity.domain", null));
         }
 
         /**
@@ -332,6 +347,18 @@ public class FileProjectProvider implements AfonProjectProvider {
                 }
             });
             return result;
+        }
+
+        /**
+         * @return how the zones of the project's domains are delegated: manual unless the file says route53
+         */
+        private DnsDelegation dnsDelegation(Map<String, Object> dns) {
+            String value = optional(dns, "dns.delegation", DnsDelegation.MANUAL.value());
+            return DnsDelegation.of(value).orElseGet(() -> {
+                problems.add(String.format("dns.delegation '%s' is not a way to delegate the DNS zones: one of %s", value,
+                                           Arrays.stream(DnsDelegation.values()).map(DnsDelegation::value).toList()));
+                return DnsDelegation.MANUAL;
+            });
         }
 
         private String egressIp(Map<String, Object> project) {

@@ -12,6 +12,9 @@ project:
   cloud: ${cloud}
   # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
   env: ${env}
+  # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>.  One
+  # address serves one cluster, so each project that runs next to another needs its own, which also leaves the env's for a deployment of the env itself
+  egressIp: <egress-ip>
 
 identity:
   # the identity project that deploys the central identity, so that up can reach its admin API for the registration
@@ -31,9 +34,16 @@ providers:
 stacks:
   create:
     auditBucket: ${id}-audit
-  tre:
-    domains:
-      ${CLOUD}_JUPYTER_DOMAIN_NAME: <jupyter-domain>
+  # the domains of the TRE are those of the env with the project id as a label after the first, eg azure-jupyter.<project>.<domain>: to name
+  # one, ${CLOUD}_JUPYTER_DOMAIN_NAME for example, here, uncomment
+  # tre:
+  #   domains:
+  #     ${CLOUD}_JUPYTER_DOMAIN_NAME: <jupyter-domain>
+
+# to have up delegate the DNS zones of its domains from the Route 53 hosted zone of the parent domain, in the current AWS account, so that it need not
+# stop for you to, uncomment (the default is manual: dns-delegate shows the NS records to add to the parent zone)
+# dns:
+#   delegation: route53
 
 # the nodes of its cluster: adjust to the quota of the subscription
 ${cluster}

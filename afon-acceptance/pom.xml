@@ -17,12 +17,17 @@
            access   the access, forbidden and external table specs of every cloud   (tags Access, Forbidden, External)  } on by default:
            users    the onboarding of users                                         (tag Users)                          } with none of the
            signing  the signing and verification of images, in a kind cluster      (tag Signing)                        } profiles active, all
-           project  the projects of the central identity, in a KeyCloak container  (tag Project)                        } the specs of these four are run
-           aws      the access specs of AWS                                         (tag Aws)                            ] to select only these,
-           azure    the access specs of Azure                                       (tag Azure)                          ] when activated, eg
+                                                                                                                        } the specs of these three are run
+           aws      the access specs of AWS                                         (tag Aws)                            ] only when activated, to select
+           azure    the access specs of Azure                                       (tag Azure)                          ] only what is activated, eg
            gcp      the access specs of GCP                                         (tag Gcp)                            ] -Paws,users
-         So by default all the specs are run, and a category is disabled by deactivating its profile, eg -P-signing or -P-access,-users.
-         Giving any profile instead selects only what the profiles given select, eg -Paws,signing; the clouds are only selected this way.
+           project  the projects: in a KeyCloak container, and what they ask of     (tag Project)                        ]
+                    a cloud, with the real tools of the cloud, which must be logged in: the <Cloud>ProjectCloudSpec of each cloud
+         The project specs are off by default, for now, and are run only when -Pproject is activated.  The cloud ones are tagged by Project and by the
+         cloud, and are in the package of the cloud's specs, which the project profile selects too, so -Pproject runs them with the container ones,
+         and a cloud's profile selects them as well, with its access specs.  So by default the access, users and signing specs are run, and a category is
+         disabled by deactivating its profile, eg -P-signing or -P-access,-users.
+         Giving any profile instead selects only what the profiles given select, eg -Paws,signing; the clouds and the project are only selected this way.
          Each profile sets, for itself, <name>.tags and <name>.suites to the values <name>.tags.on and <name>.suites.on; what is not selected
          stays at 'none', which matches no tag and no package, as the plugin cannot be given empty ones. -->
     <properties>
@@ -40,7 +45,7 @@
         <acceptance.users.suites.on>health.emrys.afon.acceptance.users</acceptance.users.suites.on>
         <acceptance.signing.tags.on>${acceptance.tags.package}.Signing</acceptance.signing.tags.on>
         <acceptance.project.tags.on>${acceptance.tags.package}.Project</acceptance.project.tags.on>
-        <acceptance.project.suites.on>health.emrys.afon.acceptance.project</acceptance.project.suites.on>
+        <acceptance.project.suites.on>health.emrys.afon.acceptance.project,health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.azure,health.emrys.afon.acceptance.gcp</acceptance.project.suites.on>
         <acceptance.signing.suites.on>health.emrys.afon.acceptance.signing</acceptance.signing.suites.on>
 
         <acceptance.access.tags>none</acceptance.access.tags>
@@ -187,11 +192,8 @@
             </properties>
         </profile>
         <profile>
-            <!-- The projects of the central identity, in a KeyCloak container, on by default -->
+            <!-- The projects: of the central identity in a KeyCloak container, and what they ask of a cloud, with its real tools.  Off by default, for now -->
             <id>project</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
             <properties>
                 <acceptance.project.tags>${acceptance.project.tags.on}</acceptance.project.tags>
                 <acceptance.project.suites>${acceptance.project.suites.on}</acceptance.project.suites>

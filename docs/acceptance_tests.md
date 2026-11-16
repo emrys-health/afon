@@ -11,6 +11,7 @@ packages, in two ways:
 | `users` | the onboarding of users in KeyCloak and Polaris (it uses an AWS catalog, but could use another cloud's) | `Users` | on |
 | `signing` | the signing of images and their verification at admission, in a kind cluster, see [below](#image-signing-test) | `Signing` | on |
 | `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
+| `project` | the projects: the clients, groups and tokens of the central identity, in a KeyCloak container, and what a project asks of a cloud (the store of its state, and its names accepted by the cloud), which use the real tools of the cloud: `aws`, `az` or `gcloud`, logged in | `Project` | off, for now |
 
 - **Disable categories** by deactivating their profiles, with a `-` before the name: everything else is still run.
 - **Select** by activating profiles: only the specs of those given are run, and the clouds are only selected this way.
@@ -22,6 +23,7 @@ packages, in two ways:
 ./afon.sh -a build -bp acceptance,access                  # only the access specs, of all the clouds
 ./afon.sh -a build -bp acceptance -c <cloud>              # only the access specs of the cloud <cloud> (the profile aws, azure or gcp)
 ./afon.sh -a build -bp acceptance,signing -c gcp          # the signing test and the specs of GCP
+./afon.sh -a build -bp acceptance,project                 # only the project specs, those of every cloud included
 ```
 With Maven alone, `mvn test -pl afon-acceptance -am
 -Pacceptance,access,signing`. `-c <cloud>` adds the profile of the cloud to those of `-bp`.

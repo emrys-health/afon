@@ -57,6 +57,11 @@ public sealed interface AfonProject permits TreProject, IdentityProject {
     @NonNull Map<String, String> nodePool();
 
     /**
+     * @return how the DNS zones of the project's domains are delegated from their parent domain, {@link DnsDelegation#MANUAL} unless the project says
+     */
+    @NonNull DnsDelegation dnsDelegation();
+
+    /**
      * The keys of the node pool of a cloud's cluster, as its node pool property takes them: {@code AZURE_AKS_NODE_POOL},
      * {@code GCP_GKE_NODE_POOL}.  AWS has no such property.
      */

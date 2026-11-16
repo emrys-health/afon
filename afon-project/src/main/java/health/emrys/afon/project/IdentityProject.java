@@ -17,12 +17,13 @@ import java.util.Map;
  * @param env      the env whose config the project is made from, or {@code null} for the active config
  * @param egressIp the address that the identity's cluster leaves from, or {@code null}, see {@link AfonProject#egressIp()}
  * @param nodePool the nodes of its cluster, see {@link AfonProject#nodePool()}
+ * @param dnsDelegation how the DNS zone of its domain is delegated, see {@link AfonProject#dnsDelegation()}
  * @param stack    the stack of the central identity that it deploys, eg {@code azure-keycloak}, of the project's cloud
  * @param domain   the domain of the identity, {@code <CLOUD>_OIDC_DOMAIN_NAME}, or {@code null} to leave it as the config the project is made
  *                 from has it
  */
 public record IdentityProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
-                              @NonNull Map<String, String> nodePool, @NonNull StackId stack, @Nullable String domain) implements AfonProject {
+                              @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull StackId stack, @Nullable String domain) implements AfonProject {
 
     @Override
     public ProjectRole role() {

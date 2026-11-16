@@ -182,9 +182,9 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void refusesToActOnTheIdentityProjectItself(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        ProjectTemplates.writeIdentity(home, "central-identity", cloud);
-        assertThat(command.run(new String[]{"close", "central-identity"})).isEqualTo(1);
-        assertThat(err.toString()).contains("Project central-identity is the central identity itself", "no clients, group or members");
+        ProjectTemplates.writeIdentity(home, "idp", cloud);
+        assertThat(command.run(new String[]{"close", "idp"})).isEqualTo(1);
+        assertThat(err.toString()).contains("Project idp is the central identity itself", "no clients, group or members");
         verifyNoInteractions(identity);
     }
 

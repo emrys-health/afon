@@ -250,6 +250,18 @@ class FileProjectProviderTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
+    void delegatesTheDnsZonesByHandUnlessTheProjectSaysRoute53(AfonCloud cloud) {
+        assertThat(ProjectFixtures.tre(valid(cloud)).dnsDelegation()).isEqualTo(DnsDelegation.MANUAL);
+        assertThat(ProjectFixtures.tre(valid(cloud) + "dns: {delegation: route53}\n").dnsDelegation()).isEqualTo(DnsDelegation.ROUTE53);
+        assertThat(ProjectFixtures.identity(IDENTITY_PROJECT.replace("${cloud}", lower(cloud)) + "dns: {delegation: route53}\n").dnsDelegation())
+            .isEqualTo(DnsDelegation.ROUTE53);
+        assertThat(invalid(valid(cloud) + "dns: {delegation: carrier-pigeon}\n").problems())
+            .anyMatch(p -> p.startsWith("dns.delegation 'carrier-pigeon' is not a way to delegate the DNS zones: one of [manual, route53]"));
+        assertThat(invalid(valid(cloud) + "dns: {zone: x}\n").problems()).anyMatch(p -> p.startsWith("dns.zone is not a known key"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
     void rejectsAnEgressIpThatIsNotAnIpv4Address(AfonCloud cloud) {
         for (String bad : new String[]{"afon-egress-ip", "20.50.115", "20.50.115.256", "20.50.115.68/32", "$(id)"}) {
             assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", egressIp: \"" + bad + "\"}")).problems())
@@ -261,8 +273,8 @@ class FileProjectProviderTest {
     @EnumSource(AfonCloud.class)
     void namesTheIdentityProjectItUses(AfonCloud cloud) {
         assertThat(ProjectFixtures.tre(valid(cloud)).identity().project()).isNull();
-        assertThat(ProjectFixtures.tre(valid(cloud).replace("identity: {", "identity: {project: central-identity, ")).identity().project())
-            .isEqualTo("central-identity");
+        assertThat(ProjectFixtures.tre(valid(cloud).replace("identity: {", "identity: {project: idp, ")).identity().project())
+            .isEqualTo("idp");
         assertThat(invalid(valid(cloud).replace("identity: {", "identity: {project: Bad_Id, ")).problems())
             .anyMatch(p -> p.startsWith("identity.project: Project id 'Bad_Id' is not a lower-case DNS label"));
     }
@@ -288,7 +300,7 @@ class FileProjectProviderTest {
     // the identity project
 
     private static final String IDENTITY_PROJECT = """
-        project: {id: central-identity, cloud: ${cloud}, role: identity}
+        project: {id: idp, cloud: ${cloud}, role: identity}
         """;
 
     @ParameterizedTest
@@ -356,7 +368,7 @@ class FileProjectProviderTest {
         String c = lower(cloud);
         ProjectPlan plan = ProjectPlan.of(FileProjectProvider.parse(ProjectFixtures.identityExample(cloud)));
         assertThat(plan.stages()).extracting(ProjectPlan.Stage::id).containsExactly(ProjectPlan.StageId.CREATE, ProjectPlan.StageId.IDENTITY);
-        assertThat(plan.stages()).extracting(ProjectPlan.Stage::stateKey).containsExactly("central-identity/" + c + "-create", "central-identity/" + c + "-keycloak");
+        assertThat(plan.stages()).extracting(ProjectPlan.Stage::stateKey).containsExactly("idp/" + c + "-create", "idp/" + c + "-keycloak");
         assertThat(plan.nightlyStages()).isEmpty();
     }
 }

@@ -13,6 +13,7 @@ import health.emrys.afon.project.IdentityProject;
 import health.emrys.afon.project.ProjectEnv;
 import health.emrys.afon.project.ProjectException;
 import health.emrys.afon.project.ProjectHome;
+import health.emrys.afon.project.ProjectNames;
 import health.emrys.afon.project.ProjectPlan;
 import health.emrys.afon.project.ProjectPlan.StageId;
 import health.emrys.afon.project.ProjectRole;
@@ -38,9 +39,9 @@ import java.util.function.Supplier;
  * manage-project validate &lt;project&gt;
  * manage-project plan &lt;project&gt;
  * manage-project configure &lt;project&gt; [--made-from &lt;env&gt;]
- * manage-project up &lt;project&gt; [--from &lt;stage&gt;] [--dry-run]
- * manage-project down &lt;project&gt; [--from &lt;stage&gt;] [--dry-run]
- * manage-project nightly &lt;project&gt; [--from &lt;stage&gt;] [--dry-run]
+ * manage-project up &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
+ * manage-project down &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
+ * manage-project nightly &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
  * manage-project run &lt;project&gt; &lt;command&gt;...
  * </pre>
  * <ul>
@@ -70,19 +71,23 @@ public class ManageProjectMain {
      */
     private static final String ENV = "--made-from";
     private static final String FROM = "--from";
+    private static final String UNTIL = "--until";
     private static final String ROLE = "--role";
     private static final String FORCE = "--force";
     private static final String DRY_RUN = "--dry-run";
     private static final List<String> RUNS = List.of("up", "down", "nightly");
 
     private static final String USAGE = String.join(System.lineSeparator(),
-        "Usage: manage-project <action> <project> [" + ENV + " <env>] [" + FROM + " <stage>] [" + DRY_RUN + "], where:",
+        "Usage: manage-project <action> <project> [" + ENV + " <env>] [" + FROM + " <stage>] [" + UNTIL + " <stage>] [" + DRY_RUN + "], where:",
+        "       manage-project find <name>",
         "       manage-project init <project> <cloud> [" + ROLE + " identity|tre] [" + ENV + " <env>] [" + FORCE + "]",
         "  <action> is one of:",
         "    init      writes the project file from the template of its role, for the deployer to complete: what is in <angle brackets>",
         "              is what only the deployer knows, so it is not valid until it is replaced.  Never overwrites a file, unless given",
         "              " + FORCE + ", which keeps the old one beside it as project.yaml.<time>.bak",
         "    validate  checks the project file, listing every problem in it",
+        "    names     lists the names of the project's resources: its clusters, and what is unique in the whole cloud, which are made of a",
+        "              token of the cloud, account and project, eg afonstorage<token>.  manage-project find <name> says which project owns a name",
         "    plan      lists the stages that bring the project up, in order, with the state of each stack",
         "    configure makes the config env config-<project> in the Afon home, and its empty cdktf env cdktf-<project>: the",
         "              config of the env it is made from with the properties derived from the project file written over it",
@@ -96,6 +101,8 @@ public class ManageProjectMain {
         "  " + ENV + " is the env whose config configure makes the project from, config-<env>: the env the project names if not given,",
         "    else the active config",
         "  " + FROM + " is the stage that up, down or nightly start from, eg after a failure: create, identity, git or tre",
+        "  " + UNTIL + " is the last stage that up, down or nightly run, eg to stop after create and delegate the DNS zones before the rest:",
+        "    the stages after it are left for " + FROM + ", which the message at the end of the run gives",
         "  " + DRY_RUN + " lists the commands that up, down or nightly would run, without running them",
         "Acting on the project's identity, its clients, group and members, is manage-identity.");
 
@@ -148,6 +155,9 @@ public class ManageProjectMain {
         if (args[0].equals("init")) {
             return init(args);
         }
+        if (args[0].equals("find")) {
+            return find(args);
+        }
         if (args[0].equals("run")) {
             // what follows the project is the command to run, whatever it has: its options are not this one's
             return runInProject(args);
@@ -155,12 +165,15 @@ public class ManageProjectMain {
         List<String> positional = new ArrayList<>();
         String env = null;
         String from = null;
+        String until = null;
         boolean dryRun = false;
         for (int i = 1; i < args.length; i++) {
             if (args[i].equals(ENV) && i + 1 < args.length) {
                 env = args[++i];
             } else if (args[i].equals(FROM) && i + 1 < args.length) {
                 from = args[++i];
+            } else if (args[i].equals(UNTIL) && i + 1 < args.length) {
+                until = args[++i];
             } else if (args[i].equals(DRY_RUN)) {
                 dryRun = true;
             } else if (args[i].startsWith("--")) {
@@ -170,21 +183,30 @@ public class ManageProjectMain {
             }
         }
         String action = args[0];
-        if (!List.of("validate", "plan", "configure", "up", "down", "nightly").contains(action)) {
+        if (!List.of("validate", "plan", "names", "configure", "up", "down", "nightly").contains(action)) {
             return usage("Unknown action '" + action + "'");
         }
         if (positional.size() != 1) {
             return usage(action + " takes one <project>");
         }
         StageId fromStage = null;
-        if (from != null) {
+        StageId untilStage = null;
+        for (String[] option : new String[][]{{FROM, from}, {UNTIL, until}}) {
+            if (option[1] == null) {
+                continue;
+            }
             if (!RUNS.contains(action)) {
-                return usage(FROM + " is for up, down and nightly");
+                return usage(option[0] + " is for up, down and nightly");
             }
             try {
-                fromStage = StageId.valueOf(from.toUpperCase(Locale.ROOT));
+                StageId stage = StageId.valueOf(option[1].toUpperCase(Locale.ROOT));
+                if (option[0].equals(FROM)) {
+                    fromStage = stage;
+                } else {
+                    untilStage = stage;
+                }
             } catch (IllegalArgumentException e) {
-                return usage("Unknown stage '" + from + "': one of " + java.util.Arrays.stream(StageId.values()).map(id -> id.name().toLowerCase(Locale.ROOT)).toList());
+                return usage("Unknown stage '" + option[1] + "': one of " + java.util.Arrays.stream(StageId.values()).map(id -> id.name().toLowerCase(Locale.ROOT)).toList());
             }
         }
         FileProjectProvider provider;
@@ -205,7 +227,14 @@ public class ManageProjectMain {
             return 1;
         }
         return switch (action) {
+            case "names" -> names(project, env != null ? env : project.env());
             case "validate" -> {
+                List<String> collisions = ProjectNames.domainCollisions(project, otherProjects());
+                if (!collisions.isEmpty()) {
+                    collisions.forEach(err::println);
+                    yield 1;
+                }
+                warnOfSharedEgressIp(project);
                 out.printf("%s is a valid %s project: %s on %s, made from %s%s%n", provider.file(), project.role(), project.id(), project.cloud(),
                            project.env() == null ? "the active config" : "config-" + project.env(),
                            project instanceof TreProject tre ? ", with " + tre.providers().size() + " provider(s)" : "");
@@ -216,8 +245,114 @@ public class ManageProjectMain {
                 yield 0;
             }
             case "configure" -> configure(project, provider.file(), env != null ? env : project.env());
-            default -> runStages(action, project, fromStage, dryRun);
+            default -> runStages(action, project, fromStage, untilStage, dryRun);
         };
+    }
+
+    /**
+     * @return the other projects in the Afon home, ie those of its projects dir that have a valid file
+     */
+    private List<AfonProject> otherProjects() {
+        List<AfonProject> projects = new ArrayList<>();
+        Path dir = afonHome.resolve(FileProjectProvider.PROJECTS_DIR);
+        if (!Files.isDirectory(dir)) {
+            return projects;
+        }
+        try (java.util.stream.Stream<Path> children = Files.list(dir)) {
+            for (Path child : (Iterable<Path>) children.sorted()::iterator) {
+                Path file = child.resolve(FileProjectProvider.FILE);
+                if (Files.isRegularFile(file)) {
+                    try {
+                        projects.add(new FileProjectProvider(file).getProject());
+                    } catch (ProjectException | IllegalStateException | IllegalArgumentException e) {
+                        // a project whose file is not valid has no domains to meet
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return projects;
+    }
+
+    /**
+     * @return the address the project's cluster leaves from: the one it names, else the {@code <CLOUD>_EGRESS_IP} of the config it is made from,
+     * which every project made from that env inherits, or {@code null} if there is none
+     */
+    private String effectiveEgressIp(AfonProject project) {
+        if (project.egressIp() != null) {
+            return project.egressIp();
+        }
+        try {
+            String inherited = envPropertiesOf(project, project.env()).getProperty(project.cloud().name() + "_EGRESS_IP", "").trim();
+            return inherited.isEmpty() ? null : inherited;
+        } catch (ProjectException | IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * A warning for each other project of the cloud that leaves from the same address, as one reserved address serves one cluster: they cannot be
+     * up at the same time.  Not an error, as projects need not be.
+     */
+    private void warnOfSharedEgressIp(AfonProject project) {
+        String ip = effectiveEgressIp(project);
+        if (ip == null) {
+            return;
+        }
+        for (AfonProject other : otherProjects()) {
+            if (!other.id().equals(project.id()) && other.cloud() == project.cloud() && ip.equals(effectiveEgressIp(other))) {
+                err.printf("WARNING: project %s and project %s both leave from %s, %s, and one address serves one cluster, so they cannot be up at the same "
+                           + "time: reserve another with %s-egress-ip create <name>, and name it in the egressIp of one of them%n",
+                           project.id(), other.id(), ip, project.egressIp() == null ? "that of the config they are made from"
+                                                                                   : "which " + project.id() + " names",
+                           project.cloud().toString().toLowerCase(Locale.ROOT));
+            }
+        }
+    }
+
+    /** The config the project is made from, with its references resolved, or what it is where there is none. */
+    private java.util.Properties envPropertiesOf(AfonProject project, String env) {
+        return ProjectEnv.envProperties(env != null ? ProjectEnv.envConfigDir(afonHome, env) : Path.of(ConfigUtils.configDir()));
+    }
+
+    private int names(AfonProject project, String env) {
+        try {
+            java.util.Map<String, String> names = ProjectNames.names(project, envPropertiesOf(project, env));
+            out.printf("Names of the resources of project %s on %s, made from %s:%n", project.id(), project.cloud(),
+                       env == null ? "the active config" : "config-" + env);
+            names.forEach((name, value) -> out.printf("  %-34s %s%n", name, value));
+            return 0;
+        } catch (ProjectException | IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
+            err.println(e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Says which project a name that is unique in the whole cloud, eg a storage account, belongs to.
+     */
+    private int find(String[] args) {
+        if (args.length != 2 || args[1].startsWith("--")) {
+            return usage("find takes one <name>, eg a storage account or a bucket");
+        }
+        int found = 0;
+        for (AfonProject project : otherProjects()) {
+            try {
+                java.util.Optional<String> property = ProjectNames.propertyOf(project, envPropertiesOf(project, project.env()), args[1]);
+                if (property.isPresent()) {
+                    out.printf("%s is the %s of project %s on %s%n", args[1], property.get(), project.id(), project.cloud());
+                    found++;
+                }
+            } catch (ProjectException | IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
+                err.printf("Cannot name the resources of project %s: %s%n", project.id(), e.getMessage());
+            }
+        }
+        if (found == 0) {
+            err.printf("No project in %s has a resource named %s%n", afonHome.resolve(FileProjectProvider.PROJECTS_DIR), args[1]);
+            return 1;
+        }
+        return 0;
     }
 
     /**
@@ -311,8 +446,14 @@ public class ManageProjectMain {
      */
     private int configure(AfonProject project, Path file, String env) {
         try {
+            List<String> collisions = ProjectNames.domainCollisions(project, otherProjects());
+            if (!collisions.isEmpty()) {
+                collisions.forEach(err::println);
+                return 1;
+            }
             Path envConfig = env != null ? ProjectEnv.envConfigDir(afonHome, env) : Path.of(ConfigUtils.configDir());
             Path config = ProjectEnv.configure(project, envConfig, afonHome, file);
+            warnOfSharedEgressIp(project);
             Path projectHome = ProjectHome.prepare(afonHome, project);
             out.printf("Configured project %s: its config env %s was made from %s, with its cdktf dir %s%n", project.id(), config, envConfig,
                        ProjectEnv.cdktfDir(afonHome, project));
@@ -326,7 +467,7 @@ public class ManageProjectMain {
         }
     }
 
-    private int runStages(String action, AfonProject project, StageId from, boolean dryRun) {
+    private int runStages(String action, AfonProject project, StageId from, StageId until, boolean dryRun) {
         ProjectPlan plan = ProjectPlan.of(project);
         IdentityProject identityProject;
         try {
@@ -336,13 +477,16 @@ public class ManageProjectMain {
             return 1;
         }
         List<Command> commands;
+        List<Command> left;
         try {
-            commands = ProjectCommands.from(switch (action) {
+            List<Command> all = ProjectCommands.from(switch (action) {
                 case "up" -> ProjectCommands.up(plan, stacks, identityProject, identityProject == null ? null
                     : ProjectEnv.cdktfDir(afonHome, identityProject).resolve("kube").resolve(identityProject.stack() + ".config"));
                 case "down" -> ProjectCommands.down(plan, stacks);
                 default -> ProjectCommands.nightly(plan, stacks);
             }, from);
+            commands = ProjectCommands.until(all, until);
+            left = all.subList(commands.size(), all.size());
         } catch (IllegalArgumentException e) {
             return usage(e.getMessage());
         }
@@ -385,6 +529,14 @@ public class ManageProjectMain {
                            project.id(), stage);
                 return 1;
             }
+        }
+        // what is left to run: a stage that is skipped is not
+        Optional<Command> following = left.stream().filter(command -> !command.skipped()).findFirst();
+        if (following.isPresent()) {
+            String next = following.get().stage().name().toLowerCase(Locale.ROOT);
+            out.printf("Stopped after stage %s, as asked.  Continue with: manage-project %s %s --from %s%n",
+                       commands.get(commands.size() - 1).stage().name().toLowerCase(Locale.ROOT), action, project.id(), next);
+            return 0;
         }
         if (action.equals("down")) {
             if (project instanceof IdentityProject) {

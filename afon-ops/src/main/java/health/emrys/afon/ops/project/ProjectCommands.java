@@ -2,6 +2,7 @@ package health.emrys.afon.ops.project;
 
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.project.AfonProject;
+import health.emrys.afon.project.DnsDelegation;
 import health.emrys.afon.project.IdentityProject;
 import health.emrys.afon.project.ProjectPlan;
 import health.emrys.afon.project.ProjectPlan.Stage;
@@ -17,8 +18,9 @@ import java.util.function.Predicate;
  * The Afon commands that run each stage of a project's {@link ProjectPlan}, in the order that brings the project up, takes it down, or
  * rebuilds what lives for a day, with no more than what to run: running them is for {@link ManageProjectMain}.
  * <ul>
- *   <li>{@code create}: the script {@code <cloud>-create} for the TRE's stack, which makes what outlives the stacks, and, if the project names
- *       an egress IP, {@code db-whitelist}, which allows it on the database;</li>
+ *   <li>{@code create}: the script {@code <cloud>-create} for the TRE's stack, which makes what outlives the stacks, if the project names
+ *       an egress IP, {@code db-whitelist}, which allows it on the database, and {@code dns-create-zones} for each stack that serves a domain, and, if the project says {@code dns.delegation: route53},
+ *       {@code dns-delegate --route53}, which delegates its zone from the parent domain;</li>
  *   <li>{@code register}: {@code manage-identity create}, in the project's home like the rest, so that it uses the config that the project is
  *       made from, that of its env, and its Keycloak admin credentials, never those of whichever env is active.  If the project names the
  *       identity project, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project, so that
@@ -91,6 +93,18 @@ final class ProjectCommands {
                     if (project.egressIp() != null) {
                         // the address that the project names, which the database has not heard of, unlike the one it inherits from its env
                         run.add(new Invocation(id, List.of("db-whitelist", cloud)));
+                    }
+                    // the domains of the project's stacks are its own, so the zones that serve them are made, once <cloud>-create has made the resource
+                    // group they are in; they are delegated from the parent domain by dns-delegate, as docs/dns_config.md says
+                    for (Stage serving : plan.stages()) {
+                        if (serving.stack() != null && List.of(StageId.IDENTITY, StageId.GIT, StageId.TRE).contains(serving.id())
+                            && stacks.defined().test(serving.stack())) {
+                            run.add(new Invocation(id, List.of("dns-create-zones", cloud, serving.stack().toString())));
+                            if (project.dnsDelegation() == DnsDelegation.ROUTE53) {
+                                // so that the stage after can get its certificates: the zones are reached from the parent domain
+                                run.add(new Invocation(id, List.of("dns-delegate", cloud, serving.stack().toString(), "--route53")));
+                            }
+                        }
                     }
                     commands.add(new Command(stage.id(), List.of(), run, null));
                 }
@@ -184,6 +198,23 @@ final class ProjectCommands {
             }
         }
         throw new IllegalArgumentException("No stage " + stage.name().toLowerCase() + " to resume from in what is run: "
+                                           + commands.stream().map(c -> c.stage().name().toLowerCase()).distinct().toList());
+    }
+
+    /**
+     * @return the commands up to and including those of the stage, or all of them if it is {@code null}
+     * @throws IllegalArgumentException if no command is for the stage
+     */
+    static List<Command> until(List<Command> commands, StageId stage) {
+        if (stage == null) {
+            return commands;
+        }
+        for (int i = commands.size() - 1; i >= 0; i--) {
+            if (commands.get(i).stage() == stage) {
+                return commands.subList(0, i + 1);
+            }
+        }
+        throw new IllegalArgumentException("No stage " + stage.name().toLowerCase() + " to stop after in what is run: "
                                            + commands.stream().map(c -> c.stage().name().toLowerCase()).distinct().toList());
     }
 }

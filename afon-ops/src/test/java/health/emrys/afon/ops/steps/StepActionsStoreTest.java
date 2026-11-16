@@ -135,7 +135,7 @@ class StepActionsStoreTest {
 
     @Test
     void thereIsNoWarningWhenThereIsNothingStoredToDelete() {
-        failure = scriptFailing("No snapshot of env central-identity tagged current with files of stack azure-keycloak");
+        failure = scriptFailing("No snapshot of env idp tagged current with files of stack azure-keycloak");
         java.io.PrintStream stderr = System.err;
         java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
         System.setErr(new java.io.PrintStream(captured));

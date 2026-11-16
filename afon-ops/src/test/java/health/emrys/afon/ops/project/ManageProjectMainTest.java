@@ -61,7 +61,7 @@ class ManageProjectMainTest {
 
     private void configure() throws Exception {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
         assertThat(command.run(new String[]{"configure", PROJECT, "--made-from", "dev"})).isZero();
     }
 
@@ -111,7 +111,7 @@ class ManageProjectMainTest {
     void configuresTheConfigAndCdktfEnvsOfTheProject(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
         assertThat(command.run(new String[]{"configure", PROJECT, "--made-from", "dev"})).isZero();
         assertThat(home.resolve("config-xyz-yyyy-nnnn/afon.properties")).content().contains("ENV_NAME=dev", "PROJECT_ID=xyz-yyyy-nnnn");
         assertThat(home.resolve("cdktf-xyz-yyyy-nnnn")).isDirectory();
@@ -129,9 +129,9 @@ class ManageProjectMainTest {
         setUp(cloud);
         String c = lower(cloud);
         Files.createDirectories(home.resolve("config-reserved"));
-        Files.writeString(home.resolve("config-reserved/afon.properties"), "ENV_NAME=reserved\n");
+        Files.writeString(home.resolve("config-reserved/afon.properties"), "ENV_NAME=reserved\n" + ProjectEnvAccounts.ACCOUNTS);
         Files.createDirectories(home.resolve("config-mine"));
-        Files.writeString(home.resolve("config-mine/afon.properties"), "ENV_NAME=mine\n");
+        Files.writeString(home.resolve("config-mine/afon.properties"), "ENV_NAME=mine\n" + ProjectEnvAccounts.ACCOUNTS);
         // the active config is another env's, which the project must not be made from
         Files.createSymbolicLink(home.resolve("config"), home.resolve("config-reserved"));
         Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
@@ -266,6 +266,7 @@ class ManageProjectMainTest {
         assertThat(ran).containsExactly(
             inProject(c + "-create", c + "-full"),
             inProject("db-whitelist", c),
+            inProject("dns-create-zones", c, c + "-full"),
             inProject("manage-identity", "create", PROJECT),
             inProject("manage-stack", "setup", c + "-full"));
         assertThat(home.resolve("projects/xyz-yyyy-nnnn/home/config")).isSymbolicLink();
@@ -282,6 +283,9 @@ class ManageProjectMainTest {
         assertThat(ran).containsExactly(
             inProject(c + "-create", c + "-full"),
             inProject("db-whitelist", c),
+            // the zones of the domains of each stack that serves one
+            inProject("dns-create-zones", c, c + "-git"),
+            inProject("dns-create-zones", c, c + "-full"),
             inProject("manage-identity", "create", PROJECT),
             inProject("manage-stack", "setup", c + "-git"),
             inProject("manage-stack", "setup", c + "-full"));
@@ -294,7 +298,7 @@ class ManageProjectMainTest {
         configure();
         status = 3;
         assertThat(command.run(new String[]{"up", PROJECT})).isEqualTo(1);
-        assertThat(ran).hasSize(3);
+        assertThat(ran).hasSize(4);
         assertThat(err.toString()).contains("Stage register failed with exit status 3", "manage-project up xyz-yyyy-nnnn --from register");
     }
 
@@ -354,18 +358,18 @@ class ManageProjectMainTest {
 
     private void setUpIdentity(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        ProjectTemplates.writeIdentity(home, "central-identity", cloud);
+        ProjectTemplates.writeIdentity(home, "idp", cloud);
     }
 
     private void configureIdentity() throws Exception {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n");
-        assertThat(command.run(new String[]{"configure", "central-identity", "--made-from", "dev"})).isZero();
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
+        assertThat(command.run(new String[]{"configure", "idp", "--made-from", "dev"})).isZero();
     }
 
     private List<String> inIdentity(String... args) {
-        List<String> all = new ArrayList<>(List.of("--home", home.resolve("projects/central-identity/home").toString(), "--cdktf",
-                                                   home.resolve("cdktf-central-identity").toString()));
+        List<String> all = new ArrayList<>(List.of("--home", home.resolve("projects/idp/home").toString(), "--cdktf",
+                                                   home.resolve("cdktf-idp").toString()));
         all.addAll(List.of(args));
         return all;
     }
@@ -375,14 +379,14 @@ class ManageProjectMainTest {
     void validatesAndPlansTheIdentityProject(AfonCloud cloud) throws Exception {
         setUpIdentity(cloud);
         String c = lower(cloud);
-        assertThat(command.run(new String[]{"validate", "central-identity"})).isZero();
-        assertThat(out.toString()).contains("is a valid identity project: central-identity on " + c + ", made from the active config")
+        assertThat(command.run(new String[]{"validate", "idp"})).isZero();
+        assertThat(out.toString()).contains("is a valid identity project: idp on " + c + ", made from the active config")
                                   .doesNotContain("provider");
         out.reset();
-        assertThat(command.run(new String[]{"plan", "central-identity"})).isZero();
-        assertThat(out.toString()).contains("Project central-identity on " + c + ", with the role identity",
-            "1. create (" + c + "-create), state central-identity/" + c + "-create",
-            "2. identity (" + c + "-keycloak), state central-identity/" + c + "-keycloak");
+        assertThat(command.run(new String[]{"plan", "idp"})).isZero();
+        assertThat(out.toString()).contains("Project idp on " + c + ", with the role identity",
+            "1. create (" + c + "-create), state idp/" + c + "-create",
+            "2. identity (" + c + "-keycloak), state idp/" + c + "-keycloak");
     }
 
     @ParameterizedTest
@@ -391,8 +395,9 @@ class ManageProjectMainTest {
         setUpIdentity(cloud);
         configureIdentity();
         String c = lower(cloud);
-        assertThat(command.run(new String[]{"up", "central-identity"})).isZero();
+        assertThat(command.run(new String[]{"up", "idp"})).isZero();
         assertThat(ran).containsExactly(inIdentity(c + "-create", c + "-keycloak"), inIdentity("db-whitelist", c),
+            inIdentity("dns-create-zones", c, c + "-keycloak"),
             inIdentity("manage-stack", "setup", c + "-keycloak"));
     }
 
@@ -402,14 +407,14 @@ class ManageProjectMainTest {
         setUpIdentity(cloud);
         configureIdentity();
         String c = lower(cloud);
-        assertThat(command.run(new String[]{"down", "central-identity"})).isZero();
+        assertThat(command.run(new String[]{"down", "idp"})).isZero();
         assertThat(ran).containsExactly(inIdentity("manage-stack", "delete", c + "-keycloak"));
         // the identity has no clients or group to close: what is left is the projects registered in it, which must register again
         assertThat(out.toString()).contains("Left as they are", "then run their register stage").doesNotContain("manage-identity close");
         ran.clear();
-        assertThat(command.run(new String[]{"nightly", "central-identity"})).isZero();
+        assertThat(command.run(new String[]{"nightly", "idp"})).isZero();
         assertThat(ran).isEmpty();
-        assertThat(out.toString()).contains("Nothing to run: no stage of project central-identity lives for a day");
+        assertThat(out.toString()).contains("Nothing to run: no stage of project idp lives for a day");
     }
 
     @ParameterizedTest
@@ -417,10 +422,10 @@ class ManageProjectMainTest {
     void resumesTheIdentityProjectFromItsStack(AfonCloud cloud) throws Exception {
         setUpIdentity(cloud);
         configureIdentity();
-        assertThat(command.run(new String[]{"up", "central-identity", "--from", "identity"})).isZero();
+        assertThat(command.run(new String[]{"up", "idp", "--from", "identity"})).isZero();
         assertThat(ran).containsExactly(inIdentity("manage-stack", "setup", lower(cloud) + "-keycloak"));
         // it has no tre stage to resume from
-        assertThat(command.run(new String[]{"up", "central-identity", "--from", "tre"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"up", "idp", "--from", "tre"})).isEqualTo(2);
         assertThat(err.toString()).contains("No stage tre to resume from");
     }
 
@@ -471,16 +476,16 @@ class ManageProjectMainTest {
         assertThat(out.toString()).doesNotContain("db-whitelist");
     }
 
-    private static final String NAMES_THE_IDENTITY = "identity:\n  project: central-identity\n";
+    private static final String NAMES_THE_IDENTITY = "identity:\n  project: idp\n";
 
     /** The project, which names the identity project, and the identity project, both configured. */
     private void setUpWithIdentity(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        ProjectTemplates.writeIdentity(home, "central-identity", cloud);
+        ProjectTemplates.writeIdentity(home, "idp", cloud);
         Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
                           ProjectTemplates.example(cloud).replace("identity:\n", NAMES_THE_IDENTITY));
         configure();
-        assertThat(command.run(new String[]{"configure", "central-identity", "--made-from", "dev"})).isZero();
+        assertThat(command.run(new String[]{"configure", "idp", "--made-from", "dev"})).isZero();
     }
 
     private List<String> inCentralIdentity(String... args) {
@@ -494,9 +499,9 @@ class ManageProjectMainTest {
         String c = lower(cloud);
         assertThat(command.run(new String[]{"up", PROJECT})).isZero();
         // the kubeconfig that the identity project's home writes is the one that the registration reaches Keycloak through
-        String kubeconfig = home.resolve("cdktf-central-identity/kube/" + c + "-keycloak.config").toString();
+        String kubeconfig = home.resolve("cdktf-idp/kube/" + c + "-keycloak.config").toString();
         assertThat(ran).containsExactly(
-            inProject(c + "-create", c + "-full"), inProject("db-whitelist", c),
+            inProject(c + "-create", c + "-full"), inProject("db-whitelist", c), inProject("dns-create-zones", c, c + "-full"),
             inCentralIdentity(c + "-update-kube-config", c + "-keycloak"),
             inProject("manage-identity", "create", PROJECT, "--kubeconfig", kubeconfig),
             // the TRE's stacks configure that Keycloak too, through the kubeconfig that the config names
@@ -533,7 +538,7 @@ class ManageProjectMainTest {
         ran.clear();
         assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isZero();
         assertThat(ran).isEmpty();
-        assertThat(out.toString()).contains("register (before): /cli/afon-cli.sh --home " + home.resolve("projects/central-identity/home"),
+        assertThat(out.toString()).contains("register (before): /cli/afon-cli.sh --home " + home.resolve("projects/idp/home"),
                                             "register: /cli/afon-cli.sh --home " + projectHome(), "manage-identity create " + PROJECT + " --kubeconfig ");
     }
 
@@ -544,20 +549,20 @@ class ManageProjectMainTest {
         Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
                           ProjectTemplates.example(cloud).replace("identity:\n", NAMES_THE_IDENTITY));
         assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isEqualTo(1);
-        assertThat(err.toString()).contains("names the identity project central-identity, which has no file");
+        assertThat(err.toString()).contains("names the identity project idp, which has no file");
 
         // a project that is not an identity project
-        Files.createDirectories(home.resolve("projects/central-identity"));
-        Files.writeString(home.resolve("projects/central-identity/project.yaml"),
-                          ProjectTemplates.example(cloud).replace("xyz-yyyy-nnnn", "central-identity"));
+        Files.createDirectories(home.resolve("projects/idp"));
+        Files.writeString(home.resolve("projects/idp/project.yaml"),
+                          ProjectTemplates.example(cloud).replace("xyz-yyyy-nnnn", "idp"));
         assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isEqualTo(1);
-        assertThat(err.toString()).contains("but central-identity has the role tre");
+        assertThat(err.toString()).contains("but idp has the role tre");
 
         // an identity project of another cloud
         AfonCloud other = AfonCloud.values()[(cloud.ordinal() + 1) % AfonCloud.values().length];
-        ProjectTemplates.writeIdentity(home, "central-identity", other);
+        ProjectTemplates.writeIdentity(home, "idp", other);
         assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isEqualTo(1);
-        assertThat(err.toString()).contains("is on " + lower(cloud) + ", but the identity project central-identity it names is on " + lower(other));
+        assertThat(err.toString()).contains("is on " + lower(cloud) + ", but the identity project idp it names is on " + lower(other));
         assertThat(ran).isEmpty();
     }
 
@@ -592,8 +597,8 @@ class ManageProjectMainTest {
         assertThat(init.run(new String[]{"init", "abc-def", lower(cloud), "--made-from", "dev"})).isZero();
         Path file = home.resolve("projects/abc-def/project.yaml");
         assertThat(file).content().contains("id: abc-def", "cloud: " + lower(cloud), "env: dev", "<identity-project>");
-        assertThat(init.run(new String[]{"init", "central-identity", lower(cloud), "--role", "identity"})).isZero();
-        assertThat(home.resolve("projects/central-identity/project.yaml")).content().contains("role: identity", "env: <env>", "<egress-ip>");
+        assertThat(init.run(new String[]{"init", "idp", lower(cloud), "--role", "identity"})).isZero();
+        assertThat(home.resolve("projects/idp/project.yaml")).content().contains("role: identity", "env: <env>", "<egress-ip>");
         assertThat(out.toString()).contains("complete what is in <angle brackets>", "manage-project validate abc-def");
         // what is left to complete is what validate says is wrong
         assertThat(init.run(new String[]{"validate", "abc-def"})).isEqualTo(1);
@@ -649,5 +654,193 @@ class ManageProjectMainTest {
     void initForceWritesTheFileOfAProjectThatHasNone(AfonCloud cloud) throws Exception {
         assertThat(commandWithTemplates().run(new String[]{"init", "abc-def", lower(cloud), "--force"})).isZero();
         assertThat(home.resolve("projects/abc-def")).isDirectoryContaining("glob:**/project.yaml").isDirectoryNotContaining("glob:**/*.bak");
+    }
+
+    // the names of a project's resources
+
+    private static String accountOf(AfonCloud cloud) {
+        return switch (cloud) {
+            case AZURE -> "sub-1";
+            case AWS -> "111111111111";
+            case GCP -> "gcp-proj";
+        };
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void listsTheNamesOfTheResourcesOfTheProject(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"names", PROJECT, "--made-from", "dev"})).isZero();
+        String c = lower(cloud);
+        assertThat(out.toString()).contains("Names of the resources of project xyz-yyyy-nnnn on " + c + ", made from config-dev",
+                                            "cluster of " + c + "-full", "full-xyz-yyyy-nnnn-cluster", "CLUSTER_NAME");
+        if (cloud == AfonCloud.AZURE) {
+            assertThat(out.toString()).contains("AZURE_STORAGE_ACCOUNT", "afonstorage" + health.emrys.afon.project.ProjectNames.token(cloud, accountOf(cloud), PROJECT));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void findsTheProjectThatOwnsAGlobalName(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        Files.writeString(home.resolve("projects/" + PROJECT + "/project.yaml"),
+                          ProjectTemplates.example(cloud).replaceFirst("(cloud: [a-z]+\n)", "$1  env: dev\n"));
+        Path envConfig = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
+        String name = cloud == AfonCloud.AZURE ? "afonstorage" + health.emrys.afon.project.ProjectNames.token(cloud, accountOf(cloud), PROJECT) : null;
+        if (name == null) {
+            // no catalog bucket of the cloud in this env: nothing is named but the cluster, which is not unique in the whole cloud
+            assertThat(command.run(new String[]{"find", "afon-0123456789-aws"})).isEqualTo(1);
+            assertThat(err.toString()).contains("No project in");
+            return;
+        }
+        assertThat(command.run(new String[]{"find", name.toUpperCase()})).isZero();
+        assertThat(out.toString()).contains(name.toUpperCase() + " is the AZURE_STORAGE_ACCOUNT of project xyz-yyyy-nnnn on azure");
+        assertThat(command.run(new String[]{"find", "another-name"})).isEqualTo(1);
+        assertThat(command.run(new String[]{"find"})).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToValidateOrConfigureAProjectWhoseDomainAnotherProjectHas(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        // the same file under another id: the same domains
+        Files.createDirectories(home.resolve("projects/other-project"));
+        Files.writeString(home.resolve("projects/other-project/project.yaml"), ProjectTemplates.example(cloud).replaceFirst("id: xyz-yyyy-nnnn", "id: other-project"));
+        assertThat(command.run(new String[]{"validate", PROJECT})).isEqualTo(1);
+        assertThat(err.toString()).contains("is also that of other-project", "one domain serves one project");
+        Files.createDirectories(home.resolve("config-dev"));
+        assertThat(command.run(new String[]{"configure", PROJECT, "--made-from", "dev"})).isEqualTo(1);
+        assertThat(home.resolve("config-xyz-yyyy-nnnn")).doesNotExist();
+    }
+
+    // an address serves one cluster
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void warnsOfProjectsThatWouldLeaveFromTheSameAddress(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        // two projects of the cloud, neither naming an address, made from an env that has one
+        Files.createDirectories(home.resolve("projects/other-project"));
+        Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
+                          ProjectTemplates.example(cloud).replace("  egressIp: 203.0.113.10\n", "").replaceFirst("(cloud: [a-z]+\n)", "$1  env: dev\n"));
+        Files.writeString(home.resolve("projects/other-project/project.yaml"),
+                          ProjectTemplates.example(cloud).replace("  egressIp: 203.0.113.10\n", "").replaceFirst("(cloud: [a-z]+\n)", "$1  env: dev\n")
+                              .replace("xyz-yyyy-nnnn", "other-project"));
+        Path envConfig = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS + cloud.name() + "_EGRESS_IP=203.0.113.5\n");
+        // a warning, not an error: they need not be up together
+        assertThat(command.run(new String[]{"validate", PROJECT})).isZero();
+        assertThat(err.toString()).contains("WARNING: project xyz-yyyy-nnnn and project other-project both leave from 203.0.113.5",
+                                            "cannot be up at the same time", lower(cloud) + "-egress-ip create");
+        // one that names its own leaves from it, so there is no warning
+        err.reset();
+        Files.writeString(home.resolve("projects/other-project/project.yaml"),
+                          Files.readString(home.resolve("projects/other-project/project.yaml")).replaceFirst("(cloud: [a-z]+\n)", "$1  egressIp: 203.0.113.99\n"));
+        assertThat(command.run(new String[]{"validate", PROJECT})).isZero();
+        assertThat(err.toString()).doesNotContain("WARNING");
+    }
+
+    // the delegation of the zones of the project's domains
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void delegatesTheZonesFromTheParentDomainWhenTheProjectAsksForRoute53(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        Path file = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
+        Files.writeString(file, Files.readString(file) + "dns:\n  delegation: route53\n");
+        gitStackDefined = true;
+        configure();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "create"})).isZero();
+        assertThat(ran).containsExactly(
+            inProject(c + "-create", c + "-full"), inProject("db-whitelist", c),
+            // each stack that serves a domain: its zones, then their delegation, so that the stages after can get their certificates
+            inProject("dns-create-zones", c, c + "-git"), inProject("dns-delegate", c, c + "-git", "--route53"),
+            inProject("dns-create-zones", c, c + "-full"), inProject("dns-delegate", c, c + "-full", "--route53"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesTheDelegationToTheDeployerByDefault(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT})).isZero();
+        assertThat(ran).noneMatch(c -> c.contains("dns-delegate"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void delegatesTheZoneOfTheIdentityProjectToo(AfonCloud cloud) throws Exception {
+        setUpIdentity(cloud);
+        Path file = home.resolve("projects/idp/project.yaml");
+        Files.writeString(file, Files.readString(file) + "dns:\n  delegation: route53\n");
+        configureIdentity();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"up", "idp", "--until", "create"})).isZero();
+        assertThat(ran).contains(inIdentity("dns-create-zones", c, c + "-keycloak"), inIdentity("dns-delegate", c, c + "-keycloak", "--route53"));
+    }
+
+    // --until stops after a stage
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void stopsAfterTheStageGivenAndSaysHowToContinue(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "create"})).isZero();
+        assertThat(ran).containsExactly(inProject(c + "-create", c + "-full"), inProject("db-whitelist", c), inProject("dns-create-zones", c, c + "-full"));
+        assertThat(out.toString()).contains("Stopped after stage create, as asked.  Continue with: manage-project up xyz-yyyy-nnnn --from register");
+        // and the rest is run from there
+        ran.clear();
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "register"})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT), inProject("manage-stack", "setup", c + "-full"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void runsOnlyTheStagesBetweenFromAndUntil(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "register", "--until", "register"})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-identity", "create", PROJECT));
+        assertThat(out.toString()).contains("[1/1] register:", "Continue with: manage-project up xyz-yyyy-nnnn --from tre");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void saysNothingOfContinuingWhenTheLastStageIsTheOneGiven(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "tre"})).isZero();
+        assertThat(out.toString()).doesNotContain("Stopped after");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesDownUpToAStageInTheReverseOrder(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        gitStackDefined = true;
+        configure();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"down", PROJECT, "--until", "tre"})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-stack", "delete", c + "-full"));
+        assertThat(out.toString()).contains("Stopped after stage tre, as asked.  Continue with: manage-project down xyz-yyyy-nnnn --from git");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesAnUntilThatIsNotAStageOfWhatIsRunOrNotForTheAction(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "nowhere"})).isEqualTo(2);
+        assertThat(err.toString()).contains("Unknown stage 'nowhere'");
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "identity"})).isEqualTo(2);
+        assertThat(err.toString()).contains("No stage identity to stop after");
+        assertThat(command.run(new String[]{"validate", PROJECT, "--until", "tre"})).isEqualTo(2);
+        assertThat(err.toString()).contains("--until is for up, down and nightly");
+        assertThat(ran).isEmpty();
     }
 }
