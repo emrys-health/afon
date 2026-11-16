@@ -21,9 +21,12 @@
            aws      the access specs of AWS                                         (tag Aws)                            ] only when activated, to select
            azure    the access specs of Azure                                       (tag Azure)                          ] only what is activated, eg
            gcp      the access specs of GCP                                         (tag Gcp)                            ] -Paws,users
-           project  the projects: in a KeyCloak container, and what they ask of     (tag Project)                        ]
-                    a cloud, with the real tools of the cloud, which must be logged in: the <Cloud>ProjectCloudSpec of each cloud
-         The project specs are off by default, for now, and are run only when -Pproject is activated.  The cloud ones are tagged by Project and by the
+           project  all the specs of the projects                                    (tag Project)                        ]
+           identity the projects in the central identity, in a KeyCloak container  (tag ProjectIdentity)                ]
+           cloud    what the projects ask of a cloud, with its tools, logged in    (tag ProjectCloud)                   ]
+         The project specs are off by default, for now, and are run only when a profile of theirs is activated: project, all of them, or one kind of
+         them, identity, those of the central identity, in a KeyCloak container, which need only docker, tagged ProjectIdentity, or cloud, those of each
+         cloud, which use its tools and need it logged in, tagged ProjectCloud.  Every one is tagged Project too.  The cloud ones are tagged by Project and by the
          cloud, and are in the package of the cloud's specs, which the project profile selects too, so -Pproject runs them with the container ones,
          and a cloud's profile selects them as well, with its access specs.  So by default the access, users and signing specs are run, and a category is
          disabled by deactivating its profile, eg -P-signing or -P-access,-users.
@@ -45,6 +48,12 @@
         <acceptance.users.suites.on>health.emrys.afon.acceptance.users</acceptance.users.suites.on>
         <acceptance.signing.tags.on>${acceptance.tags.package}.Signing</acceptance.signing.tags.on>
         <acceptance.project.tags.on>${acceptance.tags.package}.Project</acceptance.project.tags.on>
+        <!-- The kinds of the project specs, each with a tag of its own, which every project spec has as well: the identity ones are in the package project, the
+             ones of the clouds in the packages of the clouds -->
+        <acceptance.identity.tags.on>${acceptance.tags.package}.ProjectIdentity</acceptance.identity.tags.on>
+        <acceptance.identity.suites.on>health.emrys.afon.acceptance.project</acceptance.identity.suites.on>
+        <acceptance.cloud.tags.on>${acceptance.tags.package}.ProjectCloud</acceptance.cloud.tags.on>
+        <acceptance.cloud.suites.on>health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.azure,health.emrys.afon.acceptance.gcp</acceptance.cloud.suites.on>
         <acceptance.project.suites.on>health.emrys.afon.acceptance.project,health.emrys.afon.acceptance.aws,health.emrys.afon.acceptance.azure,health.emrys.afon.acceptance.gcp</acceptance.project.suites.on>
         <acceptance.signing.suites.on>health.emrys.afon.acceptance.signing</acceptance.signing.suites.on>
 
@@ -62,6 +71,10 @@
         <acceptance.signing.suites>none</acceptance.signing.suites>
         <acceptance.project.tags>none</acceptance.project.tags>
         <acceptance.project.suites>none</acceptance.project.suites>
+        <acceptance.identity.tags>none</acceptance.identity.tags>
+        <acceptance.identity.suites>none</acceptance.identity.suites>
+        <acceptance.cloud.tags>none</acceptance.cloud.tags>
+        <acceptance.cloud.suites>none</acceptance.cloud.suites>
     </properties>
 
     <dependencies>
@@ -126,8 +139,8 @@
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
                 <configuration>
-                    <tagsToInclude>${acceptance.access.tags},${acceptance.aws.tags},${acceptance.azure.tags},${acceptance.gcp.tags},${acceptance.users.tags},${acceptance.signing.tags},${acceptance.project.tags}</tagsToInclude>
-                    <wildcardSuites>${acceptance.access.suites},${acceptance.aws.suites},${acceptance.azure.suites},${acceptance.gcp.suites},${acceptance.users.suites},${acceptance.signing.suites},${acceptance.project.suites}</wildcardSuites>
+                    <tagsToInclude>${acceptance.access.tags},${acceptance.aws.tags},${acceptance.azure.tags},${acceptance.gcp.tags},${acceptance.users.tags},${acceptance.signing.tags},${acceptance.project.tags},${acceptance.identity.tags},${acceptance.cloud.tags}</tagsToInclude>
+                    <wildcardSuites>${acceptance.access.suites},${acceptance.aws.suites},${acceptance.azure.suites},${acceptance.gcp.suites},${acceptance.users.suites},${acceptance.signing.suites},${acceptance.project.suites},${acceptance.identity.suites},${acceptance.cloud.suites}</wildcardSuites>
                 </configuration>
             </plugin>
         </plugins>
@@ -197,6 +210,22 @@
             <properties>
                 <acceptance.project.tags>${acceptance.project.tags.on}</acceptance.project.tags>
                 <acceptance.project.suites>${acceptance.project.suites.on}</acceptance.project.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- The projects in the central identity, in a KeyCloak container, which need only docker, off by default, for now.  Part of project -->
+            <id>identity</id>
+            <properties>
+                <acceptance.identity.tags>${acceptance.identity.tags.on}</acceptance.identity.tags>
+                <acceptance.identity.suites>${acceptance.identity.suites.on}</acceptance.identity.suites>
+            </properties>
+        </profile>
+        <profile>
+            <!-- What the projects ask of a cloud, with the real tools of the cloud, which must be logged in, off by default, for now.  Part of project -->
+            <id>cloud</id>
+            <properties>
+                <acceptance.cloud.tags>${acceptance.cloud.tags.on}</acceptance.cloud.tags>
+                <acceptance.cloud.suites>${acceptance.cloud.suites.on}</acceptance.cloud.suites>
             </properties>
         </profile>
     </profiles>

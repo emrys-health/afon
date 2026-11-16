@@ -2,7 +2,7 @@ package health.emrys.afon.acceptance.project
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
-import health.emrys.afon.acceptance.tags.Project
+import health.emrys.afon.acceptance.tags.{Project, ProjectIdentity}
 import health.emrys.afon.cdk.DockerImages
 import health.emrys.afon.config.AfonCloud
 import health.emrys.afon.project.{FileProjectProvider, TreProject}
@@ -344,12 +344,15 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
 
 /** The projects of the central identity, on AWS. */
 @Project
+@ProjectIdentity
 class ProjectIdentityAwsSpec extends AbstractProjectIdentitySpec(AfonCloud.AWS)
 
 /** The projects of the central identity, on Azure. */
 @Project
+@ProjectIdentity
 class ProjectIdentityAzureSpec extends AbstractProjectIdentitySpec(AfonCloud.AZURE)
 
 /** The projects of the central identity, on GCP. */
 @Project
+@ProjectIdentity
 class ProjectIdentityGcpSpec extends AbstractProjectIdentitySpec(AfonCloud.GCP)

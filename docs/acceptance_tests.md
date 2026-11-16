@@ -12,6 +12,8 @@ packages, in two ways:
 | `signing` | the signing of images and their verification at admission, in a kind cluster, see [below](#image-signing-test) | `Signing` | on |
 | `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
 | `project` | the projects: the clients, groups and tokens of the central identity, in a KeyCloak container, and what a project asks of a cloud (the store of its state, and its names accepted by the cloud), which use the real tools of the cloud: `aws`, `az` or `gcloud`, logged in | `Project` | off, for now |
+| `identity` | of those, the projects in the central identity, in a KeyCloak container, which need only docker | `ProjectIdentity` | off, for now |
+| `cloud` | of those, what a project asks of a cloud, which uses the tools of the cloud (`aws`, `az`, `gcloud`), logged in | `ProjectCloud` | off, for now |
 
 - **Disable categories** by deactivating their profiles, with a `-` before the name: everything else is still run.
 - **Select** by activating profiles: only the specs of those given are run, and the clouds are only selected this way.
@@ -27,6 +29,25 @@ packages, in two ways:
 ```
 With Maven alone, `mvn test -pl afon-acceptance -am
 -Pacceptance,access,signing`. `-c <cloud>` adds the profile of the cloud to those of `-bp`.
+
+## In the container, before a commit
+
+The specs that need only docker can be run in the `afon-base` image, as the `acceptance-tests-container` workflow runs them on GitHub, with
+`scripts/docker/afon/afon-docker.sh`. It runs a command in the image with the host network and the docker socket, which the specs need as they
+assume that `localhost` is the Docker host, the repository as `/work`, your `~/.m2`, your `~/.afon` as `/tmp/afon`, and, with `--cloud`, what your
+login to the cloud left (`~/.aws` and the AWS variables, `~/.azure`, `~/.config/gcloud`):
+
+```shell
+# the Keycloak specs of the projects: the modules are installed first, then the specs are run, with their log in ~/.afon/logs
+scripts/docker/afon/afon-docker.sh -- 'mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install \
+  && mvn -B -ntp -pl afon-acceptance test -Pidentity -Dafon.home=/tmp/afon -Dafon.logging.console=OFF'
+scripts/docker/afon/afon-docker.sh --cloud aws          # a shell in the container, logged in as you are, to run what you want
+scripts/docker/afon/afon-docker.sh --image emryshealth/afon-base:1.0-SNAPSHOT --afon-home /tmp/my-afon --cloud azure -- 'az account show'
+```
+
+The image is `emryshealth/afon-base:<version of the pom>` unless `--image` gives another, such as one built here with
+`scripts/docker/afon/build.sh base`. The signing spec drives the docker client, which the image does not have, so put it in first, as the
+workflow's step does. The script can also be sourced, for its function `afon_docker '<script>' [<docker run option>...]`, which the workflow uses.
 
 ## Access specs
 

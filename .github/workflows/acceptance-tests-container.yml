@@ -14,8 +14,8 @@ name: acceptance-tests-container
 # is on the runner, in a directory that the container has, so that it can be masked in the log, which is public, and is removed at the end.
 #
 # What it tries:
-#   project  the projects of the central identity, in a KeyCloak container (profile project, the package of the specs of the containers only:
-#            the project profile selects the specs that use a cloud's tools too, which need its login)
+#   project  the projects of the central identity, in a KeyCloak container (profile identity: the profile project runs the specs of the clouds
+#            too, which use its tools and need its login)
 #   signing  the signing and verification of images, in a kind cluster, which drives the docker client: the base image has none, so a static
 #            build of the client is put in it for the run
 on:
@@ -212,45 +212,22 @@ jobs:
           # --entrypoint bash: the image's own makes a user and runs the command through `su`, which splits a script given to `bash -c`
           docker run --rm --entrypoint bash "$IMAGE" -c 'java -version 2>&1 | head -1; mvn -version | head -1; kind version; command -v docker || echo "no docker client"'
 
-      # What every command in the container is given, which the steps after this one source.  The host network, so that localhost is the host's, and
-      # the docker socket, so that the containers of the specs are the host's.  As root, which the docker socket needs, and with bash as the
-      # entrypoint.  The workspace is mounted, so that the reports are where the next steps look, and the config dir, which holds the config the
-      # specs find in AFON_HOME.  What the cloud login left, in the environment of the job or in files, is given too: AWS in its variables, Azure and
-      # GCP in the files of their clis.
-      - name: Prepare the container command
+      # The config dir, which the container has as /tmp/afon.  Every command in the container is run by scripts/docker/afon/afon-docker.sh, which the
+      # steps after this one source: it gives it the host network, so that localhost is the host's, the docker socket, so that the containers of the
+      # specs are the host's, the workspace, the maven repository, the config dir, and what the cloud login left: AWS in its variables, Azure and
+      # GCP in the files of their clis.  A developer runs the same before a commit, see docs/acceptance_tests.md.
+      - name: Prepare the config dir
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.m2/repository" "$AFON_DIR"
           chmod 700 "$AFON_DIR"
-          {
-            echo 'afon_docker() {'
-            echo '  local script="$1"; shift'
-            echo '  local cloud_args=()'
-            echo '  case "$CLOUD" in'
-            echo '    aws) cloud_args=(-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION -e AWS_DEFAULT_REGION) ;;'
-            echo '    azure) cloud_args=(-v "$HOME/.azure":/root/.azure) ;;'
-            echo '    gcp) cloud_args=(-v "$HOME/.config/gcloud":/root/.config/gcloud -e GOOGLE_APPLICATION_CREDENTIALS -v "$GOOGLE_APPLICATION_CREDENTIALS":"$GOOGLE_APPLICATION_CREDENTIALS":ro) ;;'
-            echo '  esac'
-            echo '  docker run --rm --network host --user root --entrypoint bash \'
-            echo '    -v /var/run/docker.sock:/var/run/docker.sock \'
-            echo '    -v "$GITHUB_WORKSPACE":/work -w /work \'
-            echo '    -v "$HOME/.m2":/root/.m2 \'
-            echo '    -v "$AFON_DIR":/tmp/afon \'
-            echo '    "${cloud_args[@]}" \'
-            echo '    -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION \'
-            echo '    -e CLOUD -e CONFIG_ENV -e CONFIG_TAG -e AZURE_KEY_VAULT_NAME -e GCP_PROJECT_ID \'
-            echo '    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \'
-            echo '    -e TESTCONTAINERS_HOST_OVERRIDE=localhost -e AFON_HOME=/tmp/afon -e AFON_CLI_DIR=/work \'
-            echo '    "$@" "$IMAGE" -c "$script"'
-            echo '}'
-          } > "$RUNNER_TEMP/afon-docker.sh"
 
       # The snapshot of the config, from the vault of the cloud, as the smoke tests pull it, into the config dir of the runner.  The launcher of
       # the scripts is that of the repository, which is the cli's, without the jar, as a script of the cloud needs none.
       - name: Pull the config from the vault
         run: |
           set -euo pipefail
-          source "$RUNNER_TEMP/afon-docker.sh"
+          source "$GITHUB_WORKSPACE/scripts/docker/afon/afon-docker.sh"
           afon_docker '
             set -euo pipefail
             ARGS=()
@@ -294,9 +271,9 @@ jobs:
         run: |
           set -euo pipefail
           case "$SPECS" in
-            project)               ARGS="-Pproject -Dacceptance.project.suites.on=health.emrys.afon.acceptance.project" ;;
+            project)               ARGS="-Pidentity" ;;
             signing)               ARGS="-Psigning" ;;
-            "project and signing") ARGS="-Pproject,signing -Dacceptance.project.suites.on=health.emrys.afon.acceptance.project" ;;
+            "project and signing") ARGS="-Pidentity,signing" ;;
           esac
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
           echo "Maven arguments: $ARGS"
@@ -304,7 +281,7 @@ jobs:
       - name: Validate afon config
         run: |
           set -euo pipefail
-          source "$RUNNER_TEMP/afon-docker.sh"
+          source "$GITHUB_WORKSPACE/scripts/docker/afon/afon-docker.sh"
           afon_docker '/work/afon-cli/src/main/scripts/afon-cli-scripts.sh --home /tmp/afon --cloud "$CLOUD" config-validate'
 
       - name: Run the specs in the container
@@ -312,7 +289,7 @@ jobs:
           ARGS: ${{ steps.specs.outputs.args }}
         run: |
           set -euo pipefail
-          source "$RUNNER_TEMP/afon-docker.sh"
+          source "$GITHUB_WORKSPACE/scripts/docker/afon/afon-docker.sh"
           afon_docker '
             set -euo pipefail
             # Whatever happens, what the container wrote belongs to the runner user, as the checkout and the cache of the maven repository are removed and read as it
@@ -325,8 +302,25 @@ jobs:
             docker version --format "client {{.Client.Version}}, daemon {{.Server.Version}}"
             # The modules that the specs need are installed first, without their tests, as the scalatest plugin of the acceptance module is the one run.
             mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install
-            mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test $ARGS
+            # The logs of the specs go to the file afon.log of the logs dir of the mounted AFON_HOME, not to the console, which is public and which they fill:
+            # the pom hands these two to the JVM of the specs.  The logs store has them after.
+            mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test -Dafon.home=/tmp/afon -Dafon.logging.console=OFF $ARGS
           ' -e ARGS
+
+      # The logs of the run, whatever its result, in the logs store of the cloud, which is private, as the job and its logs are lost when it ends and the
+      # console of a public repo is public.  Read them with `logs-store list` and `logs-store pull <run id>-<attempt>`.  Before the config is removed,
+      # which the store needs.  It cannot fail the job, but warns, eg if the cloud login has expired.
+      - name: Store the logs in the logs store
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          LOG_TAG: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          source "$GITHUB_WORKSPACE/scripts/docker/afon/afon-docker.sh"
+          afon_docker '/work/afon-cli/src/main/scripts/afon-cli-scripts.sh --home /tmp/afon --cloud "$CLOUD" --env "$CONFIG_ENV" logs-store push "$LOG_TAG"' -e LOG_TAG \
+            || echo "::warning::The logs could not be stored in the logs store: they are lost with the job"
 
       # What the specs left in docker, to see whether they cleaned up.
       - name: Show the containers left
@@ -346,4 +340,4 @@ jobs:
 
       - name: Remove afon config
         if: ${{ always() }}
-        run: rm -rf "$AFON_DIR" "$RUNNER_TEMP/afon-docker.sh"
+        run: rm -rf "$AFON_DIR"
