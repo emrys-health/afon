@@ -27,7 +27,7 @@ on:
         options: [aws, azure, gcp]
         default: aws
       config_env:
-        description: "The config env, ie the env of the snapshot in the vault (blank for the repository variable SMOKE_TESTS_CONFIG_ENV, else emrys3)"
+        description: "The config env, ie the env of the snapshot in the vault (blank for emrys2: emrys3 is that of the smoke tests)"
         type: string
         default: ""
       config_tag:
@@ -38,7 +38,7 @@ on:
         description: "The specs to run"
         type: choice
         options: [project, signing, project and signing]
-        default: project
+        default: project and signing
       image_tag:
         description: "The tag of the afon-base image, eg 1.0-SNAPSHOT (blank for the project version of the ref)"
         type: string
@@ -108,8 +108,8 @@ jobs:
     env:
       IMAGE: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
       CLOUD: ${{ inputs.cloud }}
-      CONFIG_ENV: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys3' }}
-      CONFIG_TAG: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
+      CONFIG_ENV: ${{ inputs.config_env || vars.ACCEPTANCE_CONFIG_ENV || 'emrys2' }}
+      CONFIG_TAG: ${{ inputs.config_tag || vars.ACCEPTANCE_CONFIG_TAG || 'current' }}
       # The environment's variables of the login, see docs/github_workflows.md: secrets of the environment, or the variables of the ones set up before.
       AWS_REGION: ${{ vars.AWS_REGION }}
       AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME || vars.AZURE_KEY_VAULT_NAME }}
