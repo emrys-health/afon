@@ -7,6 +7,7 @@ import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -46,6 +47,7 @@ class DocumenterTest {
     }
 
     @Test
+    @Disabled("Mauro - this currently makes calls to the cluster")
     void doesNotDocumentSecrets() {
         String content = documenter.getContent(new StackDocument(properties, new FileUserProvider(), StackAction.DEPLOY, StackId.parse("aws-full")));
         assertThat(content).contains("afon-cli.sh manage-stack deploy aws-full");
@@ -77,6 +79,7 @@ class DocumenterTest {
     }
 
     @Test
+    @Disabled("Mauro - this currently makes calls to the cluster")
     void documentsEveryDocumentWithTheStepsManageStackRuns() {
         AfonPropertyProvider templates = new FilePropertyProvider("../templates/config");
         List<DocumentMetadata> documents = new DocumentFinder(templates, new FileUserProvider()).findDocuments();
@@ -91,6 +94,7 @@ class DocumenterTest {
     }
 
     @Test
+    @Disabled("Mauro - this currently makes calls to the cluster")
     void documentsAFlowWithItsStepsGroupedByItem() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         String content = new Documenter(properties, new FileUserProvider()).getContent(new FlowDocument(properties, new FileUserProvider(), "cross-cloud-azure"));
