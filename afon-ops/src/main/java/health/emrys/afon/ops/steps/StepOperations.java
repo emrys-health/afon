@@ -317,6 +317,7 @@ public class StepOperations {
         return Step.sequence(format("wait_on_polaris_and_keycloak_for_cloud_%s", cloud),
                 format("wait on DNS for Polaris and KeyCloak, for Polaris to reach KeyCloak, and for the cluster to reach its own domains, for cloud `%s`", cloud),
                 waitForPolaris(cloud), waitForKeyCloak(cloud),
+                actions.createRealm(cloud, properties),
                 actions.waitOnPolarisUsingOidc(cloud, properties, dnsWaitTimeout(), KEYCLOAK_POLL_MILLIS),
                 actions.waitOnClusterReachingDomains(cloud, properties, domains, dnsWaitTimeout()));
     }

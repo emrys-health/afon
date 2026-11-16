@@ -238,6 +238,16 @@ public class DocumentingStepActions extends StepActions {
     }
 
     @Override
+    public Step createRealm(AfonCloud cloud, AfonPropertyProvider properties) {
+        return new Step("create_keycloak_realm",
+                        "The realm is needed before Polaris calls it",
+                        () -> {
+            out.println("Create the realm for Polaris by calling the admin endpoint. ");
+            out.flush();
+                        });
+    }
+
+    @Override
     public Step waitOnAnswer(String url, long timeout, long pauseMs) {
         return new Step(stepNameWaitOnAnswer(url), "Wait until it answers", () -> {
             out.println(format("Wait until `%s` answers, until timeout of %s.%n", url, DurationUtils.formatDuration(timeout)));

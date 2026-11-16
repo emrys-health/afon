@@ -3,8 +3,6 @@ package health.emrys.afon.ops.steps;
 import ch.vorburger.exec.ManagedProcess;
 import ch.vorburger.exec.ManagedProcessBuilder;
 import ch.vorburger.exec.ManagedProcessException;
-import health.emrys.afon.ops.scripts.ProcessLogLevels;
-import health.emrys.afon.ops.scripts.ScriptMain;
 import com.azure.storage.blob.models.BlobItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,14 +12,17 @@ import health.emrys.afon.config.*;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
-import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.ExecResult;
+import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.DnsResolver;
 import health.emrys.afon.ops.kube.tools.KeyCloakTunnel;
 import health.emrys.afon.ops.kube.tools.PolarisWhitelister;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
+import health.emrys.afon.ops.scripts.ProcessLogLevels;
+import health.emrys.afon.ops.scripts.ScriptMain;
 import health.emrys.afon.ops.spark.SparkRunner;
 import health.emrys.afon.ops.synth.PlanGuards;
+import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import health.emrys.afon.snowflake.SnowflakeConnectionFactory;
 import org.apache.commons.io.file.PathUtils;
 import org.jspecify.annotations.NonNull;
@@ -29,7 +30,6 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URI;
@@ -37,6 +37,7 @@ import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
@@ -54,6 +55,7 @@ import static health.emrys.afon.config.AfonProperty.AZURE_STORAGE_ACCOUNT;
 import static health.emrys.afon.config.ConfigUtils.*;
 import static health.emrys.afon.ops.ManagePolarisCatalogsMain.*;
 import static health.emrys.afon.ops.steps.DurationUtils.formatDuration;
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -1238,6 +1240,24 @@ public class StepActions {
                         Thread.sleep(pauseMs);
                     }
                 });
+    }
+
+    public Step createRealm(AfonCloud cloud, AfonPropertyProvider properties) {
+        return new Step("create_keycloak_realm",
+                        "The realm is needed before Polaris calls it",
+                            () -> {
+                                KeyCloakTunnel.run(cloud, properties,
+                                                   endpoint -> {
+                                                       KeyCloakProvider keyCloak = new KeyCloakProvider(properties, endpoint);
+                                                       try {
+                                                           String adminToken = keyCloak.adminToken();
+                                                           var response = keyCloak.createRealm(adminToken, KEYCLOAK_REALM);
+                                                           logger.info("Creating realm lead to HTTP code {}", response.getCode());
+                                                       } catch (Exception e) {
+                                                           logger.warn("Cannot create realm `{}`: {}", KEYCLOAK_REALM, e.getMessage());
+                                                       }
+                                                   });
+        });
     }
 
     /**
