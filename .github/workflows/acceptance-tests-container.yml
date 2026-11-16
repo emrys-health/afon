@@ -59,8 +59,6 @@ concurrency:
 env:
   # The client that the signing test drives, as kind does, which the base image lacks; the daemon is the runner's.
   DOCKER_CLIENT_VERSION: "27.3.1"
-  # And its buildx plugin, which the signing test drives for `docker buildx imagetools inspect`: a CLI plugin, which the static client does not have.
-  DOCKER_BUILDX_VERSION: "0.17.1"
   # As acceptance-tests.yml: no afon output on the console of the job, which is public, and room for javac to open the spark jars.
   AFON_LOGGING_CONSOLE: "OFF"
   MAVEN_OPTS: -Xmx3g
@@ -239,7 +237,7 @@ jobs:
             echo '    -v "$HOME/.m2":/root/.m2 \'
             echo '    -v "$AFON_DIR":/tmp/afon \'
             echo '    "${cloud_args[@]}" \'
-            echo '    -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION -e DOCKER_BUILDX_VERSION \'
+            echo '    -e MAVEN_OPTS -e AFON_LOGGING_CONSOLE -e DOCKER_CLIENT_VERSION \'
             echo '    -e CLOUD -e CONFIG_ENV -e CONFIG_TAG -e AZURE_KEY_VAULT_NAME -e GCP_PROJECT_ID \'
             echo '    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \'
             echo '    -e TESTCONTAINERS_HOST_OVERRIDE=localhost -e AFON_HOME=/tmp/afon -e AFON_CLI_DIR=/work \'
@@ -324,15 +322,7 @@ jobs:
               curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLIENT_VERSION}.tgz" \
                 | tar -xz --strip-components=1 -C /usr/local/bin docker/docker
             fi
-            # Its buildx plugin, if there is none
-            if ! docker buildx version > /dev/null 2>&1; then
-              mkdir -p /usr/local/lib/docker/cli-plugins
-              curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
-                "https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64"
-              chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
-            fi
             docker version --format "client {{.Client.Version}}, daemon {{.Server.Version}}"
-            docker buildx version
             # The modules that the specs need are installed first, without their tests, as the scalatest plugin of the acceptance module is the one run.
             mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install
             mvn -B -ntp -Dstyle.color=always -pl afon-acceptance test $ARGS

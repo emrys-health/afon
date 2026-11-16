@@ -9,6 +9,9 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
 
+import java.net.URI
+import java.net.http.HttpResponse.BodyHandlers
+import java.net.http.{HttpClient, HttpRequest}
 import java.nio.file.{Files, Path}
 import java.util
 import scala.jdk.CollectionConverters._
@@ -141,10 +144,27 @@ class ImageSigningSpec extends SpecPretifier with GivenWhenThen with Eventually 
       KindHelper.runOrFail(null, util.Map.of(), "docker", "tag", DockerImages.CURL_IMAGE, target)
       KindHelper.runOrFail(null, util.Map.of(), "docker", "push", target)
     }
-    val inspected = KindHelper.runOrFail(null, util.Map.of(), "docker", "buildx", "imagetools", "inspect",
-                                         s"${kind.hostRegistry}/${names.head}:1", "--format", "{{.Manifest.Digest}}")
-    assert(inspected.matches("sha256:[0-9a-f]{64}"), inspected)
-    inspected
+    val digest = registryDigest(s"${kind.hostRegistry}/${names.head}:1")
+    assert(digest.matches("sha256:[0-9a-f]{64}"), digest)
+    digest
+  }
+
+  /**
+   * The digest of what the registry serves for the reference, <host>/<name>:<tag>, from the registry itself, as the digest of a manifest is in the
+   * header Docker-Content-Digest of the answer for it, whatever it is, a manifest or an index.  So it depends on the registry only, not on the docker
+   * cli, nor on a plugin of it, such as buildx, which differ in what they print.
+   */
+  private def registryDigest(reference: String): String = {
+    val host = reference.substring(0, reference.indexOf('/'))
+    val repository = reference.substring(reference.indexOf('/') + 1, reference.lastIndexOf(':'))
+    val tag = reference.substring(reference.lastIndexOf(':') + 1)
+    val accepted = Seq("application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json",
+                       "application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json").mkString(", ")
+    val request = HttpRequest.newBuilder(URI.create(s"http://$host/v2/$repository/manifests/$tag")).header("Accept", accepted)
+      .method("HEAD", HttpRequest.BodyPublishers.noBody()).build()
+    val response = HttpClient.newHttpClient().send(request, BodyHandlers.discarding())
+    assert(response.statusCode() == 200, s"The registry answered ${response.statusCode()} for $reference")
+    response.headers().firstValue("Docker-Content-Digest").orElseThrow(() => new AssertionError(s"The registry gave no digest for $reference"))
   }
 
   /**
