@@ -34,9 +34,11 @@ public class TrinoComponent implements StackComponent {
         // fires the cloud's mutating webhooks, if it has any, which the service dependables wait for.
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.addAll(platform.getServiceDependables());
-        new TrinoWorkloads(context.properties(), context.users(),
+        new TrinoWorkloads(context.properties(),
+                           context.users(),
                            context.properties().getCloudValue(platform.cloud(), AfonCloudProperty.POLARIS_DOMAIN_NAME),
-                           context.properties().getOidcDomainName(platform.cloud()), context.images(),
+                           context.properties().getOidcDomainName(platform.cloud()),
+                           context.images(),
                            context.find(KeycloakComponent.class).isPresent())
             .deploy(context.stack(), platform.configureHelm(),
                     cloudToCatalog(platform.cloud(), new AfonCatalogs(context.properties())), dependsOn);

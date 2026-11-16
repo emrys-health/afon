@@ -87,8 +87,9 @@ public class TrinoWorkloads {
                           AfonUserProvider users,
                           String polarisDomainName,
                           String oidcDomainName,
-                          boolean keyCloakInCluster,
-                          DockerImageResolver images) {
+                          DockerImageResolver images,
+                          boolean keyCloakInCluster
+                          ) {
         this.images       = images;
         this.trinoConfig  = new KeyCloakTrinoServerConfiguration(properties, users, polarisDomainName,
                                                                  tokenEndpoint(oidcDomainName, "https"));
