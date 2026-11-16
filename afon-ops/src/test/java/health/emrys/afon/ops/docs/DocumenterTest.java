@@ -47,10 +47,9 @@ class DocumenterTest {
     }
 
     @Test
-    @Disabled("Mauro - this currently makes calls to the cluster")
     void doesNotDocumentSecrets() {
         String content = documenter.getContent(new StackDocument(properties, new FileUserProvider(), StackAction.DEPLOY, StackId.parse("aws-full")));
-        assertThat(content).contains("afon-cli.sh manage-stack deploy aws-full");
+        assertThat(content).contains("manage-stack deploy aws-full");
         assertThat(content).doesNotContain(properties.getValue(POLARIS_SECRET));
     }
 
@@ -61,25 +60,24 @@ class DocumenterTest {
         Documenter documenter = new Documenter(properties, new FileUserProvider());
         String content = documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-snowflake"), "reading-azure"));
         assertThat(content)
-            .contains("afon-cli.sh manage-stack setup aws-snowflake")
-            .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure")
-            .contains("afon-cli.sh manage-stack run aws-snowflake reading-azure ")
+            .contains("manage-stack setup aws-snowflake")
+            .contains("manage-stack run aws-snowflake reading-azure")
+            .contains("manage-stack run aws-snowflake reading-azure ")
             .contains("snowflake_reads_catalog_azure")
             .doesNotContain("deploy-snowflake");
         // the scenario spanning two stacks says to set up both
         assertThat(documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-full"), "external-azure")))
-            .contains("afon-cli.sh manage-stack setup aws-full\nafon-cli.sh manage-stack setup azure-polaris")
-            .contains("afon-cli.sh manage-stack run aws-full external-azure")
+            .contains("manage-stack setup aws-full", "manage-stack setup azure-polaris")
+            .contains("manage-stack run aws-full external-azure")
             .contains("- check_polaris_answers_for_cloud_azure")
             .contains("- create_catalog_azure_external_for_cloud_azure")
             .contains("answers with one of 200, 401, 403");
         assertThat(documenter.getContent(new ScenarioDocument(properties, new FileUserProvider(), StackId.parse("aws-snowflake"), "writing-azure")))
-            .contains("afon-cli.sh manage-stack run aws-snowflake writing-azure")
+            .contains("manage-stack run aws-snowflake writing-azure")
             .contains("snowflake_writes_to_azure");
     }
 
     @Test
-    @Disabled("Mauro - this currently makes calls to the cluster")
     void documentsEveryDocumentWithTheStepsManageStackRuns() {
         AfonPropertyProvider templates = new FilePropertyProvider("../templates/config");
         List<DocumentMetadata> documents = new DocumentFinder(templates, new FileUserProvider()).findDocuments();
@@ -94,16 +92,15 @@ class DocumenterTest {
     }
 
     @Test
-    @Disabled("Mauro - this currently makes calls to the cluster")
     void documentsAFlowWithItsStepsGroupedByItem() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         String content = new Documenter(properties, new FileUserProvider()).getContent(new FlowDocument(properties, new FileUserProvider(), "cross-cloud-azure"));
         assertThat(content)
-            .contains("afon-cli.sh manage-stack run cross-cloud-azure")
+            .contains("manage-stack run cross-cloud-azure")
             .contains("1. `setup aws-full`", "2. `setup azure-polaris`", "3. `run aws-full external-azure`")
             .contains("    - 2:deploy_complete_for_azure_polaris")
             .contains("## 1. setup aws-full", "## 2. setup azure-polaris", "## 3. run aws-full external-azure")
-            .contains("afon-cli.sh manage-stack run cross-cloud-azure 3:");
+            .contains("manage-stack run cross-cloud-azure 3:");
         assertThat(content.indexOf("## 1. setup aws-full")).isLessThan(content.indexOf("## 2. setup azure-polaris"));
     }
 
