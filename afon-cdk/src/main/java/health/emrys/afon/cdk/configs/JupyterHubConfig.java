@@ -203,7 +203,7 @@ public class JupyterHubConfig {
         // the single VNC port (each user now has their own pod rather than sharing ports on one),
         // behind that user's own VNC password, so one user's cannot open another's desktop.
         this.sessions = new ArrayList<>();
-        for (AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getMembers()) {
             sessions.add(new GuacamoleConfig.Session(user.email(), jupyterPassword, VNC_PORT,
                                                      vncPassword(jupyterPassword, user.slug())));
         }
@@ -323,7 +323,7 @@ public class JupyterHubConfig {
         // logged into JupyterHub and spawned it.
         Map<String, String>        emailToVncHost = new LinkedHashMap<>();
         List<ITerraformDependable> guacamoleDeps  = new ArrayList<>(eksDependOn);
-        for (AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getMembers()) {
             emailToVncHost.put(user.email(), vncServiceName(user.slug()));
             List<ServiceSpecPort> userPorts = List.of(ServiceSpecPort.builder()
                                                         .name("vnc")
@@ -713,7 +713,7 @@ public class JupyterHubConfig {
             images.pysparkNotebook(), SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
-            pythonSetOf(userProvider.getUsers().stream().map(AfonUser::email).toList()),
+            pythonSetOf(userProvider.getMembers().stream().map(AfonUser::email).toList()),
             pythonSlugMap(),
             URLEncoder.encode(GUACAMOLE_PATH, StandardCharsets.UTF_8),
             SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
@@ -762,7 +762,7 @@ public class JupyterHubConfig {
      * Renders the email->slug dict literal body (no braces): {@code 'a@x': 'a', 'b@x': 'b'}.
      */
     private String pythonSlugMap() {
-        return userProvider.getUsers().stream()
+        return userProvider.getMembers().stream()
                          .map(u -> "'" + u.email() + "': '" + u.slug() + "'")
                          .reduce((a, b) -> a + ", " + b)
                          .orElse("");

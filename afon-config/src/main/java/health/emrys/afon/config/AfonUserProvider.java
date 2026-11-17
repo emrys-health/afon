@@ -52,6 +52,20 @@ public interface AfonUserProvider {
 
     List<AfonUser> getUsers();
 
+    /**
+     * @return the users who operate the TRE: those with a Keycloak login and password, Polaris principals and a Git account
+     */
+    default List<AfonUser> getAdmins() {
+        return getUsers().stream().filter(user -> user.has(AfonUser.Role.ADMIN)).toList();
+    }
+
+    /**
+     * @return the users who use the TRE: those that JupyterHub and its remote desktop serve
+     */
+    default List<AfonUser> getMembers() {
+        return getUsers().stream().filter(user -> user.has(AfonUser.Role.MEMBER)).toList();
+    }
+
     List<AfonUserAcl> getUserAcls();
 
     List<String> getUserNames();

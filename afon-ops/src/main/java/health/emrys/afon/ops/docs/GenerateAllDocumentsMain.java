@@ -2,7 +2,7 @@ package health.emrys.afon.ops.docs;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 
 public class GenerateAllDocumentsMain {
@@ -11,7 +11,7 @@ public class GenerateAllDocumentsMain {
 
     public GenerateAllDocumentsMain() {
         this.properties = new OpsPropertyProvider();
-        this.users = new FileUserProvider();
+        this.users = ProjectUserProvider.forActiveConfig();
     }
 
     private void generateDocuments() {

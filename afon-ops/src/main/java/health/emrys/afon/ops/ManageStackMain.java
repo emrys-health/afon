@@ -5,7 +5,7 @@ import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.docs.DocumentNames;
 import health.emrys.afon.ops.docs.Documenter;
@@ -213,7 +213,7 @@ public class ManageStackMain {
             System.exit(1);
             return;
         }
-        ManageStackMain manager = new ManageStackMain(new StackPlanFactory(), new FileUserProvider());
+        ManageStackMain manager = new ManageStackMain(new StackPlanFactory(), ProjectUserProvider.forActiveConfig());
         if (Arrays.stream(allArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
             manager.help(Arrays.stream(allArgs).filter(arg -> !arg.equals("-h") && !arg.equals("--help"))
                                .toArray(String[]::new));

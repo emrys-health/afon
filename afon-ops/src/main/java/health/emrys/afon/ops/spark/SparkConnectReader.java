@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonCloud;
@@ -36,7 +36,7 @@ public class SparkConnectReader {
     public static void main(String[] args) {
         AfonPropertyProvider properties = new DefaultPropertyProvider().forCloud(AfonCloud.AZURE);
         properties.setValue(AfonProperty.POLARIS_ENDPOINT, "westmidspolarisazure.click");
-        SparkConnectReader app = new SparkConnectReader(properties, new FileUserProvider());
+        SparkConnectReader app = new SparkConnectReader(properties, ProjectUserProvider.forActiveConfig());
         app.sparkLocalRead("westmids", "azure"); // this is fast
 //        app.sparkConnectRead("westmids", "azure"); // this is slow
     }

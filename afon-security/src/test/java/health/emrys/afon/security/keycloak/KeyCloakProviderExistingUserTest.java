@@ -29,6 +29,8 @@ class KeyCloakProviderExistingUserTest {
     private final List<String> requests = new ArrayList<>();
     private final List<String> bodies   = new ArrayList<>();
     private volatile boolean   userExists = true;
+    /** The user has another username than the one asked for, so is found only by their email. */
+    private volatile boolean   foundByEmailOnly = false;
     private volatile int       resetCode  = 204;
     private HttpServer         keycloak;
     private KeyCloakProvider   provider;
@@ -44,7 +46,8 @@ class KeyCloakProviderExistingUserTest {
             if (call.equals("POST /admin/realms/polaris/users")) {
                 reply(exchange, 409, "{}");
             } else if (call.equals("GET /admin/realms/polaris/users")) {
-                reply(exchange, 200, userExists ? "[{\"id\":\"the-id\",\"username\":\"mauro\"}]" : "[]");
+                boolean byUsername = String.valueOf(exchange.getRequestURI().getQuery()).contains("username=");
+                reply(exchange, 200, userExists && !(foundByEmailOnly && byUsername) ? "[{\"id\":\"the-id\",\"username\":\"mauro\"}]" : "[]");
             } else if (call.equals("PUT /admin/realms/polaris/users/the-id/reset-password")) {
                 reply(exchange, resetCode, "");
             } else {
@@ -102,5 +105,21 @@ class KeyCloakProviderExistingUserTest {
             .isInstanceOf(IOException.class)
             .hasMessageContaining("no user with that username exists");
         assertThat(requests).doesNotContain("PUT /admin/realms/polaris/users/the-id/reset-password");
+    }
+
+    @Test
+    void setsThePasswordOfTheUserWhoHoldsTheEmailWhateverTheirUsername() throws IOException {
+        foundByEmailOnly = true;
+        provider.createUser("token", "polaris", AfonUserProvider.createUser("ada", PASSWORD, "ada@example.org"));
+
+        assertThat(requests).contains("PUT /admin/realms/polaris/users/the-id/reset-password");
+    }
+
+    @Test
+    void stillFailsWhenNeitherTheEmailNorTheUsernameIsOfAUser() {
+        userExists = false;
+        assertThatThrownBy(() -> provider.createUser("token", "polaris", AfonUserProvider.createUser("ada", PASSWORD, "ada@example.org")))
+            .isInstanceOf(IOException.class)
+            .hasMessageContaining("no user with that username exists");
     }
 }

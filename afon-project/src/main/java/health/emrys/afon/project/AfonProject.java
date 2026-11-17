@@ -2,6 +2,7 @@ package health.emrys.afon.project;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.StackId;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
@@ -73,6 +74,13 @@ public sealed interface AfonProject permits TreProject, IdentityProject {
      * @return the stack that the project deploys: its TRE's, or the central identity's
      */
     @NonNull StackId stack();
+
+    /**
+     * @return the project's researchers, by email: those of a TRE project, none for an identity project, which no one uses
+     */
+    default @NonNull List<TreProject.Member> members() {
+        return List.of();
+    }
 
     /**
      * @return what the function of the type of the project gives: one for a TRE project, the other for an identity project

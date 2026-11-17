@@ -94,7 +94,7 @@ public class PolarisUserManager {
         removeSharedPrincipalRole();
         createCatalogRole(catalogName);
         List<HttpResponse> responses = new ArrayList<>();
-        for (AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getAdmins()) {
             if (userProvider.isAuthorised(user.username(), catalogName)) {
                 responses.add(configureUser(user.username(), catalogName));
             } else {

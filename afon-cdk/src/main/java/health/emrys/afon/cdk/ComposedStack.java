@@ -15,7 +15,7 @@ import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.config.StackId;
 import org.jspecify.annotations.NonNull;
@@ -95,6 +95,6 @@ public class ComposedStack extends TerraformStack {
         if (args.length != 1) {
             throw new IllegalArgumentException("Usage: ComposedStack <stack-id>, eg aws-full");
         }
-        synthesise(StackDefinitions.resolve(StackId.parse(args[0])), new FilePropertyProvider(), new FileUserProvider());
+        synthesise(StackDefinitions.resolve(StackId.parse(args[0])), new FilePropertyProvider(), ProjectUserProvider.forActiveConfig());
     }
 }

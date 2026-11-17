@@ -203,7 +203,7 @@ public class GiteaConfig {
      */
     String usersList() {
         String admin = properties.getValue(GITEA_ADMIN_USERNAME);
-        return users.getUsers()
+        return users.getAdmins()
                     .stream()
                     .filter(user -> !user.username().equals(admin))
                     .map(user -> user.username() + "," + email(user) + ","

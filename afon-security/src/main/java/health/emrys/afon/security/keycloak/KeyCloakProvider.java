@@ -884,7 +884,12 @@ public class KeyCloakProvider implements IdentityProvider {
         // so silently treating the 409 as success (as postJson does) leaves logins failing with
         // user_not_found. Confirm the user really exists; if not, fail loudly with the likely cause.
         if (code == HttpStatus.SC_CONFLICT) {
-            String id = userId(adminToken, realm, user.username());
+            // the email is the identity: the user who holds it is the user, whatever their username, eg a member that was made, by their
+            // email, before the setup of the TRE made this admin
+            String id = user.email() == null || user.email().isBlank() ? null : userIdByEmail(adminToken, realm, user.email());
+            if (id == null) {
+                id = userId(adminToken, realm, user.username());
+            }
             if (id == null) {
                 throw new IOException(format(
                     "Could not create KeyCloak user '%s' in realm '%s': HTTP 409 but no user with that "
@@ -916,9 +921,21 @@ public class KeyCloakProvider implements IdentityProvider {
      * @return the id of the user with exactly this username in the realm, or null if there is none.
      */
     private String userId(String adminToken, String realm, String username) throws IOException {
+        return userIdBy(adminToken, realm, "username", username);
+    }
+
+    /**
+     * @return the id of the user with exactly this email in the realm, or null if there is none: a user whose username is not their email,
+     * as an admin's of {@code users.csv} may not be
+     */
+    private String userIdByEmail(String adminToken, String realm, String email) throws IOException {
+        return userIdBy(adminToken, realm, "email", email);
+    }
+
+    private String userIdBy(String adminToken, String realm, String field, String value) throws IOException {
         String uri = format(
-            "/admin/realms/%s/users?exact=true&username=%s",
-            realm, URLEncoder.encode(username, StandardCharsets.UTF_8));
+            "/admin/realms/%s/users?exact=true&%s=%s",
+            realm, field, URLEncoder.encode(value, StandardCharsets.UTF_8));
         return restClient.get(uri, adminToken, response -> {
             if (response.getCode() != HttpStatus.SC_OK) {
                 return null;
@@ -981,7 +998,12 @@ public class KeyCloakProvider implements IdentityProvider {
         try {
             String token = adminToken();
             ensurePrincipalInUserProfile(token);
-            String id = userId(token, KEYCLOAK_REALM, username);
+            // the email is the identity: a user of the email may have another username, eg an admin of users.csv, and a second one with the
+            // same email could not be made
+            String id = userIdByEmail(token, KEYCLOAK_REALM, username);
+            if (id == null) {
+                id = userId(token, KEYCLOAK_REALM, username);
+            }
             boolean created = id == null;
             if (created) {
                 Map<String, Object> user = new LinkedHashMap<>();

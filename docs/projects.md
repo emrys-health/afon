@@ -422,8 +422,15 @@ and group are made: `manage-identity sync-members`, which you can also run by ha
 A project has at least one member: `init` writes `members: []`, which `validate` and `up` refuse until a member is added,
 so that a project is never brought up that nobody can sign in to. To change the members, edit the list and run
 `afon-cli.sh manage-project up <project> --from register --until register`, or
-`manage-project run <project> manage-identity sync-members`; a new member needs no redeploy. The emails are compared in
-lower case. Whether a Provider's contract names a member is for the Provider, not the file.
+`manage-project run <project> manage-identity sync-members`. The emails are compared in lower case. 
+
+The members are also the users of the TRE's own services: JupyterHub and its remote desktop serve each of them, by their
+email, and have them from the TRE's deployment, so a member added later signs in to the central identity at once, but is
+served by JupyterHub only after the TRE is deployed again (`manage-project up <project> --from tre`). Members have no
+password in the TRE: they sign in with the one they set in the central identity. The users of `users.csv` in the env that
+the project is made from are its **admins**, who set it up and run its smoke tests, and who are not served by JupyterHub
+unless they are also listed as members, by the same email, which must then be their username in `users.csv`: see
+[Users](configuration.md#users).
 
 ## Key-based authentication
 
@@ -469,8 +476,6 @@ each project: `manage-project up <project> --from register`.
 
 ## What is not done yet
 
-- A project's members are its group in the shared identity only: the users of the TRE's own services (`users.csv` of the
-  env) are not configured by the project.
 - The TRE's tools do not yet sign in with the project's client, nor check the audience, the project claim or the `acr` of
   a token: the project's client and group exist in Keycloak, and the TRE works as a normal TRE that uses it.
 - Keycloak does not issue the `mfa` level yet.

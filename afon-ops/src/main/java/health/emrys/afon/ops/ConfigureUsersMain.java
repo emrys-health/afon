@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
@@ -63,7 +64,7 @@ public class ConfigureUsersMain {
         responses.add(identityProvider.createConfidentialClient(
                 adminToken, KEYCLOAK_REALM,
                 propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
-        for (AfonUser user : userProvider.getUsers()) {
+        for (AfonUser user : userProvider.getAdmins()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
             if (user.username().equals(propertyProvider.getValue(USER_ID))) {
                 responses.add(identityProvider.createConfidentialClient(adminToken, KEYCLOAK_REALM, user.username(), user.password()));
@@ -139,7 +140,7 @@ public class ConfigureUsersMain {
         String catalogName = args.length == 2 ? args[1] : null;
 
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
-        var    userProvider     = new FileUserProvider();
+        var    userProvider     = ProjectUserProvider.forActiveConfig();
         // as seen by the cloud, whose KeyCloak it configures and whose Polaris it calls
         AfonPropertyProvider propertyProvider = new OpsPropertyProvider().forCloud(cloud);
         var app = new ConfigureUsersMain(userProvider, propertyProvider, keycloakEndpoint);

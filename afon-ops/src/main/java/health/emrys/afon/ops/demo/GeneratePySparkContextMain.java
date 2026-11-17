@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -257,7 +257,7 @@ public class GeneratePySparkContextMain {
         }
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         var properties = new OpsPropertyProvider();
-        new GeneratePySparkContextMain(cloud, properties, new FileUserProvider()).generatePySparkCode();
+        new GeneratePySparkContextMain(cloud, properties, ProjectUserProvider.forActiveConfig()).generatePySparkCode();
     }
 
 

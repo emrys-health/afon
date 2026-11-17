@@ -6,7 +6,7 @@ import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.config.StackId;
 import health.emrys.afon.ops.synth.DeterministicSynthesis;
 
@@ -123,7 +123,7 @@ public class ValidateStackMain {
         }
         String stackDir;
         try {
-            stackDir = validator.validate(stack, properties, new FileUserProvider());
+            stackDir = validator.validate(stack, properties, ProjectUserProvider.forActiveConfig());
         } catch (RuntimeException e) {
             // printed as well as logged, as the console logging may be off, eg in the CLI
             System.err.printf("Failed to validate stack %s: %s%n", stack, e);

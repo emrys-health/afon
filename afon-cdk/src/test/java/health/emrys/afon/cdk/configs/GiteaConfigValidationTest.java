@@ -10,6 +10,7 @@ import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.Test;
 
+import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +55,13 @@ class GiteaConfigValidationTest {
     void acceptsPasswordsOfTheMinimumLength() {
         GiteaConfig config = configOf(AfonCloud.AWS, user("mauro", "12345678"));
         assertThat(config.usersList()).startsWith("mauro,").contains("12345678");
+    }
+
+    @Test
+    void givesAnAccountToTheAdminsAndNotToTheMembersWhoHaveNoPassword() {
+        AfonUser member = new AfonUser("bob@example.org", null, "bob@example.org", "bob-abc123", "Bob", "Brown", EnumSet.of(AfonUser.Role.MEMBER));
+        GiteaConfig config = configOf(AfonCloud.AWS, user("mauro", "12345678"), member);
+        assertThat(config.usersList()).startsWith("mauro,").doesNotContain("bob");
     }
 
     @Test

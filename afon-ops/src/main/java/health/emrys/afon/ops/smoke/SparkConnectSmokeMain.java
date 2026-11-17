@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.*;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
@@ -110,7 +111,7 @@ public class SparkConnectSmokeMain {
 
     public static void main(String[] args) {
         try {
-            new SparkConnectSmokeMain(smokeTestProperties(), new FileUserProvider()).callSparkConnectorInCluster();
+            new SparkConnectSmokeMain(smokeTestProperties(), ProjectUserProvider.forActiveConfig()).callSparkConnectorInCluster();
             logger.info("Test past");
         } catch (Exception e) {
             logger.error("Error reading Spark Connector", e);

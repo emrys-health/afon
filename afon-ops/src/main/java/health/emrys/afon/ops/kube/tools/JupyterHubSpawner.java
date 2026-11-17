@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
+import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.CliCommand;
@@ -53,7 +54,7 @@ public class JupyterHubSpawner {
     private static final String USERNAME_ANNOTATION = "hub.jupyter.org/username";
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
-    private FileUserProvider users;
+    private AfonUserProvider users;
 
     public static void main(String[] args) throws Exception {
         FilePropertyProvider properties = new FilePropertyProvider();
@@ -75,7 +76,7 @@ public class JupyterHubSpawner {
     public JupyterHubSpawner(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
-        users          = new FileUserProvider();
+        users          = ProjectUserProvider.forActiveConfig();
     }
 
     /**

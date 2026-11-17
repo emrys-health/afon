@@ -4,7 +4,7 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.config.FileUserProvider;
+import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
@@ -95,7 +95,7 @@ public class CheckOidcMain {
         var properties = new OpsPropertyProvider();
         AfonCloud cloud = AfonCloud.valueOf(positional.get(0).toUpperCase());
         String domainName = properties.getOidcDomainName(cloud);
-        var app = new CheckOidcMain(new KeyCloakProvider(domainName), domainName, properties, new FileUserProvider(),
+        var app = new CheckOidcMain(new KeyCloakProvider(domainName), domainName, properties, ProjectUserProvider.forActiveConfig(),
                                     System.out, System.err);
         if (!app.check()) {
             System.exit(1);

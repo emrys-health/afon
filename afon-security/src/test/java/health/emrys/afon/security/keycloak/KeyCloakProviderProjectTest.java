@@ -250,4 +250,33 @@ class KeyCloakProviderProjectTest {
         // KeyCloak drops an attribute that the user profile does not declare, so it is declared, for admins only
         assertThat(bodyOf("PUT /admin/realms/polaris/users/profile", "polaris_principal")).contains("\"edit\":[\"admin\"]");
     }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void usesTheUserWhoHasTheEmailUnderAnotherUsernameInsteadOfMakingAnother(AfonCloud cloud) {
+        // an admin of users.csv, whose username is not their email
+        keycloak.removeContext("/");
+        keycloak.createContext("/", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            String call = exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath();
+            String query = String.valueOf(exchange.getRequestURI().getQuery());
+            requests.add(call);
+            bodies.add(body);
+            if (exchange.getRequestURI().getPath().endsWith("/protocol/openid-connect/token")) {
+                reply(exchange, 200, "{\"access_token\":\"the-token\"}");
+            } else if (call.equals("GET /admin/realms/polaris/users")) {
+                reply(exchange, 200, query.contains("email=") ? "[{\"id\":\"the-admin-id\"}]" : "[]");
+            } else if (call.equals("GET /admin/realms/polaris/users/profile")) {
+                reply(exchange, 200, "{\"attributes\":[{\"name\":\"username\"}]}");
+            } else if (call.equals("GET /admin/realms/polaris/users/the-admin-id")) {
+                reply(exchange, 200, "{\"username\":\"ada\"}");
+            } else {
+                reply(exchange, call.startsWith("POST") ? 201 : 204, "");
+            }
+        });
+        assertThat(provider.ensureUser("Ada@Example.org", "Ada", "L")).isEqualTo("the-admin-id");
+        assertThat(requests).doesNotContain("POST /admin/realms/polaris/users");
+        assertThat(requests).doesNotContain("PUT /admin/realms/polaris/users/the-admin-id/execute-actions-email");
+        assertThat(bodyOf("PUT /admin/realms/polaris/users/the-admin-id", "afon:the-admin-id")).contains("polaris_principal");
+    }
 }

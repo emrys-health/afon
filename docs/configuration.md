@@ -323,6 +323,19 @@ change to `users.csv` takes effect on the next deploy, which restarts Gitea's po
 The configured user, which clients authenticate as (e.g. to get its OIDC token, or to run Spark), is named by the
 `USER_ID` property in `secret.properties` and must be one of the users in `users.csv`, whose password is read from there.
 
+In a project, the users of `users.csv` are its **admins**, who bootstrap and operate the TRE, and the `members` of its
+`project.yaml` are the TRE's other users (see [Members](projects.md#members)).  Outside a project, every user of `users.csv`
+is both, as it has always been.
+
+- An admin has a KeyCloak login with the password of `users.csv`, Polaris principals and a Gitea account, as described above.
+- A member has no password here: the central identity invites it when `manage-identity sync-members` adds it to the
+  project's group.  It is not given a KeyCloak login, Polaris principal or Gitea account by the setup of a stack, and its username is
+  its email, as it is in the central identity.
+- JupyterHub and its remote desktop serve the members, and not the admins, unless the project names an admin as a member,
+  by the same email: that person is then both, and must have that email as their username in `users.csv`, as a member is
+  known by their email, or the project is refused.  A project's `USER_ID`, which is an admin, is therefore not served by JupyterHub,
+  so the smoke tests that sign in to it as that user do not apply to a project.
+
 ### Command config-updates
 
 To update the config files to the current property names, run:
