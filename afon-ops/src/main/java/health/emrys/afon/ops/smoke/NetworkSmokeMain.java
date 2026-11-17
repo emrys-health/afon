@@ -1,9 +1,11 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.AllowedCidrs;
+import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.cdk.configs.JupyterHubConfig;
 import health.emrys.afon.cdk.configs.SparkNames;
+import health.emrys.afon.cdk.configs.TrinoWorkloads;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonProperty;
@@ -94,7 +96,8 @@ public class NetworkSmokeMain {
         results.addAll(checkNetworkWithPods(jupyterPods(), List.of(
             this::checkCannotSeeOtherBuckets,
             this::checkVncPasswordIsNotShared,
-            this::checkNotebookOnlyReachableFromHubAndGuacamole)));
+            this::checkNotebookOnlyReachableFromHubAndGuacamole,
+            this::checkNotebookTrustsTrinoOverHttps)));
         return results;
     }
 
@@ -497,6 +500,54 @@ public class NetworkSmokeMain {
             results.add(notConnected(connect, target));
         }
         return results;
+    }
+
+    /** Where a notebook reaches the Trino coordinator, a name its certificate holds. */
+    static final String TRINO_URL = format("https://%s:%d/v1/info", CdkHelper.TRINO_SERVICE_NAME, TrinoWorkloads.HTTPS_PORT);
+
+    /**
+     * Checks that the notebook can make an HTTPS connection to the Trino coordinator, trusting it with only the certificate the
+     * pod is given at {@code $TRINO_CA_CERT}: curl verifies the coordinator's self-signed certificate against that file alone, so
+     * this fails if the network policy drops the connection, if the certificate is not mounted, or if it is not the one the
+     * coordinator serves.  {@code /v1/info} takes no token, so it is only TLS that is checked.  Not checked if the stack has no
+     * Trino, whose Service is then absent.
+     */
+    private List<ExecResult> checkNotebookTrustsTrinoOverHttps(String pod) throws Exception {
+        boolean trino = client.listServices().stream()
+                              .anyMatch(service -> CdkHelper.TRINO_SERVICE_NAME.equals(service.getMetadata().getName()));
+        if (!trino) {
+            logger.warn("Not checking that {} can reach Trino over HTTPS: the stack has no {} Service", pod, CdkHelper.TRINO_SERVICE_NAME);
+            return List.of(new ExecResult(0, "Not checked: the stack has no Trino", "", "curl " + TRINO_URL, pod));
+        }
+        logger.info("Checking {} can reach {} trusting ${}", pod, TRINO_URL, JupyterHubConfig.TRINO_CA_CERT_ENV);
+        String ca = "\"$" + JupyterHubConfig.TRINO_CA_CERT_ENV + "\"";
+        String script = String.join("; ",
+                                    "test -s " + ca + " || { echo \"no certificate at " + ca + "\" >&2; exit 2; }",
+                                    "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 20 --retry 3 "
+                                    + "--retry-all-errors --cacert " + ca + " " + TRINO_URL);
+        return List.of(trustsTrino(client.exec(pod, "sh", "-c", script)));
+    }
+
+    /**
+     * @param curl the result of curl, verifying the coordinator's certificate against {@code $TRINO_CA_CERT}, writing out the
+     *             HTTP status
+     * @return a success if curl made the HTTPS connection, whatever the status, as any status at all means the certificate was
+     * trusted, else a failure saying why not
+     */
+    static ExecResult trustsTrino(ExecResult curl) {
+        String status = curl.stdout().strip();
+        if (curl.isSuccess() && status.matches("[1-5]\\d\\d")) {
+            return new ExecResult(0, format("%s reached %s over HTTPS, trusting $%s (HTTP %s)", curl.host(), TRINO_URL,
+                                            JupyterHubConfig.TRINO_CA_CERT_ENV, status), "", curl.command(), curl.host());
+        }
+        String why = switch (curl.exitCode()) {
+            case 2 -> "the certificate is not mounted";
+            case 60, 77 -> "the coordinator's certificate is not trusted with $" + JupyterHubConfig.TRINO_CA_CERT_ENV;
+            case 6, 7, 28 -> "the coordinator could not be connected to: is the network policy allowing it?";
+            default -> "curl failed";
+        };
+        return new ExecResult(-1, curl.stdout(), format("%s could not reach %s over HTTPS, as %s: %s", curl.host(), TRINO_URL, why,
+                                                        curl.stderr()), curl.command(), curl.host());
     }
 
     /**

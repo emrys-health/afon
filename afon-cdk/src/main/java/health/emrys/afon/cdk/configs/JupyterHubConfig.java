@@ -132,7 +132,7 @@ public class JupyterHubConfig {
     private static final String SINGLEUSER_LABEL_VALUE = "jupyter-singleuser";
 
     /** The variable of a notebook pod naming the file of the Trino coordinator's certificate, which it is to trust. */
-    static final String TRINO_CA_CERT_ENV = "TRINO_CA_CERT";
+    public static final String TRINO_CA_CERT_ENV = "TRINO_CA_CERT";
 
     /** Where a notebook pod has the Trino coordinator's certificate, as {@link TrinoWorkloads#TLS_CA_KEY}. */
     static final String TRINO_CA_DIR = "/etc/trino-tls";
