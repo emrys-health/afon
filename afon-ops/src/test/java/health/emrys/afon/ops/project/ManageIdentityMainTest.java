@@ -278,4 +278,32 @@ class ManageIdentityMainTest {
         assertThat(err.toString()).contains("close takes a <project>, unless it is run in the home of one");
         assertThat(command.run(new String[]{"remove-member", "ann@example.org"})).isEqualTo(2);
     }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void invitesAResearcherAgain(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        assertThat(command.run(new String[]{"invite", PROJECT, "ada@example.org"})).isZero();
+        verify(identity).invite("ada@example.org");
+        assertThat(out.toString()).contains("Sent the invitation to ada@example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsWhenTheInvitationCannotBeSent(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Could not send the invitation email to ada@example.org (HTTP 500)"))
+                           .when(identity).invite("ada@example.org");
+        assertThat(command.run(new String[]{"invite", PROJECT, "ada@example.org"})).isEqualTo(1);
+        assertThat(err.toString()).contains("Could not send the invitation email");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesOneEmailToInvite(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        assertThat(command.run(new String[]{"invite", PROJECT})).isEqualTo(2);
+        assertThat(command.run(new String[]{"invite", PROJECT, "a@example.org", "b@example.org"})).isEqualTo(2);
+        verify(identity, never()).invite(any());
+    }
 }

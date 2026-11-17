@@ -58,6 +58,7 @@ class KeyCloakProviderProjectTest {
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final List<String> bodies = new CopyOnWriteArrayList<>();
     private volatile boolean groupMade;
+    private final FlowEmulator flows = new FlowEmulator();
     private HttpServer keycloak;
     private KeyCloakProvider provider;
 
@@ -70,7 +71,10 @@ class KeyCloakProviderProjectTest {
             String call = exchange.getRequestMethod() + " " + path;
             requests.add(call);
             bodies.add(body);
-            if (path.endsWith("/protocol/openid-connect/token")) {
+            FlowEmulator.Answer flow = flows.handle(exchange.getRequestMethod(), path, body);
+            if (flow != null) {
+                reply(exchange, flow.code(), flow.body());
+            } else if (path.endsWith("/protocol/openid-connect/token")) {
                 reply(exchange, 200, "{\"access_token\":\"the-token\"}");
             } else if (call.equals("GET /admin/realms/polaris/clients")) {
                 String clientId = exchange.getRequestURI().getQuery().replace("clientId=", "");
@@ -278,5 +282,125 @@ class KeyCloakProviderProjectTest {
         assertThat(requests).doesNotContain("POST /admin/realms/polaris/users");
         assertThat(requests).doesNotContain("PUT /admin/realms/polaris/users/the-admin-id/execute-actions-email");
         assertThat(bodyOf("PUT /admin/realms/polaris/users/the-admin-id", "afon:the-admin-id")).contains("polaris_principal");
+    }
+
+    private Map<String, Object> childOf(String flow, String displayNameOrProvider) {
+        return flows.children(flow).stream()
+                    .filter(e -> displayNameOrProvider.equals(e.get("displayName")) || displayNameOrProvider.equals(e.get("providerId")))
+                    .findFirst().orElseThrow(() -> new AssertionError("No " + displayNameOrProvider + " in " + flow + ": " + flows.flows));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void logsTheMembersInToTheClientAfterTheSecondFactorAndNoOneElse(AfonCloud cloud) {
+        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+
+        String tre = "xyz-yyyy-nnnn-tre";
+        // the login is a flow of the client's own: the cookie or the forms, and then the check of membership, whichever it was
+        assertThat(childOf(tre + "-browser", tre + "-authenticate").get("requirement")).isEqualTo("REQUIRED");
+        assertThat(childOf(tre + "-browser", tre + "-members").get("requirement")).isEqualTo("CONDITIONAL");
+        assertThat(childOf(tre + "-authenticate", "auth-cookie").get("requirement")).isEqualTo("ALTERNATIVE");
+        assertThat(childOf(tre + "-authenticate", tre + "-forms").get("requirement")).isEqualTo("ALTERNATIVE");
+        // the first factor, then the second, each when the session is below its level
+        assertThat(childOf(tre + "-forms", tre + "-level-1").get("requirement")).isEqualTo("CONDITIONAL");
+        assertThat(childOf(tre + "-level-1", "auth-username-password-form").get("requirement")).isEqualTo("REQUIRED");
+        assertThat(flows.configOf(childOf(tre + "-level-1", "conditional-level-of-authentication")).get("config"))
+            .isEqualTo(Map.of("loa-condition-level", "1", "loa-max-age", "36000"));
+        assertThat(childOf(tre + "-level-2", "auth-otp-form").get("requirement")).isEqualTo("REQUIRED");
+        assertThat(flows.configOf(childOf(tre + "-level-2", "conditional-level-of-authentication")).get("config"))
+            .isEqualTo(Map.of("loa-condition-level", "2", "loa-max-age", "36000"));
+        // whoever lacks the client's role of the project is denied
+        assertThat(flows.configOf(childOf(tre + "-members", "conditional-user-role")).get("config"))
+            .isEqualTo(Map.of("condUserRole", tre + ".xyz-yyyy-nnnn", "negate", "true"));
+        assertThat(childOf(tre + "-members", "conditional-user-role").get("requirement")).isEqualTo("REQUIRED");
+        assertThat(childOf(tre + "-members", "deny-access-authenticator").get("requirement")).isEqualTo("REQUIRED");
+        // the Git client has its own, that checks its own role
+        assertThat(flows.configOf(childOf("xyz-yyyy-nnnn-git-members", "conditional-user-role")).get("config"))
+            .isEqualTo(Map.of("condUserRole", "xyz-yyyy-nnnn-git.xyz-yyyy-nnnn", "negate", "true"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void bindsTheLoginAndTheAcrToEachClientInTheSameUpdateThatMakesIt(AfonCloud cloud) {
+        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+
+        assertThat(bodyOf("POST /admin/realms/polaris/clients", "\"clientId\":\"xyz-yyyy-nnnn-tre\"")).contains(
+            "\"authenticationFlowBindingOverrides\":{\"browser\":\"flow-xyz-yyyy-nnnn-tre-browser\"}", "\"default.acr.values\":\"mfa\"", "\"minimum.acr.value\":\"mfa\"");
+        assertThat(bodyOf("POST /admin/realms/polaris/clients", "\"clientId\":\"xyz-yyyy-nnnn-git\"")).contains(
+            "\"authenticationFlowBindingOverrides\":{\"browser\":\"flow-xyz-yyyy-nnnn-git-browser\"}");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void mapsTheAcrToTheLevelOfTheSecondFactorKeepingTheOtherMappings(AfonCloud cloud) {
+        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+
+        assertThat(bodyOf("PUT /admin/realms/polaris", "acr.loa.map")).contains("acr.loa.map", "mfa", "2");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void convergesTheLoginAgainWithoutMakingAnotherOrLeavingItOpen(AfonCloud cloud) {
+        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        int executions = flows.flows.values().stream().mapToInt(List::size).sum();
+        int configs = flows.configs.size();
+
+        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+
+        assertThat(flows.flows.values().stream().mapToInt(List::size).sum()).isEqualTo(executions);
+        assertThat(flows.configs).hasSize(configs);
+        assertThat(childOf("xyz-yyyy-nnnn-tre-members", "deny-access-authenticator").get("requirement")).isEqualTo("REQUIRED");
+        assertThat(requests).doesNotContain("DELETE /admin/realms/polaris/authentication/flows/flow-xyz-yyyy-nnnn-tre-browser");
+    }
+
+    /** A KeyCloak that has the user of the email, or none, and answers the sending of the invitation with the code. */
+    private void keycloakWith(boolean userExists, int invitationCode) {
+        keycloak.removeContext("/");
+        keycloak.createContext("/", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            String call = exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath();
+            requests.add(call);
+            bodies.add(body);
+            if (exchange.getRequestURI().getPath().endsWith("/protocol/openid-connect/token")) {
+                reply(exchange, 200, "{\"access_token\":\"the-token\"}");
+            } else if (call.equals("GET /admin/realms/polaris/users")) {
+                reply(exchange, 200, userExists ? "[{\"id\":\"the-user-id\"}]" : "[]");
+            } else if (call.equals("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email")) {
+                reply(exchange, invitationCode, "");
+            } else {
+                reply(exchange, 404, "");
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void invitesAnExistingUserAgainWithTheActionsOfTheInvitationAndMakesNoOther(AfonCloud cloud) {
+        keycloakWith(true, 204);
+
+        provider.invite("Alice@Tre.Example");
+
+        assertThat(bodyOf("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email", "VERIFY_EMAIL"))
+            .contains("UPDATE_PASSWORD", "CONFIGURE_TOTP");
+        assertThat(requests).doesNotContain("POST /admin/realms/polaris/users");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToInviteAUserWhoIsNotInTheIdentity(AfonCloud cloud) {
+        keycloakWith(false, 204);
+
+        assertThatThrownBy(() -> provider.invite("nobody@tre.example")).isInstanceOf(IllegalStateException.class)
+                                                                         .hasMessageContaining("No user nobody@tre.example");
+        assertThat(requests).doesNotContain("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsToInviteWhenTheEmailCannotBeSentUnlikeTheInvitationOfANewUser(AfonCloud cloud) {
+        keycloakWith(true, 500);
+
+        assertThatThrownBy(() -> provider.invite("alice@tre.example")).isInstanceOf(IllegalStateException.class)
+                                                                       .hasMessageContaining("HTTP 500").hasMessageContaining("SMTP");
     }
 }

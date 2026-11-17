@@ -60,6 +60,9 @@ public class ContainerHelper {
     public static final  String KEYCLOACK_PROTOCOL   = "http";
     public static final  String POLARIS_NETWORK_HOST = "polaris-service";
     public static final  int    POLARIS_PORT         = 8181;
+    public static final  String MAILPIT_ALIAS        = "mailpit";
+    public static final  int    MAILPIT_API_PORT     = 8025;
+    public static final  int    MAILPIT_SMTP_PORT    = 1025;
 
     /**
      * For testing.
@@ -84,8 +87,36 @@ public class ContainerHelper {
     private GenericContainer<?> trino;
     private GenericContainer<?> sparkConnect;
     private GenericContainer<?> keyCloak;
+    private GenericContainer<?> mailpit;
 
     private ContainerHelper() {
+    }
+
+    /**
+     * @return the docker network that the containers of the helper share, which another container joins to reach them by their aliases, eg
+     * {@value #MAILPIT_ALIAS}
+     */
+    public Network network() {
+        return network;
+    }
+
+    /**
+     * Starts a mail server that keeps the emails it is sent, eg the invitations of a KeyCloak, and gives them back by its API.  A KeyCloak on
+     * {@link #network()} sends them to {@value #MAILPIT_ALIAS}:{@value #MAILPIT_SMTP_PORT}.
+     *
+     * @return the container, whose API is at the mapped port {@value #MAILPIT_API_PORT}
+     */
+    public synchronized GenericContainer<?> startMailpit() {
+        if (mailpit == null) {
+            mailpit = new GenericContainer<>(MAILPIT_IMAGE)
+                .withNetwork(network)
+                .withNetworkAliases(MAILPIT_ALIAS)
+                .withExposedPorts(MAILPIT_API_PORT, MAILPIT_SMTP_PORT)
+                .waitingFor(Wait.forHttp("/api/v1/info").forPort(MAILPIT_API_PORT).forStatusCode(200).withStartupTimeout(Duration.ofMinutes(2)));
+            logger.info("Starting Mailpit docker container.");
+            mailpit.start();
+        }
+        return mailpit;
     }
 
     public synchronized GenericContainer<?> startKeyCloak(AfonPropertyProvider properties) {

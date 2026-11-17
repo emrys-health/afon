@@ -264,4 +264,56 @@ class ProjectNamesTest {
         assertThat(properties).contains(cloud.name() + "_JUPYTER_DOMAIN_NAME=jupyter.xyz-yyyy-nnnn.example.org")
                               .doesNotContain(lower(cloud) + "-jupyter.xyz-yyyy-nnnn.dev.click");
     }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void putsTheOidcDomainOfTheIdentityUnderItsProjectAsTheDomainsOfATreAre(AfonCloud cloud) {
+        // azure-oidc.dev.click of the env is azure-oidc.idp.dev.click: the env may have a Keycloak of its own at its domain
+        String c = lower(cloud);
+        Properties env = env(cloud.name() + "_OIDC_DOMAIN_NAME", c + "-oidc.dev.click");
+        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env))
+            .containsEntry(cloud.name() + "_OIDC_DOMAIN_NAME", c + "-oidc.idp.dev.click");
+        // and the TRE of a project leaves the OIDC domain, which is the identity's, alone
+        assertThat(all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env)).doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesTheOidcDomainOfTheEnvForAllCloudsWhenTheCloudHasNoneOfItsOwn(AfonCloud cloud) {
+        Properties env = env("OIDC_DOMAIN_NAME", "oidc.dev.click");
+        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env))
+            .containsEntry(cloud.name() + "_OIDC_DOMAIN_NAME", "oidc.idp.dev.click");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesTheOidcDomainOfTheEnvAsItIsWhenItHasNoParentDomainOrNone(AfonCloud cloud) {
+        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env("OIDC_DOMAIN_NAME", "dev.click")))
+            .doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
+        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env()))
+            .doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesTheIdentityADatabaseOfItsOwnSoThatItDoesNotShareTheRealmOfTheEnvsKeycloak(AfonCloud cloud) {
+        var identity = ProjectFixtures.identity(ProjectFixtures.identityExample(cloud));
+        Properties env = env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-dev");
+        assertThat(ProjectNames.derive(identity, env, "dev").get("secret.properties"))
+            .containsOnlyKeys("KEYCLOAK_DB_URL").containsEntry("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-idp");
+        // the parameters of the URL are kept
+        assertThat(ProjectNames.derive(identity, env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak?sslmode=require"), "dev")
+                               .get("secret.properties")).containsEntry("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void derivesNoDatabaseForATreOrWhenTheEnvHasNoneToDeriveFrom(AfonCloud cloud) {
+        Properties env = env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak");
+        // a TRE uses the identity's Keycloak, with no database of its own
+        assertThat(ProjectNames.derive(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env, "dev")).doesNotContainKey("secret.properties");
+        var identity = ProjectFixtures.identity(ProjectFixtures.identityExample(cloud));
+        assertThat(ProjectNames.derive(identity, env(), "dev")).doesNotContainKey("secret.properties");
+        assertThat(ProjectNames.derive(identity, env("KEYCLOAK_DB_URL", "not-a-url"), "dev")).doesNotContainKey("secret.properties");
+    }
 }

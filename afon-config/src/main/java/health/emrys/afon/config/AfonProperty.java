@@ -288,6 +288,23 @@ public enum AfonProperty {
     KEYCLOAK_DB_URL("KEYCLOAK_DB_URL"),
     KEYCLOAK_DB_USERNAME("KEYCLOAK_DB_USERNAME"),
     KEYCLOAK_DB_PASSWORD("KEYCLOAK_DB_PASSWORD"),
+    /**
+     * The SMTP server that the realm of the Keycloak sends its emails through, eg the invitations to the researchers of a project, which they set
+     * their password and second factor by.  Optional: with no host, the realm sends none, and an invitation fails (it is a warning, as the
+     * researcher is made all the same, but gets no email, and is not invited again by a later sync, only by {@code manage-identity invite}).  Set in the env of
+     * the Keycloak, before the researchers are made.
+     */
+    KEYCLOAK_SMTP_HOST("KEYCLOAK_SMTP_HOST"),
+    /** The port of {@link #KEYCLOAK_SMTP_HOST}.  Optional: 587 when empty, as for the usual STARTTLS submission. */
+    KEYCLOAK_SMTP_PORT("KEYCLOAK_SMTP_PORT"),
+    /** The address that the emails of the realm are sent from.  Required with {@link #KEYCLOAK_SMTP_HOST}. */
+    KEYCLOAK_SMTP_FROM("KEYCLOAK_SMTP_FROM"),
+    /** How the connection to the SMTP server is secured: {@code starttls}, {@code ssl} or {@code none}.  Optional: {@code starttls} when empty. */
+    KEYCLOAK_SMTP_SECURITY("KEYCLOAK_SMTP_SECURITY"),
+    /** The user that authenticates to the SMTP server, in {@code secret.properties}.  Optional: none authenticates when empty. */
+    KEYCLOAK_SMTP_USERNAME("KEYCLOAK_SMTP_USERNAME"),
+    /** The password of {@link #KEYCLOAK_SMTP_USERNAME}, in {@code secret.properties}. */
+    KEYCLOAK_SMTP_PASSWORD("KEYCLOAK_SMTP_PASSWORD"),
 
     // Guacamole
     GUACAMOLE_DB_HOST("GUACAMOLE_DB_HOST"),

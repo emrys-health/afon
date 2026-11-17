@@ -31,6 +31,7 @@ import java.util.function.BiFunction;
  * manage-identity add-member &lt;project&gt; &lt;email&gt; [--first-name &lt;name&gt;] [--last-name &lt;name&gt;]
  * manage-identity remove-member &lt;project&gt; &lt;email&gt;
  * manage-identity sync-members &lt;project&gt;
+ * manage-identity invite &lt;project&gt; &lt;email&gt;
  * manage-identity close &lt;project&gt;
  * </pre>
  * <ul>
@@ -44,6 +45,8 @@ import java.util.function.BiFunction;
  *   <li>{@code sync-members} makes the project's group have the members that the project's file lists, and no others: it adds those that are
  *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A project has at least one member, so
  *       the group is never emptied by it;</li>
+ *   <li>{@code invite} sends the invitation again to a researcher who is in the central identity, by email: for one who never got it, let it
+ *       expire, or lost their second factor.  Unlike the invitation of {@code add-member}, which is a warning if it cannot be sent, it fails;</li>
  *   <li>{@code close} closes the project's TRE client, so that no token is issued for it.</li>
  *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
  *       {@code <afon-home>/projects/<project>/project.yaml}, see {@link FileProjectProvider#forProject}.</li>
@@ -69,6 +72,7 @@ public class ManageIdentityMain {
         "                                  makes the researcher if absent, adds them to the project's group, prints their user id",
         "  remove-member <email>           removes the researcher from the group and ends their sessions",
         "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
+        "  invite <email>                  sends the invitation again to a researcher who is in the central identity (it fails if it cannot be sent)",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -132,7 +136,7 @@ public class ManageIdentityMain {
         // <project> is left out in the home of a project, whose config has its id
         int withoutProject = switch (action) {
             case "create", "close", "sync-members" -> 0;
-            case "add-member", "remove-member" -> 1;
+            case "add-member", "remove-member", "invite" -> 1;
             default -> -1;
         };
         String project;
@@ -155,6 +159,7 @@ public class ManageIdentityMain {
                                                   : usage("add-member takes one <email>");
             case "remove-member" -> rest.size() == 1 ? with(project, options, (p, e) -> removeMember(p, e, rest.get(0)))
                                                      : usage("remove-member takes one <email>");
+            case "invite" -> rest.size() == 1 ? with(project, options, (p, e) -> invite(p, e, rest.get(0))) : usage("invite takes one <email>");
             case "sync-members" -> rest.isEmpty() ? with(project, options, this::syncMembers) : usage("sync-members takes no argument");
             case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
@@ -247,6 +252,11 @@ public class ManageIdentityMain {
         }
         provider.removeMember(project, userId.get());
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
+    }
+
+    private void invite(TreProject project, String endpoint, String email) {
+        identity.apply(project, endpoint).invite(email);
+        out.printf("Sent the invitation to %s%n", email);
     }
 
     private void syncMembers(TreProject project, String endpoint) {

@@ -51,7 +51,7 @@ import java.util.Set;
  * A project with the role {@code identity} deploys the central identity, and has only {@code project} and
  * <pre>
  * stacks:
- *   identity: {stack, domain}                  stack defaults to &lt;cloud&gt;-keycloak; domain is {@code <CLOUD>_OIDC_DOMAIN_NAME}, the env's if not given
+ *   identity: {stack, domain}                  stack defaults to &lt;cloud&gt;-keycloak; domain is {@code <CLOUD>_OIDC_DOMAIN_NAME}, the env's with the project id as a label after the first if not given
  * </pre>
  * no {@code identity}, {@code providers}, {@code create}, {@code git} or {@code tre}.
  * <p>

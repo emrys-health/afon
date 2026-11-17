@@ -34,7 +34,9 @@ afon-cli.sh --env emrys2 config-status
 
 The config of `emrys2` already has what the projects use: `AZURE_SUBSCRIPTION`, `AZURE_RESOURCE_GROUP`, `AZURE_REGION`,
 `AZURE_OIDC_DOMAIN_NAME` (`azure-oidc.emrys2.click`), `AZURE_JUPYTER_DOMAIN_NAME` (`azure-jupyter.emrys2.click`),
-`POLARIS_DB_HOST`, and the Keycloak admin credentials in `secret.properties`.
+`POLARIS_DB_HOST`, and the Keycloak admin credentials in `secret.properties`. The projects serve their domains under
+the project's id, eg the identity project `idp` at `azure-oidc.idp.emrys2.click`: see
+[Names](#names-of-a-projects-resources).
 
 ## 1. The identity project
 
@@ -148,7 +150,7 @@ project:
 
 identity:
   project: idp
-  issuerUrl: https://azure-oidc.emrys2.click/realms/polaris
+  issuerUrl: https://azure-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
 providers:
@@ -276,7 +278,7 @@ project:
 
 identity:
   project: idp
-  issuerUrl: https://azure-oidc.emrys2.click/realms/polaris
+  issuerUrl: https://azure-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
 providers:
@@ -346,12 +348,20 @@ never share a resource:
   differs for the same project id in another account, as these names are unique across all accounts.
 - **The domains** of a TRE are those of the env with the project id as a label after the first: the env's
   `AZURE_JUPYTER_DOMAIN_NAME=azure-jupyter.emrys2.click` gives the project `azure-jupyter.project1.emrys2.click`, and the
-  same for the Polaris domain if the env has one. The OIDC domain is the identity's, and is not touched. Each domain has
-  a DNS zone of its own, which `up` makes in its `create` stage (`dns-create-zones`, which is safe to repeat), and which
+  same for the Polaris domain if the env has one. The OIDC domain is the identity's, and a TRE does not touch it. The
+  identity project has its OIDC domain derived in the same way, so that it does not clash with a Keycloak that the env
+  serves at its own domain: the env's `AZURE_OIDC_DOMAIN_NAME=azure-oidc.emrys2.click` gives
+  `azure-oidc.idp.emrys2.click`, which is what the TRE projects name in `identity.issuerUrl`; `stacks.identity.domain` in
+  its file wins over the derived one. An env domain that has no parent domain is left as it is. Each domain has a DNS
+  zone of its own, which `up` makes in its `create` stage (`dns-create-zones`, which is safe to repeat), and which
   the parent zone delegates, as it does the env's own (see [DNS Configuration](./dns_config.md)). A domain in
   `stacks.tre.domains` wins over the derived one, and `validate` and `configure` refuse a domain that another project of
   the same cloud has. The env's domain must have a parent domain: `emryspolaris.click` has none, so a project made from
   it names its own.
+- **The Keycloak database** of the identity project is `keycloak-<project>` on the Postgres of the env, eg `keycloak-idp`
+  from `jdbc:postgresql://<host>:5432/keycloak-emrys2`, with the parameters of the URL kept. Without it, the project
+  would share the realm and the users of a Keycloak that the env deploys itself. The stack creates the database if it
+  is absent, and the env's own is left as it is: the derived line is the last of the project's `secret.properties`.
 
 The account of the env must be set (`AZURE_SUBSCRIPTION`, `AWS_ACCOUNT_ID`, `GCP_PROJECT_ID`), or `configure` stops and
 says so.
@@ -413,16 +423,19 @@ members:
 `up` makes the project's group have these members, and no others, in its `register` stage, after the project's clients
 and group are made: `manage-identity sync-members`, which you can also run by hand, in the project's home. It
 - makes a researcher who is not in the central identity yet, who is sent an invitation (to verify the email, set a
-  password and enrol a second factor), as `add-member` does;
+  password and enrol with MFA), as `add-member` does;
 - adds those who are listed and not in the group;
 - **removes those who are in the group and not listed**, ending their sessions (a token already issued lasts until it
   expires). The file is the authority: so a member added by hand with `add-member` is removed by the next sync unless it
   is listed.
 
+The invitation is an email that the central identity's Keycloak sends, so it needs an SMTP server: see [Setting up
+SMTP](#setting-up-smtp), which also says how to send an invitation again.
+
 A project has at least one member: `init` writes `members: []`, which `validate` and `up` refuse until a member is added,
 so that a project is never brought up that nobody can sign in to. To change the members, edit the list and run
 `afon-cli.sh manage-project up <project> --from register --until register`, or
-`manage-project run <project> manage-identity sync-members`. The emails are compared in lower case. 
+`manage-project run <project> manage-identity sync-members`. The emails are compared in lower case.
 
 The members are also the users of the TRE's own services: JupyterHub and its remote desktop serve each of them, by their
 email, and have them from the TRE's deployment, so a member added later signs in to the central identity at once, but is
@@ -431,6 +444,108 @@ password in the TRE: they sign in with the one they set in the central identity.
 the project is made from are its **admins**, who set it up and run its smoke tests, and who are not served by JupyterHub
 unless they are also listed as members, by the same email, which must then be their username in `users.csv`: see
 [Users](configuration.md#users).
+
+## Setting up SMTP
+
+The central identity's Keycloak emails each researcher the invitation to verify their email, set a password and enrol
+with MFA, so it needs an SMTP server. This section detals how to set one up with Amazon Simple Email Service (SES),
+the service of AWS for sending email, which works well with a domain registered in AWS Route 53, as `emrys2.click` is.
+Any other SMTP server works the same way: only the values of the properties differ. With no server, the realm sends
+nothing: a researcher is made all the same, with a warning, but gets no invitation, and a later sync does not send it
+again.
+
+**1. Verify the domain in SES.** In the AWS console, in the region you send from (the verification, the credentials and
+the endpoint all belong to one region, here `eu-west-2`), open Amazon SES, **Identities**, **Create identity**, choose
+**Domain** and enter it, eg `emrys2.click`. Leave Easy DKIM on and accept the option to publish its DNS records to Route
+53, which adds three CNAME records. Wait a few minutes, until the identity shows **Verified** and its DKIM status
+**Successful**. You need none of the optional extras that the console offers (Virtual Deliverability Manager, tenant
+management). It is worth setting a **custom MAIL FROM domain**, eg `mail.emrys2.click`, on the **Authentication** tab of
+the identity: publish the MX and TXT records it shows, and choose to use the default MAIL FROM domain if they fail. It
+improves delivery to inboxes, and changes nothing that you configure here.
+
+**2. Make the SMTP credentials.** In SES, **SMTP settings**, **Create SMTP credentials**, which makes an IAM user: name
+it for the env and its use, eg `emrys2-keycloak-smtp`. Keep the **SMTP user name**, which starts with `AKIA`, and the
+**SMTP password** that the page shows once. They are not the name of the IAM user nor its secret access key. If you lose
+the password, make new credentials, and delete the user of the old ones.
+
+**3. Restrict what that user can send.** The policy that the console attaches lets the user send as any identity of the
+account. In IAM, replace it with an inline policy that allows only the sender that Keycloak uses:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ses:SendRawEmail",
+      "Resource": "arn:aws:ses:eu-west-2:<account>:identity/*",
+      "Condition": {"StringEquals": {"ses:FromAddress": "keycloak@emrys2.click"}}
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ses:SendRawEmail",
+      "Resource": "arn:aws:ses:eu-west-2:<account>:configuration-set/my-first-configuration-set"
+    }
+  ]
+}
+```
+
+Until SES has given the account production access (its **sandbox** sends only to verified addresses and to the addresses
+of verified domains), it checks the permission on the identity of each recipient too, and on the account's default
+configuration set, if it has one, which is why the first statement covers every identity and the second the configuration
+set. A narrower policy fails with `554 Access denied`, naming the resource that it does not allow. After production
+access the first statement can name only the identity of the domain, `identity/emrys2.click`, and the second can go.
+
+**4. Set the properties** in the config of the env that the identity project is made from, `afon.properties` and
+`secret.properties`:
+
+```properties
+KEYCLOAK_SMTP_HOST=email-smtp.eu-west-2.amazonaws.com
+KEYCLOAK_SMTP_PORT=587
+KEYCLOAK_SMTP_SECURITY=starttls
+KEYCLOAK_SMTP_FROM=keycloak@emrys2.click
+```
+
+and, in `secret.properties`, `KEYCLOAK_SMTP_USERNAME` (the `AKIA...` user name) and `KEYCLOAK_SMTP_PASSWORD`. The port is
+587 if empty, and the security `starttls` (or `ssl`, or `none`) if empty. `KEYCLOAK_SMTP_FROM` must be an address of the
+verified domain. Port 25, which clouds block or throttle, is not used.
+
+**5. Send a test email** from this machine, with the config of the active env, to an address you can read:
+
+```shell
+afon-cli.sh project-smtp <email> --verbose
+```
+
+It says what it connects to and as whom, never the password, and with `--verbose` shows the replies of the server, which
+say what is wrong if it fails. `--dry-run` only says what it would send, and `--from <address>` sends from another
+address.
+
+| Reply | Cause |
+|-------|-------|
+| `535 Authentication Credentials Invalid`, or `Login denied` | the user name or password: the `AKIA...` name and the SMTP password of step 2, made in this region |
+| `554 Message rejected: Email address is not verified` | the sandbox: send to an address of the verified domain, or verify the address in SES, or ask SES for production access |
+| `554 Access denied ... not authorized to perform 'ses:SendRawEmail' on resource ...` | the policy of step 3 does not allow that resource: add it |
+| a timeout | the network does not let this machine, or later the cluster, reach `email-smtp.eu-west-2.amazonaws.com` on port 587 |
+
+**6. Give the settings to the identity.** Configure the identity project again, and run its `identity` stage, whose setup
+puts the settings in the realm:
+
+```shell
+afon-cli.sh manage-project configure idp
+afon-cli.sh manage-project up idp --from identity
+```
+
+Then send an invitation from the cluster, to a researcher who is in the central identity, which also tests the route from
+the cluster to the server:
+
+```shell
+afon-cli.sh manage-project run project1 manage-identity invite <email>
+```
+
+To send the invitation again, to a researcher who never got it, let it expire (it is valid for 12 hours, and once), or
+lost their second factor, run the same command. It sends the same email, and fails, saying so, if the researcher is not
+in the central identity or the email cannot be sent. If they lost their second factor, remove their authenticator in the
+Keycloak admin console first.
 
 ## Key-based authentication
 
@@ -478,7 +593,6 @@ each project: `manage-project up <project> --from register`.
 
 - The TRE's tools do not yet sign in with the project's client, nor check the audience, the project claim or the `acr` of
   a token: the project's client and group exist in Keycloak, and the TRE works as a normal TRE that uses it.
-- Keycloak does not issue the `mfa` level yet.
 - The Data Provider catalog in `providers` is checked, but not yet read by the engines.
 
 The design, and the options this page leaves out (a project's own Git, its nightly rebuild), are in `multi_project.md` in

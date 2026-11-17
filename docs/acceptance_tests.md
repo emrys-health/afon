@@ -12,7 +12,7 @@ packages, in two ways:
 | `signing` | the signing of images and their verification at admission, in a kind cluster, see [below](#image-signing-test) | `Signing` | on |
 | `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
 | `project` | the projects: the clients, groups and tokens of the central identity, in a KeyCloak container, and what a project asks of a cloud (the store of its state, and its names accepted by the cloud), which use the real tools of the cloud: `aws`, `az` or `gcloud`, logged in | `Project` | off, for now |
-| `identity` | of those, the projects in the central identity, in a KeyCloak container, which need only docker | `ProjectIdentity` | off, for now |
+| `identity` | of those, the projects in the central identity, in a KeyCloak container and a Mailpit one, which need only docker, run for AWS alone as KeyCloak does not know the cloud | `ProjectIdentity` | off, for now |
 | `cloud` | of those, what a project asks of a cloud, which uses the tools of the cloud (`aws`, `az`, `gcloud`), logged in | `ProjectCloud` | off, for now |
 
 - **Disable categories** by deactivating their profiles, with a `-` before the name: everything else is still run.

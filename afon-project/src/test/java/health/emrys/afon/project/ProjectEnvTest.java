@@ -232,4 +232,42 @@ class ProjectEnvTest {
         assertThat(properties.getCloudValue(cloud, AfonCloudProperty.EGRESS_IP)).isEqualTo("203.0.113.20");
         assertThat(properties.getOidcDomainName(cloud)).isEqualTo("oidc.example.org");
     }
+
+    private AfonPropertyProvider configuredIdentity(AfonCloud cloud, String yaml, String envProperties) throws IOException {
+        Path file = home.resolve("identity.yaml");
+        Files.writeString(file, yaml);
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + envProperties);
+        return new FilePropertyProvider(ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file).toString());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void deploysTheIdentityProjectAtADomainUnderItsProjectUnlessItsFileGivesOne(AfonCloud cloud) throws IOException {
+        String example = ProjectFixtures.identityExample(cloud);
+        String withoutDomain = example.replace("stacks:\n  identity:\n    domain: oidc.example.org\n", "");
+        String envDomain = cloud.name() + "_OIDC_DOMAIN_NAME=" + lower(cloud) + "-oidc.dev.click\n";
+        // the env's azure-oidc.dev.click is azure-oidc.idp.dev.click for the project that deploys the identity
+        assertThat(configuredIdentity(cloud, withoutDomain, "OIDC_DOMAIN_NAME=\n" + envDomain).getOidcDomainName(cloud))
+            .isEqualTo(lower(cloud) + "-oidc.idp.dev.click");
+        // and what the file says wins
+        assertThat(configuredIdentity(cloud, example, "OIDC_DOMAIN_NAME=\n" + envDomain).getOidcDomainName(cloud)).isEqualTo("oidc.example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresTheIdentityProjectWithADatabaseOfItsOwn(AfonCloud cloud) throws IOException {
+        Path file = home.resolve("identity.yaml");
+        Files.writeString(file, ProjectFixtures.identityExample(cloud));
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + "POLARIS_DB_HOST=db.example.org\n");
+        Files.writeString(env.resolve("secret.properties"), "KEYCLOAK_DB_URL=jdbc:postgresql://${POLARIS_DB_HOST}:5432/keycloak-dev?sslmode=require\n");
+        Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
+        // the env's database is left to the env, and the project's is its own: the last line of the file wins, as it does when it is sourced
+        assertThat(Files.readString(env.resolve("secret.properties"))).doesNotContain("keycloak-idp");
+        assertThat(Files.readString(config.resolve("secret.properties")))
+            .contains("KEYCLOAK_DB_URL=jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
+        assertThat(new FilePropertyProvider(config.toString()).getValue(AfonProperty.KEYCLOAK_DB_URL))
+            .isEqualTo("jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
+    }
 }

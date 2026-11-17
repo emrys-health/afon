@@ -107,6 +107,15 @@ public interface IdentityProvider {
     Optional<String> findUser(String email);
 
     /**
+     * Sends the invitation to an existing user again: the email whose required actions are to verify the email, set a password and enrol a
+     * second factor, as {@link #ensureUser} sends it to a new one, and only then.  For a user who never got it, or let it expire, or lost their
+     * second factor.  Unlike the invitation of {@code ensureUser}, a failure to send it is an error.
+     *
+     * @throws IllegalStateException if there is no user with this email, or the email cannot be sent, eg for want of an SMTP server
+     */
+    void invite(String email);
+
+    /**
      * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client
      * for the TRE, whose tokens carry the audiences of the project's Provider catalogs, and one for Git, whose tokens carry
      * no Provider audience.  Each authenticates by {@code private_key_jwt} with the public key it is given, and each token

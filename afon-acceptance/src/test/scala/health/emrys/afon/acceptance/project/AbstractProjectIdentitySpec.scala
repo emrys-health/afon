@@ -1,6 +1,7 @@
 package health.emrys.afon.acceptance.project
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import health.emrys.afon.acceptance.ContainerHelper
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Project, ProjectIdentity}
 import health.emrys.afon.cdk.DockerImages
@@ -15,7 +16,7 @@ import org.testcontainers.containers.wait.strategy.Wait
 import java.math.BigInteger
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
-import java.net.http.{HttpClient, HttpRequest}
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import java.security.spec.PKCS8EncodedKeySpec
@@ -23,15 +24,19 @@ import java.security.{KeyFactory, KeyPairGenerator, PrivateKey, Signature}
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 /**
- * The projects of the central identity, against a real KeyCloak, the one that Afon deploys, in a container: needs docker only.  No cloud is special,
- * so the specs of the clouds, which differ only in the names of the properties of the cloud, are those of the subclasses, one for each.
+ * The projects of the central identity, against a real KeyCloak, the one that Afon deploys, in a container: needs docker only.  The cloud of the projects
+ * changes only the names of the properties of the cloud, so a subclass gives the cloud to run it for, see [[ProjectIdentityAwsSpec]].
  *
  * Each project has a client for its TRE and one for its Git, and a group.  A token of a project's client names that project, and
- * only when the user is in its group, and carries the audiences of the project's Providers on the TRE client alone.  The tokens are
- * those that KeyCloak would issue, which its admin API generates for a user and a client without a browser login.
+ * only when the user is in its group, and carries the audiences of the project's Providers on the TRE client alone.  Most tokens are
+ * those that KeyCloak would issue, which its admin API generates for a user and a client without a browser login; the login of a project's client,
+ * which admits only its members, after a second factor, is run as a browser would, with the one-time password of an authenticator that it enrols.
  */
 abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
 
@@ -42,6 +47,7 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
 
   private lazy val keycloak: GenericContainer[_] = {
     val container: GenericContainer[_] = new GenericContainer[Nothing](DockerImages.KEYCLOAK_IMAGE)
+    container.withNetwork(ContainerHelper.instance.network())
     container.withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", AdminUser)
     container.withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", AdminPassword)
     container.withEnv("KC_HTTP_ENABLED", "true")
@@ -53,15 +59,24 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
   }
 
   private lazy val baseUrl = s"http://localhost:${keycloak.getMappedPort(8080)}"
+  /** The mail server, which the realm sends its invitations to and whose API gives them back, in a container of the helper that the KeyCloak shares a network with. */
+  private lazy val mailpit: GenericContainer[_] = ContainerHelper.instance.startMailpit()
+  private lazy val mailUrl = s"http://localhost:${mailpit.getMappedPort(ContainerHelper.MAILPIT_API_PORT)}"
 
   private lazy val provider: KeyCloakProvider = {
+    mailpit // started first, so that the realm has a server to send its invitations to
+    // the container may be one of an earlier run, or of another spec, with the emails of its own to the same addresses: this spec counts only its own
+    http.send(HttpRequest.newBuilder(URI.create(s"$mailUrl/api/v1/messages")).DELETE().build(), BodyHandlers.ofString())
     val identity = new KeyCloakProvider(baseUrl, AdminUser, AdminPassword)
+      .withSmtp(new KeyCloakProvider.Smtp(ContainerHelper.MAILPIT_ALIAS, ContainerHelper.MAILPIT_SMTP_PORT, "tre@example.org", KeyCloakProvider.Smtp.Security.NONE, null, null))
     identity.createRealm(identity.adminToken(), KEYCLOAK_REALM)
     identity
   }
 
   override def afterAll(): Unit = {
-    try if (keycloak != null) keycloak.stop() finally super.afterAll()
+    try {
+      if (keycloak != null) keycloak.stop()
+    } finally super.afterAll()
   }
 
   /** A public key as a JWK, as the TRE operator gives it: the private key stays with them. */
@@ -153,6 +168,174 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       .header("Content-Type", "application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(form)).build()
     val response = http.send(request, BodyHandlers.ofString())
     (response.statusCode(), mapper.readTree(response.body()).path("error").asText())
+  }
+
+
+  /**
+   * A browser, as far as a login goes: it keeps the cookies that KeyCloak sets, whichever their attributes, as the realm is plain http here, and follows no
+   * redirect of itself, so that the one to the client's redirect URI, which carries the code, is seen.
+   */
+  private final class Browser {
+    private val cookies = mutable.LinkedHashMap.empty[String, String]
+    private val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()
+
+    def send(request: HttpRequest.Builder): HttpResponse[String] = {
+      if (cookies.nonEmpty) request.header("Cookie", cookies.map { case (k, v) => s"$k=$v" }.mkString("; "))
+      val response = client.send(request.build(), BodyHandlers.ofString())
+      response.headers().allValues("Set-Cookie").forEach { cookie =>
+        val pair = cookie.takeWhile(_ != ';')
+        val at = pair.indexOf('=')
+        val (name, value) = (pair.take(at), pair.drop(at + 1))
+        if (value.isEmpty) cookies.remove(name) else cookies(name) = value
+      }
+      response
+    }
+  }
+
+  /** What a login ended with: the code that it was given for the client's redirect URI, or else the page that it stopped at, and the secret of the authenticator that it enrolled. */
+  private case class LoginResult(code: Option[String], page: String, totpSecret: Option[String])
+
+  private val usedCounters = mutable.Set.empty[(String, Long)]
+
+  /** The current one-time password of an authenticator, one that was not used already, as KeyCloak refuses a code twice. */
+  private def totp(secret: String): String = {
+    val now = System.currentTimeMillis() / 30000
+    val counter = Seq(now, now + 1, now - 1).find(c => !usedCounters.contains((secret, c))).getOrElse {
+      Thread.sleep(31000)
+      System.currentTimeMillis() / 30000
+    }
+    usedCounters += ((secret, counter))
+    val mac = Mac.getInstance("HmacSHA1")
+    mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA1"))
+    val hash = mac.doFinal(java.nio.ByteBuffer.allocate(8).putLong(counter).array())
+    val offset = hash(hash.length - 1) & 0xf
+    val binary = ((hash(offset) & 0x7f) << 24) | ((hash(offset + 1) & 0xff) << 16) | ((hash(offset + 2) & 0xff) << 8) | (hash(offset + 3) & 0xff)
+    "%06d".format(binary % 1000000)
+  }
+
+  private def form(fields: Seq[(String, String)]): HttpRequest.BodyPublisher =
+    HttpRequest.BodyPublishers.ofString(fields.map { case (k, v) => s"${java.net.URLEncoder.encode(k, StandardCharsets.UTF_8)}=${java.net.URLEncoder.encode(v, StandardCharsets.UTF_8)}" }.mkString("&"))
+
+  private def textOf(page: String): String = page.replaceAll("(?s)<(script|style).*?</\\1>", " ").replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim
+
+  /**
+   * Logs a user in to a project's client by the browser flow, as a browser would: the page of the password, then, if the user may go on, the page of
+   * the second factor, which enrols an authenticator the first time and asks for its code after.
+   *
+   * @param totpSecret the secret of the user's authenticator, if they have enrolled one
+   */
+  private def login(browser: Browser, clientId: String, redirectUri: String, challenge: String, username: String, password: String,
+                    totpSecret: Option[String], acrValues: Option[String] = None): LoginResult = {
+    val query = (Seq("client_id" -> clientId, "redirect_uri" -> redirectUri, "response_type" -> "code", "scope" -> "openid", "state" -> "state",
+                    "code_challenge" -> challenge, "code_challenge_method" -> "S256") ++ acrValues.map("acr_values" -> _))
+      .map { case (k, v) => s"$k=${java.net.URLEncoder.encode(v, StandardCharsets.UTF_8)}" }.mkString("&")
+    var secret = totpSecret
+    var response = browser.send(HttpRequest.newBuilder(URI.create(s"$baseUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/auth?$query")).GET())
+    for (_ <- 1 to 10) {
+      if (response.statusCode() / 100 == 3) {
+        val location = URI.create(baseUrl).resolve(response.headers().firstValue("Location").orElseThrow())
+        if (location.toString.startsWith(redirectUri)) {
+          val code = location.getRawQuery.split("&").map(_.split("=", 2)).collectFirst { case Array("code", value) => value }
+          return LoginResult(code, "", secret)
+        }
+        response = browser.send(HttpRequest.newBuilder(location).GET())
+      } else {
+        val page = response.body()
+        val action = "(?s)<form[^>]*\\saction=\"([^\"]+)\"".r.findFirstMatchIn(page).map(_.group(1).replace("&amp;", "&"))
+        val fields: Option[Seq[(String, String)]] =
+          if (page.contains("name=\"username\"")) Some(Seq("username" -> username, "password" -> password))
+          else if (page.contains("name=\"totpSecret\"")) {
+            secret = "name=\"totpSecret\" value=\"([^\"]+)\"".r.findFirstMatchIn(page).map(_.group(1))
+            Some(Seq("totp" -> totp(secret.get), "totpSecret" -> secret.get, "userLabel" -> "phone"))
+          } else if (page.contains("name=\"otp\"") && secret.isDefined) Some(Seq("otp" -> totp(secret.get)))
+          else None
+        if (action.isEmpty || fields.isEmpty) return LoginResult(None, textOf(page.substring(page.indexOf("kc-error-message").max(0))), secret)
+        response = browser.send(HttpRequest.newBuilder(URI.create(action.get)).header("Content-Type", "application/x-www-form-urlencoded")
+                                  .POST(form(fields.get)))
+      }
+    }
+    LoginResult(None, "the login did not end", secret)
+  }
+
+  /** The claims of the access token that a client is given for a code, which it presents with an assertion signed with its private key, and the verifier of its challenge. */
+  private def exchange(clientId: String, key: PrivateKey, code: String, redirectUri: String, verifier: String): JsonNode = {
+    val request = HttpRequest.newBuilder(URI.create(s"$baseUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/token"))
+      .header("Content-Type", "application/x-www-form-urlencoded")
+      .POST(form(Seq("grant_type" -> "authorization_code", "code" -> code, "redirect_uri" -> redirectUri, "client_id" -> clientId, "code_verifier" -> verifier,
+                     "client_assertion_type" -> "urn:ietf:params:oauth:client-assertion-type:jwt-bearer", "client_assertion" -> clientAssertion(clientId, key)))).build()
+    val response = http.send(request, BodyHandlers.ofString())
+    assert(response.statusCode() == 200, s"token endpoint: HTTP ${response.statusCode()} ${response.body()}")
+    mapper.readTree(Base64.getUrlDecoder.decode(mapper.readTree(response.body()).get("access_token").asText().split("\\.")(1)))
+  }
+
+  /** A challenge of the S256 method, and the verifier that it is of. */
+  private def pkce(): (String, String) = {
+    val verifier = Base64.getUrlEncoder.withoutPadding().encodeToString(java.util.UUID.randomUUID().toString.getBytes(StandardCharsets.UTF_8))
+    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII))
+    (Base64.getUrlEncoder.withoutPadding().encodeToString(digest), verifier)
+  }
+
+  /** The key pair of a project's TRE client, as the project-key script makes it: the public key for the registration, the private key for the client's assertions. */
+  private def projectKey(id: String): (String, PrivateKey) = {
+    val afonHome = Files.createTempDirectory("afon-home")
+    runScript("project/key.sh", afonHome, id, "tre")
+    (Files.readString(afonHome.resolve(s"projects/$id/keys/tre.jwk")), privateKeyOf(afonHome.resolve(s"keys/$id/tre.pem")))
+  }
+
+  /** The emails that the mail server has for an address, the newest first. */
+  private def messagesTo(email: String): Seq[JsonNode] =
+    mapper.readTree(http.send(HttpRequest.newBuilder(URI.create(s"$mailUrl/api/v1/messages")).GET().build(), BodyHandlers.ofString()).body())
+      .get("messages").elements().asScala.filter(m => m.get("To").elements().asScala.exists(_.get("Address").asText == email)).toSeq
+
+  /** Waits a little for the mail server to have at least this many emails for an address. */
+  private def awaitMessagesTo(email: String, count: Int): Seq[JsonNode] = {
+    val deadline = System.currentTimeMillis() + 15000
+    var found = messagesTo(email)
+    while (found.size < count && System.currentTimeMillis() < deadline) { Thread.sleep(500); found = messagesTo(email) }
+    assert(found.size >= count, s"$count email(s) to $email expected at the mail server, and it has ${found.size}")
+    found
+  }
+
+  /** The first link of the newest email that the mail server has for an address, which it is waited for a little. */
+  private def linkOfInvitationTo(email: String): String = {
+    val found = awaitMessagesTo(email, 1)
+    val text = mapper.readTree(http.send(HttpRequest.newBuilder(URI.create(s"$mailUrl/api/v1/message/${found.head.get("ID").asText}")).GET().build(),
+                                         BodyHandlers.ofString()).body()).get("Text").asText()
+    "https?://\\S+".r.findFirstIn(text).getOrElse(fail(s"no link in the email to $email: $text"))
+  }
+
+  /**
+   * A researcher accepts the invitation that the identity provider emailed them, as in a browser: they follow its link, enrol an authenticator, set a password,
+   * and the identity provider marks their email verified.
+   *
+   * @return the secret of the authenticator that they enrolled
+   */
+  private def acceptInvitation(email: String, password: String): String = {
+    val browser = new Browser
+    var secret: Option[String] = None
+    var response = browser.send(HttpRequest.newBuilder(URI.create(linkOfInvitationTo(email))).GET())
+    for (_ <- 1 to 10 if response != null) {
+      if (response.statusCode() / 100 == 3) {
+        response = browser.send(HttpRequest.newBuilder(URI.create(baseUrl).resolve(response.headers().firstValue("Location").orElseThrow())).GET())
+      } else {
+        val page = response.body()
+        val action = "(?s)<form[^>]*\\saction=\"([^\"]+)\"".r.findFirstMatchIn(page).map(_.group(1).replace("&amp;", "&"))
+        val link = "href=\"([^\"]*login-actions[^\"]*)\"".r.findFirstMatchIn(page).map(_.group(1).replace("&amp;", "&"))
+        if (action.isDefined) {
+          val fields =
+            if (page.contains("name=\"password-new\"")) Seq("password-new" -> password, "password-confirm" -> password)
+            else if (page.contains("name=\"totpSecret\"")) {
+              secret = "name=\"totpSecret\" value=\"([^\"]+)\"".r.findFirstMatchIn(page).map(_.group(1))
+              Seq("totp" -> totp(secret.get), "totpSecret" -> secret.get, "userLabel" -> "phone")
+            } else Seq.empty
+          response = browser.send(HttpRequest.newBuilder(URI.create(action.get)).header("Content-Type", "application/x-www-form-urlencoded").POST(form(fields)))
+        } else if (link.isDefined) {
+          response = browser.send(HttpRequest.newBuilder(URI.create(link.get)).GET())
+        } else response = null
+      }
+    }
+    assert(secret.isDefined, s"the invitation to $email did not have them enrol an authenticator")
+    secret.get
   }
 
   private def clientUuid(clientId: String): String =
@@ -360,20 +543,88 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       assert(get(s"/admin/realms/$KEYCLOAK_REALM/users/$first/credentials").size() == 0)
       assert(!provider.findUser("nobody@tre.example").isPresent)
     }
+
+    "send the invitation again to a researcher who is in the identity provider, who can accept it, and refuse one who is not" in {
+      Given("a researcher made in the identity provider, who has been sent the invitation once")
+      provider.ensureUser("rob@tre.example", "Rob", "R")
+      awaitMessagesTo("rob@tre.example", 1)
+
+      When("the invitation is sent again")
+      provider.invite("rob@tre.example")
+
+      Then("the mail server has a second email for them, and following its link has them enrol an authenticator")
+      assert(awaitMessagesTo("rob@tre.example", 2).size == 2)
+      assert(acceptInvitation("rob@tre.example", "rob-password").nonEmpty)
+
+      When("it is sent to someone who is not in the identity provider")
+      Then("it fails, and sends nothing")
+      val error = intercept[IllegalStateException](provider.invite("nobody@tre.example"))
+      assert(error.getMessage.contains("nobody@tre.example"))
+      assert(messagesTo("nobody@tre.example").isEmpty)
+    }
+
+    "log a member in to the project's TRE client after a second factor, and refuse a user who is not a member, even with the session of another project" in {
+      Given("two TRE projects registered in the identity provider, the first with alice as a member and the second with bob")
+      val (first, second) = ("cfg-2026-0011", "cfg-2026-0012")
+      val (publicKey, privateKey) = projectKey(first)
+      val firstProject = projectOf(first, Seq("data1"), ownGit = false)
+      val secondProject = projectOf(second, Seq("data1"), ownGit = false)
+      provider.ensureProject(firstProject, Map("tre" -> publicKey).asJava)
+      provider.ensureProject(secondProject, Map("tre" -> publicKey).asJava)
+      adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
+      val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
+      val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
+      And("alice and bob have accepted the invitations that the identity provider emailed them, setting their passwords and enrolling their authenticators")
+      val aliceSecret = acceptInvitation("alice@tre.example", "alice-password")
+      val bobSecret = acceptInvitation("bob@tre.example", "bob-password")
+      provider.addMember(firstProject, alice)
+      provider.addMember(secondProject, bob)
+      val redirectUri = s"https://jupyter.$first.example.org/oauth2/callback"
+      val (challenge, verifier) = pkce()
+
+      When("alice logs in to the first project's TRE client, with their password and the code of their authenticator")
+      val browser = new Browser
+      val aliceLogin = login(browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret))
+      Then("the identity provider gives the client a code, whose token says that a second factor was used, and names the project, the user and the audiences")
+      assert(aliceLogin.code.isDefined, aliceLogin.page)
+      val token = exchange(s"$first-tre", privateKey, aliceLogin.code.get, redirectUri, verifier)
+      assert(token.get("acr").asText == "mfa", token.toString)
+      assert(values(token.get("project")) == Seq(first))
+      assert(token.get("polaris_principal").asText == s"afon:$alice")
+      assert(values(token.get("aud")).toSet == Set(s"$first-tre", "provider-data1"))
+
+      When("alice logs in again, with a new session")
+      val again = login(new Browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret))
+      Then("they are asked for the code of their authenticator, and the token says as much")
+      assert(again.code.isDefined, again.page)
+      assert(exchange(s"$first-tre", privateKey, again.code.get, redirectUri, verifier).get("acr").asText == "mfa")
+
+      When("alice asks, in the request that starts the login, for a level of authentication below the second factor")
+      val lowered = login(new Browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret), Some("1"))
+      Then("the identity provider still asks for the second factor, or gives no code: no token comes of a password alone")
+      assert(lowered.code.isEmpty || exchange(s"$first-tre", privateKey, lowered.code.get, redirectUri, verifier).get("acr").asText == "mfa",
+             s"a code of a password alone: $lowered")
+
+      When("bob, who is not a member of the first project, logs in to its TRE client with the right password")
+      val bobLogin = login(new Browser, s"$first-tre", redirectUri, challenge, "bob@tre.example", "bob-password", Some(bobSecret))
+      Then("the identity provider denies them, and gives the client no code")
+      assert(bobLogin.code.isEmpty)
+      assert(bobLogin.page.contains("You are not a member of this project"), bobLogin.page)
+
+      When("alice, who has a session of the first project, logs in to the second project's TRE client, of which they are not a member")
+      val denied = login(browser, s"$second-tre", s"https://jupyter.$second.example.org/oauth2/callback", challenge, "alice@tre.example", "alice-password",
+                         Some(aliceSecret))
+      Then("the identity provider denies them too: a session of one project is no way into another")
+      assert(denied.code.isEmpty)
+      assert(denied.page.contains("You are not a member of this project"), denied.page)
+    }
   }
 }
 
-/** The projects of the central identity, on AWS. */
+/**
+ * The projects of the central identity, run for AWS alone: they are tested against KeyCloak, which does not know the cloud of a project, and the only thing
+ * that the cloud changes, the name of the domain property that the redirect URIs are made from, is tested for each cloud by the unit tests of the provider.
+ */
 @Project
 @ProjectIdentity
 class ProjectIdentityAwsSpec extends AbstractProjectIdentitySpec(AfonCloud.AWS)
-
-/** The projects of the central identity, on Azure. */
-@Project
-@ProjectIdentity
-class ProjectIdentityAzureSpec extends AbstractProjectIdentitySpec(AfonCloud.AZURE)
-
-/** The projects of the central identity, on GCP. */
-@Project
-@ProjectIdentity
-class ProjectIdentityGcpSpec extends AbstractProjectIdentitySpec(AfonCloud.GCP)

@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The names that a project's resources have, so that no two projects share one, even in one cloud account, and the same project id in
@@ -21,6 +23,9 @@ import java.util.Properties;
  * the stacks needs, and fits every cloud's limits, whatever the id.  {@link #find} says which project a name is the token of.
  */
 public final class ProjectNames {
+
+    /** A {@code jdbc:postgresql://host[:port]/database[?parameters]} URL, by its part up to the database, the database and the parameters. */
+    private static final Pattern DB_URL = Pattern.compile("^(jdbc:postgresql://[^/?]+/)([^?/]+)(\\?.*)?$");
 
     /** The number of hex characters of the token. */
     static final int TOKEN_LENGTH = 10;
@@ -139,11 +144,19 @@ public final class ProjectNames {
      * @throws ProjectException if the domain has no parent domain, eg a registered domain, which the project's would be under the top level domain
      */
     static String subdomain(String property, String envDomain, String projectId) {
+        return subdomain(property, envDomain, projectId, "stacks.tre.domains");
+    }
+
+    /**
+     * @param where the key of the project's file that gives the domain instead, which a problem says to set
+     * @see #subdomain(String, String, String)
+     */
+    static String subdomain(String property, String envDomain, String projectId, String where) {
         String[] labels = envDomain.split("\\.");
         if (labels.length < 3) {
             throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
                 "cannot derive the project's %s from %s of the config the project is made from: it has no parent domain to put the project's under; "
-                    + "set it in stacks.tre.domains", property, envDomain)));
+                    + "set it in %s", property, envDomain, where)));
         }
         return labels[0] + "." + projectId + "." + String.join(".", java.util.Arrays.copyOfRange(labels, 1, labels.length));
     }
@@ -172,6 +185,18 @@ public final class ProjectNames {
                 }
             }
         }
+        if (project instanceof IdentityProject) {
+            // the identity's domain is under its project too, as a TRE's are: the env may serve a Keycloak of its own at the env's domain, which the
+            // identity would claim as well.  What the project's file gives, in stacks.identity.domain, wins.
+            String envDomain = env.getProperty(prefix + "OIDC_DOMAIN_NAME", "").trim();
+            if (envDomain.isEmpty()) {
+                envDomain = env.getProperty("OIDC_DOMAIN_NAME", "").trim();
+            }
+            // an env domain with no parent, eg emrysoauth.click, is left as it is: the project's is not under it, and the file may name one
+            if (envDomain.split("\\.").length >= 3 && !envDomain.contains("[") && !envDomain.contains("$")) {
+                cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", subdomain(prefix + "OIDC_DOMAIN_NAME", envDomain, project.id().value(), "stacks.identity.domain"));
+            }
+        }
         switch (cloud) {
             case AZURE -> {
                 // the containers of its catalogs, and of Git and the logs, are in the storage account, so they are the project's own
@@ -193,10 +218,22 @@ public final class ProjectNames {
                 }
             }
         }
+        Map<String, String> secrets = new LinkedHashMap<>();
+        if (project instanceof IdentityProject) {
+            // its Keycloak has a database of its own, as the identity of an env that has a Keycloak too would otherwise share the realm and the users of
+            // that one: the stack makes the database if it is absent
+            Matcher url = DB_URL.matcher(env.getProperty("KEYCLOAK_DB_URL", "").trim());
+            if (url.matches()) {
+                secrets.put("KEYCLOAK_DB_URL", url.group(1) + "keycloak-" + project.id().value() + (url.group(3) == null ? "" : url.group(3)));
+            }
+        }
         Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
         byFile.put(ProjectEnv.COMMON_FILE, common);
         byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
         byFile.put("catalogs-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", catalogs);
+        if (!secrets.isEmpty()) {
+            byFile.put("secret.properties", secrets);
+        }
         return byFile;
     }
 

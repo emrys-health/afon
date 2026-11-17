@@ -48,6 +48,7 @@ public final class DockerImages {
 
     public static final String POSTGRES_ALPINE_IMAGE     = reference("postgres-alpine");
     public static final String REGISTRY_IMAGE            = reference("registry");
+    public static final String MAILPIT_IMAGE             = reference("mailpit");
 
     /**
      * Overrides the appVersion of the vendored Trino Helm chart (see {@code

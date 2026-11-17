@@ -64,6 +64,7 @@ public class GenerateScriptMains {
         new ScriptEntry("db", "DbWhitelistMain", "db/whitelist.sh"),
 
         new ScriptEntry("project", "ProjectKeyMain", "project/key.sh"),
+        new ScriptEntry("project", "ProjectSmtpMain", "project/smtp.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
         new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),

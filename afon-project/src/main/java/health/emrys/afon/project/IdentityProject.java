@@ -19,8 +19,8 @@ import java.util.Map;
  * @param nodePool the nodes of its cluster, see {@link AfonProject#nodePool()}
  * @param dnsDelegation how the DNS zone of its domain is delegated, see {@link AfonProject#dnsDelegation()}
  * @param stack    the stack of the central identity that it deploys, eg {@code azure-keycloak}, of the project's cloud
- * @param domain   the domain of the identity, {@code <CLOUD>_OIDC_DOMAIN_NAME}, or {@code null} to leave it as the config the project is made
- *                 from has it
+ * @param domain   the domain of the identity, {@code <CLOUD>_OIDC_DOMAIN_NAME}, or {@code null} to derive it from that of the config the project is
+ *                 made from, with the project id as a label after the first, eg {@code azure-oidc.idp.emrys2.click}
  */
 public record IdentityProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
                               @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull StackId stack, @Nullable String domain) implements AfonProject {

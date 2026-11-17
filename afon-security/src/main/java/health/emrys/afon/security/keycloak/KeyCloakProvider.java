@@ -63,6 +63,9 @@ public class KeyCloakProvider implements IdentityProvider {
                 "https://" + jupyterDomain + JUPYTERHUB_CALLBACK);
     }
 
+    /** The attribute of a realm that maps an {@code acr} to a level of authentication, as JSON. */
+    static final String ACR_LOA_MAP = "acr.loa.map";
+
     /** Alias of the copied browser flow that this realm binds to, with its OTP step forced on. */
     public static final String BROWSER_MFA_FLOW = "browser-mfa";
     /** Alias of the copied direct-grant flow that only {@link #MFA_CLIENT} binds to, with its OTP step forced on. */
@@ -88,6 +91,7 @@ public class KeyCloakProvider implements IdentityProvider {
     private final String adminUsername;
     private final String adminPassword;
     private final String loginTheme;
+    private Smtp smtp;
     /**
      * How often, and how long apart, a token request failing with an I/O or server error is tried: up to five minutes, as
      * a KeyCloak starting on a busy cluster has taken three minutes to be ready.
@@ -135,6 +139,90 @@ public class KeyCloakProvider implements IdentityProvider {
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME),
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
                 properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
+        this.smtp = Smtp.of(properties);
+    }
+
+    /**
+     * The SMTP server that the realm sends its emails through, eg the invitations of {@link #ensureUser}.
+     *
+     * @param host     the server
+     * @param port     its port
+     * @param from     the address that the emails are sent from
+     * @param security how the connection is secured
+     * @param user     the user that authenticates to it, or {@code null} if none does
+     * @param password the password of the user
+     */
+    public record Smtp(String host, int port, String from, Security security, String user, String password) {
+
+        /** How the connection to an SMTP server is secured. */
+        public enum Security {
+            STARTTLS, SSL, NONE
+        }
+
+        /** Never says the password, as it is not logged. */
+        @Override
+        public String toString() {
+            return "Smtp[host=" + host + ", port=" + port + ", from=" + from + ", security=" + security + ", user=" + user + "]";
+        }
+
+        public Smtp {
+            if (host == null || host.isBlank() || from == null || from.isBlank()) {
+                throw new IllegalArgumentException("An SMTP server needs a host and the address to send from");
+            }
+        }
+
+        /**
+         * @return the server that the properties name, or {@code null} if they name none
+         * @throws IllegalArgumentException if they name a host with no address to send from, or a port or security that is not valid
+         */
+        static Smtp of(AfonPropertyProvider properties) {
+            String host = properties.getValue(KEYCLOAK_SMTP_HOST, "").trim();
+            if (host.isEmpty()) {
+                return null;
+            }
+            String from = properties.getValue(KEYCLOAK_SMTP_FROM, "").trim();
+            if (from.isEmpty()) {
+                throw new IllegalArgumentException(KEYCLOAK_SMTP_FROM + " is required with " + KEYCLOAK_SMTP_HOST + ": the address that the emails are sent from");
+            }
+            String port = properties.getValue(KEYCLOAK_SMTP_PORT, "").trim();
+            String security = properties.getValue(KEYCLOAK_SMTP_SECURITY, "").trim();
+            String user = properties.getValue(KEYCLOAK_SMTP_USERNAME, "").trim();
+            try {
+                return new Smtp(host, port.isEmpty() ? 587 : Integer.parseInt(port), from,
+                                security.isEmpty() ? Security.STARTTLS : Security.valueOf(security.toUpperCase(Locale.ROOT)),
+                                user.isEmpty() ? null : user, properties.getValue(KEYCLOAK_SMTP_PASSWORD, ""));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(KEYCLOAK_SMTP_PORT + " must be a number and " + KEYCLOAK_SMTP_SECURITY + " starttls, ssl or none", e);
+            }
+        }
+
+        /** @return the settings of a realm's {@code smtpServer} */
+        Map<String, String> realmSettings() {
+            Map<String, String> settings = new LinkedHashMap<>();
+            settings.put("host", host);
+            settings.put("port", String.valueOf(port));
+            settings.put("from", from);
+            settings.put("ssl", String.valueOf(security == Security.SSL));
+            settings.put("starttls", String.valueOf(security == Security.STARTTLS));
+            if (user != null) {
+                settings.put("auth", "true");
+                settings.put("user", user);
+                settings.put("password", password == null ? "" : password);
+            } else {
+                settings.put("auth", "false");
+            }
+            return settings;
+        }
+    }
+
+    /**
+     * Has the realm send its emails through this server, from {@link #createRealm} on.
+     *
+     * @return this provider
+     */
+    public KeyCloakProvider withSmtp(Smtp smtp) {
+        this.smtp = smtp;
+        return this;
     }
 
     /** The URL of KeyCloak's REST API, for tests. */
@@ -333,6 +421,10 @@ public class KeyCloakProvider implements IdentityProvider {
         String displayNameHtml = branding.getProperty("displayNameHtml");
         if (displayNameHtml != null) {
             realmConfig.put("displayNameHtml", displayNameHtml);
+        }
+        if (smtp != null) {
+            // without it the realm keeps the server it has, and with none an invitation cannot be sent
+            realmConfig.put("smtpServer", smtp.realmSettings());
         }
         String json = mapper.writeValueAsString(realmConfig);
         HttpResponse created = postJson(adminToken, "/admin/realms", json, "realm " + realm);
@@ -1096,20 +1188,51 @@ public class KeyCloakProvider implements IdentityProvider {
      * and can be invited again.
      */
     private void invite(String token, String id, String username) throws IOException {
-        String uri = format("/admin/realms/%s/users/%s/execute-actions-email", KEYCLOAK_REALM, id);
-        HttpResponse response = putJson(token, uri, mapper.writeValueAsString(INVITATION_ACTIONS), "the invitation of " + username);
+        HttpResponse response = sendInvitation(token, id, username);
         if (isFailure(response)) {
             logger.warn("Could not send the invitation email to {} (HTTP {}): is SMTP configured on the realm?", username,
                         response.getCode());
         }
     }
 
+    private HttpResponse sendInvitation(String token, String id, String username) throws IOException {
+        String uri = format("/admin/realms/%s/users/%s/execute-actions-email", KEYCLOAK_REALM, id);
+        return putJson(token, uri, mapper.writeValueAsString(INVITATION_ACTIONS), "the invitation of " + username);
+    }
+
     @Override
     public Optional<String> findUser(String email) {
         try {
-            return Optional.ofNullable(userId(adminToken(), KEYCLOAK_REALM, email.toLowerCase(Locale.ROOT)));
+            return Optional.ofNullable(userIdOf(adminToken(), email.toLowerCase(Locale.ROOT)));
         } catch (IOException e) {
             throw new RuntimeException("Failed to look up KeyCloak user " + email, e);
+        }
+    }
+
+    /**
+     * @return the id of the user of the email, which is their identity, whatever their username is, else of the one with it as their username, or null
+     */
+    private String userIdOf(String token, String email) throws IOException {
+        String id = userIdByEmail(token, KEYCLOAK_REALM, email);
+        return id != null ? id : userId(token, KEYCLOAK_REALM, email);
+    }
+
+    @Override
+    public void invite(String email) {
+        String address = email.toLowerCase(Locale.ROOT);
+        try {
+            String token = adminToken();
+            String id = userIdOf(token, address);
+            if (id == null) {
+                throw new IllegalStateException("No user " + address + " in the central identity: add them to a project first");
+            }
+            HttpResponse response = sendInvitation(token, id, address);
+            if (isFailure(response)) {
+                throw new IllegalStateException(format(
+                    "Could not send the invitation email to %s (HTTP %d): is SMTP configured on the realm? See KEYCLOAK_SMTP_HOST", address, response.getCode()));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to invite KeyCloak user " + address, e);
         }
     }
 
@@ -1121,10 +1244,13 @@ public class KeyCloakProvider implements IdentityProvider {
             String token = adminToken();
             String realm = KEYCLOAK_REALM;
             ensurePrincipalInUserProfile(token);
-            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project), jwks(publicKeys, "tre"));
+            ensureAcrLevel(token, realm, identity.acr());
+            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project), jwks(publicKeys, "tre"),
+                                             ensureBrowserFlow(token, realm, identity.treClient(), id), identity.acr());
             // a project with no Git of its own has Git deployed with its TRE, so no Git client
             String git = project.git() == null ? null
-                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), jwks(publicKeys, "git"));
+                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), jwks(publicKeys, "git"),
+                                      ensureBrowserFlow(token, realm, identity.gitClient(), id), identity.acr());
             List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
             project.providers().forEach(provider -> treAudiences.add(provider.audience()));
             convergeProjectClient(token, realm, tre, identity.treClient(), id, identity, treAudiences);
@@ -1161,12 +1287,13 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * Makes, or converges, a project's client: standard flow only (no direct grants, service accounts or implicit flow), with
-     * PKCE, full scope off so that no role but its own reaches a token, and authenticating by {@code private_key_jwt}.
+     * PKCE, full scope off so that no role but its own reaches a token, and authenticating by {@code private_key_jwt}.  Its login
+     * is the flow that only the project's members pass, after a second factor, see {@link KeyCloakProjectFlow}.
      *
      * @return the client's internal UUID
      */
-    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String jwks)
-        throws IOException {
+    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String jwks,
+                                       String browserFlowId, String acr) throws IOException {
         String json = mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("enabled", true),
@@ -1180,10 +1307,16 @@ public class KeyCloakProvider implements IdentityProvider {
             Map.entry("fullScopeAllowed", false),
             Map.entry("redirectUris", redirectUris),
             Map.entry("webOrigins", List.of("+")),
+            // the login that admits only the members, after the second factor
+            Map.entry("authenticationFlowBindingOverrides", Map.of("browser", browserFlowId)),
             Map.entry("attributes", Map.of(
                 "use.jwks.string", "true",
                 "jwks.string", jwks,
-                "pkce.code.challenge.method", "S256"))));
+                "pkce.code.challenge.method", "S256",
+                // asked for by default, and the least that a login may be: a request for less (acr_values=1) is a request for a token
+                // of a password alone, which carries the project claim and the audiences all the same
+                "default.acr.values", acr,
+                "minimum.acr.value", acr))));
         HttpResponse created = postJson(token, format("/admin/realms/%s/clients", realm), json, "project client " + clientId);
         String uuid = clientUuid(token, realm, clientId);
         if (uuid == null) {
@@ -1251,6 +1384,131 @@ public class KeyCloakProvider implements IdentityProvider {
                 restClient.delete(format("/admin/realms/%s/clients/%s/protocol-mappers/models/%s", realm, uuid, existing.get("id")), token);
                 logger.info("Removed the audience mapper {} of client {}", name, clientId);
             }
+        }
+    }
+
+    /**
+     * Makes the realm map the {@code acr} to the level of authentication that a second factor gives, so that a login at that
+     * level has the {@code acr} in its token, and the client that asks for it by default.  The other entries of the map are kept,
+     * as the realm's attributes are replaced by those sent.
+     */
+    private void ensureAcrLevel(String token, String realm, String acr) throws IOException {
+        String uri = format("/admin/realms/%s", realm);
+        Map<String, Object> representation = getMap(token, uri, "realm " + realm);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        Object existing = representation.get("attributes");
+        if (existing instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> attributes.put(String.valueOf(key), value));
+        }
+        Map<String, Object> levels = new LinkedHashMap<>();
+        Object mapped = attributes.get(ACR_LOA_MAP);
+        if (mapped instanceof String json && !json.isBlank()) {
+            mapper.readTree(json).fields().forEachRemaining(entry -> levels.put(entry.getKey(), entry.getValue().asText()));
+        }
+        if (KeyCloakProjectFlow.MFA_LEVEL.equals(levels.get(acr))) {
+            return;
+        }
+        levels.put(acr, KeyCloakProjectFlow.MFA_LEVEL);
+        attributes.put(ACR_LOA_MAP, mapper.writeValueAsString(levels));
+        if (isFailure(putJson(token, uri, mapper.writeValueAsString(Map.of("attributes", attributes)), "the ACR levels of realm " + realm))) {
+            throw new IOException("Could not map the acr " + acr + " to a level in realm " + realm);
+        }
+        logger.info("Mapped the acr {} to level {} in realm {}", acr, KeyCloakProjectFlow.MFA_LEVEL, realm);
+    }
+
+    /**
+     * Makes, or converges, the browser login of a project's client, {@link KeyCloakProjectFlow}: what is absent is made, and each
+     * requirement and configuration is set as it should be, so that a login that was made is never left open while it is converged.
+     *
+     * @return the id of the top flow, which the client binds its login to
+     */
+    private String ensureBrowserFlow(String token, String realm, String clientId, String projectId) throws IOException {
+        KeyCloakProjectFlow.Node top = KeyCloakProjectFlow.of(clientId, projectId);
+        if (flowIdOrNull(token, realm, top.name()) == null) {
+            String json = mapper.writeValueAsString(Map.of("alias", top.name(), "providerId", "basic-flow", "topLevel", true, "builtIn", false,
+                                                          "description", "The login of the project's client " + clientId));
+            if (isFailure(postJson(token, format("/admin/realms/%s/authentication/flows", realm), json, "flow " + top.name()))) {
+                throw new IOException("Could not make KeyCloak flow " + top.name());
+            }
+        }
+        ensureFlowChildren(token, realm, top);
+        return flowId(token, realm, top.name());
+    }
+
+    private void ensureFlowChildren(String token, String realm, KeyCloakProjectFlow.Node flow) throws IOException {
+        for (KeyCloakProjectFlow.Node child : flow.children()) {
+            Map<String, Object> execution = directExecution(flowExecutions(token, realm, flow.name()), child);
+            if (execution == null) {
+                String kind = child.isFlow() ? "flow" : "execution";
+                Map<String, Object> body = child.isFlow()
+                    ? Map.of("alias", child.name(), "type", "basic-flow", "provider", "registration-page-form", "description", child.name())
+                    : Map.of("provider", child.provider());
+                String uri = format("/admin/realms/%s/authentication/flows/%s/executions/%s", realm, pathSegment(flow.name()), kind);
+                if (isFailure(postJson(token, uri, mapper.writeValueAsString(body), kind + " " + (child.isFlow() ? child.name() : child.provider())))) {
+                    throw new IOException(format("Could not make %s %s in KeyCloak flow %s", kind, child.isFlow() ? child.name() : child.provider(), flow.name()));
+                }
+                execution = directExecution(flowExecutions(token, realm, flow.name()), child);
+                if (execution == null) {
+                    throw new IOException(format("KeyCloak made %s in flow %s but does not list it", child.isFlow() ? child.name() : child.provider(), flow.name()));
+                }
+            }
+            if (!child.requirement().equals(execution.get("requirement"))) {
+                execution.put("requirement", child.requirement());
+                if (isFailure(putJson(token, format("/admin/realms/%s/authentication/flows/%s/executions", realm, pathSegment(flow.name())),
+                                      mapper.writeValueAsString(execution), "execution " + execution.get("displayName") + " -> " + child.requirement()))) {
+                    throw new IOException("Could not set KeyCloak flow execution " + execution.get("displayName"));
+                }
+            }
+            if (!child.config().isEmpty()) {
+                ensureExecutionConfig(token, realm, String.valueOf(execution.get("id")), (String) execution.get("authenticationConfig"), child);
+            }
+            if (child.isFlow()) {
+                ensureFlowChildren(token, realm, child);
+            }
+        }
+    }
+
+    /**
+     * @return the execution that the flow holds directly, of the node's alias if it is a flow, or its provider if it is not, or null
+     */
+    private static Map<String, Object> directExecution(List<Map<String, Object>> executions, KeyCloakProjectFlow.Node node) {
+        for (Map<String, Object> execution : executions) {
+            int level = execution.get("level") instanceof Number number ? number.intValue() : 0;
+            boolean isFlow = Boolean.TRUE.equals(execution.get("authenticationFlow"));
+            if (level == 0 && isFlow == node.isFlow()
+                && (node.isFlow() ? node.name().equals(execution.get("displayName")) : node.provider().equals(execution.get("providerId")))) {
+                return execution;
+            }
+        }
+        return null;
+    }
+
+    private void ensureExecutionConfig(String token, String realm, String executionId, String configId, KeyCloakProjectFlow.Node node)
+        throws IOException {
+        Map<String, Object> config = new LinkedHashMap<>(Map.of("alias", node.name(), "config", node.config()));
+        if (configId == null) {
+            String uri = format("/admin/realms/%s/authentication/executions/%s/config", realm, executionId);
+            if (isFailure(postJson(token, uri, mapper.writeValueAsString(config), "the configuration " + node.name()))) {
+                throw new IOException("Could not configure KeyCloak flow execution " + node.name());
+            }
+            return;
+        }
+        config.put("id", configId);
+        if (isFailure(putJson(token, format("/admin/realms/%s/authentication/config/%s", realm, configId), mapper.writeValueAsString(config),
+                              "the configuration " + node.name()))) {
+            throw new IOException("Could not configure KeyCloak flow execution " + node.name());
+        }
+    }
+
+    /** @return the id of the realm's flow of this alias, or null if there is none */
+    private String flowIdOrNull(String token, String realm, String flowAlias) throws IOException {
+        try {
+            return flowId(token, realm, flowAlias);
+        } catch (IOException e) {
+            if (e.getMessage() != null && e.getMessage().startsWith("No KeyCloak flow")) {
+                return null;
+            }
+            throw e;
         }
     }
 

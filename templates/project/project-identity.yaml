@@ -14,6 +14,12 @@ project:
   # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>
   egressIp: <egress-ip>
 
+# its domain is that of the env with the project's id as a label after the first, eg azure-oidc.emrys2.click is azure-oidc.${id}.emrys2.click:
+# the TRE projects name it in identity.issuerUrl.  To give it another, uncomment and edit:
+# stacks:
+#   identity:
+#     domain: azure-oidc.${id}.example.org
+
 # how the DNS zone of its domain is delegated from the parent domain: manual (or none, or no value), where you delegate by hand: up does not
 # stop, so run it with --until create, add the NS records that dns-delegate shows to the parent zone, then run the rest; or route53, where
 # up writes them to the Route 53 hosted zone of the parent domain, in the current AWS account, and runs through

@@ -92,6 +92,12 @@ images:
     tag: 2.8.3
     digest: sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
     category: third-party
+  mailpit:
+    # the mail server of the acceptance tests of the central identity, which keeps the invitations that its Keycloak sends
+    image: axllent/mailpit
+    tag: v1.27
+    digest: sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    category: third-party
   postgres-alpine:
     image: postgres
     tag: 16-alpine

@@ -47,9 +47,9 @@ public final class ProjectEnv {
     static final String BLOCK_HEADER = "# --- Derived from project.yaml by manage-project: do not edit, configure it again ---";
 
     /**
-     * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $}, {@code ;} or the like, but the {@code ,} of a node pool.
+     * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $}, {@code ;} or the like, but the {@code ,} of a node pool and the {@code ?} and {@code =} of the parameters of a database URL.
      */
-    private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@,\\[\\]+-]+");
+    private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@,\\[\\]+?=-]+");
 
     private ProjectEnv() {
     }
@@ -243,7 +243,17 @@ public final class ProjectEnv {
      * @return the properties of the config dir that the names of a project's resources are made from, with their references resolved
      */
     public static Properties envProperties(Path envConfig) {
-        return new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs")).getProperties();
+        Properties properties = new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs")).getProperties();
+        // the database of the env's Keycloak, which is a secret, from which the identity project names a database of its own
+        try {
+            String url = new FilePropertyProvider(envConfig.toString(), List.of("afon", "secret")).getValue(AfonProperty.KEYCLOAK_DB_URL, "");
+            if (url != null && !url.isBlank()) {
+                properties.setProperty(AfonProperty.KEYCLOAK_DB_URL.getName(), url.trim());
+            }
+        } catch (RuntimeException e) {
+            // an env with no secrets, or secrets that do not resolve, has no database to derive one from
+        }
+        return properties;
     }
 
     /** A line of a properties file that sets a property in terms of others, eg {@code AZURE_GITEA_BUCKET=${AZURE_STORAGE_ACCOUNT}-gitea}. */
