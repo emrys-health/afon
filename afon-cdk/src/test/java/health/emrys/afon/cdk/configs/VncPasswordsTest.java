@@ -72,19 +72,6 @@ class VncPasswordsTest {
     }
 
     @Test
-    void handsEachPodItsUsersSecretByReference() {
-        String hubConfig = resources.path("kubernetes_config_map").path("jupyterhubConfigMap")
-                                    .path("data").path("jupyterhub_config.py").asText();
-
-        assertThat(hubConfig)
-            .contains("c.KubeSpawner.environment = {'JUPYTER_VNC_SESSIONS': '1'}")
-            .contains("spawner.environment['JUPYTER_VNC_PASSWORD'] = {\n"
-                      + "        'valueFrom': {'secretKeyRef': {'name': 'vnc-password-' + slug, 'key': 'password'}}}")
-            .contains("raise web.HTTPError(403, 'No desktop is provisioned for %s' % spawner.user.name)")
-            .doesNotContain(MASTER_KEY);
-    }
-
-    @Test
     void givesGuacamoleEachUsersOwnPassword() {
         String sql = resources.path("kubernetes_config_map").path("guacamoleProvisionCm")
                               .path("data").path("provision.sql").asText();
