@@ -33,10 +33,12 @@ class DockerImagesTest {
 
     @Test
     void onlyTheImagesOfTheChartsAreNotPinned() {
-        // polaris is pinned too: Kyverno pins the unpinned images of a signed cluster to a digest, which the plan would then differ from
+        // polaris is pinned too: Kyverno pins the unpinned images of a signed cluster to a digest, which the plan would then differ from.
+        // notebook-alternative is a placeholder until the second notebook image is chosen: only a spawned pod, which is not in the plan,
+        // runs it, and Kyverno refuses it in a signed cluster, as it has no signature
         assertThat(DockerImages.all().get("trino").digest()).isNull();
         assertThat(DockerImages.all().values()).filteredOn(image -> image.digest() == null)
-            .extracting(DockerImageDefinitions.Definition::name).containsExactlyInAnyOrder("trino")
+            .extracting(DockerImageDefinitions.Definition::name).containsExactlyInAnyOrder("trino", "notebook-alternative")
             .allSatisfy(name -> assertThat(DockerImages.all().get(name).unpinned()).isNotBlank());
     }
 

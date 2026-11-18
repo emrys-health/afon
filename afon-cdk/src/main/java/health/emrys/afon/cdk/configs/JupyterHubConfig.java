@@ -124,6 +124,15 @@ public class JupyterHubConfig {
     private static final String GUACAMOLE_USER = "guacamole-user";
 
     /**
+     * The slug of the notebook profile a spawn without a {@code profile} argument gets: the pyspark-notebook image.
+     */
+    static final String DEFAULT_PROFILE     = "pyspark";
+    /**
+     * The slug of the other notebook profile, chosen with {@code /hub/spawn?profile=alternative&next=/guacamole/}.
+     */
+    static final String ALTERNATIVE_PROFILE = "alternative";
+
+    /**
      * Label KubeSpawner stamps on every notebook pod it spawns (see {@code extra_labels} in
      * {@link #jupyterhubConfigPy()}). It is the handle the egress {@code NetworkPolicy} selects on:
      * the pods that need locking down are the per-user notebooks — where user code actually runs —
@@ -603,12 +612,14 @@ public class JupyterHubConfig {
                # --- The hub owns the domain root. ---
                c.JupyterHub.base_url = '%7$s'
                # A bare visit to the domain root auto-spawns the user's pod and then hands off to
-               # Guacamole, which streams that pod's VNC desktop. Sending root traffic to the spawn
-               # page makes it auto-submit (there is no options form); ?next redirects the browser to
-               # Guacamole once the pod is up, rather than to the single-user web UI, which the
+               # Guacamole, which streams that pod's VNC desktop. The spawn page starts the server
+               # straight away, without showing its options form, because it is given a query
+               # argument other than next: the profile (see profile_list below). Keep ?profile: without
+               # it, the hub shows the form for choosing a profile instead. ?next redirects the browser
+               # to Guacamole once the pod is up, rather than to the single-user web UI, which the
                # browser cannot reach (see redirect_to_server below). Keep ?next: without it a spawn
                # ends on /hub/home, not the desktop.
-               c.JupyterHub.default_url = '/hub/spawn?next=%13$s'
+               c.JupyterHub.default_url = '/hub/spawn?profile=%24$s&next=%13$s'
                
                # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
                c.ConfigurableHTTPProxy.should_start = False
@@ -630,6 +641,17 @@ public class JupyterHubConfig {
                c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
                c.KubeSpawner.namespace = os.environ.get('POD_NAMESPACE', 'default')
                c.KubeSpawner.image = '%5$s'
+               # The images a user may spawn, chosen by slug with /hub/spawn?profile=<slug>&next=...
+               # It is an allowlist: an unknown slug fails the spawn, and the image is never taken from
+               # the request. Each image must run the VNC desktop (start-vnc.sh) and jupyterhub-singleuser,
+               # as Guacamole and the hub rely on them, so build it FROM pyspark-notebook. A user has one
+               # server, so a running one is not replaced: they stop it, from /hub/home, to change image.
+               c.KubeSpawner.profile_list = [
+                   {'display_name': 'PySpark', 'slug': '%24$s', 'default': True,
+                    'kubespawner_override': {'image': '%5$s'}},
+                   {'display_name': 'Alternative', 'slug': '%25$s',
+                    'kubespawner_override': {'image': '%26$s'}},
+               ]
                # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
                c.KubeSpawner.image_pull_policy = 'Always'
                c.KubeSpawner.port = %6$d
@@ -721,7 +743,8 @@ public class JupyterHubConfig {
             SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
             pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL,
             vncSecretName(""), VNC_PASSWORD_KEY,
-            TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME);
+            TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME,
+            DEFAULT_PROFILE, ALTERNATIVE_PROFILE, images.notebookAlternative());
     }
 
     /**

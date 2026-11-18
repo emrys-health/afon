@@ -100,6 +100,7 @@ public final class DockerImageResolver {
     public String keycloak()         { return reference("keycloak"); }
     public String spark()            { return reference("spark"); }
     public String pysparkNotebook()  { return reference("pyspark-notebook"); }
+    public String notebookAlternative() { return reference("notebook-alternative"); }
     public String gitea()            { return reference("gitea"); }
     public String jupyterhubHub()    { return reference("jupyterhub-hub"); }
     public String jupyterhubProxy()  { return reference("jupyterhub-proxy"); }

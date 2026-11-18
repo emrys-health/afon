@@ -23,6 +23,14 @@ images:
     tag: x86_64-spark-4.0.1_afon402
     digest: sha256:1d0350512144937e2f7b446fd857b03dddedc90fd5f8aaebdb2c464c3303ce75
     category: first-party
+  # The second notebook image a user can spawn, with /hub/spawn?profile=alternative, see JupyterHubConfig.  A placeholder:
+  # replace the image and tag with a real one, built FROM pyspark-notebook so it has the VNC desktop and jupyterhub-singleuser
+  # that Guacamole and the hub rely on, then pin it with: afon-cli.sh docker-image --pin notebook-alternative
+  notebook-alternative:
+    image: emryshealth/notebook-alternative
+    tag: placeholder
+    unpinned: a placeholder, which does not exist, until the second notebook image is chosen
+    category: first-party
 
   # upstream
   # The tag of the Polaris images is the version of Polaris the project builds against, so when polaris.version in the root
