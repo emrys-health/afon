@@ -30,8 +30,8 @@ import static java.lang.String.format;
  *                                                   └─► guacamole-web ClusterIP (port 8080) ─► Guacamole
  * </pre>
  *
- * <p>oauth2-proxy delegates authentication to an OIDC provider (default: Google). MFA is enforced
- * by the provider itself — any account with 2-Step Verification enabled will require it.
+ * <p>oauth2-proxy delegates authentication to the OIDC issuer, the cloud's KeyCloak
+ * ({@code OIDC_ISSUER_URL}). MFA is enforced by KeyCloak itself, whose browser flow requires it.
  */
 public class JupyterMfaConfig {
 
