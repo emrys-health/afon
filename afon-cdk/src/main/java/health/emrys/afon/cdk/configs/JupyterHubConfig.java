@@ -66,9 +66,11 @@ import static org.slf4j.LoggerFactory.getLogger;
  *   <li>per-user notebook pods — created at runtime by {@code KubeSpawner}, not declared here.</li>
  * </ul>
  *
- * <p>Authentication is fronted by oauth2-proxy (so an OIDC provider
- * enforces MFA); the hub itself therefore uses a pass-through authenticator. oauth2-proxy points at
- * the {@code proxy-public} ClusterIP service rather than at a single Jupyter pod.
+ * <p>Authentication is fronted by oauth2-proxy, so that the cloud's KeyCloak enforces MFA before any
+ * request reaches the hub. The hub is also an OIDC client of that KeyCloak itself
+ * ({@code GenericOAuthenticator}), so it can capture each user's token in {@code auth_state} and hand it
+ * to their pod; as the user already has a KeyCloak session, this second login does not prompt them.
+ * oauth2-proxy points at the {@code proxy-public} ClusterIP service rather than at a single Jupyter pod.
  */
 public class JupyterHubConfig {
 

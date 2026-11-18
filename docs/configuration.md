@@ -169,8 +169,7 @@ Once the config is in place, with `--env <new env>` (or `config-switch`), and lo
    to them, eg the IAM whitelist entry of each AWS catalog bucket.  Then set `AZURE_CONNECTION_STRING` (blank in the copy), as above.
 3. **Certificates:** issue the certificate of each domain name, `<cloud>-issue-cert`; check with
    `<cloud>-issue-cert --check`.  
-4. **Google OAuth:** add the redirect URIs of the new Jupyter domain names to the Google OAuth client `OAUTH2_CLIENT_ID`.
-5. **The config in the vaults:** `config-vault push <tag> -c <cloud>` for each cloud, so that the env can be pulled elsewhere, eg by the smoke tests. The Key Vault of Azure is new, so it holds nothing yet.
+4. **The config in the vaults:** `config-vault push <tag> -c <cloud>` for each cloud, so that the env can be pulled elsewhere, eg by the smoke tests. The Key Vault of Azure is new, so it holds nothing yet.
 
 #### For the CI smoke tests
 
