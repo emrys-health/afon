@@ -20,8 +20,8 @@ images:
     category: first-party
   pyspark-notebook:
     image: emryshealth/pyspark-notebook
-    tag: x86_64-spark-4.0.1_afon328
-    digest: sha256:587bdc84c43a8b8c025c17a8ccdf172b2c10c0b3bfa277198525ea5a5327326c
+    tag: x86_64-spark-4.0.1_afon402
+    digest: sha256:1d0350512144937e2f7b446fd857b03dddedc90fd5f8aaebdb2c464c3303ce75
     category: first-party
 
   # upstream
