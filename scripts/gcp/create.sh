@@ -57,6 +57,9 @@ admin_grants_of() {
 }
 
 IFS=',' read -ra CATALOG_IDS <<< "$GCP_CATALOG_IDS"
+# the catalogs of a Data Provider that a TRE project reads are not made, nor deleted, here: their storage is the Data Provider's
+source $AFON_ROOT/scripts/config/catalog-source.sh
+own_catalog_ids GCP CATALOG_IDS
 
 ## Service Accounts
 

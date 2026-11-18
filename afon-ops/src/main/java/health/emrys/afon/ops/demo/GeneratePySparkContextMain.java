@@ -54,7 +54,7 @@ public class GeneratePySparkContextMain {
     public void generatePySparkCode() {
         String tableName = tableName();
         System.out.println("\u001B[32m");
-        System.out.println(new PySparkSessionCode(polarisConfig).sessionCode(sparkCatalogs()));
+        System.out.println(new PySparkSessionCode(polarisConfig).sessionCode(sparkCatalogs(), dataProviderCatalogs()));
         System.out.println("""
                            df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
                            print("Initialized test data")
@@ -134,6 +134,15 @@ public class GeneratePySparkContextMain {
         Map<String, String> catalogs = new LinkedHashMap<>();
         afonCatalogs.all().forEach(catalog -> catalogs.put(catalog.toString(), catalog.toString()));
         catalogs.put(FEDERATED_CATALOG_NAME, FEDERATED_CATALOG_NAME);
+        return catalogs;
+    }
+
+    /**
+     * The catalogs of the Data Providers that a TRE project reads, each under its id, which is not the name of a catalog of the stack's own.
+     */
+    private Map<String, AfonCatalog> dataProviderCatalogs() {
+        Map<String, AfonCatalog> catalogs = new LinkedHashMap<>();
+        afonCatalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER).forEach(catalog -> catalogs.put(catalog.id(), catalog));
         return catalogs;
     }
 

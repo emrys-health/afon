@@ -179,4 +179,60 @@ class WhitelistConfigTest {
         WhitelistConfig whitelist = new WhitelistConfig(new FilePropertyProvider(TEMPLATES_CONFIG_DIR), TEMPLATES_CONFIG_DIR);
         assertThat(whitelist.domains()).isNotNull();
     }
+
+    private WhitelistConfig whitelistWith(String extraProperties) throws IOException {
+        Files.writeString(dir.resolve("afon.properties"), PROPERTIES + extraProperties);
+        Files.writeString(dir.resolve("whitelist.yaml"), WHITELIST);
+        return new WhitelistConfig(new FilePropertyProvider(dir.toString(), List.of("afon")), dir.toString());
+    }
+
+    private static String dataProvider(String cloud, String id, String uri, String bucket) {
+        return cloud + "_CATALOG_IDS=" + id + "\n" + cloud + "_CATALOG_NAME_" + id + "=cvd\n" + cloud + "_CATALOG_TYPE_" + id + "=rest\n"
+               + cloud + "_CATALOG_SOURCE_" + id + "=data-provider\n" + cloud + "_CATALOG_URI_" + id + "=" + uri + "\n"
+               + cloud + "_CATALOG_AUDIENCE_" + id + "=provider-x\n" + cloud + "_BUCKET_NAME_" + id + "=" + bucket + "\n";
+    }
+
+    @Test
+    void aTreMayResolveTheEndpointAndTheStorageOfTheCatalogsOfItsDataProvidersWhateverItsCloud() throws IOException {
+        String properties = dataProvider("AZURE", "lon_cvd", "https://azure-polaris.lon.example/api/catalog", "afonstorage1");
+        assertThat(whitelistWith(properties).domains(AfonCloud.AWS))
+            .contains("azure-polaris.lon.example", "afonstorage1.blob.core.windows.net")
+            .contains("pypi.org", "oidc.example", "pol-aws.example", "bucket-1.s3.eu-west-1.amazonaws.com");
+        assertThat(whitelistWith(properties).domains(AfonCloud.GCP)).contains("azure-polaris.lon.example", "afonstorage1.blob.core.windows.net");
+        assertThat(whitelistWith(properties).domains()).contains("azure-polaris.lon.example", "afonstorage1.blob.core.windows.net");
+    }
+
+    @Test
+    void theStorageOfADataProviderIsThatOfItsCloud() throws IOException {
+        assertThat(whitelistWith(dataProvider("AWS", "nw_cvd", "https://aws-polaris.nw.example/api/catalog", "afon-abc-cvd")).domains(AfonCloud.AZURE))
+            .contains("aws-polaris.nw.example", "afon-abc-cvd.s3.eu-west-1.amazonaws.com");
+        assertThat(whitelistWith(dataProvider("GCP", "nw_cvd", "https://gcp-polaris.nw.example/api/catalog", "afon-abc-cvd")).domains(AfonCloud.AZURE))
+            .contains("gcp-polaris.nw.example", "storage.googleapis.com");
+    }
+
+    @Test
+    void theCatalogsOfADataProviderOnTheSameStorageAreOneDomain() throws IOException {
+        String properties = "AZURE_CATALOG_IDS=lon_cvd,lon_dbt\n"
+            + "AZURE_CATALOG_NAME_lon_cvd=cvd\nAZURE_CATALOG_TYPE_lon_cvd=rest\nAZURE_CATALOG_SOURCE_lon_cvd=data-provider\n"
+            + "AZURE_CATALOG_URI_lon_cvd=https://azure-polaris.lon.example/api/catalog\nAZURE_CATALOG_AUDIENCE_lon_cvd=provider-lon\nAZURE_BUCKET_NAME_lon_cvd=afonstorage1\n"
+            + "AZURE_CATALOG_NAME_lon_dbt=dbt\nAZURE_CATALOG_TYPE_lon_dbt=rest\nAZURE_CATALOG_SOURCE_lon_dbt=data-provider\n"
+            + "AZURE_CATALOG_URI_lon_dbt=https://azure-polaris.lon.example/api/catalog\nAZURE_CATALOG_AUDIENCE_lon_dbt=provider-lon\nAZURE_BUCKET_NAME_lon_dbt=afonstorage1\n";
+        assertThat(whitelistWith(properties).domains(AfonCloud.AWS))
+            .containsOnlyOnce("azure-polaris.lon.example").containsOnlyOnce("afonstorage1.blob.core.windows.net");
+    }
+
+    @Test
+    void aConfigWithNoDataProviderHasTheDomainsItHadBefore() throws IOException {
+        assertThat(whitelist(WHITELIST).domains(AfonCloud.AWS))
+            .containsExactly("pypi.org", "oidc.example", "pol-aws.example", "jup-aws.example",
+                             "bucket-1.s3.eu-west-1.amazonaws.com", "bucket-2.s3.eu-west-1.amazonaws.com");
+    }
+
+    @Test
+    void theStorageOfADataProviderOnAwsIsLeftOutWhenThisConfigHasNoRegion() throws IOException {
+        Files.writeString(dir.resolve("afon.properties"), "OIDC_DOMAIN_NAME=oidc.example\n" + dataProvider("AWS", "nw_cvd", "https://aws-polaris.nw.example/api/catalog", "afon-abc-cvd"));
+        Files.writeString(dir.resolve("whitelist.yaml"), "common:\n  domains:\n    - ${OIDC_DOMAIN_NAME}\n");
+        assertThat(new WhitelistConfig(new FilePropertyProvider(dir.toString(), List.of("afon")), dir.toString()).domains(AfonCloud.AZURE))
+            .containsExactly("oidc.example", "aws-polaris.nw.example");
+    }
 }

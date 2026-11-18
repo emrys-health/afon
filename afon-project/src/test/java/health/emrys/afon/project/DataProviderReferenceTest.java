@@ -92,6 +92,29 @@ class DataProviderReferenceTest {
         assertThat(project.dataProviders().get(0).catalogName()).isEqualTo("dbt");
     }
 
+    /**
+     * End to end, in the config that a TRE is deployed with: the catalogs that its file names of a Data Provider's project, as that project and its env say
+     * them, are in its catalogs file as catalogs from the Data Provider, read as any catalog is, and are not among those the stack makes.
+     */
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresATreWithTheCatalogsOfTheDataProvidersItNames(AfonCloud cloud) throws IOException {
+        provider(cloud);
+        Files.writeString(home.resolve("config-dev/secret.properties"), "");
+        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd, dbt]}"));
+        Path config = ProjectEnv.configure(project, home.resolve("config-dev"), home, home.resolve("projects/xyz-yyyy-nnnn/project.yaml"));
+
+        var catalogs = new health.emrys.afon.config.AfonCatalogs(new health.emrys.afon.config.FilePropertyProvider(config.toString()));
+        var fromDataProviders = catalogs.bySource(health.emrys.afon.config.AfonCatalogs.Source.DATA_PROVIDER);
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::id).containsExactly("lon_cvd", "lon_dbt");
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::name).containsExactly("cvd", "dbt");
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::catalogUri)
+            .containsOnly("https://" + lower(cloud) + "-polaris.lon.dev.click/api/catalog");
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::audience).containsOnly("provider-lon");
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::cloud).containsOnly(cloud);
+        assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).doesNotContain("lon_cvd", "lon_dbt");
+    }
+
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void mixesCatalogsNamedAndDefinedInFull(AfonCloud cloud) throws IOException {

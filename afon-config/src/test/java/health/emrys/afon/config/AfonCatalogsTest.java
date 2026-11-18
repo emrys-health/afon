@@ -223,4 +223,69 @@ public class AfonCatalogsTest {
                 .hasMessageContaining("AWS_CATALOG_TYPE_aws_mystery");
     }
 
+
+    private static Properties withADataProviderCatalog() {
+        Properties raw = defaultSetProperties();
+        raw.setProperty("AZURE_CATALOG_IDS", raw.getProperty("AZURE_CATALOG_IDS") + ",lon_cvd");
+        raw.setProperty("AZURE_CATALOG_NAME_lon_cvd", "cvd");
+        raw.setProperty("AZURE_CATALOG_TYPE_lon_cvd", "rest");
+        raw.setProperty("AZURE_CATALOG_SOURCE_lon_cvd", "data-provider");
+        raw.setProperty("AZURE_CATALOG_URI_lon_cvd", "https://azure-polaris.lon.example/api/catalog");
+        raw.setProperty("AZURE_CATALOG_AUDIENCE_lon_cvd", "provider-lon");
+        raw.setProperty("AZURE_BUCKET_NAME_lon_cvd", "afonstorage1");
+        return raw;
+    }
+
+    @Test
+    public void aCatalogOfADataProviderIsACatalogFromAnotherSource() {
+        AfonCatalogs catalogs = new AfonCatalogs(providerWith(withADataProviderCatalog()));
+
+        assertThat(catalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER)).singleElement().satisfies(c -> {
+            assertThat(c.id()).isEqualTo("lon_cvd");
+            assertThat(c.cloud()).isEqualTo(AfonCloud.AZURE);
+            assertThat(c.name()).isEqualTo("cvd");
+            assertThat(c.source()).isEqualTo(AfonCatalogs.Source.DATA_PROVIDER);
+            assertThat(c.catalogUri()).isEqualTo("https://azure-polaris.lon.example/api/catalog");
+            assertThat(c.audience()).isEqualTo("provider-lon");
+            assertThat(c.bucketName()).isEqualTo("afonstorage1");
+        });
+    }
+
+    @Test
+    public void whatTheStackMakesAndQueriesIsWhatItWasWithoutThem() {
+        AfonCatalogs with = new AfonCatalogs(providerWith(withADataProviderCatalog()));
+        assertThat(idsOf(with.all())).containsExactlyInAnyOrderElementsOf(idsOf(defaultCatalogs.all()));
+        assertThat(idsOf(with.byCloud(AfonCloud.AZURE))).doesNotContain("lon_cvd");
+        assertThat(idsOf(with.allIncluding("rest"))).isEmpty();
+        assertThat(defaultCatalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER)).isEmpty();
+        assertThat(defaultCatalogs.all()).allSatisfy(c -> assertThat(c.source()).isEqualTo(AfonCatalogs.Source.STACK));
+    }
+
+    @Test
+    public void aCatalogOfADataProviderMissingItsEndpointIsRefused() {
+        Properties raw = withADataProviderCatalog();
+        raw.remove("AZURE_CATALOG_URI_lon_cvd");
+        assertThatThrownBy(() -> new AfonCatalogs(providerWith(raw))).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("AZURE_CATALOG_URI_lon_cvd");
+    }
+
+    @Test
+    public void aSourceThatIsNotOneIsRefused() {
+        Properties raw = withADataProviderCatalog();
+        raw.setProperty("AZURE_CATALOG_SOURCE_lon_cvd", "elsewhere");
+        assertThatThrownBy(() -> new AfonCatalogs(providerWith(raw))).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("elsewhere");
+    }
+
+    @Test
+    public void theValueOfASourceInTheConfigIsItsNameInLowerCaseWithHyphens() {
+        assertThat(AfonCatalogs.Source.values()).containsExactly(AfonCatalogs.Source.STACK, AfonCatalogs.Source.DATA_PROVIDER);
+        assertThat(AfonCatalogs.Source.STACK.value()).isEqualTo("stack");
+        assertThat(AfonCatalogs.Source.DATA_PROVIDER.value()).isEqualTo("data-provider");
+        assertThat(AfonCatalogs.Source.of("data-provider")).isEqualTo(AfonCatalogs.Source.DATA_PROVIDER);
+        assertThat(AfonCatalogs.Source.of(" stack ")).isEqualTo(AfonCatalogs.Source.STACK);
+        assertThat(AfonCatalogs.Source.of("")).isEqualTo(AfonCatalogs.Source.STACK);
+        assertThat(AfonCatalogs.Source.of(null)).isEqualTo(AfonCatalogs.Source.STACK);
+        assertThatThrownBy(() -> AfonCatalogs.Source.of("DATA_PROVIDER")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

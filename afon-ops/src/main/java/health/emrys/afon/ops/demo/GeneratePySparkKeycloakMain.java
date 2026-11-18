@@ -60,7 +60,9 @@ public class GeneratePySparkKeycloakMain {
     private String pySparkTestCode() {
         Map<String, String> catalogs = new LinkedHashMap<>();
         afonCatalogs.all().forEach(catalog -> catalogs.put(toSparkName(catalog), catalog.toString()));
-        return new PySparkSessionCode(config).sessionCode(catalogs) + awsSmokeTest("AwsAccessSpec");
+        Map<String, AfonCatalog> dataProviders = new LinkedHashMap<>();
+        afonCatalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER).forEach(catalog -> dataProviders.put("test_" + catalog.id(), catalog));
+        return new PySparkSessionCode(config).sessionCode(catalogs, dataProviders) + awsSmokeTest("AwsAccessSpec");
     }
 
     private @NonNull String toSparkName(AfonCatalog catalog) {

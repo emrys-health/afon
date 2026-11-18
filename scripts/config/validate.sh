@@ -46,6 +46,10 @@ for CATALOGS_FILE in $CONFIG_DIR/catalogs-*.properties ; do {
     if grep -qE "^${CLOUD}_CATALOG_TYPE_$ID=glue[[:space:]]*$" $CATALOGS_FILE ; then
       continue
     fi
+    # a catalog of a Data Provider shares its storage with the others of that Data Provider, which is not one of this stack's to overlap
+    if grep -qE "^${CLOUD}_CATALOG_SOURCE_$ID=data-provider[[:space:]]*$" $CATALOGS_FILE ; then
+      continue
+    fi
     BUCKET=$(grep "^${CLOUD}_BUCKET_NAME_$ID=" $CATALOGS_FILE | cut -d= -f2 | tr -d '[:space:]' || true)
     if [ -n "$BUCKET" ] ; then
       echo "$BUCKET $ID"

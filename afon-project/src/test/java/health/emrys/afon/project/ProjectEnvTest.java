@@ -42,6 +42,7 @@ class ProjectEnvTest {
         Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + "PROJECT_ID=\nOIDC_ISSUER_URL=https://[OIDC_DOMAIN_NAME]/realms/polaris");
         Files.writeString(env.resolve("afon-" + lower(cloud) + ".properties"), cloud.name() + "_REGION=a-region\n" + cloud.name() + "_KEYCLOAK_EXTERNAL=false\n");
         Files.writeString(env.resolve("secret.properties"), "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n");
+        Files.writeString(env.resolve("catalogs.properties"), "");
         return new OnCloud(new FileProjectProvider(file).getProject(), file, env);
     }
 
@@ -59,7 +60,8 @@ class ProjectEnvTest {
         String prefix = cloud.name() + "_";
         String file = "afon-" + lower(cloud) + ".properties";
         var derived = ProjectEnv.derive(on(cloud).project());
-        assertThat(derived.keySet()).containsExactly("afon.properties", file);
+        // and the catalogs of its Data Providers, in the catalogs file of the cloud of their storage, which is its own here
+        assertThat(derived.keySet()).containsExactly("afon.properties", file, "catalogs-" + lower(cloud) + ".properties");
         assertThat(derived.get("afon.properties")).containsEntry("PROJECT_ID", "xyz-yyyy-nnnn")
             .containsEntry("OIDC_AUDIENCE", "xyz-yyyy-nnnn-tre").containsEntry("OIDC_GIT_AUDIENCE", "xyz-yyyy-nnnn-git")
             .containsEntry("OIDC_PROJECT_CLAIM", "project").containsEntry("OIDC_USER_CLAIM", "polaris_principal")
@@ -127,6 +129,53 @@ class ProjectEnvTest {
         assertThat(derived.get("afon.properties")).doesNotContainKeys("GIT_DOMAIN_NAME", "OIDC_GIT_AUDIENCE").containsKey("OIDC_AUDIENCE");
         assertThat(derived.values().stream().flatMap(m -> m.keySet().stream())).doesNotContain(cloud.name() + "_GITEA_BUCKET")
             .contains(cloud.name() + "_AUDIT_BUCKET");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresTheCatalogsOfTheDataProvidersAsCatalogsFromAnotherSource(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+
+        var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
+        var fromDataProviders = catalogs.bySource(health.emrys.afon.config.AfonCatalogs.Source.DATA_PROVIDER);
+        assertThat(fromDataProviders).extracting(health.emrys.afon.config.AfonCatalog::id).containsExactly("data1", "data2");
+        var first = fromDataProviders.get(0);
+        assertThat(first.catalogUri()).isEqualTo("https://polaris.data1.example/api/catalog");
+        assertThat(first.name()).isEqualTo("xyz-yyyy-nnnn");
+        assertThat(first.audience()).isEqualTo("provider-data1");
+        assertThat(first.bucketName()).isEqualTo("data1-xyz-yyyy-nnnn");
+        assertThat(first.cloud()).isEqualTo(cloud);
+        // the ids are in the list of the cloud's catalogs, where the others are, and in its catalogs file, not in afon.properties
+        assertThat(config.resolve("catalogs-" + lower(cloud) + ".properties")).content().contains(cloud.name() + "_CATALOG_IDS=data1,data2");
+        assertThat(config.resolve("afon.properties")).content().doesNotContain("CATALOG_SOURCE");
+        // what the stack makes and queries is what the env's config says
+        assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).doesNotContain("data1", "data2");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void keepsTheCatalogIdsThatTheEnvListsAndNamesTheOnesOfTheDataProvidersWithUnderscores(AfonCloud cloud) {
+        String yaml = ProjectFixtures.example(cloud).replace("id: data1", "id: lon-cvd");
+        java.util.Properties env = new java.util.Properties();
+        env.setProperty("AZURE_SUBSCRIPTION", "sub-1");
+        env.setProperty("AWS_ACCOUNT_ID", "111111111111");
+        env.setProperty("GCP_PROJECT_ID", "gcp-proj");
+        env.setProperty(cloud.name() + "_CATALOG_IDS", "mine,other");
+        var catalogs = ProjectEnv.derive(ProjectFixtures.tre(yaml), null, null, env).get("catalogs-" + lower(cloud) + ".properties");
+        assertThat(catalogs).containsEntry(cloud.name() + "_CATALOG_IDS", "mine,other,lon_cvd,data2")
+                            .containsEntry(cloud.name() + "_CATALOG_NAME_lon_cvd", "xyz-yyyy-nnnn")
+                            .containsEntry(cloud.name() + "_CATALOG_SOURCE_lon_cvd", "data-provider")
+                            .containsEntry(cloud.name() + "_CATALOG_AUDIENCE_lon_cvd", "provider-data1");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void writesNoDataProviderForTheIdentityNorForADataProject(AfonCloud cloud) {
+        assertThat(ProjectEnv.derive(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud))).values().stream().flatMap(m -> m.keySet().stream()))
+            .noneMatch(k -> k.contains("CATALOG_SOURCE"));
+        assertThat(ProjectEnv.derive(ProjectFixtures.data(ProjectFixtures.dataExample(cloud))).values().stream().flatMap(m -> m.keySet().stream()))
+            .noneMatch(k -> k.contains("CATALOG_SOURCE"));
     }
 
     @ParameterizedTest

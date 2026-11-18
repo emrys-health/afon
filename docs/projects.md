@@ -349,7 +349,17 @@ the Data Provider's project, which has to be made, with the config of its env th
 project or catalog that is not there, and a Data Provider that trusts another identity than the one the TRE uses. Each
 catalog is an entry in the TRE, with the id `<project>-<catalog>`: a TRE that reads both catalogs of `lon` names them
 together, `- {project: lon, catalogs: [cvd, dbt]}`, and has `lon-cvd` and `lon-dbt`. `configure` writes the catalogs in
-full, as `defined`, into the copy of the file in the project's config, as the record of what was deployed.
+full, as `defined`, into the copy of the file in the project's config, as the record of what was deployed. It also writes
+them into the project's config as catalogs, like any other, in the `catalogs-<cloud>.properties` of the cloud of their
+storage: each id, which is that of the entry with its hyphens as underscores, eg `lon_cvd`, is in `<CLOUD>_CATALOG_IDS`
+with the env's, and has `<CLOUD>_CATALOG_NAME_<id>`, `_CATALOG_URI_<id>`, `_CATALOG_AUDIENCE_<id>` and
+`_BUCKET_NAME_<id>`, and `<CLOUD>_CATALOG_SOURCE_<id>=data-provider`, which says it is served from the Data Provider's
+Polaris and not from the stack's own, as the default, `stack`, says of every other.
+`AfonCatalogs.bySource("data-provider")` returns them, and `AfonCatalogs.all()` is what it was, the stack's own, which is
+what its Polaris makes and its engines query. The scripts that make and delete the buckets of the stack's catalogs,
+`<cloud>-create` and `<cloud>-destroy`, skip a catalog of the Data Provider source, as does `config-validate` when it
+checks for catalogs that share a bucket, so that none of them makes or deletes the storage of a Data Provider. A config
+outside a project has none.
 
 A Data Provider that Afon did not deploy has no project to name: its catalog is then given in full, in `defined`, as
 `id`, `catalogUri`, `catalogName`, `audience`, `bucket` and `cloud`. The `audience` is one for each Data Provider in the
@@ -791,54 +801,63 @@ this deployment.
 
 ### The Data Providers, `lon` and `nw` (Azure)
 
-- **Not tried: the Data Providers on Azure.** The `data` project role is built and tested, with its derived domain,
-  storage, database and catalogs, `up` and `down`. Two Data Providers, `lon` and `nw`, with these two catalogs each, have
-  not been deployed.
-- **Not tried: the Data Provider using the central identity.** A Data Provider's file names the identity, and `configure`
-  points its config at it: the OIDC domain is the issuer's host, and the setup of its stack reaches Keycloak by a
-  port-forward to `idp`'s cluster, on its own cloud. An Azure stack setting up against a Keycloak on AWS has not been
-  run.
-- **Tried in a container, not in a Data Provider: the Polaris checking the tokens.** The Polaris of a Data Provider, from
+- **Tried on Azure: `lon`.** The `data` project role is built and tested, with its derived domain, storage, database and
+  catalogs, `up` and `down`. `lon`, with its `cvd` and `dbt` catalogs, has been brought up on Azure with `up lon`,
+  against the central identity that `idp` deploys on AWS: its Polaris pod is running and ready, with no errors in its
+  log. It was checked by its pod and its log, not yet by `azure-polaris`, nor by listing its catalogs. `nw` has not been
+  deployed.
+- **Tried on Azure: the Data Provider using the central identity.** A Data Provider's file names the identity, and
+  `configure` points its config at it: the OIDC domain is the issuer's host, and the setup of its stack reaches Keycloak
+  by a port-forward to `idp`'s cluster, on its own cloud. `up lon` did this, an Azure stack setting up against a Keycloak
+  on AWS, with its data stage, `manage-stack setup azure-polaris`.
+- **Tried in a container, and started on `lon`: the Polaris checking the tokens.** The Polaris of a Data Provider, from
   the issuer URL, the audience (`provider-lon`, `provider-nw`) and the `acr` in its config, requires the issuer of the
   identity, its own audience and `acr: mfa` of every token, and takes the token's project claim as the one principal role
   that is active, `<project>Project`, so that a member of two projects has the access of the project that the token is
-  for. The spec of the Data Provider's access runs it in a container, and a token for another Data Provider's audience, or
-  without the `acr`, is refused.
-- **Tried in a container, not in a Data Provider: its admin client.** The admin client of a Data Provider
-  (`POLARIS_ID`, which makes its catalogs) is a service of the central identity: no second factor to give, and no
-  audience unless it is given. `manage-stack setup` of the Data Provider's Polaris, which makes the client, gives its
-  tokens the Data Provider's audience and says `acr: mfa` in them, from the properties the Data Provider's config has,
-  so that its own Polaris does not refuse it. That `acr` is the word of whoever holds the client's secret, not the proof
-  of a second factor, so it is for this client alone, which no person signs in as. `POLARIS_ID` is a property of the env,
-  not derived for each project, so the Data Providers made from the same env share one client, which collects the
-  audience of each one that is set up: `lon` and `nw` from `emrys2` then both accept its token, and whoever holds its
-  secret holds the admin access of all of them. A separate client for each Data Provider, with its own secret, is not
-  built. The spec does it with the same calls. Not run by `setup` against a Data Provider on Azure and an identity on
-  AWS.
+  for. The spec of the Data Provider's access runs it in a container, and a token for another Data Provider's audience,
+  or without the `acr`, is refused. `lon`'s Polaris starts with that configuration. A refusal has not been tried on
+  `lon`.
+- **Tried in a container, not in a Data Provider: its admin client.** The admin client of a Data Provider (`POLARIS_ID`,
+  which makes its catalogs) is a service of the central identity: no second factor to give, and no audience unless it is
+  given. `manage-stack setup` of the Data Provider's Polaris, which makes the client, gives its tokens the Data
+  Provider's audience and says `acr: mfa` in them, from the properties the Data Provider's config has, so that its own
+  Polaris does not refuse it. That `acr` is the word of whoever holds the client's secret, not the proof of a second
+  factor, so it is for this client alone, which no person signs in as. `POLARIS_ID` is a property of the env, not derived
+  for each project, so the Data Providers made from the same env share one client, which collects the audience of each
+  one that is set up: `lon` and `nw` from `emrys2` then both accept its token, and whoever holds its secret holds the
+  admin access of all of them. A separate client for each Data Provider, with its own secret, is not built. The spec does
+  it with the same calls, and the setup of `lon` ran it against an identity on AWS.
 - **Tried in a container, not in a Data Provider: the grants of a project.** `manage-project-grants` makes the project's
   principal role and catalog role, the read-only access to `released`, and the members' principals, as [The data
   projects](#the-data-projects) says. A spec runs them against the Polaris and the Keycloak of the identity, in
-  containers (`-Pidentity`): the members get their tokens from the identity as the TRE's client does, and a project
-  reads only what is released, and only if the Data Provider names the member. It has not been run against a Data
-  Provider's Polaris on Azure.
-- **Not built: the Data Provider gets the user ids.** The file of members is written by hand from what
-  `manage-identity add-member` prints; the contract that names who may read is the Data Provider's. Nothing yet checks a
-  TRE's members against it.
+  containers (`-Pidentity`): the members get their tokens from the identity as the TRE's client does, and a project reads
+  only what is released, and only if the Data Provider names the member. It has not been run against `lon`.
+- **Not built: the Data Provider gets the user ids.** The file of members is written by hand from what `manage-identity
+  add-member` prints; the contract that names who may read is the Data Provider's. Nothing yet checks a TRE's members
+  against it.
 - **Partly built: letting the TREs in.** `configure` of a Data Provider adds the egress IP of each TRE that names it to
-  its `<CLOUD>_POLARIS_ALLOWED_CIDRS`, see "Who can reach its Polaris" in [The data projects](#the-data-projects).
-  Not done: the storage account of the catalogs, which has no firewall, so a credential that Polaris vends works from any
-  address; and a Data Provider that is already deployed has to be configured and deployed again when a TRE is added.
-  Not tried on Azure.
+  its `<CLOUD>_POLARIS_ALLOWED_CIDRS`, see "Who can reach its Polaris" in [The data projects](#the-data-projects). Not
+  done: the storage account of the catalogs, which has no firewall, so a credential that Polaris vends works from any
+  address; and a Data Provider that is already deployed has to be configured and deployed again when a TRE is added. Not
+  tried on Azure.
 
 ### The TREs reading the Data Providers
 
-- **Not built: the engines do not read `dataProviders`.** The catalogs in a project's file are resolved and checked, and
-  read by no tool. Spark and Trino should each get a catalog for every entry (its endpoint and its name, authenticated
-  with the user's token), so that `cvd-2026` queries the `cvd` catalog of `lon` and of `nw`.
-- **Not built: the whitelist of the TRE.** Its egress should allow, from the same entries, the Polaris domain and the
-  storage account (`bucket`) of each Data Provider. It allows only what the env's own config names.
-- **Not tried: the read across clouds.** An AWS Spark or Trino reading Azure storage with the credentials that the
-  Data Provider's Polaris vends, behind a storage firewall, which there is none of yet.
+- **Partly built: Spark reads the catalogs of the Data Providers, Trino does not.** `configure` writes them into the
+  project's catalogs file, as catalogs from the Data Provider source, which `AfonCatalogs.bySource("data-provider")`
+  reads. The PySpark session code that `GeneratePySparkKeycloakMain` and `GeneratePySparkContextMain` write has a catalog
+  for each, named after its id (`test_lon_cvd`), at the Data Provider's own endpoint, with the notebook's `OIDC_TOKEN`;
+  it is only the code, not tried against a Data Provider. The token is the one the notebook has, which JupyterHub got
+  with the env's client, so it does not carry the audience of the Data Provider until the TRE signs in with the project's
+  client, below. Trino has none: each of its catalogs starts with a credential of its own, which a Data Provider's
+  Polaris would refuse for lack of its audience and `acr`.
+- **Built, not tried: the whitelist of the TRE.** The domains that the TRE may resolve have, for each catalog from a Data
+  Provider (see above), the host of its Polaris and its storage: the `blob` endpoint of an Azure storage account, the
+  regional endpoint of an AWS bucket, in the region of the TRE's config, as the Data Provider's is not known, and
+  `storage.googleapis.com` on GCP. They are derived from the catalogs by `WhitelistConfig`, so nothing is added to
+  `whitelist.yaml`, and a config outside a project has none. Not tried on a cluster.
+- **Not tried: the read across clouds.** An AWS Spark or Trino reading Azure storage with the credentials that the Data
+  Provider's Polaris vends, behind a storage firewall, which there is none of yet.
 
 ### What the TRE's tools check
 

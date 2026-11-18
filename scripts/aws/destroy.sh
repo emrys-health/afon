@@ -50,6 +50,9 @@ bucket_of() {
 }
 
 IFS=',' read -ra CATALOG_IDS <<< "$AWS_CATALOG_IDS"
+# the catalogs of a Data Provider that a TRE project reads are not made, nor deleted, here: their storage is the Data Provider's
+source $AFON_ROOT/scripts/config/catalog-source.sh
+own_catalog_ids AWS CATALOG_IDS
 for ID in "${CATALOG_IDS[@]}"; do
   BUCKET="$(bucket_of "$ID")"
   if [ -n "$BUCKET" ]; then

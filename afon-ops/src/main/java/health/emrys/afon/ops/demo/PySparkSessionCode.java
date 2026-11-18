@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.demo;
 
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.spark.SparkWarehouseConfig;
 
 import java.util.Map;
@@ -27,6 +28,15 @@ class PySparkSessionCode {
      * @param catalogs the Spark catalog names mapped to their Polaris catalog names.
      */
     String sessionCode(Map<String, String> catalogs) {
+        return sessionCode(catalogs, Map.of());
+    }
+
+    /**
+     * @param catalogs      the Spark catalog names mapped to their Polaris catalog names, of the stack's own Polaris.
+     * @param dataProviders the Spark catalog names mapped to the catalogs of the Data Providers that a TRE project reads, each with its own endpoint, and
+     *                      the same token as the others.
+     */
+    String sessionCode(Map<String, String> catalogs, Map<String, AfonCatalog> dataProviders) {
         StringBuilder python = new StringBuilder("""
                                                  from pyspark.sql import SparkSession
                                                  import os as os
@@ -37,6 +47,14 @@ class PySparkSessionCode {
         catalogs.forEach((sparkCatalog, catalogName) -> {
             python.append(format("# %s \n", catalogName));
             new TreeMap<>(config.sparkConfigsWithToken(sparkCatalog, catalogName, OIDC_TOKEN))
+                .forEach((key, value) -> python.append(key.endsWith(".token")
+                                                           ? format(".config(\"%s\", %s)\n", key, value)
+                                                           : format(".config(\"%s\", \"%s\")\n", key, value)));
+            python.append("\n");
+        });
+        dataProviders.forEach((sparkCatalog, catalog) -> {
+            python.append(format("# %s, of a Data Provider \n", catalog.name()));
+            new TreeMap<>(config.sparkConfigsWithToken(catalog, sparkCatalog, OIDC_TOKEN))
                 .forEach((key, value) -> python.append(key.endsWith(".token")
                                                            ? format(".config(\"%s\", %s)\n", key, value)
                                                            : format(".config(\"%s\", \"%s\")\n", key, value)));

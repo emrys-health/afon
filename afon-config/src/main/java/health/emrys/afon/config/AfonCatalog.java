@@ -20,6 +20,9 @@ public final class AfonCatalog {
     private final String type;
     private final String bucketName;
     private final boolean adminGrants;
+    private final AfonCatalogs.Source source;
+    private final String catalogUri;
+    private final String audience;
 
     public static AfonCatalog catalogFor(AfonCloud cloud, AfonCatalogs catalogs) {
         switch (cloud) {
@@ -35,12 +38,20 @@ public final class AfonCatalog {
     }
 
     AfonCatalog(String id, AfonCloud cloud, String name, String type, String bucketName, boolean adminGrants) {
+        this(id, cloud, name, type, bucketName, adminGrants, AfonCatalogs.Source.STACK, null, null);
+    }
+
+    AfonCatalog(String id, AfonCloud cloud, String name, String type, String bucketName, boolean adminGrants, AfonCatalogs.Source source,
+                String catalogUri, String audience) {
         this.id = id;
         this.cloud = cloud;
         this.name = name;
         this.type = type;
         this.bucketName = bucketName;
         this.adminGrants = adminGrants;
+        this.source = source;
+        this.catalogUri = catalogUri;
+        this.audience = audience;
     }
 
     /**
@@ -81,6 +92,30 @@ public final class AfonCatalog {
      */
     public boolean adminGrants() {
         return adminGrants;
+    }
+
+    /**
+     * Where the catalog is served from: {@link AfonCatalogs.Source#STACK}, the stack's own Polaris, which makes it, and whose storage is the stack's, or
+     * {@link AfonCatalogs.Source#DATA_PROVIDER}, the Polaris of a Data Provider that a TRE project reads, which the stack neither makes nor holds the
+     * storage of, see {@link #catalogUri()} and {@link #audience()}.
+     */
+    public AfonCatalogs.Source source() {
+        return source;
+    }
+
+    /**
+     * The endpoint of the catalog, its Iceberg REST catalog, if it is served from a Data Provider, else {@code null}: the stack's own Polaris is the one
+     * that the stack deploys.
+     */
+    public String catalogUri() {
+        return catalogUri;
+    }
+
+    /**
+     * The audience that the tokens for the catalog carry, if it is served from a Data Provider, else {@code null}.
+     */
+    public String audience() {
+        return audience;
     }
 
     /**

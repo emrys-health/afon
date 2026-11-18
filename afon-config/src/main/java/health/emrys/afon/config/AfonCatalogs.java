@@ -16,14 +16,69 @@ import java.util.*;
  */
 public class AfonCatalogs {
 
-    private final List<AfonCatalog> catalogs;
+    /**
+     * Where a catalog is served from, which a config says in {@code <CLOUD>_CATALOG_SOURCE_<id>}, by the {@link #value()} of the source: when it says none, {@link #STACK}.
+     */
+    public enum Source {
+        /** The stack's own Polaris, which makes the catalog, and whose storage is the stack's: the default, and all there is outside a project. */
+        STACK("stack"),
+        /**
+         * The Polaris of a Data Provider that a TRE project reads, which the stack neither makes nor holds the storage of.  A project's {@code configure} writes
+         * them from its {@code dataProviders}, with {@code <CLOUD>_CATALOG_URI_<id>}, the endpoint of the Iceberg REST catalog, and
+         * {@code <CLOUD>_CATALOG_AUDIENCE_<id>}, that of the tokens for it, and the cloud of the properties is that of the storage, which is not always the TRE's.
+         * The scripts that make and delete the storage of a stack's catalogs skip them, by this value.
+         */
+        DATA_PROVIDER("data-provider");
 
-    public AfonCatalogs(AfonPropertyProvider properties) {
-        this.catalogs = createCatalogs(properties);
+        private final String value;
+
+        Source(String value) {
+            this.value = value;
+        }
+
+        /** @return the value in the config, eg {@code data-provider}, which the scripts read too */
+        public String value() {
+            return value;
+        }
+
+        /**
+         * @return the source whose value in the config is the one given, {@link #STACK} if it is blank
+         * @throws IllegalArgumentException if it is not the value of a source
+         */
+        public static Source of(String value) {
+            String trimmed = value == null ? "" : value.trim();
+            return Arrays.stream(values()).filter(s -> s.value.equals(trimmed)).findFirst()
+                         .orElseGet(() -> {
+                             if (trimmed.isEmpty()) {
+                                 return STACK;
+                             }
+                             throw new IllegalArgumentException("'" + value + "' is not the source of a catalog: " + Arrays.stream(values()).map(Source::value).toList());
+                         });
+        }
     }
 
+    private final List<AfonCatalog> allCatalogs;
+    private final List<AfonCatalog> stackCatalogs;
+
+    public AfonCatalogs(AfonPropertyProvider properties) {
+        this.allCatalogs = createCatalogs(properties);
+        this.stackCatalogs = bySource(Source.STACK);
+    }
+
+    /**
+     * @return the catalogs of the stack's own Polaris, {@link Source#STACK}: what it makes and grants, what its scripts make the storage of, and what its
+     * engines query, which is all the catalogs there are outside a project.  The others are {@link #bySource}.
+     */
     public List<AfonCatalog> all() {
-        return catalogs;
+        return stackCatalogs;
+    }
+
+    /**
+     * @param source where the catalogs are served from
+     * @return the catalogs from the source, none from {@link Source#DATA_PROVIDER} outside a project
+     */
+    public List<AfonCatalog> bySource(Source source) {
+        return allCatalogs.stream().filter(c -> c.source() == source).toList();
     }
 
     private static @NonNull List<AfonCatalog> createCatalogs(AfonPropertyProvider properties) {
@@ -57,7 +112,25 @@ public class AfonCatalogs {
         }
         String bucketName = raw.getProperty(prefix + "_BUCKET_NAME_" + id);
         boolean adminGrants = Boolean.parseBoolean(raw.getProperty(prefix + "_ADMIN_GRANTS_" + id, "true"));
-        return new AfonCatalog(id, cloud, name, type, bucketName, adminGrants);
+        Source source;
+        try {
+            source = Source.of(raw.getProperty(prefix + "_CATALOG_SOURCE_" + id));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Catalog '" + id + "' has " + prefix + "_CATALOG_SOURCE_" + id + ": " + e.getMessage(), e);
+        }
+        return switch (source) {
+            case STACK -> new AfonCatalog(id, cloud, name, type, bucketName, adminGrants);
+            case DATA_PROVIDER -> new AfonCatalog(id, cloud, name, type, bucketName, adminGrants, Source.DATA_PROVIDER,
+                                                  required(raw, prefix + "_CATALOG_URI_" + id, id), required(raw, prefix + "_CATALOG_AUDIENCE_" + id, id));
+        };
+    }
+
+    private static String required(Properties raw, String property, String id) {
+        String value = raw.getProperty(property);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Catalog '" + id + "' is missing " + property);
+        }
+        return value.trim();
     }
 
     private static String idsProperty(AfonCloud cloud) {

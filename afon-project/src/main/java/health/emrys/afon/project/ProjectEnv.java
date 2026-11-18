@@ -1,5 +1,6 @@
 package health.emrys.afon.project;
 
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.ConfigUtils;
@@ -163,6 +164,9 @@ public final class ProjectEnv {
         Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
         byFile.put(COMMON_FILE, common);
         byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
+        if (project instanceof TreProject tre) {
+            byFile.putAll(deriveDataProviders(tre, env));
+        }
         if (env != null) {
             // the names of the project's resources go first, so that what the file says is not overridden by them
             ProjectNames.derive(project, env, project.env()).forEach((file, names) -> {
@@ -224,6 +228,56 @@ public final class ProjectEnv {
             cloudSpecific.put(prefix + "GITEA_BUCKET", project.create().gitBucket());
         }
         project.tre().domains().forEach((property, domain) -> (property.startsWith(prefix) ? cloudSpecific : common).put(property, domain));
+    }
+
+    /**
+     * The catalogs of the Data Providers that the project names, as catalogs like any other, in the {@code catalogs-<cloud>.properties} of the cloud of each
+     * one's storage, with the source {@link AfonCatalogs.Source#DATA_PROVIDER}: {@code <CLOUD>_CATALOG_IDS}, which keeps the ids that the config the project is
+     * made from lists, and for each id {@code _CATALOG_NAME_<id>} (its name at the endpoint), {@code _CATALOG_TYPE_<id>} ({@code rest}, as it is an Iceberg REST
+     * catalog that is reached), {@code _CATALOG_SOURCE_<id>}, {@code _CATALOG_URI_<id>}, {@code _CATALOG_AUDIENCE_<id>} and {@code _BUCKET_NAME_<id>} (its
+     * storage, which is the Data Provider's).  The id is that of the entry, with its hyphens as underscores, for it names properties that a shell sources.
+     * The scripts that make and delete the storage of a stack's catalogs skip those of this source.
+     *
+     * @param env the config the project is made from, or {@code null} for none
+     */
+    private static Map<String, Map<String, String>> deriveDataProviders(TreProject project, Properties env) {
+        Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
+        Map<String, Set<String>> ids = new LinkedHashMap<>();
+        for (TreProject.DataProvider provider : project.dataProviders()) {
+            String prefix = provider.cloud().name() + "_";
+            String file = "catalogs-" + provider.cloud().toString().toLowerCase(Locale.ROOT) + ".properties";
+            Map<String, String> catalogs = byFile.computeIfAbsent(file, f -> new LinkedHashMap<>());
+            Set<String> ofCloud = ids.computeIfAbsent(file, f -> {
+                Set<String> existing = new LinkedHashSet<>();
+                if (env != null) {
+                    for (String id : env.getProperty(prefix + "CATALOG_IDS", "").split(",")) {
+                        if (!id.isBlank()) {
+                            existing.add(id.trim());
+                        }
+                    }
+                }
+                return existing;
+            });
+            String id = provider.id().replace('-', '_');
+            if (!ofCloud.add(id)) {
+                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                    "dataProviders: '%s' is the catalog id '%s', which another catalog of %s has already", provider.id(), id, provider.cloud())));
+            }
+            catalogs.put(prefix + "CATALOG_NAME_" + id, provider.catalogName());
+            catalogs.put(prefix + "CATALOG_TYPE_" + id, "rest");
+            catalogs.put(prefix + "CATALOG_SOURCE_" + id, AfonCatalogs.Source.DATA_PROVIDER.value());
+            catalogs.put(prefix + "CATALOG_URI_" + id, provider.catalogUri());
+            catalogs.put(prefix + "CATALOG_AUDIENCE_" + id, provider.audience());
+            catalogs.put(prefix + "BUCKET_NAME_" + id, provider.bucket());
+        }
+        ids.forEach((file, ofCloud) -> {
+            Map<String, String> catalogs = new LinkedHashMap<>();
+            catalogs.put(file.substring("catalogs-".length(), file.length() - ".properties".length()).toUpperCase(Locale.ROOT) + "_CATALOG_IDS",
+                         String.join(",", ofCloud));
+            catalogs.putAll(byFile.get(file));
+            byFile.put(file, catalogs);
+        });
+        return byFile;
     }
 
     /**

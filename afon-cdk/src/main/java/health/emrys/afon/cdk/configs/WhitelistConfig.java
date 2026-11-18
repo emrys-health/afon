@@ -1,5 +1,7 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -13,6 +15,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +45,8 @@ import static org.slf4j.LoggerFactory.getLogger;
  *     - ${AWS_POLARIS_DOMAIN_NAME}
  *     - ${AWS_BUCKET_NAME_aws}.s3.${AWS_REGION}.amazonaws.com
  * </pre>
+ * The domains of the catalogs that a TRE project reads from Data Providers are not listed in the file: they are derived from the catalogs of the config, see
+ * {@link #dataProviderDomains}, and added to those of every cloud.
  * A {@code ${NAME}} is replaced by the value of the property of that name, which is either an {@link AfonProperty} or the
  * key of a catalog, {@code <CLOUD>_BUCKET_NAME_<id>}, {@code <CLOUD>_CATALOG_NAME_<id>}, {@code <CLOUD>_CATALOG_TYPE_<id>} or
  * {@code <CLOUD>_ADMIN_GRANTS_<id>}, see {@link health.emrys.afon.config.AfonCatalogs}.  Any other name fails the load, so
@@ -70,6 +75,7 @@ public class WhitelistConfig {
 
     private final AfonPropertyProvider properties;
     private final Map<String, List<String>> sections;
+    private final List<String> dataProviderDomains;
 
     public WhitelistConfig(AfonPropertyProvider properties) {
         this(properties, ConfigUtils.configDir());
@@ -77,6 +83,7 @@ public class WhitelistConfig {
 
     public WhitelistConfig(AfonPropertyProvider properties, String configDir) {
         this.properties = properties;
+        this.dataProviderDomains = dataProviderDomains();
         Path file = Path.of(configDir, WHITELIST_FILE);
         if (!Files.isRegularFile(file)) {
             this.sections = fallback(file);
@@ -104,23 +111,74 @@ public class WhitelistConfig {
     }
 
     /**
-     * @return the domains of all the sections: the common ones and those of every cloud
+     * @return the domains of all the sections: the common ones and those of every cloud, and those of the Data Providers' catalogs, see
+     * {@link #dataProviderDomains}
      */
     public List<String> domains() {
         Set<String> domains = new LinkedHashSet<>(resolve(COMMON));
         for (AfonCloud cloud : AfonCloud.values()) {
             domains.addAll(resolve(cloud.toString()));
         }
+        domains.addAll(dataProviderDomains);
         return List.copyOf(domains);
     }
 
     /**
-     * @return the common domains and those of the cloud only
+     * @return the common domains and those of the cloud only, and those of the Data Providers' catalogs, which a TRE reads from whichever cloud it is on
      */
     public List<String> domains(AfonCloud cloud) {
         Set<String> domains = new LinkedHashSet<>(resolve(COMMON));
         domains.addAll(resolve(cloud.toString()));
+        domains.addAll(dataProviderDomains);
         return List.copyOf(domains);
+    }
+
+    /**
+     * The domains of the catalogs that the config has from Data Providers, which a TRE project's {@code configure} writes from its {@code dataProviders}, see
+     * {@link AfonCatalogs.Source#DATA_PROVIDER}: the host of each one's endpoint, and its storage, which the engines read the data from with the credentials that
+     * its Polaris vends.  They are derived, so they are not in {@code whitelist.yaml}, and a config outside a project has none.  The storage is, by the cloud of the
+     * catalog, as the stacks' own is in the template: the {@code blob} endpoint of an Azure storage account, the bucket's regional endpoint on AWS, in the region
+     * of this config, as the Data Provider's is not known, or the shared endpoint of Google Cloud Storage.
+     */
+    private List<String> dataProviderDomains() {
+        Set<String> domains = new LinkedHashSet<>();
+        for (AfonCatalog catalog : new AfonCatalogs(properties).bySource(AfonCatalogs.Source.DATA_PROVIDER)) {
+            String host = host(catalog.catalogUri());
+            if (host == null) {
+                logger.warn("Leaving out the endpoint of the Data Provider catalog '{}': '{}' has no host", catalog.id(), catalog.catalogUri());
+            } else {
+                domains.add(host);
+            }
+            String storage = storageOf(catalog);
+            if (storage != null) {
+                domains.add(storage);
+            }
+        }
+        return List.copyOf(domains);
+    }
+
+    private String storageOf(AfonCatalog catalog) {
+        return switch (catalog.cloud()) {
+            case AZURE -> catalog.bucketName() + ".blob.core.windows.net";
+            case GCP -> "storage.googleapis.com";
+            case AWS -> {
+                String region = properties.getProperties().getProperty("AWS_REGION", "").trim();
+                if (region.isEmpty()) {
+                    logger.warn("Leaving out the storage of the Data Provider catalog '{}': AWS_REGION is not set, which its bucket's endpoint needs", catalog.id());
+                    yield null;
+                }
+                yield catalog.bucketName() + ".s3." + region + ".amazonaws.com";
+            }
+        };
+    }
+
+    private static String host(String uri) {
+        try {
+            String host = URI.create(uri).getHost();
+            return host == null || host.isBlank() ? null : host.toLowerCase(Locale.ROOT);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private List<String> resolve(String section) {

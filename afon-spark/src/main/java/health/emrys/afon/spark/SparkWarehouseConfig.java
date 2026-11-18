@@ -121,6 +121,29 @@ public class SparkWarehouseConfig {
     }
 
     /**
+     * Spark configs for a catalog of a Data Provider that a TRE project reads, authenticating with the caller's own OIDC {@code token}: its own endpoint, not the
+     * stack's Polaris, and the name that the catalog has there.  There is no OAuth server of this config to refresh the token with, nor a client to
+     * authenticate: the Data Provider checks the token alone, for its audience, its second factor and its project.
+     *
+     * @param dataProvider a catalog from {@link health.emrys.afon.config.AfonCatalogs.Source#DATA_PROVIDER}
+     * @param sparkCatalog the name of the catalog in Spark, which is not that of a catalog of the stack's own, or of another Data Provider
+     */
+    public Map<String, String> sparkConfigsWithToken(AfonCatalog dataProvider, String sparkCatalog, String token) {
+        if (dataProvider.source() != AfonCatalogs.Source.DATA_PROVIDER) {
+            throw new IllegalArgumentException("Catalog '" + dataProvider.id() + "' is not from a Data Provider, but from the " + dataProvider.source());
+        }
+        Map<String, String> config = new HashMap<>();
+        config.put(format("spark.sql.catalog.%s", sparkCatalog), "org.apache.iceberg.spark.SparkCatalog");
+        config.put(format("spark.sql.catalog.%s.cache-enabled", sparkCatalog), "false");
+        config.put(format("spark.sql.catalog.%s.header.X-Iceberg-Access-Delegation", sparkCatalog), "vended-credentials");
+        config.put(format("spark.sql.catalog.%s.type", sparkCatalog), ICEBERG_CATALOG_TYPE_REST);
+        config.put(format("spark.sql.catalog.%s.uri", sparkCatalog), dataProvider.catalogUri());
+        config.put(format("spark.sql.catalog.%s.warehouse", sparkCatalog), dataProvider.name()); // this is the Data Provider's Polaris catalog name
+        config.put(format("spark.sql.catalog.%s.token", sparkCatalog), token);
+        return Map.copyOf(config);
+    }
+
+    /**
      * The catalog configs common to all authentication modes.
      */
     protected Map<String, String> catalogConfigs(String sparkCatalog, String catalogName) {
