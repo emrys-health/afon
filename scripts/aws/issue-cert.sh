@@ -2,11 +2,14 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris] [--force|--check]"
+  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris|--stack <stack id>] [--force|--check]"
   echo "Requests a new ACM certificate (DNS validation) for the given stack's domain,"
   echo "creates the validation CNAME in the Route53 hosted zone named after the domain,"
   echo "and waits for ACM to issue it. The domains come from afon.properties/afon-aws.properties,"
   echo "same as the CDK stacks themselves use. Defaults to 'all'."
+  echo ""
+  echo "With --stack, issues the certificate of each domain name that the stack serves from its cluster, as dns-create-zones makes"
+  echo "their zones, which is what a project's up does, after it delegates them."
   echo ""
   echo "A domain that already has an ISSUED certificate is skipped, so that this is safe to repeat, unless --force"
   echo "requests a new one. ACM renews the certificates in use by itself, as long as their validation record stays."
@@ -18,14 +21,20 @@ usage(){
 }
 
 NAME="all"
+STACK=""
 FORCE=false
 CHECK=false
-for ARG in "$@"; do
-  case "$ARG" in
+while [ $# -gt 0 ]; do
+  case "$1" in
     --force) FORCE=true ;;
     --check) CHECK=true ;;
-    *)       NAME="$ARG" ;;
+    --stack)
+      if [ -z "${2:-}" ]; then usage; exit 1; fi
+      STACK="$2"
+      shift ;;
+    *)       NAME="$1" ;;
   esac
+  shift
 done
 
 # Issues one certificate: request, wait for the validation record, upsert its CNAME, then
@@ -130,6 +139,33 @@ check_cert() {
 
 RESULTS=()
 FAILED=()
+
+# The domain names that the stack serves, once each, whose zones dns-create-zones makes: the certificates are those of the stack, not of the env
+if [ -n "$STACK" ]; then
+  source $AFON_ROOT/scripts/dns/zones-source.sh
+  dns_set_stack_domains aws "$STACK" || exit 1
+  MISSING=()
+  for DOMAIN in $DNS_DOMAINS; do
+    if [ "$CHECK" == "true" ]; then
+      check_cert "$DOMAIN" "$DOMAIN" || MISSING+=("$DOMAIN")
+    else
+      issue_cert "$DOMAIN" "$DOMAIN" || FAILED+=("$DOMAIN")
+    fi
+  done
+  if [ ${#MISSING[@]} -gt 0 ]; then exit 1; fi
+  if [ ${#RESULTS[@]} -gt 0 ]; then
+    echo ""
+    echo "Issued:"
+    for result in "${RESULTS[@]}"; do
+      echo "  $result"
+    done
+  fi
+  if [ ${#FAILED[@]} -gt 0 ]; then
+    echo "Failed: ${FAILED[*]}"
+    exit 1
+  fi
+  exit 0
+fi
 
 if [ "$CHECK" == "true" ]; then
   MISSING=()

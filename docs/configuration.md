@@ -205,7 +205,7 @@ Then set the repository variable `SMOKE_TESTS_CONFIG_ENV` to the env, once a run
 What differs by cloud:
 
 - **`aws`:** the DNS zones are Route 53 hosted zones.  `aws-issue-cert` requests an ACM certificate with DNS validation for each domain, and takes `all`, `keycloak`,
-  `jupyter` or `polaris`.  `aws-create` adds the IAM whitelist entry of each catalog bucket.  The IAM role of the CI identity is per account.
+  `jupyter` or `polaris`, or `--stack <stack>`, for the domains that a stack serves, as a project's `up` issues them.  `aws-create` adds the IAM whitelist entry of each catalog bucket.  The IAM role of the CI identity is per account.
 - **`azure`:** `azure-create` also creates the storage account and the Key Vault, and needs `AZURE_APP_ID` and `AZURE_SP_ID` in `secret-azure.properties` (the app
   is shared, see above).  It ends by saying that `AZURE_CONNECTION_STRING` is not set, as it is blank in the copy: get the string of the new account with
   `az storage account show-connection-string --resource-group <AZURE_RESOURCE_GROUP> --name <AZURE_STORAGE_ACCOUNT> --query connectionString -o tsv`,

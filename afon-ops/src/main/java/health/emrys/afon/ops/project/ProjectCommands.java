@@ -20,7 +20,8 @@ import java.util.function.Predicate;
  * <ul>
  *   <li>{@code create}: the script {@code <cloud>-create} for the TRE's stack, which makes what outlives the stacks, if the project names
  *       an egress IP, {@code db-whitelist}, which allows it on the database, and {@code dns-create-zones} for each stack that serves a domain, and, if the project says {@code dns.delegation: route53},
- *       {@code dns-delegate --route53}, which delegates its zone from the parent domain;</li>
+ *       {@code dns-delegate --route53}, which delegates its zone from the parent domain, and on AWS {@code aws-issue-cert --stack}, which issues the ACM
+ *       certificates of its domains, as the stacks look them up;</li>
  *   <li>{@code register}: {@code manage-identity create}, in the project's home like the rest, so that it uses the config that the project is
  *       made from, that of its env, and its Keycloak admin credentials, never those of whichever env is active.  If the project names the
  *       identity project, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project, so that
@@ -104,6 +105,11 @@ final class ProjectCommands {
                             if (project.dnsDelegation() == DnsDelegation.ROUTE53) {
                                 // so that the stage after can get its certificates: the zones are reached from the parent domain
                                 run.add(new Invocation(id, List.of("dns-delegate", cloud, serving.stack().toString(), "--route53")));
+                                if (cloud.equals("aws")) {
+                                    // AWS stacks look up the ISSUED ACM certificate of each of their domains, which only exists once the zone is delegated, as ACM
+                                    // validates it there: Azure and GCP stacks get theirs themselves if none is cached
+                                    run.add(new Invocation(id, List.of("aws-issue-cert", "--stack", serving.stack().toString())));
+                                }
                             }
                         }
                     }

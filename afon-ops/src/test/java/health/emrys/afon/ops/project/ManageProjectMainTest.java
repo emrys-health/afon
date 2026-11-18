@@ -780,11 +780,26 @@ class ManageProjectMainTest {
         configure();
         String c = lower(cloud);
         assertThat(command.run(new String[]{"up", PROJECT, "--until", "create"})).isZero();
-        assertThat(ran).containsExactly(
-            inProject(c + "-create", c + "-full"), inProject("db-whitelist", c),
-            // each stack that serves a domain: its zones, then their delegation, so that the stages after can get their certificates
-            inProject("dns-create-zones", c, c + "-git"), inProject("dns-delegate", c, c + "-git", "--route53"),
-            inProject("dns-create-zones", c, c + "-full"), inProject("dns-delegate", c, c + "-full", "--route53"));
+        List<List<String>> expected = new ArrayList<>(List.of(inProject(c + "-create", c + "-full"), inProject("db-whitelist", c)));
+        // each stack that serves a domain: its zones, then their delegation, so that the stages after can get their certificates, which on AWS, whose
+        // stacks look up the issued ACM certificate of each of their domains, are issued once the zone is delegated
+        for (String stack : List.of(c + "-git", c + "-full")) {
+            expected.add(inProject("dns-create-zones", c, stack));
+            expected.add(inProject("dns-delegate", c, stack, "--route53"));
+            if (cloud == AfonCloud.AWS) {
+                expected.add(inProject("aws-issue-cert", "--stack", stack));
+            }
+        }
+        assertThat(ran).containsExactlyElementsOf(expected);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void issuesNoCertificatesWhereTheDelegationIsLeftToTheDeployer(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT, "--until", "create"})).isZero();
+        assertThat(ran).noneMatch(c -> c.contains("aws-issue-cert"));
     }
 
     @ParameterizedTest
@@ -806,6 +821,11 @@ class ManageProjectMainTest {
         String c = lower(cloud);
         assertThat(command.run(new String[]{"up", "idp", "--until", "create"})).isZero();
         assertThat(ran).contains(inIdentity("dns-create-zones", c, c + "-keycloak"), inIdentity("dns-delegate", c, c + "-keycloak", "--route53"));
+        if (cloud == AfonCloud.AWS) {
+            assertThat(ran).contains(inIdentity("aws-issue-cert", "--stack", "aws-keycloak"));
+        } else {
+            assertThat(ran).noneMatch(r -> r.contains("aws-issue-cert"));
+        }
     }
 
     // --until stops after a stage
