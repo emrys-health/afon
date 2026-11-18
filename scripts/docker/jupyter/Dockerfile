@@ -41,6 +41,23 @@ RUN install -d -m 0755 /etc/apt/keyrings \
  && apt-get install -y --no-install-recommends firefox \
  && rm -rf /var/lib/apt/lists/*
 
+# VS Code (desktop), from Microsoft's official APT repo, run in the VNC desktop like
+# Firefox, so the Guacamole stream stays the only way into the pod. It is started with
+# `code` from the xterm. The wrapper in /usr/local/bin (ahead of /usr/bin on PATH) passes
+# --no-sandbox: Chromium's sandbox needs either the setuid chrome-sandbox, which
+# KubeSpawner's allow_privilege_escalation=False (no_new_privs) defeats, or unprivileged
+# user namespaces, which the container runtime's seccomp profile blocks, so without it
+# the window never opens. The pod itself is the isolation boundary, one per user.
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+        > /etc/apt/keyrings/packages.microsoft.asc \
+ && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/packages.microsoft.asc] https://packages.microsoft.com/repos/code stable main" \
+        > /etc/apt/sources.list.d/vscode.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends code \
+ && rm -rf /var/lib/apt/lists/* \
+ && printf '#!/usr/bin/env bash\nexec /usr/bin/code --no-sandbox "$@"\n' > /usr/local/bin/code \
+ && chmod +x /usr/local/bin/code
+
 # Hook scripts: jupyter docker-stacks sources every *.sh in this directory from
 # start-notebook.sh (before exec'ing the main command), so DISPLAY=:1 propagates and any
 # backgrounded servers start. 0-start-vnc brings up the X/VNC desktop; 1-start-local-lab
@@ -98,3 +115,21 @@ RUN pip install --no-cache-dir --only-binary=:all: \
     "trino==0.340.0" \
     "pytest==8.3.4" \
     "ruff==0.9.6"
+
+# 7. VS Code extensions and settings, baked in at build time: the notebook pods' egress is
+#    restricted to whitelisted domains (see NetworkConfig), so the Marketplace cannot be
+#    reached at runtime. $HOME is not a mounted volume, so what is installed here is what
+#    the user gets. ms-python.python brings its dependencies (Pylance, the debugger).
+#    Telemetry and updates are off, as neither could leave the pod anyway.
+RUN code --install-extension ms-python.python \
+ && code --install-extension ms-toolsai.jupyter \
+ && mkdir -p "${HOME}/.config/Code/User" \
+ && printf '%s\n' \
+      '{' \
+      '  "telemetry.telemetryLevel": "off",' \
+      '  "update.mode": "none",' \
+      '  "extensions.autoUpdate": false,' \
+      '  "extensions.autoCheckUpdates": false,' \
+      '  "workbench.enableExperiments": false,' \
+      '  "python.defaultInterpreterPath": "/opt/conda/bin/python"' \
+      '}' > "${HOME}/.config/Code/User/settings.json"
