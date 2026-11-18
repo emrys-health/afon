@@ -124,11 +124,12 @@ public class JupyterHubConfig {
     private static final String GUACAMOLE_USER = "guacamole-user";
 
     /**
-     * The slug of the notebook profile a spawn without a {@code profile} argument gets: the pyspark-notebook image.
+     * The slug of the notebook profile selected by default in the hub's spawn form: the pyspark-notebook image.
      */
     static final String DEFAULT_PROFILE     = "pyspark";
     /**
-     * The slug of the other notebook profile, chosen with {@code /hub/spawn?profile=alternative&next=/guacamole/}.
+     * The slug of the other notebook profile, chosen in the hub's spawn form, or by a link to
+     * {@code /hub/spawn?profile=alternative&next=/guacamole/}, which skips the form.
      */
     static final String ALTERNATIVE_PROFILE = "alternative";
 
@@ -611,15 +612,16 @@ public class JupyterHubConfig {
                
                # --- The hub owns the domain root. ---
                c.JupyterHub.base_url = '%7$s'
-               # A bare visit to the domain root auto-spawns the user's pod and then hands off to
-               # Guacamole, which streams that pod's VNC desktop. The spawn page starts the server
-               # straight away, without showing its options form, because it is given a query
-               # argument other than next: the profile (see profile_list below). Keep ?profile: without
-               # it, the hub shows the form for choosing a profile instead. ?next redirects the browser
-               # to Guacamole once the pod is up, rather than to the single-user web UI, which the
-               # browser cannot reach (see redirect_to_server below). Keep ?next: without it a spawn
-               # ends on /hub/home, not the desktop.
-               c.JupyterHub.default_url = '/hub/spawn?profile=%24$s&next=%13$s'
+               # A bare visit to the domain root lands on the spawn page, which shows KubeSpawner's form
+               # for choosing the image (see profile_list below), then spawns the user's pod and hands
+               # off to Guacamole, which streams that pod's VNC desktop. If their pod is already running,
+               # there is no form: they go straight to the desktop. A query argument other than next, eg
+               # ?profile=<slug>, skips the form and spawns that profile at once, which a link can use.
+               # ?next redirects the browser to Guacamole once the pod is up, rather than to the
+               # single-user web UI, which the browser cannot reach (see redirect_to_server below). Keep
+               # ?next: without it a spawn ends on /hub/home, not the desktop. The form keeps it, as it
+               # posts back to the URL it was served from.
+               c.JupyterHub.default_url = '/hub/spawn?next=%13$s'
                
                # --- Proxy runs in its own pod (configurable-http-proxy), not inside the hub. ---
                c.ConfigurableHTTPProxy.should_start = False
@@ -648,8 +650,10 @@ public class JupyterHubConfig {
                # server, so a running one is not replaced: they stop it, from /hub/home, to change image.
                c.KubeSpawner.profile_list = [
                    {'display_name': 'PySpark', 'slug': '%24$s', 'default': True,
+                    'description': 'Spark 4 with Polaris and Trino, the Python analysis stack and VS Code.',
                     'kubespawner_override': {'image': '%5$s'}},
                    {'display_name': 'Alternative', 'slug': '%25$s',
+                    'description': 'A placeholder for a second notebook image, which is yet to be chosen.',
                     'kubespawner_override': {'image': '%26$s'}},
                ]
                # Re-pull on every spawn so a rebuilt image under the same tag is picked up.
