@@ -205,7 +205,7 @@ class ManageIdentityMainTest {
         setUp(cloud);
         ProjectTemplates.writeIdentity(home, "idp", cloud);
         assertThat(command.run(new String[]{"close", "idp"})).isEqualTo(1);
-        assertThat(err.toString()).contains("Project idp is the central identity itself", "no clients, group or members");
+        assertThat(err.toString()).contains("Project idp has the role identity", "no clients, group or members");
         verifyNoInteractions(identity);
     }
 
@@ -281,7 +281,7 @@ class ManageIdentityMainTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void invitesAResearcherAgain(AfonCloud cloud) throws Exception {
+    void invitesAMemberAgain(AfonCloud cloud) throws Exception {
         setUp(cloud);
         assertThat(command.run(new String[]{"invite", PROJECT, "ada@example.org"})).isZero();
         verify(identity).invite("ada@example.org");

@@ -399,12 +399,26 @@ public class PolarisConfig extends Construct {
         }
     }
 
+    /**
+     * The OIDC settings of the Polaris: a Data Provider's, which has an audience and an {@code acr} that it requires, checks that the token is issued by the
+     * identity of its issuer URL, for its audience, with that {@code acr}, and takes the roles from the project that the token names; any other checks
+     * only that the token is of its realm
+     */
+    /** @return whether the property has a value: the template of the config has the keys of a project's, empty, so that a key alone is not a Data Provider */
+    private static boolean isSet(AfonPropertyProvider properties, health.emrys.afon.config.AfonProperty property) {
+        return properties.hasProperty(property) && !properties.getValue(property).isBlank();
+    }
+
     private static @NonNull String kcExports(AfonPropertyProvider properties, AfonCloud cloud) {
         String kcHost = properties.getOidcDomainName(cloud);
-        Map<String, String> kcProperties = KeyCloakHelper.polarisOidcEnv(
-            KeyCloakConfigurer.internalRealmUrl(kcHost, "https"),
-            properties.getValue(KEYCLOAK_DB_USERNAME),
-            properties.getValue(KEYCLOAK_DB_PASSWORD));
+        String url = KeyCloakConfigurer.internalRealmUrl(kcHost, "https");
+        String id = properties.getValue(KEYCLOAK_DB_USERNAME);
+        String secret = properties.getValue(KEYCLOAK_DB_PASSWORD);
+        Map<String, String> kcProperties = isSet(properties, OIDC_AUDIENCE) && isSet(properties, OIDC_ACR)
+            ? KeyCloakHelper.polarisOidcEnv(url, id, secret,
+                                            new KeyCloakHelper.Trust(properties.getOidcIssuerUrl(cloud), properties.getValue(OIDC_AUDIENCE),
+                                                                     properties.getValue(OIDC_ACR), "project"))
+            : KeyCloakHelper.polarisOidcEnv(url, id, secret);
         return toExports(kcProperties);
     }
 
@@ -415,10 +429,18 @@ public class PolarisConfig extends Construct {
             ).collect(Collectors.joining("\n"));
     }
 
-    private static String toEnvironmentVariable(String propertyName) {
+    /**
+     * @return the name of the environment variable that sets the property, as SmallRye Config reads it: the dots and the hyphens, and the brackets of an
+     * index and the quotes of a key of a map, are underscores, so {@code mappings[0].regex} is {@code MAPPINGS_0__REGEX} and {@code required-claims."acr"}
+     * is {@code REQUIRED_CLAIMS__ACR_}
+     */
+    public static String toEnvironmentVariable(String propertyName) {
         return propertyName
             .replace('.', '_')
             .replace('-', '_')
+            .replace('[', '_')
+            .replace(']', '_')
+            .replace('"', '_')
             .toUpperCase(Locale.ROOT);
     }
 

@@ -26,8 +26,8 @@ import java.util.function.Predicate;
  *       identity project, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project, so that
  *       no address is admitted to it.  {@code manage-identity sync-members} follows, which makes the group of the project have the
  *       members that the file lists, and no others;</li>
- *   <li>{@code identity}, {@code git} and {@code tre}: {@code manage-stack setup} or {@code delete} of the stack, the identity's being that of the
- *       project with the identity role.</li>
+ *   <li>{@code identity}, {@code git}, {@code tre} and {@code data}: {@code manage-stack setup} or {@code delete} of the stack, the identity's being
+ *       that of the project with the identity role, and a Data Provider's its Polaris, which it sets up with its catalogs.</li>
  * </ul>
  * Taking a project down deletes its stacks, and leaves what it made outside them, its buckets and its place in the central identity, which
  * are kept until the project is closed on purpose: {@code manage-identity close}.
@@ -98,7 +98,7 @@ final class ProjectCommands {
                     // the domains of the project's stacks are its own, so the zones that serve them are made, once <cloud>-create has made the resource
                     // group they are in; they are delegated from the parent domain by dns-delegate, as docs/dns_config.md says
                     for (Stage serving : plan.stages()) {
-                        if (serving.stack() != null && List.of(StageId.IDENTITY, StageId.GIT, StageId.TRE).contains(serving.id())
+                        if (serving.stack() != null && List.of(StageId.IDENTITY, StageId.GIT, StageId.TRE, StageId.DATA).contains(serving.id())
                             && stacks.defined().test(serving.stack())) {
                             run.add(new Invocation(id, List.of("dns-create-zones", cloud, serving.stack().toString())));
                             if (project.dnsDelegation() == DnsDelegation.ROUTE53) {
@@ -111,7 +111,7 @@ final class ProjectCommands {
                 }
                 case REGISTER -> commands.add(register(id, cloud, identityProject, identityKubeconfig));
                 case IDENTITY, GIT -> commands.add(stackCommand(plan, stage, "setup", stacks));
-                case TRE -> commands.add(withIdentityKubeconfig(stackCommand(plan, stage, "setup", stacks), cloud, identityProject));
+                case TRE, DATA -> commands.add(withIdentityKubeconfig(stackCommand(plan, stage, "setup", stacks), cloud, identityProject));
             }
         }
         return commands;
@@ -132,7 +132,7 @@ final class ProjectCommands {
         List<Invocation> run = List.of(new Invocation(id, List.of("manage-identity", "create", id, "--kubeconfig", identityKubeconfig.toString())),
                                        new Invocation(id, List.of("manage-identity", "sync-members", id, "--kubeconfig", identityKubeconfig.toString())));
         return new Command(StageId.REGISTER,
-            List.of(new Invocation(identityProject.id().value(), List.of(cloud + "-update-kube-config", stack))),
+            List.of(new Invocation(identityProject.id().value(), List.of(identityProject.cloud().toString() + "-update-kube-config", stack))),
             run,
             null);
     }
@@ -146,7 +146,8 @@ final class ProjectCommands {
             return command;
         }
         return new Command(command.stage(),
-                           List.of(new Invocation(identityProject.id().value(), List.of(cloud + "-update-kube-config", identityProject.stack().toString()))),
+                           List.of(new Invocation(identityProject.id().value(), List.of(identityProject.cloud().toString() + "-update-kube-config",
+                                                                        identityProject.stack().toString()))),
                            command.run(), command.note());
     }
 
@@ -156,7 +157,7 @@ final class ProjectCommands {
     static List<Command> down(ProjectPlan plan, Stacks stacks) {
         List<Command> commands = new ArrayList<>();
         for (Stage stage : plan.stages()) {
-            if (stage.id() == StageId.IDENTITY || stage.id() == StageId.GIT || stage.id() == StageId.TRE) {
+            if (stage.id() == StageId.IDENTITY || stage.id() == StageId.GIT || stage.id() == StageId.TRE || stage.id() == StageId.DATA) {
                 commands.add(stackCommand(plan, stage, "delete", stacks));
             }
         }

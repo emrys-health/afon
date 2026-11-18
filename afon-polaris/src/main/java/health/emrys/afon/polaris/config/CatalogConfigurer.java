@@ -12,6 +12,7 @@ import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.message.BasicClassicHttpResponse;
 import org.apache.polaris.core.admin.model.CatalogPrivilege;
+import org.apache.polaris.core.admin.model.NamespacePrivilege;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +74,22 @@ public class CatalogConfigurer {
 
     public static String tableURI(String catalogName, String namespace, String tableName) {
         return format("/api/catalog/v1/%s/namespaces/%s/tables/%s", catalogName, namespace, tableName);
+    }
+
+    public static String namespacesCreateURI(String catalogName) {
+        return format("/api/catalog/v1/%s/namespaces", catalogName);
+    }
+
+    public static String tableRenameURI(String catalogName) {
+        return format("/api/catalog/v1/%s/tables/rename", catalogName);
+    }
+
+    public static String principalRoleURI(String principalRole) {
+        return format("%s/%s", principalRolesURI(), principalRole);
+    }
+
+    public static String principalsOfRoleURI(String principalRole) {
+        return format("%s/principals", principalRoleURI(principalRole));
     }
 
     public static String principalsURI() {
@@ -375,6 +392,104 @@ public class CatalogConfigurer {
         ClassicHttpResponse response = client.delete(uri, accessToken);
         if (isFailure(response)) {
             logger.warn("Failed to delete principal {}", principalName);
+        }
+        return response;
+    }
+
+
+    /**
+     * Creates the namespace if absent, leaving an existing one, and what it holds, as it is.
+     */
+    public ClassicHttpResponse createNamespaceIfAbsent(String catalogName, String namespace) throws IOException, IncorrectConfigException {
+        if (client.exists(namespaceURI(catalogName, namespace), accessToken)) {
+            logger.info("Namespace {} of catalog {} already exists", namespace, catalogName);
+            return skipped("Namespace already exists");
+        }
+        logger.info("Creating namespace {} in catalog {}", namespace, catalogName);
+        ClassicHttpResponse response = client.post(namespacesCreateURI(catalogName), serialiser.namespaceCreation(List.of(namespace)), accessToken);
+        if (isFailure(response)) {
+            logger.warn("Failed to create namespace {} in catalog {}", namespace, catalogName);
+        }
+        return response;
+    }
+
+    /**
+     * Grants the privilege on the namespace to the catalog role: a grant that is made already is left as it is.
+     */
+    public ClassicHttpResponse createNamespaceGrant(String catalogName, String catalogRoleName, String namespace, NamespacePrivilege privilege)
+        throws IOException, IncorrectConfigException {
+        ClassicHttpResponse response = client.put(catalogRolesGrantURI(catalogName, catalogRoleName),
+                                                  serialiser.namespaceGrant(List.of(namespace), privilege), accessToken);
+        if (isFailure(response)) {
+            logger.warn("Failed to grant {} on namespace {} of catalog {} to catalog role {}", privilege, namespace, catalogName, catalogRoleName);
+        }
+        return response;
+    }
+
+    /**
+     * Takes the privilege on the namespace away from the catalog role.
+     */
+    public ClassicHttpResponse revokeNamespaceGrant(String catalogName, String catalogRoleName, String namespace, NamespacePrivilege privilege)
+        throws IOException, IncorrectConfigException {
+        ClassicHttpResponse response = client.post(catalogRolesGrantURI(catalogName, catalogRoleName),
+                                                   serialiser.namespaceRevoke(List.of(namespace), privilege), accessToken);
+        if (isFailure(response)) {
+            logger.warn("Failed to revoke {} on namespace {} of catalog {} from catalog role {}", privilege, namespace, catalogName, catalogRoleName);
+        }
+        return response;
+    }
+
+    /**
+     * @return whether the principal role exists
+     */
+    public boolean principalRoleExists(String principalRoleName) throws IOException {
+        return client.exists(principalRoleURI(principalRoleName), accessToken);
+    }
+
+    /**
+     * @return the names of the principals that have the principal role
+     */
+    public List<String> principalsOf(String principalRoleName) throws IOException, ParseException {
+        List<String> names = new ArrayList<>();
+        for (JsonNode node : getNodes(principalsOfRoleURI(principalRoleName), "principals")) {
+            names.add(node.get("name").asText());
+        }
+        return names;
+    }
+
+    /**
+     * @return the names of the principal roles that the principal has
+     */
+    public List<String> principalRolesOf(String principalName) throws IOException, ParseException {
+        List<String> names = new ArrayList<>();
+        for (JsonNode node : getNodes(principalRolesURI(principalName), "roles")) {
+            names.add(node.get("name").asText());
+        }
+        return names;
+    }
+
+    /**
+     * Takes the principal role from the principal, leaving both.
+     */
+    public ClassicHttpResponse removePrincipalRole(String principalName, String principalRoleName) throws IOException {
+        logger.info("Removing role {} from principal {}", principalRoleName, principalName);
+        ClassicHttpResponse response = client.delete(principalRolesURI(principalName) + "/" + principalRoleName, accessToken);
+        if (isFailure(response)) {
+            logger.warn("Failed to remove role {} from principal {}", principalRoleName, principalName);
+        }
+        return response;
+    }
+
+    /**
+     * Moves the table from a namespace to another of the catalog.
+     */
+    public ClassicHttpResponse renameTable(String catalogName, String fromNamespace, String toNamespace, String table)
+        throws IOException, IncorrectConfigException {
+        logger.info("Moving table {} of catalog {} from namespace {} to {}", table, catalogName, fromNamespace, toNamespace);
+        ClassicHttpResponse response = client.post(tableRenameURI(catalogName), serialiser.tableRename(List.of(fromNamespace), table, List.of(toNamespace)),
+                                                   accessToken);
+        if (isFailure(response)) {
+            logger.warn("Failed to move table {} of catalog {} from namespace {} to {}", table, catalogName, fromNamespace, toNamespace);
         }
         return response;
     }

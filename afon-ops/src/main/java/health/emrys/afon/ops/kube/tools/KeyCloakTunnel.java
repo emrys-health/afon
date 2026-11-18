@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
+import static health.emrys.afon.config.AfonProperty.KEYCLOAK_CLOUD;
 import static health.emrys.afon.config.AfonProperty.KEYCLOAK_KUBECONFIG;
 import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PORT;
 
@@ -18,7 +19,7 @@ import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_PO
  * ingress may only admit {@code <CLOUD>_KEYCLOAK_ALLOWED_CIDRS} to it, which need not include this machine.
  *
  * <p>The pod is looked for in the cluster of {@code KEYCLOAK_KUBECONFIG} if the config names one, as a project's does for the Keycloak of
- * its identity project, else in the cluster of the current kubectl context, which must be that of the cloud. If none runs there, as
+ * its identity project, and then of the cloud of {@code KEYCLOAK_CLOUD} if that is not the stacks', else in the cluster of the current kubectl context, which must be that of the cloud. If none runs there, as
  * when the stacks use the KeyCloak of another stack, eg with {@code <CLOUD>_KEYCLOAK_EXTERNAL=true}, KeyCloak is reached through
  * its public domain name instead, so this machine must then be admitted to it.
  *
@@ -46,6 +47,23 @@ public final class KeyCloakTunnel {
     }
 
     /**
+     * @return the cloud of the cluster that Keycloak is in: {@code KEYCLOAK_CLOUD} if the config names one, as a project's does when its identity is
+     * on another cloud than its own, else the cloud of the stacks
+     * @throws IllegalStateException if {@code KEYCLOAK_CLOUD} is not a cloud
+     */
+    static AfonCloud cloudOfKeycloak(AfonCloud cloud, AfonPropertyProvider properties) {
+        String named = properties.getValue(KEYCLOAK_CLOUD, "");
+        if (named == null || named.isBlank()) {
+            return cloud;
+        }
+        try {
+            return AfonCloud.valueOf(named.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("KEYCLOAK_CLOUD is '" + named + "', which is not a cloud: aws, azure or gcp");
+        }
+    }
+
+    /**
      * Runs the call with the endpoint of a port-forward to the KeyCloak pod in the cluster of the cloud, closed when it returns, or
      * with {@code null} if no KeyCloak pod runs in that cluster.
      *
@@ -69,7 +87,7 @@ public final class KeyCloakTunnel {
      */
     public static void run(AfonCloud cloud, AfonPropertyProvider properties, Path kubeConfig, Call call) throws Exception {
         try (KubeClient client = kubeConfig == null ? new KubeClient(properties) : new KubeClient(properties, kubeConfig.toString())) {
-            client.requireContextOf(cloud);
+            client.requireContextOf(cloudOfKeycloak(cloud, properties));
             Optional<String> pod = client.runningPodWithLabel(POD_LABEL);
             if (pod.isEmpty()) {
                 logger.warn("No running pod with the label {} in the kubectl context '{}', as when KeyCloak is another stack's: "

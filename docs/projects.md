@@ -2,16 +2,36 @@
 
 A project is what is deployed together for one purpose, defined by a `project.yaml` that the deployer writes.
 
-We detail here a working end-to-end deployment on Azure, from the env `emrys2`, with three projects:
+We detail here a deployment from the env `emrys2`, with the central identity and two research environments on AWS, which
+read the data of two Data Providers on Azure:
 
-- `idp`, the project with the role `identity`: the one Keycloak that signs users in for every project;
-- `project1`, a project with the role `tre` (the default): a trusted research environment that uses that Keycloak;
-- `project2`, a second `tre` project, which runs next to `project1` and shares nothing with it but the identity.
+- `idp`, the project with the role `identity`, on AWS: the one Keycloak that signs users in for every project;
+- `cvd-2026`, a project with the role `tre` (the default), on AWS: a trusted research environment that uses that
+  Keycloak, and reads the `cvd` catalog of each Data Provider;
+- `dbt-2026`, a second `tre` project on AWS, which runs next to `cvd-2026` and shares nothing with it but the identity,
+  and reads the `dbt` catalog of each Data Provider;
+- `lon` and `nw`, two projects with the role `data`, on Azure: the Data Providers, each with its own Polaris and two
+  catalogs, `cvd` and `dbt`. A Data Provider is another organisation in practice, which deploys its own project: here we
+  play both.
+
+```
+AWS     idp ............................ the identity: signs the members in, issues their tokens
+         |
+         +-- cvd-2026 (aws-full) ....... reads the catalog cvd of lon and of nw
+         +-- dbt-2026 (aws-full) ....... reads the catalog dbt of lon and of nw
+
+Azure   lon (azure-polaris) ............ catalogs cvd and dbt
+        nw  (azure-polaris) ............ catalogs cvd and dbt
+```
+
+The identity, the TREs as normal TREs that use it, and the members' login with a second factor were built and run on
+Azure. On AWS they have **not been tried**, and a TRE does not read the Data Providers' catalogs yet, which do not trust
+the identity either: [What is not done yet](#what-is-not-done-yet) says what is missing, and which of what is written
+here is the way it is meant to work, and has not been tried.
 
 Each project is made from an env, here `emrys2`: its config is a copy of the env's (partially overrideable by
-`project.yaml`), so the deployment information (the subscription, resource group, region, domain names, secrets) come
-from the env. A project makes its own config, state and home, so running it never interferes with the env you are working
-in:
+`project.yaml`), so the deployment information (the account, region, domain names, secrets) come from the env. A project
+makes its own config, state and home, so running it never interferes with the env you are working in:
 
 ```
 ~/.afon/projects/<project>/project.yaml    the project definition 
@@ -25,18 +45,144 @@ A project id is a lower-case DNS label of at most 30 characters, eg `xyz-yyyy-nn
 
 ## Before you start
 
-You are logged in to Azure, and `emrys2` is the active env:
+You are logged in to AWS, and `emrys2` is the active env:
 
 ```shell
-afon-cli.sh azure-login
+afon-cli.sh aws-login
 afon-cli.sh --env emrys2 config-status
 ```
 
-The config of `emrys2` already has what the projects use: `AZURE_SUBSCRIPTION`, `AZURE_RESOURCE_GROUP`, `AZURE_REGION`,
-`AZURE_OIDC_DOMAIN_NAME` (`azure-oidc.emrys2.click`), `AZURE_JUPYTER_DOMAIN_NAME` (`azure-jupyter.emrys2.click`),
-`POLARIS_DB_HOST`, and the Keycloak admin credentials in `secret.properties`. The projects serve their domains under
-the project's id, eg the identity project `idp` at `azure-oidc.idp.emrys2.click`: see
-[Names](#names-of-a-projects-resources).
+The config of `emrys2` has to have what the projects use: `AWS_ACCOUNT_ID`, `AWS_REGION`, `AWS_OIDC_DOMAIN_NAME` (eg
+`aws-oidc.emrys2.click`), `AWS_JUPYTER_DOMAIN_NAME` (eg `aws-jupyter.emrys2.click`), `POLARIS_DB_HOST`, and the Keycloak
+admin credentials in `secret.properties`. The parent domain, `emrys2.click`, is a Route 53 hosted zone of the account, so
+that `up` can delegate the zones of the projects' domains. The projects serve their domains under the project's id, eg
+the identity project `idp` at `aws-oidc.idp.emrys2.click`: see [Names](#names-of-a-projects-resources).
+
+## The Data Providers
+
+A Data Provider holds data, and lets a project's TRE read it. Each runs one Polaris, whatever the number of projects,
+with a catalog for each use of its data. Here `lon` and `nw` each have two catalogs, `cvd` and `dbt`: `cvd-2026` reads
+the `cvd` catalog of both, and `dbt-2026` the `dbt` catalog of both. A Data Provider is a project with the role `data`,
+which deploys the stack `azure-polaris` and creates its catalogs. It is long-lived, as the data it holds: it is not taken
+down with a TRE, and not rebuilt.
+
+You are logged in to Azure (`afon-cli.sh azure-login`), and the config of `emrys2` has the Azure properties that a
+Data Provider uses: `AZURE_SUBSCRIPTION`, `AZURE_RESOURCE_GROUP`, `AZURE_REGION`, `AZURE_POLARIS_DOMAIN_NAME`,
+`POLARIS_DB_HOST` and the Polaris credentials.
+
+**1. Reserve its egress IP**, as for the identity, so that it leaves from an address of its own:
+
+```shell
+afon-cli.sh azure-egress-ip create afon-egress-ip-lon
+afon-cli.sh azure-egress-ip show afon-egress-ip-lon
+```
+
+**2. Make `~/.afon/projects/lon/project.yaml`** from the template of its role, and complete it, with the address as
+`egressIp` and the catalogs:
+
+```shell
+afon-cli.sh manage-project init lon azure --role data --made-from emrys2
+```
+
+```yaml
+project:
+  id: lon
+  cloud: azure
+  role: data
+  env: emrys2
+  egressIp: <the address of lon>
+
+identity:
+  project: idp
+  issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
+  acr: mfa
+  audience: provider-lon
+
+catalogs: [cvd, dbt]
+
+dns:
+  delegation: route53
+
+cluster:
+  nodePool:
+    vmSize: Standard_D2s_v3
+    nodeCount: 2
+```
+
+`identity` is the central identity that its Polaris trusts, the same that the TREs sign in to, here the one that `idp`
+deploys on AWS: its issuer, the `acr` that proves a second factor, and the audience that the tokens for this Data
+Provider carry, `provider-lon` if the file gives none. `configure` makes the host of the issuer the Data Provider's OIDC
+domain, so that its Polaris, and the setup of its stack, use that Keycloak, and writes the kubeconfig of `idp`'s cluster
+for the port-forward that the setup reaches Keycloak by, whichever cloud `idp` is on. `catalogs` lists the ids of its
+catalogs, at least one: lower-case letters, digits and underscores, the first a letter. Each is an internal catalog,
+named by its id, in storage that is the project's own. A Data Provider has no clients, group or members in the central
+identity: that is for the TRE projects. `cluster.nodePool` is the small nodes of the identity, as a Data Provider runs
+Polaris only; AWS has none.
+
+**Who can reach its Polaris.** A Data Provider does not list the TREs that read it: they name it, in their own
+`dataProviders.named`. So `configure lon` looks through the projects of the Afon home for the TREs that name a catalog of
+`lon`, and adds the egress IP of each, the one its file names or else the env's `<CLOUD>_EGRESS_IP`, to
+`<CLOUD>_POLARIS_ALLOWED_CIDRS` in the config of `lon`, after what the env already allows there. The deploy, and
+`kube-polaris-whitelist`, then restrict the Polaris ingress to those addresses and the cluster's own, and, when
+`kube-polaris-whitelist` is told to (`--caller`), the machine it is run from. With no TRE naming `lon`, the property is
+left as the env has it, and a Polaris with none is open, guarded by its token checks alone, as any other is. `configure`
+refuses if a TRE that names it leaves from no known address, as it would be locked out with nothing to say so. A TRE
+that is added or moved is admitted by configuring and deploying the Data Provider again. The storage account of the catalogs has no network restriction
+yet: it is open to any network, and protected by its credentials.
+
+Its Polaris is at the Polaris domain of the env with the project's id as a label after the first, eg the env's
+`AZURE_POLARIS_DOMAIN_NAME=azure-polaris.emrys2.click` gives `azure-polaris.lon.emrys2.click`, with a database and a
+storage account of its own: see [Names](#names-of-a-projects-resources). The env's domain must have a parent domain, or
+the file names its own, in `stacks.data.domain`.
+
+**3. Check it, configure it and bring it up:**
+
+```shell
+afon-cli.sh manage-project validate lon
+afon-cli.sh manage-project configure lon
+afon-cli.sh manage-project up lon --dry-run
+afon-cli.sh manage-project up lon
+```
+
+`up` runs two stages in the project's home: `create` (`azure-create` for the stack `azure-polaris`, `db-whitelist azure`,
+which allows the project's egress IP on the Postgres, and the zone of its domain, delegated by `route53`) and `data`
+(`manage-stack setup azure-polaris`, which also creates the catalogs, after `aws-update-kube-config aws-keycloak` has
+written the kubeconfig of `idp`'s cluster, in its own home). `nw` is made the same way, with its own id, address and
+catalogs. `down lon` deletes the stack and leaves its storage, with the data of its catalogs.
+
+**4. Grant a project its catalog.** A Data Provider lets a project in by its own grants, in its own Polaris, with its own
+admin credentials: the TRE side never does. In the home of the Data Provider's project, for the `cvd` catalog of `lon`
+and the project `cvd-2026`, whose members' user ids (what `manage-identity add-member` prints) are one for each line
+of a file:
+
+```shell
+afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd --members cvd-2026-members.txt
+```
+
+It makes, for the project, a principal role `cvd-2026Project` and a catalog role `cvd-2026Reader` in the catalog, with
+read-only access to the namespace `released` (or the one given with `--namespace`), and nothing else: no write, and not
+`staging`, where the Data Provider makes and checks its tables. It makes a principal `afon:<user id>` for each member
+in the file, who then has the project's role. The file is the authority, as `members` is: a member not in it loses
+the role, and a principal with no role left is deleted. It is safe to repeat. The same command changes one member or
+ends the access, or moves a table that was checked from `staging` to `released`:
+
+```shell
+afon-cli.sh manage-project run lon manage-project-grants add-member cvd-2026 <user id>
+afon-cli.sh manage-project run lon manage-project-grants remove-member cvd-2026 <user id>
+afon-cli.sh manage-project run lon manage-project-grants release cvd patients
+afon-cli.sh manage-project run lon manage-project-grants revoke cvd-2026 cvd
+```
+
+Because the names are the allowlist, a token whose project claim or user claim names no role or principal that exists
+reads nothing, as its Polaris checks the tokens (see [What is not done yet](#what-is-not-done-yet)). A
+project whose catalog is its own, as `cvd` is `cvd-2026`'s, is isolated by the catalog; one catalog shared by several
+projects is only isolated by the namespace of each, `--namespace`, so give each its own.
+
+A TRE names the catalogs of a Data Provider in its `dataProviders`, as [below](#2-a-first-tre-project): it takes the
+**catalog endpoint** (`https://azure-polaris.lon.emrys2.click/api/catalog`), the **audience** that its tokens carry for
+it (`provider-lon`) and the **storage account** of the catalog from the Data Provider's project. The Data Provider
+decides who reads what: it lets a project in, and names the members, by its own grants. These grants are not built:
+see [What is not done yet](#what-is-not-done-yet).
 
 ## 1. The identity project
 
@@ -44,18 +190,18 @@ the project's id, eg the identity project `idp` at `azure-oidc.idp.emrys2.click`
 so that the database allows it once:
 
 ```shell
-afon-cli.sh azure-egress-ip create afon-egress-ip-idp
-afon-cli.sh azure-egress-ip show afon-egress-ip-idp
+afon-cli.sh aws-egress-ip create afon-egress-ip-idp
+afon-cli.sh aws-egress-ip show afon-egress-ip-idp
 ```
 
-The script ends with a line about `AZURE_EGRESS_IP` in `afon-azure.properties`: ignore it, as the project carries its own
+The script ends with a line about `AWS_EGRESS_IP` in `afon-aws.properties`: ignore it, as the project carries its own
 address.
 
 **2. Make `~/.afon/projects/idp/project.yaml`** from the template of its role, and complete it with the address from step
 1:
 
 ```shell
-afon-cli.sh manage-project init idp azure --role identity --made-from emrys2
+afon-cli.sh manage-project init idp aws --role identity --made-from emrys2
 ```
 
 `--made-from` is the env whose config the project is made from. It is not `--env`, which `afon-cli.sh` takes itself, and
@@ -68,20 +214,18 @@ that is the egress IP, which you replace with the address from step 1. The resul
 ```yaml
 project:
   id: idp
-  cloud: azure
+  cloud: aws
   role: identity
   env: emrys2
   egressIp: <the address from step 1>
 
-cluster:
-  nodePool:
-    vmSize: Standard_D2s_v3
-    nodeCount: 2
+dns:
+  delegation: route53
 ```
 
-`cluster.nodePool` gives the nodes of the identity's cluster, which runs Keycloak only, so that it does not take the vCPU
-quota that the larger nodes of `azure-full` need. It is optional: without it the project uses the nodes of the env, and
-both clusters then take the same size.
+AWS has no node pool property, so the nodes of the identity's cluster, as those of the TREs', are those of the env.
+`delegation: route53` has `up` write the `NS` records of the project's domains into the Route 53 hosted zone of
+`emrys2.click`: see [Automatic delegation](#automatic-delegation).
 
 **3. Check it and configure it:**
 
@@ -95,144 +239,155 @@ afon-cli.sh manage-project configure idp
 ```shell
 afon-cli.sh manage-project up idp --dry-run
 afon-cli.sh manage-project up idp
-afon-cli.sh azure-keycloak
+afon-cli.sh aws-keycloak
 ```
 
-`up` runs two stages in the project's home: `create` (the `azure-create` script for the identity's stack, then
-`db-whitelist azure`, which allows the project's egress IP on the Postgres at `POLARIS_DB_HOST`) and `identity`
-(`manage-stack setup azure-keycloak`). It stops at the first to fail and says how to resume:
+`up` runs two stages in the project's home: `create` (the `aws-create` script for the identity's stack, then
+`db-whitelist aws`, which allows the project's egress IP on the Postgres at `POLARIS_DB_HOST`) and `identity`
+(`manage-stack setup aws-keycloak`). It stops at the first to fail and says how to resume:
 `manage-project up idp --from <stage>`.
 
 ## 2. A first TRE project
 
 **1. Make the key pair of its TRE client.** The client authenticates to the identity with a private key, and the identity
-is given the public key. This writes the public key to `~/.afon/projects/project1/keys/tre.jwk`, and the private key,
-readable by its owner only, to `~/.afon/keys/project1/tre.pem`:
+is given the public key. This writes the public key to `~/.afon/projects/cvd-2026/keys/tre.jwk`, and the private key,
+readable by its owner only, to `~/.afon/keys/cvd-2026/tre.pem`:
 
 ```shell
-afon-cli.sh project-key project1 tre
+afon-cli.sh project-key cvd-2026 tre
 ```
 
 Keep the private key in the secret store of the TRE's cloud, and delete that copy: Afon never reads it. See [Key-based
 authentication](#key-based-authentication) for what the key is for.
 
 **2. Reserve its egress IP**, as for the identity, so that it leaves from an address of its own, and the env's
-`AZURE_EGRESS_IP` stays free for a deployment of the env itself. One address serves the outbound traffic of one cluster,
-so projects that run next to each other each need their own:
+`AWS_EGRESS_IP` stays free for a deployment of the env itself. One address serves the outbound traffic of one cluster, so
+projects that run next to each other each need their own. A Data Provider allows this address too, to let the TRE read
+its data:
 
 ```shell
-afon-cli.sh azure-egress-ip create afon-egress-ip-project1
-afon-cli.sh azure-egress-ip show afon-egress-ip-project1
+afon-cli.sh aws-egress-ip create afon-egress-ip-cvd-2026
+afon-cli.sh aws-egress-ip show afon-egress-ip-cvd-2026
 ```
 
-**3. Make `~/.afon/projects/project1/project.yaml`** from the template of its role, which is `tre` unless you give
+**3. Make `~/.afon/projects/cvd-2026/project.yaml`** from the template of its role, which is `tre` unless you give
 `--role identity`, and complete it, with the address as `egressIp`:
 
 ```shell
-afon-cli.sh manage-project init project1 azure --made-from emrys2
+afon-cli.sh manage-project init cvd-2026 aws --made-from emrys2
 ```
 
 It has the minimum a TRE project needs:
 
 - the issuer of the identity;
 - the `acr` (authentication context class reference) value that proves a second factor;
-- one Data Provider catalog, here the Polaris of the env itself;
+- the Data Provider catalogs, one entry each: here the `cvd` catalog of `lon`, and that of `nw`;
 - an audit bucket;
 - at least one member;
 - the identity project that deploys the identity.
 
 ```yaml
 project:
-  id: project1
-  cloud: azure
+  id: cvd-2026
+  cloud: aws
   env: emrys2
-  egressIp: <the address of project1>
+  egressIp: <the address of cvd-2026>
 
 identity:
   project: idp
-  issuerUrl: https://azure-oidc.idp.emrys2.click/realms/polaris
+  issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
-providers:
-  - id: azure
-    catalogUri: https://azure-polaris.emrys2.click/api/catalog
-    catalogName: azure
-    audience: provider-azure
-    bucket: emrys2afonstorage
-
-cluster:
-  nodePool:
-    vmSize: Standard_D4s_v6
-    nodeCount: 2
+dataProviders:
+  named:
+    - project: lon
+      catalogs: [cvd]
+    - project: nw
+      catalogs: [cvd]
 
 members:
   - alice@tre.example
 
 stacks:
   create:
-    auditBucket: project1-audit
+    auditBucket: cvd-2026-audit
+
+dns:
+  delegation: route53
 ```
 
+Each entry of `named` names a Data Provider's project, `lon` or `nw`, and its catalogs, whose files and config say the
+rest: the endpoint of its Polaris (`https://azure-polaris.lon.emrys2.click/api/catalog`), the audience that the tokens
+for it carry (`provider-lon`, that of its identity), the storage account of each catalog, which the TRE's whitelist
+allows, and the cloud of that storage, which is not the project's here. `validate`, `configure` and `up` read them from
+the Data Provider's project, which has to be made, with the config of its env there, though not yet up; they refuse a
+project or catalog that is not there, and a Data Provider that trusts another identity than the one the TRE uses. Each
+catalog is an entry in the TRE, with the id `<project>-<catalog>`: a TRE that reads both catalogs of `lon` names them
+together, `- {project: lon, catalogs: [cvd, dbt]}`, and has `lon-cvd` and `lon-dbt`. `configure` writes the catalogs in
+full, as `defined`, into the copy of the file in the project's config, as the record of what was deployed.
+
+A Data Provider that Afon did not deploy has no project to name: its catalog is then given in full, in `defined`, as
+`id`, `catalogUri`, `catalogName`, `audience`, `bucket` and `cloud`. The `audience` is one for each Data Provider in the
+first pass, so that the `cvd` and `dbt` catalogs of `lon` share `provider-lon`; `bucket` is the storage account of the
+catalog, for the TRE's whitelist. A project has at least one catalog, in either list, and the ids are unique.
+
 The TRE's domains are not defined in the file: they are derived from the env's (see
-[Names](#names-of-a-projects-resources)), eg `azure-jupyter.project1.emrys2.click`. Their zones are made by `up`, in the
+[Names](#names-of-a-projects-resources)), eg `aws-jupyter.cvd-2026.emrys2.click`. Their zones are made by `up`, in the
 `create` stage, but have to be delegated from the parent domain before the TRE can get its certificates. Either `up` does
 it, or you stop after `create`, delegate, and run the rest.
 
-**Automatic delegation.** If the parent domain, `emrys2.click`, is a Route 53 hosted zone of your AWS account, set this
-in the project's file, where the template has `delegation: none`, and `up` runs `dns-delegate --route53` after it makes
-the zones, so that it need not stop:
+### Automatic delegation
+
+If the parent domain, `emrys2.click`, is a Route 53 hosted zone of your AWS account, as it is here, set this in the
+project's file, where the template has `delegation: none`, and `up` runs `dns-delegate --route53` after it makes the
+zones, so that it need not stop:
 
 ```yaml
 dns:
   delegation: route53
 ```
 
-It needs the `aws` CLI and credentials, even if the project is on Azure or GCP. It writes the `NS` record of each domain
-into the hosted zone of its closest parent domain, replacing the one that is there, so it is safe to repeat. It fails,
-and `up` stops at `create`, if there is no such zone: then delegate by hand. If a domain of `stacks.tre.domains` is
-itself a registered domain, it has no parent zone, so `route53` would change its nameservers at the registrar, and
-whatever DNS it used before would stop answering for it. Keep `manual` for such a domain. The default, also for `none` or
-no value, is `manual`.
+It writes the `NS` record of each domain into the hosted zone of its closest parent domain, replacing the one that is
+there, so it is safe to repeat. It fails, and `up` stops at `create`, if there is no such zone: then delegate by hand. If
+a domain of `stacks.tre.domains` is itself a registered domain, it has no parent zone, so `route53` would change its
+nameservers at the registrar, and whatever DNS it used before would stop answering for it. Keep `manual` for such a
+domain. The default, also for `none` or no value, is `manual`.
 
 **By hand**, stop after `create`, delegate, and run the rest:
 
 ```shell
-afon-cli.sh manage-project up project1 --until create
-afon-cli.sh manage-project run project1 dns-delegate azure tre
-afon-cli.sh manage-project up project1 --from register
+afon-cli.sh manage-project up cvd-2026 --until create
+afon-cli.sh manage-project run cvd-2026 dns-delegate aws tre
+afon-cli.sh manage-project up cvd-2026 --from register
 ```
 
 `--until` is the last stage to run; the message at the end gives the `--from` that continues. `dns-delegate` shows the
 `NS` records to add to the zone of `emrys2.click`, or with `--route53` writes them there, if that zone is a Route 53
 hosted zone of your AWS account (see [DNS Configuration](./dns_config.md)). Check with
-`afon-cli.sh manage-project run project1 azure-dns-zones`.
+`afon-cli.sh manage-project run cvd-2026 aws-dns-zones`.
 
-The TRE has a larger `cluster.nodePool`, as `azure-full` does not fit smaller nodes: two `Standard_D4s_v6` are 8 vCPUs of
-the `StandardDsv6Family`, so mind the quota of the subscription, which the identity's cluster, and any other, share. On
-GCP the keys are `machineType` and `nodeCount`; AWS has no node pool property, so a project there takes the nodes of its
-env.
-
-The TRE deploys the stack `azure-full`, with Git in it, and is not rebuilt at night. It leaves from its own egress IP,
-which `up` allows on the database in the `create` stage, as it does for the identity. A project that names none leaves
-from the `AZURE_EGRESS_IP` of the env's config, which it then shares with the env's own deployment and with any other
-project that names none: they cannot be up at the same time.
+The TRE deploys the stack `aws-full`, with Git in it, and is not rebuilt at night. AWS has no node pool property, so its
+nodes are those of the env: mind the vCPU quota of the account in the region, which the TREs and the identity share. It
+leaves from its own egress IP, which `up` allows on the database in the `create` stage, as it does for the identity. A
+project that names none leaves from the `AWS_EGRESS_IP` of the env's config, which it then shares with the env's own
+deployment and with any other project that names none: they cannot be up at the same time.
 
 **4. Check it, configure it and bring it up:**
 
 ```shell
-afon-cli.sh manage-project validate project1
-afon-cli.sh manage-project plan project1
-afon-cli.sh manage-project configure project1
-afon-cli.sh manage-project up project1 --dry-run
-afon-cli.sh manage-project up project1
+afon-cli.sh manage-project validate cvd-2026
+afon-cli.sh manage-project plan cvd-2026
+afon-cli.sh manage-project configure cvd-2026
+afon-cli.sh manage-project up cvd-2026 --dry-run
+afon-cli.sh manage-project up cvd-2026
 ```
 
-`up` runs three stages in the project's home: `create` (`azure-create` for `azure-full`), `register`
-(`manage-identity create project1`: the project's client and group in the central identity, which needs the identity to
-be up; see below) and `tre` (`manage-stack setup azure-full`). If one fails, fix the cause and resume with
-`manage-project up project1 --from <stage>`.
+`up` runs three stages in the project's home: `create` (`aws-create` for `aws-full`), `register`
+(`manage-identity create cvd-2026`: the project's client and group in the central identity, which needs the identity to
+be up; see below) and `tre` (`manage-stack setup aws-full`). If one fails, fix the cause and resume with
+`manage-project up cvd-2026 --from <stage>`.
 
-**IMPORTANT:** The project has names of its own, so it can run next to `emrys2`'s own `azure-full`, and next to other
+**IMPORTANT:** The project has names of its own, so it can run next to `emrys2`'s own `aws-full`, and next to other
 projects made from the same env, see [Names](#names-of-a-projects-resources). It still uses the egress IP of `emrys2`
 unless a different egress IP is configured: set `egressIp` in the project's `project.yaml`, which
 `manage-project configure` then writes into the project's config.
@@ -246,23 +401,24 @@ before you `configure` the TRE project, and `up` writes the kubeconfig again bef
 
 ## 3. A second TRE project
 
-`project2` is made the same way as `project1`, from the same env and with the same identity, and runs at the same time:
+`dbt-2026` is made the same way as `cvd-2026`, from the same env and with the same identity, and runs at the same time:
 each project has its own cluster, storage, domains and state, see [Names](#names-of-a-projects-resources). Each step is
-the one above, with `project2` for `project1`:
+the one above, with `dbt-2026` for `cvd-2026`:
 
 ```shell
-afon-cli.sh project-key project2 tre
-afon-cli.sh manage-project init project2 azure --made-from emrys2
+afon-cli.sh project-key dbt-2026 tre
+afon-cli.sh manage-project init dbt-2026 aws --made-from emrys2
 ```
 
-Complete `~/.afon/projects/project2/project.yaml` as for `project1`. What differs is the id, the audit bucket, the egress
-IP, and whatever else is the project's own, such as its Data Provider catalogs and its nodes.
+Complete `~/.afon/projects/dbt-2026/project.yaml` as for `cvd-2026`. What differs is the id, the audit bucket, the egress
+IP, and whatever else is the project's own, such as its Data Provider catalogs: here the `dbt` catalog of each Data
+Provider.
 
-**Its own egress IP.** As for `project1`, reserve an address of its own, and name it in its file:
+**Its own egress IP.** As for `cvd-2026`, reserve an address of its own, and name it in its file:
 
 ```shell
-afon-cli.sh azure-egress-ip create afon-egress-ip-project2
-afon-cli.sh azure-egress-ip show afon-egress-ip-project2
+afon-cli.sh aws-egress-ip create afon-egress-ip-dbt-2026
+afon-cli.sh aws-egress-ip show afon-egress-ip-dbt-2026
 ```
 
 `up` then allows it on the database, in the `create` stage, as it did for the identity. `validate` and `configure` warn
@@ -271,72 +427,65 @@ that are not up together may share one.
 
 ```yaml
 project:
-  id: project2
-  cloud: azure
+  id: dbt-2026
+  cloud: aws
   env: emrys2
-  egressIp: <the address of project2>
+  egressIp: <the address of dbt-2026>
 
 identity:
   project: idp
-  issuerUrl: https://azure-oidc.idp.emrys2.click/realms/polaris
+  issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
-providers:
-  - id: azure
-    catalogUri: https://azure-polaris.emrys2.click/api/catalog
-    catalogName: azure
-    audience: provider-azure
-    bucket: emrys2afonstorage
-
-cluster:
-  nodePool:
-    vmSize: Standard_D4s_v6
-    nodeCount: 2
+dataProviders:
+  named:
+    - project: lon
+      catalogs: [dbt]
+    - project: nw
+      catalogs: [dbt]
 
 members:
-  - alice@tre.example
+  - bob@tre.example
 
 stacks:
   create:
-    auditBucket: project2-audit
+    auditBucket: dbt-2026-audit
+
+dns:
+  delegation: route53
 ```
 
-Check it, and see that nothing is shared with `project1`:
+Check it, and see that nothing is shared with `cvd-2026`:
 
 ```shell
-afon-cli.sh manage-project validate project2
-afon-cli.sh manage-project configure project2
-afon-cli.sh manage-project names project1
-afon-cli.sh manage-project names project2
+afon-cli.sh manage-project validate dbt-2026
+afon-cli.sh manage-project configure dbt-2026
+afon-cli.sh manage-project names cvd-2026
+afon-cli.sh manage-project names dbt-2026
 ```
 
-The two lists differ in the cluster (`full-project1-cluster`, `full-project2-cluster`), the storage account and key vault
-(`afonstorage<token>` and `afon-kv-<token>`, with another token for each project) and the domains
-(`azure-jupyter.project1.emrys2.click`, `azure-jupyter.project2.emrys2.click`). `validate` and `configure` refuse a
-domain that both would have, and `afon-cli.sh manage-project find <name>` tells which project a storage account or a key
-vault belongs to.
+The two lists differ in the cluster (`full-cvd-2026-cluster`, `full-dbt-2026-cluster`), the buckets
+(`afon-<token>-<catalog>`, with another token for each project) and the domains (`aws-jupyter.cvd-2026.emrys2.click`,
+`aws-jupyter.dbt-2026.emrys2.click`). `validate` and `configure` refuse a domain that both would have, and
+`afon-cli.sh manage-project find <name>` tells which project a bucket belongs to.
 
-Bring it up, with the delegation of its domains in the middle, as for `project1`:
+Bring it up as for `cvd-2026`, with the delegation of its domains written by `up`:
 
 ```shell
-afon-cli.sh manage-project up project2 --until create
-afon-cli.sh manage-project run project2 dns-delegate azure tre
-afon-cli.sh manage-project up project2 --from register
+afon-cli.sh manage-project up dbt-2026
 ```
-Here, we are assuming that `project2` does **not** configure delegation to `route53`.
 
-Before you do, mind the quota. Each TRE is two `Standard_D4s_v6`, 8 vCPUs of the `StandardDsv6Family`, so the two
-projects need 16 of the subscription's quota in the region, next to the identity's nodes (`Standard_D2s_v3`, another
-family). The projects are brought up and down on their own: `down project2` leaves `project1` and the identity as they
-are. To put a project in an account of its own, make it from an env whose config has that account, and the quota is that
-account's.
+Before you do, mind the quota: the nodes of each TRE are the env's, so the two projects and the identity take three times
+what one cluster does of the account's vCPU quota in the region. The projects are brought up and down on their own:
+`down dbt-2026` leaves `cvd-2026` and the identity as they are. To put a project in an account of its own, make it from
+an env whose config has that account, and the quota is that account's.
 
 ## Names of a project's resources
 
 `configure` gives a project names of its own, so that projects, even made from one env or deployed in one cloud account,
 never share a resource:
 
-- **The cluster** is `<stack type>-<project id>-cluster`, eg `full-project1-cluster`, set as `CLUSTER_NAME`. The id makes
+- **The cluster** is `<stack type>-<project id>-cluster`, eg `full-cvd-2026-cluster`, set as `CLUSTER_NAME`. The id makes
   up part of it, so it is checked against the limit of the cloud on `validate`: 40 characters on GKE, 63 on AKS, 100 on
   EKS.
 - **What is unique in the whole cloud** is `afonstorage<token>` for an Azure storage account and `afon-...` for the rest,
@@ -347,28 +496,35 @@ never share a resource:
   same on every `up`, so the audit trail and the other buckets that outlive the stacks stay where they are, and it
   differs for the same project id in another account, as these names are unique across all accounts.
 - **The domains** of a TRE are those of the env with the project id as a label after the first: the env's
-  `AZURE_JUPYTER_DOMAIN_NAME=azure-jupyter.emrys2.click` gives the project `azure-jupyter.project1.emrys2.click`, and the
-  same for the Polaris domain if the env has one. The OIDC domain is the identity's, and a TRE does not touch it. The
-  identity project has its OIDC domain derived in the same way, so that it does not clash with a Keycloak that the env
-  serves at its own domain: the env's `AZURE_OIDC_DOMAIN_NAME=azure-oidc.emrys2.click` gives
-  `azure-oidc.idp.emrys2.click`, which is what the TRE projects name in `identity.issuerUrl`; `stacks.identity.domain` in
-  its file wins over the derived one. An env domain that has no parent domain is left as it is. Each domain has a DNS
-  zone of its own, which `up` makes in its `create` stage (`dns-create-zones`, which is safe to repeat), and which
-  the parent zone delegates, as it does the env's own (see [DNS Configuration](./dns_config.md)). A domain in
-  `stacks.tre.domains` wins over the derived one, and `validate` and `configure` refuse a domain that another project of
-  the same cloud has. The env's domain must have a parent domain: `emryspolaris.click` has none, so a project made from
-  it names its own.
+  `AWS_JUPYTER_DOMAIN_NAME=aws-jupyter.emrys2.click` gives the project `aws-jupyter.cvd-2026.emrys2.click`, and the same
+  for the Polaris domain if the env has one. The OIDC domain of a TRE is the identity's: the host of its
+  `identity.issuerUrl`. The identity project has its OIDC domain derived in the same way, so that it does not clash with
+  a Keycloak that the env serves at its own domain: the env's `AWS_OIDC_DOMAIN_NAME=aws-oidc.emrys2.click` gives
+  `aws-oidc.idp.emrys2.click`, which is what the TRE projects name in `identity.issuerUrl`; `stacks.identity.domain` in
+  its file wins over the derived one. A Data Provider has its Polaris domain derived too: the env's
+  `AZURE_POLARIS_DOMAIN_NAME=azure-polaris.emrys2.click` gives `azure-polaris.lon.emrys2.click`, and `stacks.data.domain`
+  wins. An env domain that has no parent domain is left as it is for the identity, and the file has to name one for a
+  Data Provider. Each domain has a DNS zone of its own, which `up` makes in its `create` stage (`dns-create-zones`, which
+  is safe to repeat), and which the parent zone delegates, as it does the env's own (see [DNS
+  Configuration](./dns_config.md)). A domain in `stacks.tre.domains` wins over the derived one, and `validate` and
+  `configure` refuse a domain that another project of the same cloud has. The env's domain must have a parent domain:
+  `emryspolaris.click` has none, so a project made from it names its own.
+- **The catalogs of a Data Provider** are those its file lists, in place of the env's: each is internal, named by its id,
+  with storage that is the project's own. On Azure that is a container, named by the id, in the project's storage
+  account; on AWS and GCP a bucket named in the whole cloud, `afon-<token>-<id>`. Polaris keeps its database by its
+  domain, so a Data Provider's Polaris has a database of its own on the Postgres of the env, and two Data Providers do
+  not share one.
 - **The Keycloak database** of the identity project is `keycloak-<project>` on the Postgres of the env, eg `keycloak-idp`
   from `jdbc:postgresql://<host>:5432/keycloak-emrys2`, with the parameters of the URL kept. Without it, the project
-  would share the realm and the users of a Keycloak that the env deploys itself. The stack creates the database if it
-  is absent, and the env's own is left as it is: the derived line is the last of the project's `secret.properties`.
+  would share the realm and the users of a Keycloak that the env deploys itself. The stack creates the database if it is
+  absent, and the env's own is left as it is: the derived line is the last of the project's `secret.properties`.
 
 The account of the env must be set (`AZURE_SUBSCRIPTION`, `AWS_ACCOUNT_ID`, `GCP_PROJECT_ID`), or `configure` stops and
 says so.
 
 ```shell
-afon-cli.sh manage-project names project1
-afon-cli.sh manage-project find afonstorage5edcf267da
+afon-cli.sh manage-project names cvd-2026
+afon-cli.sh manage-project find afon-5edcf267da-polaris-logs
 ```
 
 `names` lists them. `find` says which project owns a storage account, key vault or bucket name, from the files under
@@ -385,9 +541,9 @@ after the project is the command, as it is, and in the cloud of the project, so 
 `cdktf-store`, need not be given `--cloud`, which `afon-cli.sh` would take for itself:
 
 ```shell
-afon-cli.sh manage-project run idp kube-keycloak-whitelist azure show
-afon-cli.sh manage-project run project1 azure-kubectl get pods -A
-afon-cli.sh manage-project run project1 cdktf-store list
+afon-cli.sh manage-project run idp aws-cluster identity
+afon-cli.sh manage-project run cvd-2026 aws-cluster tre
+afon-cli.sh manage-project run cvd-2026 cdktf-store list
 ```
 
 The options that `afon-cli.sh` takes itself (`--env`, `--cloud`, `--home`, `--cdktf`) cannot be given to the command,
@@ -396,12 +552,12 @@ Keycloak through the port-forward that `configure` named, so run it there, never
 your machine:
 
 ```shell
-afon-cli.sh manage-project run project1 manage-identity add-member <email>
-afon-cli.sh manage-project run project1 manage-identity remove-member <email>
-afon-cli.sh manage-project run project1 manage-identity sync-members
+afon-cli.sh manage-project run cvd-2026 manage-identity add-member <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity remove-member <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity sync-members
 ```
 
-`add-member` and `remove-member` change one researcher at a time. A project that lists its `members` in its
+`add-member` and `remove-member` change one member at a time. A project that lists its `members` in its
 `project.yaml` has them made for it: see [Members](#members).
 
 The state of a project's stacks is stored by `cdktf-store`, as the tag `current`, under the project's id, so apart from
@@ -409,8 +565,8 @@ that of any env.
 
 ## Members
 
-The researchers of a TRE project are listed in its `project.yaml`, each as an email, optionally with their first and last
-name, which are set only when the researcher is first made in the central identity:
+The members of a TRE project are listed in its `project.yaml`, each as an email, optionally with their first and last
+name, which are set only when the member is first made in the central identity:
 
 ```yaml
 members:
@@ -422,7 +578,7 @@ members:
 
 `up` makes the project's group have these members, and no others, in its `register` stage, after the project's clients
 and group are made: `manage-identity sync-members`, which you can also run by hand, in the project's home. It
-- makes a researcher who is not in the central identity yet, who is sent an invitation (to verify the email, set a
+- makes a member who is not in the central identity yet, who is sent an invitation (to verify the email, set a
   password and enrol with MFA), as `add-member` does;
 - adds those who are listed and not in the group;
 - **removes those who are in the group and not listed**, ending their sessions (a token already issued lasts until it
@@ -447,12 +603,11 @@ unless they are also listed as members, by the same email, which must then be th
 
 ## Setting up SMTP
 
-The central identity's Keycloak emails each researcher the invitation to verify their email, set a password and enrol
-with MFA, so it needs an SMTP server. This section detals how to set one up with Amazon Simple Email Service (SES),
-the service of AWS for sending email, which works well with a domain registered in AWS Route 53, as `emrys2.click` is.
-Any other SMTP server works the same way: only the values of the properties differ. With no server, the realm sends
-nothing: a researcher is made all the same, with a warning, but gets no invitation, and a later sync does not send it
-again.
+The central identity's Keycloak emails each member the invitation to verify their email, set a password and enrol
+with MFA, so it needs an SMTP server. This section detals how to set one up with Amazon Simple Email Service (SES), the
+service of AWS for sending email, which works well with a domain registered in AWS Route 53, as `emrys2.click` is. Any
+other SMTP server works the same way: only the values of the properties differ. With no server, the realm sends nothing:
+a member is made all the same, with a warning, but gets no invitation, and a later sync does not send it again.
 
 **1. Verify the domain in SES.** In the AWS console, in the region you send from (the verification, the credentials and
 the endpoint all belong to one region, here `eu-west-2`), open Amazon SES, **Identities**, **Create identity**, choose
@@ -535,15 +690,15 @@ afon-cli.sh manage-project configure idp
 afon-cli.sh manage-project up idp --from identity
 ```
 
-Then send an invitation from the cluster, to a researcher who is in the central identity, which also tests the route from
+Then send an invitation from the cluster, to a member who is in the central identity, which also tests the route from
 the cluster to the server:
 
 ```shell
-afon-cli.sh manage-project run project1 manage-identity invite <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity invite <email>
 ```
 
-To send the invitation again, to a researcher who never got it, let it expire (it is valid for 12 hours, and once), or
-lost their second factor, run the same command. It sends the same email, and fails, saying so, if the researcher is not
+To send the invitation again, to a member who never got it, let it expire (it is valid for 12 hours, and once), or
+lost their second factor, run the same command. It sends the same email, and fails, saying so, if the member is not
 in the central identity or the email cannot be sent. If they lost their second factor, remove their authenticator in the
 Keycloak admin console first.
 
@@ -568,10 +723,10 @@ only if the member is in the project's group.
 ## Taking down the projects
 
 ```shell
-afon-cli.sh manage-project down project2
-afon-cli.sh manage-project run project2 manage-identity close
-afon-cli.sh manage-project down project1
-afon-cli.sh manage-project run project1 manage-identity close
+afon-cli.sh manage-project down dbt-2026
+afon-cli.sh manage-project run dbt-2026 manage-identity close
+afon-cli.sh manage-project down cvd-2026
+afon-cli.sh manage-project run cvd-2026 manage-identity close
 afon-cli.sh manage-project down idp
 ```
 
@@ -583,7 +738,7 @@ be on somebody's allow-list.
 To open the project again, run `create`, which makes the client enabled again:
 
 ```shell
-afon-cli.sh manage-project run project1 manage-identity create
+afon-cli.sh manage-project run cvd-2026 manage-identity create
 ```
 
 If the shared identity is brought down too, its state is lost with it, so after bringing it up again run `register` for
@@ -591,9 +746,85 @@ each project: `manage-project up <project> --from register`.
 
 ## What is not done yet
 
-- The TRE's tools do not yet sign in with the project's client, nor check the audience, the project claim or the `acr` of
-  a token: the project's client and group exist in Keycloak, and the TRE works as a normal TRE that uses it.
-- The Data Provider catalog in `providers` is checked, but not yet read by the engines.
+What the page above describes is either working, or the way it is meant to work and **not yet tried**. This is what is
+missing, by area. **Not built** means that the code is not there; **not tried** means that it is, but has not been run on
+this deployment.
+
+### The Data Providers, `lon` and `nw` (Azure)
+
+- **Not tried: the Data Providers on Azure.** The `data` project role is built and tested, with its derived domain,
+  storage, database and catalogs, `up` and `down`. Two Data Providers, `lon` and `nw`, with these two catalogs each, have
+  not been deployed.
+- **Not tried: the Data Provider using the central identity.** A Data Provider's file names the identity, and `configure`
+  points its config at it: the OIDC domain is the issuer's host, and the setup of its stack reaches Keycloak by a
+  port-forward to `idp`'s cluster, on its own cloud. An Azure stack setting up against a Keycloak on AWS has not been
+  run.
+- **Tried in a container, not in a Data Provider: the Polaris checking the tokens.** The Polaris of a Data Provider, from
+  the issuer URL, the audience (`provider-lon`, `provider-nw`) and the `acr` in its config, requires the issuer of the
+  identity, its own audience and `acr: mfa` of every token, and takes the token's project claim as the one principal role
+  that is active, `<project>Project`, so that a member of two projects has the access of the project that the token is
+  for. The spec of the Data Provider's access runs it in a container, and a token for another Data Provider's audience, or
+  without the `acr`, is refused.
+- **Tried in a container, not in a Data Provider: its admin client.** The admin client of a Data Provider
+  (`POLARIS_ID`, which makes its catalogs) is a service of the central identity: no second factor to give, and no
+  audience unless it is given. `manage-stack setup` of the Data Provider's Polaris, which makes the client, gives its
+  tokens the Data Provider's audience and says `acr: mfa` in them, from the properties the Data Provider's config has,
+  so that its own Polaris does not refuse it. That `acr` is the word of whoever holds the client's secret, not the proof
+  of a second factor, so it is for this client alone, which no person signs in as. `POLARIS_ID` is a property of the env,
+  not derived for each project, so the Data Providers made from the same env share one client, which collects the
+  audience of each one that is set up: `lon` and `nw` from `emrys2` then both accept its token, and whoever holds its
+  secret holds the admin access of all of them. A separate client for each Data Provider, with its own secret, is not
+  built. The spec does it with the same calls. Not run by `setup` against a Data Provider on Azure and an identity on
+  AWS.
+- **Tried in a container, not in a Data Provider: the grants of a project.** `manage-project-grants` makes the project's
+  principal role and catalog role, the read-only access to `released`, and the members' principals, as [The Data
+  Providers](#the-data-providers) says. A spec runs them against the Polaris and the Keycloak of the identity, in
+  containers (`-Pidentity`): the members get their tokens from the identity as the TRE's client does, and a project
+  reads only what is released, and only if the Data Provider names the member. It has not been run against a Data
+  Provider's Polaris on Azure.
+- **Not built: the Data Provider gets the user ids.** The file of members is written by hand from what
+  `manage-identity add-member` prints; the contract that names who may read is the Data Provider's. Nothing yet checks a
+  TRE's members against it.
+- **Partly built: letting the TREs in.** `configure` of a Data Provider adds the egress IP of each TRE that names it to
+  its `<CLOUD>_POLARIS_ALLOWED_CIDRS`, see "Who can reach its Polaris" in [The Data Providers](#the-data-providers).
+  Not done: the storage account of the catalogs, which has no firewall, so a credential that Polaris vends works from any
+  address; and a Data Provider that is already deployed has to be configured and deployed again when a TRE is added.
+  Not tried on Azure.
+
+### The TREs reading the Data Providers
+
+- **Not built: the engines do not read `dataProviders`.** The catalogs in a project's file are resolved and checked, and
+  read by no tool. Spark and Trino should each get a catalog for every entry (its endpoint and its name, authenticated
+  with the user's token), so that `cvd-2026` queries the `cvd` catalog of `lon` and of `nw`.
+- **Not built: the whitelist of the TRE.** Its egress should allow, from the same entries, the Polaris domain and the
+  storage account (`bucket`) of each Data Provider. It allows only what the env's own config names.
+- **Not tried: the read across clouds.** An AWS Spark or Trino reading Azure storage with the credentials that the
+  Data Provider's Polaris vends, behind a storage firewall, which there is none of yet.
+
+### What the TRE's tools check
+
+- **Not built: the TRE's tools do not yet sign in with the project's client, nor check the audience, the project claim or
+  the `acr` of a token.** The project's client and group exist in Keycloak, and the TRE works as a normal TRE that uses
+  it. It is to do for each tool: JupyterHub, the gate in front of it and Guacamole, Trino, Spark and Gitea. Whether each
+  can authenticate its client by `private_key_jwt`, or has to be put behind oauth2-proxy, has not been checked.
+- **Not built: the issuer is not pinned.** Polaris and the consumers still accept any issuer, as Keycloak stamps it from
+  the host that was called. Pinning it needs the hostname fixed, and every caller using the public name.
+
+### The identity and the TREs on AWS
+
+- **Not tried: the identity project on AWS.** `aws-create` for its stack, `db-whitelist aws` and
+  `manage-stack setup aws-keycloak`, with the ingress and certificate through Route 53, are the scripts that exist for
+  AWS. The page was made for an Azure deployment and written for AWS from them, not by running them.
+- **Not tried: the admin side of Keycloak on AWS.** `manage-identity` reaches it by a port-forward to its pod, through
+  the kubeconfig of the cluster, which has been run on Azure. On AWS the restriction of who reaches the admin side is the
+  listener rules of the load balancer (`AWS_KEYCLOAK_ALLOWED_CIDRS`), which `kube-keycloak-whitelist` does not change.
+- **Not tried: the TREs as projects on AWS.** `aws-full` with the project's names, its own egress IP, the delegation of
+  its domains by `route53`, and the `register` stage against an identity on AWS.
+- **To check: the env.** That `emrys2` has the AWS properties of [Before you start](#before-you-start), with the domains
+  the page assumes (`aws-oidc.emrys2.click`, `aws-jupyter.emrys2.click`), and that `emrys2.click` is a hosted zone of the
+  account.
+
+### Not on this page
 
 The design, and the options this page leaves out (a project's own Git, its nightly rebuild), are in `multi_project.md` in
 the `afon-dev-docs` repository.

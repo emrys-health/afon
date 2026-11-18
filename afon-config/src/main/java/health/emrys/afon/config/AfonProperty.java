@@ -282,6 +282,12 @@ public enum AfonProperty {
      * stack when unset.
      */
     KEYCLOAK_KUBECONFIG("KEYCLOAK_KUBECONFIG"),
+    /**
+     * The cloud of the cluster of {@link #KEYCLOAK_KUBECONFIG}, when the identity is on another cloud than the stacks that use it, eg a Data
+     * Provider on Azure that uses an identity on AWS, so that the kubectl context that the port-forward needs is checked to be of that cloud, not the
+     * stacks'.  Optional: the cloud of the stack when unset.
+     */
+    KEYCLOAK_CLOUD("KEYCLOAK_CLOUD"),
     KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME("KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME"),
     KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD"),
     KEYCLOAK_DB("KEYCLOAK_DB"),
@@ -289,10 +295,10 @@ public enum AfonProperty {
     KEYCLOAK_DB_USERNAME("KEYCLOAK_DB_USERNAME"),
     KEYCLOAK_DB_PASSWORD("KEYCLOAK_DB_PASSWORD"),
     /**
-     * The SMTP server that the realm of the Keycloak sends its emails through, eg the invitations to the researchers of a project, which they set
+     * The SMTP server that the realm of the Keycloak sends its emails through, eg the invitations to the members of a project, which they set
      * their password and second factor by.  Optional: with no host, the realm sends none, and an invitation fails (it is a warning, as the
-     * researcher is made all the same, but gets no email, and is not invited again by a later sync, only by {@code manage-identity invite}).  Set in the env of
-     * the Keycloak, before the researchers are made.
+     * member is made all the same, but gets no email, and is not invited again by a later sync, only by {@code manage-identity invite}).  Set in the env of
+     * the Keycloak, before the members are made.
      */
     KEYCLOAK_SMTP_HOST("KEYCLOAK_SMTP_HOST"),
     /** The port of {@link #KEYCLOAK_SMTP_HOST}.  Optional: 587 when empty, as for the usual STARTTLS submission. */

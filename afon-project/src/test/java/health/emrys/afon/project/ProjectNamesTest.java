@@ -316,4 +316,46 @@ class ProjectNamesTest {
         assertThat(ProjectNames.derive(identity, env(), "dev")).doesNotContainKey("secret.properties");
         assertThat(ProjectNames.derive(identity, env("KEYCLOAK_DB_URL", "not-a-url"), "dev")).doesNotContainKey("secret.properties");
     }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void putsThePolarisDomainOfADataProjectUnderItsProjectUnlessItsFileGivesOne(AfonCloud cloud) {
+        String c = lower(cloud);
+        Properties env = env(cloud.name() + "_POLARIS_DOMAIN_NAME", c + "-polaris.dev.click");
+        var data = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
+        assertThat(all(data, env)).containsEntry(cloud.name() + "_POLARIS_DOMAIN_NAME", c + "-polaris.lon.dev.click");
+        // what the file says is for the config of the project to take, so nothing is derived for it
+        var named = ProjectFixtures.data(ProjectFixtures.dataExample(cloud) + "stacks:\n  data: {domain: polaris.lon.example.org}\n");
+        assertThat(all(named, env)).doesNotContainKey(cloud.name() + "_POLARIS_DOMAIN_NAME");
+        assertThat(ProjectNames.domainCollisions(named, java.util.List.of(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)
+            .replace("id: lon", "id: nw") + "stacks:\n  data: {domain: polaris.lon.example.org}\n")))).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToDeriveThePolarisDomainOfADataProjectFromOneWithNoParent(AfonCloud cloud) {
+        Properties env = env(cloud.name() + "_POLARIS_DOMAIN_NAME", "polaris.click");
+        assertThatThrownBy(() -> all(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)), env)).isInstanceOf(ProjectException.class)
+                                                                                                    .hasMessageContaining("stacks.data.domain");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesADataProjectCatalogsOfItsOwnInPlaceOfTheEnvs(AfonCloud cloud) {
+        String p = cloud.name() + "_";
+        var derived = ProjectNames.derive(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)), env(), "dev");
+        Map<String, String> catalogs = derived.get("catalogs-" + lower(cloud) + ".properties");
+        assertThat(catalogs).containsEntry(p + "CATALOG_IDS", "cvd,dbt")
+                            .containsEntry(p + "CATALOG_NAME_cvd", "cvd").containsEntry(p + "CATALOG_TYPE_cvd", "internal")
+                            .containsEntry(p + "CATALOG_NAME_dbt", "dbt").containsEntry(p + "CATALOG_TYPE_dbt", "internal");
+        String token = ProjectNames.token(cloud, ProjectNames.account(cloud, env(), "dev"), "lon");
+        if (cloud == AfonCloud.AZURE) {
+            // a container of the project's storage account
+            assertThat(catalogs).containsEntry(p + "BUCKET_NAME_cvd", "cvd").containsEntry(p + "BUCKET_NAME_dbt", "dbt");
+        } else {
+            assertThat(catalogs).containsEntry(p + "BUCKET_NAME_cvd", "afon-" + token + "-cvd").containsEntry(p + "BUCKET_NAME_dbt", "afon-" + token + "-dbt");
+        }
+        // and none of the env's, which have their own ids
+        assertThat(catalogs).doesNotContainKeys(p + "BUCKET_NAME_" + lower(cloud), p + "BUCKET_NAME_x_external");
+    }
 }

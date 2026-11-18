@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.ENV_NAME;
 import static health.emrys.afon.config.AfonProperty.OIDC_ISSUER_URL;
@@ -64,6 +65,8 @@ class ProjectEnvTest {
             .containsEntry("OIDC_PROJECT_CLAIM", "project").containsEntry("OIDC_USER_CLAIM", "polaris_principal")
             .containsEntry("GIT_DOMAIN_NAME", "git.xyz-yyyy-nnnn.example.org").containsEntry("TRE_TEARDOWN_TIME", "22:00")
             .containsEntry("TRE_TEARDOWN_TIME_ZONE", "Europe/London");
+        // the identity is at the host of its issuer, whatever the env's own OIDC domain is
+        assertThat(derived.get(file)).containsEntry(prefix + "OIDC_DOMAIN_NAME", "id.example.org");
         assertThat(derived.get(file)).containsEntry(prefix + "KEYCLOAK_EXTERNAL", "true")
             .containsEntry(prefix + "AUDIT_BUCKET", "xyz-yyyy-nnnn-audit").containsEntry(prefix + "EGRESS_IP", "203.0.113.10").containsEntry(prefix + "GITEA_BUCKET", "xyz-yyyy-nnnn-gitea")
             .containsEntry(prefix + "JUPYTER_DOMAIN_NAME", "jupyter.xyz-yyyy-nnnn.example.org");
@@ -269,5 +272,55 @@ class ProjectEnvTest {
             .contains("KEYCLOAK_DB_URL=jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
         assertThat(new FilePropertyProvider(config.toString()).getValue(AfonProperty.KEYCLOAK_DB_URL))
             .isEqualTo("jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresADataProjectWithItsCatalogsAndItsPolarisDomain(AfonCloud cloud) throws IOException {
+        Path file = home.resolve("data.yaml");
+        Files.writeString(file, ProjectFixtures.dataExample(cloud));
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
+        Files.writeString(env.resolve("afon-" + lower(cloud) + ".properties"), cloud.name() + "_POLARIS_DOMAIN_NAME=" + lower(cloud) + "-polaris.dev.click\n");
+        Files.writeString(env.resolve("catalogs.properties"), "");
+        Files.writeString(env.resolve("catalogs-" + lower(cloud) + ".properties"), cloud.name() + "_CATALOG_IDS=" + lower(cloud) + "\n"
+            + cloud.name() + "_CATALOG_NAME_" + lower(cloud) + "=" + lower(cloud) + "\n" + cloud.name() + "_CATALOG_TYPE_" + lower(cloud) + "=internal\n");
+        Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
+        assertThat(config).isEqualTo(home.resolve("config-lon"));
+        AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+        assertThat(properties.getCloudValue(cloud, AfonCloudProperty.POLARIS_DOMAIN_NAME)).isEqualTo(lower(cloud) + "-polaris.lon.dev.click");
+        assertThat(properties.getCloudValue(cloud, AfonCloudProperty.EGRESS_IP)).isEqualTo("203.0.113.40");
+        // it trusts the central identity, which is at the host of its issuer: its OIDC domain, as the config reads the issuer as being at it
+        assertThat(properties.getOidcDomainName(cloud)).isEqualTo("id.example.org");
+        assertThat(properties.getOidcIssuerUrl(cloud)).isEqualTo("https://id.example.org/realms/polaris");
+        assertThat(properties.getValue(AfonProperty.OIDC_ACR)).isEqualTo("mfa");
+        assertThat(properties.getValue(AfonProperty.OIDC_AUDIENCE)).isEqualTo("provider-lon");
+        // the catalogs are the project's: the env's is no longer one of them
+        assertThat(new health.emrys.afon.config.AfonCatalogs(properties).all()).extracting(health.emrys.afon.config.AfonCatalog::id)
+                                                                                  .filteredOn(id -> cloudOf(id, cloud)).containsExactly("cvd", "dbt");
+    }
+
+    private static boolean cloudOf(String id, AfonCloud cloud) {
+        return List.of("cvd", "dbt", lower(cloud)).contains(id);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void namesTheCloudOfTheIdentityProjectOnlyWhenItIsNotTheProjects(AfonCloud cloud) throws IOException {
+        AfonCloud other = AfonCloud.values()[(cloud.ordinal() + 1) % AfonCloud.values().length];
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
+        Path file = home.resolve("data.yaml");
+        for (AfonCloud identityCloud : List.of(cloud, other)) {
+            Path idp = home.resolve("projects/idp/project.yaml");
+            Files.createDirectories(idp.getParent());
+            Files.writeString(idp, ProjectFixtures.identityExample(identityCloud));
+            Files.writeString(file, ProjectFixtures.dataExample(cloud).replace("identity: {", "identity: {project: idp, "));
+            Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
+            AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+            // the kubeconfig is that of the identity's stack, wherever it is, and its cloud is named only if it differs
+            assertThat(properties.getValue(AfonProperty.KEYCLOAK_KUBECONFIG)).endsWith("cdktf-idp/kube/" + lower(identityCloud) + "-keycloak.config");
+            assertThat(properties.getValue(AfonProperty.KEYCLOAK_CLOUD, "")).isEqualTo(identityCloud == cloud ? "" : lower(identityCloud));
+        }
     }
 }

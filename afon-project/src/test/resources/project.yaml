@@ -8,17 +8,18 @@ identity:
   issuerUrl: https://id.example.org/realms/polaris
   acr: mfa
 
-providers:
-  - id: data1
-    catalogUri: https://polaris.data1.example/api/catalog
-    catalogName: xyz-yyyy-nnnn
-    audience: provider-data1
-    bucket: data1-xyz-yyyy-nnnn
-  - id: data2
-    catalogUri: https://polaris.data2.example/api/catalog
-    catalogName: xyz-yyyy-nnnn
-    audience: provider-data2
-    bucket: data2-xyz-yyyy-nnnn
+dataProviders:
+  defined:
+    - id: data1
+      catalogUri: https://polaris.data1.example/api/catalog
+      catalogName: xyz-yyyy-nnnn
+      audience: provider-data1
+      bucket: data1-xyz-yyyy-nnnn
+    - id: data2
+      catalogUri: https://polaris.data2.example/api/catalog
+      catalogName: xyz-yyyy-nnnn
+      audience: provider-data2
+      bucket: data2-xyz-yyyy-nnnn
 
 members: [ada@example.org]
 

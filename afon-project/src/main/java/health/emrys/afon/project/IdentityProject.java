@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * A project with the role {@link ProjectRole#IDENTITY}: the central identity itself, which every TRE project uses to sign in.  It has no
- * Providers, clients or members, and is not torn down nightly.  It holds the egress IP that the identity leaves from, its own, so that
+ * Data Providers, clients or members, and is not torn down nightly.  It holds the egress IP that the identity leaves from, its own, so that
  * what the identity depends on, eg its database, allowlists one address that does not change when it is rebuilt.
  *
  * @param id       the project's immutable id

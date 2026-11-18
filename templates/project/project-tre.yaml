@@ -23,16 +23,24 @@ identity:
   # the authentication context class reference that proves a second factor
   acr: mfa
 
-# the Data Providers' project catalogs, one entry each
-providers:
-  - id: <provider>
-    catalogUri: https://<provider-domain>/api/catalog
-    catalogName: <catalog>
-    audience: <provider-audience>
-    bucket: <provider-bucket>
+# the catalogs of the Data Providers that the project reads, in one or both of two lists.  named has the catalogs of a Data Provider that is one of Afon's
+# projects (with the role data): the endpoint, the audience and the storage are taken from that project, which must be made, with its env's config there,
+# and the entry for each catalog has the id <data-project>-<catalog>.  defined has a Data Provider that is not one of Afon's, in full
+dataProviders:
+  # uncomment to name the catalogs of a Data Provider's project, and remove the entry of defined if the project has no other:
+  # named:
+  #   - project: <data-project>
+  #     catalogs: [<catalog>, <catalog>]
+  defined:
+    - id: <provider>
+      catalogUri: https://<provider-domain>/api/catalog
+      catalogName: <catalog>
+      audience: <provider-audience>
+      bucket: <provider-bucket>
+      # cloud: <cloud>                   # that of the bucket, the project's unless it says another
 
-# the project's researchers, at least one, who up makes the members of its group in the central identity, and no others (one not listed is
-# removed): an email, or {email, firstName, lastName}, the names being set only when the researcher is first made in the identity
+# the project's members, at least one, made members of its group in the central identity, and no others (one not listed is
+# removed): an email, or {email, firstName, lastName}, the names being set only when the member is first made in the identity
 # a project is not valid until it has one, eg
 #   - alice@tre.example
 #   - {email: bob@tre.example, firstName: Bob, lastName: Hope}

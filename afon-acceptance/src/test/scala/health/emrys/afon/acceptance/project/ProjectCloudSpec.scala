@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters._
  *
  * No cloud is special: the specs of the clouds differ only in the tools they run, which are those of the subclasses' cloud.
  */
-abstract class AbstractProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
+abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
 
   private val mapper = new ObjectMapper()
   private val lower = cloud.toString.toLowerCase
@@ -51,8 +51,9 @@ abstract class AbstractProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier 
     FileProjectProvider.parse(
       s"""project: {id: $id, cloud: $lower}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
-         |providers:
-         |  - {id: p, catalogUri: 'https://polaris.example/api', catalogName: $id, audience: provider-p, bucket: b}
+         |dataProviders:
+         |  defined:
+         |    - {id: p, catalogUri: 'https://polaris.example/api', catalogName: $id, audience: provider-p, bucket: b}
          |members: [ada@example.org]
          |stacks:
          |  create: {auditBucket: $id-audit}

@@ -99,6 +99,8 @@ public final class ProjectNames {
             }
         } else if (project instanceof IdentityProject identity && identity.domain() != null) {
             domains.put("stacks.identity.domain", identity.domain());
+        } else if (project instanceof DataProject data && data.domain() != null) {
+            domains.put("stacks.data.domain", data.domain());
         }
         return domains;
     }
@@ -197,6 +199,14 @@ public final class ProjectNames {
                 cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", subdomain(prefix + "OIDC_DOMAIN_NAME", envDomain, project.id().value(), "stacks.identity.domain"));
             }
         }
+        if (project instanceof DataProject data && data.domain() == null) {
+            // the Data Provider's Polaris is under its project, as a TRE's domains are: two Data Providers made from one env would otherwise serve one name, and
+            // Polaris keeps its database by its domain, so each has a database of its own too.  What the file says, in stacks.data.domain, wins.
+            String envDomain = env.getProperty(prefix + "POLARIS_DOMAIN_NAME", "").trim();
+            if (!envDomain.isEmpty()) {
+                cloudSpecific.put(prefix + "POLARIS_DOMAIN_NAME", subdomain(prefix + "POLARIS_DOMAIN_NAME", envDomain, project.id().value(), "stacks.data.domain"));
+            }
+        }
         switch (cloud) {
             case AZURE -> {
                 // the containers of its catalogs, and of Git and the logs, are in the storage account, so they are the project's own
@@ -211,11 +221,24 @@ public final class ProjectNames {
                 if (!env.getProperty(prefix + "POLARIS_LOG_BUCKET", "").isBlank()) {
                     cloudSpecific.put(prefix + "POLARIS_LOG_BUCKET", "afon-" + token + "-polaris-logs");
                 }
-                for (String id : env.getProperty(prefix + "CATALOG_IDS", "").split(",")) {
-                    if (!id.isBlank() && !env.getProperty(prefix + "BUCKET_NAME_" + id.trim(), "").isBlank()) {
-                        catalogs.put(prefix + "BUCKET_NAME_" + id.trim(), "afon-" + token + "-" + id.trim().replace('_', '-').toLowerCase(Locale.ROOT));
+                if (!(project instanceof DataProject)) {
+                    for (String id : env.getProperty(prefix + "CATALOG_IDS", "").split(",")) {
+                        if (!id.isBlank() && !env.getProperty(prefix + "BUCKET_NAME_" + id.trim(), "").isBlank()) {
+                            catalogs.put(prefix + "BUCKET_NAME_" + id.trim(), "afon-" + token + "-" + id.trim().replace('_', '-').toLowerCase(Locale.ROOT));
+                        }
                     }
                 }
+            }
+        }
+        if (project instanceof DataProject data) {
+            // the catalogs of a Data Provider are its own, in place of those of the env: each is internal, named by its id, with storage that is the project's
+            // (a container of its storage account on Azure, a bucket named in the whole cloud on AWS and GCP)
+            catalogs.put(prefix + "CATALOG_IDS", String.join(",", data.catalogs()));
+            for (String id : data.catalogs()) {
+                String name = id.replace('_', '-');
+                catalogs.put(prefix + "CATALOG_NAME_" + id, id);
+                catalogs.put(prefix + "CATALOG_TYPE_" + id, "internal");
+                catalogs.put(prefix + "BUCKET_NAME_" + id, cloud == AfonCloud.AZURE ? name : "afon-" + token + "-" + name);
             }
         }
         Map<String, String> secrets = new LinkedHashMap<>();

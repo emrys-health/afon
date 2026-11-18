@@ -23,7 +23,7 @@ class ProjectTemplateTest {
 
     /** The deployer's part: every placeholder replaced, the address by an address. */
     private static String completed(String file) {
-        return file.replace("members: []", "members: [ada@example.org]").replace("<egress-ip>", "203.0.113.30").replaceAll("<[a-z-]+>", "example");
+        return file.replace("members: []", "members: [ada@example.org]").replace("catalogs: []", "catalogs: [cvd, dbt]").replace("<egress-ip>", "203.0.113.30").replaceAll("<[a-z-]+>", "example");
     }
 
     @ParameterizedTest
@@ -88,5 +88,20 @@ class ProjectTemplateTest {
         Files.writeString(dir.resolve("project-tre.yaml"), "project: {id: ${nope}}\n");
         assertThatThrownBy(() -> ProjectTemplate.render(dir, ProjectRole.TRE, AfonCloud.AZURE, "xyz-yyyy-nnnn", null))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("${nope}");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void fillsTheIdCloudEnvAndNodesOfADataProject(AfonCloud cloud) {
+        String file = ProjectTemplate.render(TEMPLATES, ProjectRole.DATA, cloud, "lon", "dev");
+        assertThat(file).doesNotContain("${").contains("id: lon", "cloud: " + lower(cloud), "role: data", "env: dev", "<egress-ip>", "catalogs: []");
+        DataProject project = ProjectFixtures.data(completed(file));
+        assertThat(project.id().value()).isEqualTo("lon");
+        assertThat(project.cloud()).isEqualTo(cloud);
+        assertThat(project.env()).isEqualTo("dev");
+        assertThat(project.catalogs()).containsExactly("cvd", "dbt");
+        // a Data Provider runs Polaris only, so it takes the small nodes of the identity
+        assertThat(project.nodePool()).isEqualTo(cloud == AfonCloud.AWS ? java.util.Map.of() : cloud == AfonCloud.AZURE
+            ? java.util.Map.of("vmSize", "Standard_D2s_v3", "nodeCount", "2") : java.util.Map.of("machineType", "e2-standard-2", "nodeCount", "2"));
     }
 }

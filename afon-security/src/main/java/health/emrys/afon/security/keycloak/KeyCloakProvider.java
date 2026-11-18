@@ -1058,7 +1058,7 @@ public class KeyCloakProvider implements IdentityProvider {
     static final String GITEA_AUTH_NAME = "keycloak";
     /** The user attribute holding the principal name that the user's tokens carry, {@code afon:<user id>}. */
     static final String PRINCIPAL_ATTRIBUTE = "polaris_principal";
-    /** The prefix of a principal made of an external user, eg {@code afon:<user id>}, as the Providers name it. */
+    /** The prefix of a principal made of an external user, eg {@code afon:<user id>}, as the Data Providers name it. */
     public static final String PRINCIPAL_PREFIX = "afon:";
     private static final List<String> INVITATION_ACTIONS = List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
     private static final String AUDIENCE_MAPPER_PREFIX = "aud-";
@@ -1161,7 +1161,7 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * Gives the user the attribute that a protocol mapper puts in the user claim of their tokens, {@code afon:<user id>},
-     * so that Polaris' default principal mapper, which reads the claim as it is, yields the Provider's principal name: the
+     * so that Polaris' default principal mapper, which reads the claim as it is, yields the Data Provider's principal name: the
      * immutable id, never a username, which can change or be reused.
      */
     private void setPrincipalAttribute(String token, String id) throws IOException {
@@ -1218,6 +1218,54 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
+    public void ensureClientAudience(String clientId, String audience) {
+        try {
+            String token = adminToken();
+            String uuid = clientUuid(token, KEYCLOAK_REALM, clientId);
+            if (uuid == null) {
+                throw new IllegalStateException("No client " + clientId + " in the central identity to give the audience " + audience);
+            }
+            upsertMapper(token, KEYCLOAK_REALM, uuid, Map.of(
+                "name", AUDIENCE_MAPPER_PREFIX + audience,
+                "protocol", "openid-connect",
+                "protocolMapper", "oidc-audience-mapper",
+                "config", Map.of(
+                    "included.custom.audience", audience,
+                    "access.token.claim", "true",
+                    "id.token.claim", "false",
+                    "introspection.token.claim", "true")));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to give the client " + clientId + " the audience " + audience, e);
+        }
+    }
+
+    @Override
+    public void ensureClientAcr(String clientId, String acr) {
+        try {
+            String token = adminToken();
+            String uuid = clientUuid(token, KEYCLOAK_REALM, clientId);
+            if (uuid == null) {
+                throw new IllegalStateException("No client " + clientId + " in the central identity to give the acr " + acr);
+            }
+            // the realm's own mapper, of the client scope of the acr, says the level of the login, which is the first for a client that signs in with a secret
+            removeDefaultScope(token, KEYCLOAK_REALM, uuid, "acr");
+            upsertMapper(token, KEYCLOAK_REALM, uuid, Map.of(
+                "name", "acr-of-the-service",
+                "protocol", "openid-connect",
+                "protocolMapper", "oidc-hardcoded-claim-mapper",
+                "config", Map.of(
+                    "claim.name", "acr",
+                    "claim.value", acr,
+                    "jsonType.label", "String",
+                    "access.token.claim", "true",
+                    "id.token.claim", "false",
+                    "introspection.token.claim", "true")));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to give the client " + clientId + " the acr " + acr, e);
+        }
+    }
+
+    @Override
     public void invite(String email) {
         String address = email.toLowerCase(Locale.ROOT);
         try {
@@ -1252,7 +1300,7 @@ public class KeyCloakProvider implements IdentityProvider {
                 : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), jwks(publicKeys, "git"),
                                       ensureBrowserFlow(token, realm, identity.gitClient(), id), identity.acr());
             List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
-            project.providers().forEach(provider -> treAudiences.add(provider.audience()));
+            project.dataProviders().forEach(provider -> treAudiences.add(provider.audience()));
             convergeProjectClient(token, realm, tre, identity.treClient(), id, identity, treAudiences);
             if (git != null) {
                 convergeProjectClient(token, realm, git, identity.gitClient(), id, identity, List.of(identity.gitClient()));
@@ -1377,7 +1425,7 @@ public class KeyCloakProvider implements IdentityProvider {
                     "id.token.claim", "false",
                     "introspection.token.claim", "true")));
         }
-        // a Provider no longer in the project loses its audience
+        // a Data Provider no longer in the project loses its audience
         for (Map<String, Object> existing : projectMappers(token, realm, uuid)) {
             String name = String.valueOf(existing.get("name"));
             if (name.startsWith(AUDIENCE_MAPPER_PREFIX) && !wanted.contains(name)) {

@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * The ordered stages that bring a project up: what outlives its stacks, then, for a TRE project, its registration in the central identity, its
- * own Git if it has one, and its TRE; for an identity project, the central identity.  Taking it
+ * own Git if it has one, and its TRE; for an identity project, the central identity; for a data project, the Data Provider's Polaris.  Taking it
  * down is the reverse.  A stage is a stack, or an identity stage that has none.
  *
  * @param project the project
@@ -30,7 +30,9 @@ public record ProjectPlan(@NonNull AfonProject project, @NonNull List<Stage> sta
         /** Deploys the project's Git, which the nightly teardown leaves alone. */
         GIT,
         /** Deploys the project's TRE, which lives for a day. */
-        TRE
+        TRE,
+        /** Deploys a Data Provider's Polaris and its catalogs, which the nightly teardown leaves alone. */
+        DATA
     }
 
     /**
@@ -61,6 +63,8 @@ public record ProjectPlan(@NonNull AfonProject project, @NonNull List<Stage> sta
                 stages.add(stage(project, StageId.GIT, new StackId(project.cloud(), "git"), false));
             }
             stages.add(stage(project, StageId.TRE, project.stack(), tre.tre().teardown() != null));
+        } else if (project instanceof DataProject) {
+            stages.add(stage(project, StageId.DATA, project.stack(), false));
         } else {
             stages.add(stage(project, StageId.IDENTITY, project.stack(), false));
         }

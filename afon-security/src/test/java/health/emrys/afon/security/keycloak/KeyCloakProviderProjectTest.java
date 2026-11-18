@@ -37,8 +37,9 @@ class KeyCloakProviderProjectTest {
     private static final String TEMPLATE = """
         project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
-        providers:
-          - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
+        dataProviders:
+          defined:
+            - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
         members: [ada@example.org]
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
@@ -145,7 +146,7 @@ class KeyCloakProviderProjectTest {
         assertThat(bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "client-role-mapper"))
             .contains("\"usermodel.clientRoleMapping.clientId\":\"xyz-yyyy-nnnn-tre\"", "\"claim.name\":\"project\"");
         bodyOf("POST /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/protocol-mappers/models", "provider-data1");
-        // the Git client carries no Provider audience
+        // the Git client carries no Data Provider audience
         assertThat(bodies.stream().filter(b -> b.contains("provider-data1"))).hasSize(1);
 
         assertThat(requests).contains("POST /admin/realms/polaris/groups",

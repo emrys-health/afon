@@ -65,11 +65,12 @@ public final class ProjectTemplate {
     }
 
     /**
-     * @return the node pool of the cluster, as a flow mapping: what the role needs, the identity running Keycloak only, or empty on a cloud with
+     * @return the node pool of the cluster, as a flow mapping: what the role needs, the identity running Keycloak only and a Data Provider Polaris only, or empty on a cloud with
      * no node pool property
      */
     static String nodePool(ProjectRole role, AfonCloud cloud) {
-        boolean identity = role == ProjectRole.IDENTITY;
+        // the identity runs Keycloak only, and a Data Provider Polaris only, so they take the smaller nodes
+        boolean identity = role != ProjectRole.TRE;
         return switch (cloud) {
             case AZURE -> pool("vmSize", identity ? "Standard_D2s_v3" : "Standard_D4s_v6", 2);
             case GCP -> pool("machineType", identity ? "e2-standard-2" : "e2-standard-4", 2);

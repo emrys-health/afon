@@ -41,8 +41,9 @@ class ProjectUserProviderTest {
         return tre(ProjectFixtures.render("""
             project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
             identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
-            providers:
-              - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
+            dataProviders:
+              defined:
+                - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
             members: %s
             stacks:
               create: {auditBucket: audit, gitBucket: gitea}

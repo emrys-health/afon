@@ -34,11 +34,11 @@ import scala.jdk.CollectionConverters._
  * changes only the names of the properties of the cloud, so a subclass gives the cloud to run it for, see [[ProjectIdentityAwsSpec]].
  *
  * Each project has a client for its TRE and one for its Git, and a group.  A token of a project's client names that project, and
- * only when the user is in its group, and carries the audiences of the project's Providers on the TRE client alone.  Most tokens are
+ * only when the user is in its group, and carries the audiences of the project's Data Providers on the TRE client alone.  Most tokens are
  * those that KeyCloak would issue, which its admin API generates for a user and a client without a browser login; the login of a project's client,
  * which admits only its members, after a second factor, is run as a browser would, with the one-time password of an authenticator that it enrols.
  */
-abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
+abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
 
   private val mapper = new ObjectMapper()
   private val http = HttpClient.newHttpClient()
@@ -94,11 +94,12 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
   private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): TreProject = {
     val git = if (ownGit) s"\n         |  git: {domain: git.$id.example.org}" else ""
     val catalogs = providers.map(name =>
-      s"  - {id: $name, catalogUri: 'https://polaris.$name.example/api', catalogName: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
+      s"    - {id: $name, catalogUri: 'https://polaris.$name.example/api', catalogName: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
     FileProjectProvider.parse(
       s"""project: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
-         |providers:
+         |dataProviders:
+         |  defined:
          |$catalogs
          |members: [ada@example.org]
          |stacks:
@@ -305,7 +306,7 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
   }
 
   /**
-   * A researcher accepts the invitation that the identity provider emailed them, as in a browser: they follow its link, enrol an authenticator, set a password,
+   * A member accepts the invitation that the identity provider emailed them, as in a browser: they follow its link, enrol an authenticator, set a password,
    * and the identity provider marks their email verified.
    *
    * @return the secret of the authenticator that they enrolled
@@ -531,8 +532,8 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       assert(client("cfg-2026-0006-git").get("enabled").asBoolean)
     }
 
-    "make a researcher in the identity provider once, with no password, to be invited" in {
-      When("a researcher is made twice in the identity provider")
+    "make a member in the identity provider once, with no password, to be invited" in {
+      When("a member is made twice in the identity provider")
       val first = provider.ensureUser("bob@tre.example", "Bob", "B")
       val second = provider.ensureUser("bob@tre.example", "Bob", "B")
       Then("it is the same user, with the required actions of an invitation and no credentials")
@@ -544,8 +545,8 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
       assert(!provider.findUser("nobody@tre.example").isPresent)
     }
 
-    "send the invitation again to a researcher who is in the identity provider, who can accept it, and refuse one who is not" in {
-      Given("a researcher made in the identity provider, who has been sent the invitation once")
+    "send the invitation again to a member who is in the identity provider, who can accept it, and refuse one who is not" in {
+      Given("a member made in the identity provider, who has been sent the invitation once")
       provider.ensureUser("rob@tre.example", "Rob", "R")
       awaitMessagesTo("rob@tre.example", 1)
 
@@ -627,4 +628,4 @@ abstract class AbstractProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifi
  */
 @Project
 @ProjectIdentity
-class ProjectIdentityAwsSpec extends AbstractProjectIdentitySpec(AfonCloud.AWS)
+class ProjectIdentityAwsSpec extends ProjectIdentitySpec(AfonCloud.AWS)

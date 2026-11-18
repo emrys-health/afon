@@ -1,0 +1,44 @@
+# A Data Provider: the Polaris that holds the catalogs that the TREs read, deployed by a project of its own.  Made by
+#   afon-cli.sh manage-project init ${id} --role data ${cloud} --made-from ${env}
+# Complete what is in <angle brackets>, then check it, configure it and bring it up:
+#   afon-cli.sh manage-project validate ${id}
+#   afon-cli.sh manage-project configure ${id}
+#   afon-cli.sh manage-project up ${id}
+# See docs/projects.md.
+project:
+  id: ${id}
+  cloud: ${cloud}
+  role: data
+  # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
+  env: ${env}
+  # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>
+  egressIp: <egress-ip>
+
+# the central identity that its Polaris trusts, the same that the TREs sign in to: its issuer, the acr that proves a second factor, and the audience
+# that the tokens for this Data Provider carry, provider-${id} if not given; project is the id of the identity project, which deploys the identity
+identity:
+  project: <identity-project>
+  issuerUrl: https://<identity-domain>/realms/polaris
+  acr: mfa
+  audience: provider-${id}
+
+# its catalogs, one for each use of its data, at least one: lower-case letters, digits and underscores, the first a letter, eg [cvd, dbt].  Each is
+# internal, in storage that is the project's own, and named by its id.  A TRE project names them in the named of its dataProviders
+catalogs: []
+
+# its Polaris is at the Polaris domain of the env with the project's id as a label after the first, eg azure-polaris.emrys2.click is
+# azure-polaris.${id}.emrys2.click.  To name another, uncomment and edit:
+# stacks:
+#   data:
+#     domain: <polaris-domain>
+
+# how the DNS zone of its domain is delegated from the parent domain: manual (or none, or no value), where you delegate by hand: up does not
+# stop, so run it with --until create, add the NS records that dns-delegate shows to the parent zone, then run the rest; or route53, where
+# up writes them to the Route 53 hosted zone of the parent domain, in the current AWS account, and runs through
+dns:
+  delegation: none
+
+# the nodes of its cluster, which runs Polaris only: adjust to the quota of the subscription (AWS has no node pool property, so there the nodes
+# are those of the env)
+cluster:
+  nodePool: ${nodePool}

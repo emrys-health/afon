@@ -39,13 +39,13 @@ import java.util.function.BiFunction;
  *       public key, as a JWK, of each of the project's clients, {@code tre.jwk} and {@code git.jwk}, which the TRE operator
  *       gives: the private keys stay with the operator, and the Git client has none if the project has no Git of its own.  It is the {@code keys} dir of the project's own dir if not given,
  *       see {@link FileProjectProvider#keysDir};</li>
- *   <li>{@code add-member} makes the researcher in the central identity if absent, with an invitation email, adds them to the
- *       project's group, and prints their user id, which each Provider whose contract names them makes their principal from;</li>
- *   <li>{@code remove-member} removes the researcher from the group and ends their sessions;</li>
+ *   <li>{@code add-member} makes the member in the central identity if absent, with an invitation email, adds them to the
+ *       project's group, and prints their user id, which each Data Provider whose contract names them makes their principal from;</li>
+ *   <li>{@code remove-member} removes the member from the group and ends their sessions;</li>
  *   <li>{@code sync-members} makes the project's group have the members that the project's file lists, and no others: it adds those that are
  *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A project has at least one member, so
  *       the group is never emptied by it;</li>
- *   <li>{@code invite} sends the invitation again to a researcher who is in the central identity, by email: for one who never got it, let it
+ *   <li>{@code invite} sends the invitation again to a member who is in the central identity, by email: for one who never got it, let it
  *       expire, or lost their second factor.  Unlike the invitation of {@code add-member}, which is a warning if it cannot be sent, it fails;</li>
  *   <li>{@code close} closes the project's TRE client, so that no token is issued for it.</li>
  *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
@@ -69,10 +69,10 @@ public class ManageIdentityMain {
         "                                  <dir> holds tre.jwk and git.jwk, the public key of each client: the " + FileProjectProvider.KEYS_DIR + " dir",
         "                                  of the project's own dir if not given",
         "  add-member <email> [" + FIRST_NAME + " <name>] [" + LAST_NAME + " <name>]",
-        "                                  makes the researcher if absent, adds them to the project's group, prints their user id",
-        "  remove-member <email>           removes the researcher from the group and ends their sessions",
+        "                                  makes the member if absent, adds them to the project's group, prints their user id",
+        "  remove-member <email>           removes the member from the group and ends their sessions",
         "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
-        "  invite <email>                  sends the invitation again to a researcher who is in the central identity (it fails if it cannot be sent)",
+        "  invite <email>                  sends the invitation again to a member who is in the central identity (it fails if it cannot be sent)",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -194,7 +194,8 @@ public class ManageIdentityMain {
         try {
             AfonProject loaded = provider.getProject();
             if (!(loaded instanceof TreProject tre)) {
-                err.printf("Project %s is the central identity itself: it has no clients, group or members, and its stack is deployed by manage-project up%n", loaded.id());
+                err.printf("Project %s has the role %s: it has no clients, group or members, and its stack is deployed by manage-project up%n", loaded.id(),
+                           loaded.role());
                 return 1;
             }
             Path kubeConfig = options.containsKey(KUBECONFIG) ? Path.of(options.get(KUBECONFIG)) : null;

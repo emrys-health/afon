@@ -22,8 +22,9 @@ class FileProjectProviderTest {
     private static final String VALID = """
         project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
-        providers:
-          - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
+        dataProviders:
+          defined:
+            - {id: data1, catalogUri: "https://p.example/api", catalogName: w, audience: provider-data1, bucket: b}
         members: [ada@example.org]
         stacks:
           create: {auditBucket: audit, gitBucket: gitea}
@@ -56,7 +57,7 @@ class FileProjectProviderTest {
         assertThat(project.cloud()).isEqualTo(cloud);
         assertThat(project.identity().treClient()).isEqualTo("xyz-yyyy-nnnn-tre");
         assertThat(project.identity().gitClient()).isEqualTo("xyz-yyyy-nnnn-git");
-        assertThat(project.providers()).extracting(TreProject.Provider::cloud).containsExactly(cloud, cloud);
+        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::cloud).containsExactly(cloud, cloud);
         assertThat(project.tre().stack().toString()).isEqualTo(lower(cloud) + "-full");
         assertThat(project.tre().domains()).containsEntry(cloud.name() + "_JUPYTER_DOMAIN_NAME", "jupyter.xyz-yyyy-nnnn.example.org");
         assertThat(project.tre().teardown()).isEqualTo("22:00");
@@ -68,7 +69,7 @@ class FileProjectProviderTest {
     void takesTheCloudOfAProvidersStorageFromItselfNotFromTheProject(AfonCloud cloud) {
         AfonCloud other = anotherThan(cloud);
         TreProject project = ProjectFixtures.tre(valid(cloud).replace("bucket: b}", "bucket: b, cloud: " + lower(other) + "}"));
-        assertThat(project.providers()).extracting(TreProject.Provider::cloud).containsExactly(other);
+        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::cloud).containsExactly(other);
     }
 
     @ParameterizedTest
@@ -96,7 +97,7 @@ class FileProjectProviderTest {
     @EnumSource(AfonCloud.class)
     void reportsEveryProblemAtOnce(AfonCloud cloud) {
         ProjectException e = invalid(valid(cloud).replace("xyz-yyyy-nnnn", "CVD_1").replace("audience: provider-data1, ", ""));
-        assertThat(e.problems()).anyMatch(p -> p.startsWith("project.id")).anyMatch(p -> p.equals("providers[0].audience is required"));
+        assertThat(e.problems()).anyMatch(p -> p.startsWith("project.id")).anyMatch(p -> p.equals("dataProviders.defined[0].audience is required"));
     }
 
     @ParameterizedTest
@@ -110,8 +111,8 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void rejectsDuplicateProviderIds(AfonCloud cloud) {
-        String twice = valid(cloud).replace("bucket: b}", "bucket: b}\n  - {id: data1, catalogUri: \"https://q\", catalogName: w, audience: a, bucket: c}");
-        assertThat(invalid(twice).problems()).contains("providers[1].id 'data1' is used by another provider");
+        String twice = valid(cloud).replace("bucket: b}", "bucket: b}\n    - {id: data1, catalogUri: \"https://q\", catalogName: w, audience: a, bucket: c}");
+        assertThat(invalid(twice).problems()).contains("dataProviders.defined[1].id 'data1' is used by another Data Provider");
     }
 
     private static String withMembers(AfonCloud cloud, String members) {
@@ -373,7 +374,7 @@ class FileProjectProviderTest {
         String yaml = valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: identity}");
         assertThat(invalid(yaml).problems())
             .anyMatch(p -> p.startsWith("identity is not a known key"))
-            .anyMatch(p -> p.startsWith("providers is not a known key"))
+            .anyMatch(p -> p.startsWith("dataProviders is not a known key"))
             .anyMatch(p -> p.startsWith("stacks.create is not a known key"))
             .anyMatch(p -> p.startsWith("stacks.git is not a known key"))
             .anyMatch(p -> p.startsWith("stacks.tre is not a known key"));
@@ -393,7 +394,7 @@ class FileProjectProviderTest {
         assertThat(FileProjectProvider.parse(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: tre}")).role())
             .isEqualTo(ProjectRole.TRE);
         assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: catalog}")).problems())
-            .contains("project.role 'catalog' is not a role of a project: one of [identity, tre]");
+            .contains("project.role 'catalog' is not a role of a project: one of [identity, tre, data]");
     }
 
     @ParameterizedTest
@@ -404,5 +405,80 @@ class FileProjectProviderTest {
         assertThat(plan.stages()).extracting(ProjectPlan.Stage::id).containsExactly(ProjectPlan.StageId.CREATE, ProjectPlan.StageId.IDENTITY);
         assertThat(plan.stages()).extracting(ProjectPlan.Stage::stateKey).containsExactly("idp/" + c + "-create", "idp/" + c + "-keycloak");
         assertThat(plan.nightlyStages()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void readsADataProjectWithItsCatalogsAndThePolarisStackOfItsCloud(AfonCloud cloud) {
+        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
+        assertThat(project.id().value()).isEqualTo("lon");
+        assertThat(project.role()).isEqualTo(ProjectRole.DATA);
+        assertThat(project.cloud()).isEqualTo(cloud);
+        assertThat(project.catalogs()).containsExactly("cvd", "dbt");
+        assertThat(project.stack().toString()).isEqualTo(lower(cloud) + "-polaris");
+        assertThat(project.domain()).isNull();
+        assertThat(project.egressIp()).isEqualTo("203.0.113.40");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesTheStackAndTheDomainOfADataProjectFromItsFile(AfonCloud cloud) {
+        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud)
+            + "stacks:\n  data: {stack: " + lower(cloud) + "-polaris, domain: polaris.lon.example.org}\n");
+        assertThat(project.domain()).isEqualTo("polaris.lon.example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesADataProjectWithNoCatalogOrAnInvalidOne(AfonCloud cloud) {
+        String base = ProjectFixtures.dataExample(cloud);
+        assertThat(invalid(base.replace("catalogs: [cvd, dbt]\n", "")).getMessage()).contains("catalogs is missing");
+        assertThat(invalid(base.replace("catalogs: [cvd, dbt]", "catalogs: []")).getMessage()).contains("catalogs must be a non-empty list");
+        assertThat(invalid(base.replace("[cvd, dbt]", "[Cvd]")).getMessage()).contains("catalogs[0] 'Cvd' is not a catalog id");
+        assertThat(invalid(base.replace("[cvd, dbt]", "[cvd, cvd]")).getMessage()).contains("catalogs[1] 'cvd' is the id of another catalog");
+        assertThat(invalid(base.replace("[cvd, dbt]", "[1cvd]")).getMessage()).contains("is not a catalog id");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesWhatADataProjectDoesNotHave(AfonCloud cloud) {
+        String base = ProjectFixtures.dataExample(cloud);
+        // it has no members, Data Providers or identity of its own, and no TRE stacks
+        assertThat(invalid(base + "members: [ada@example.org]\n").getMessage()).contains("members");
+        assertThat(invalid(base + "dataProviders: []\n").getMessage()).contains("dataProviders");
+        assertThat(invalid(base + "stacks:\n  tre: {domains: {}}\n").getMessage()).contains("stacks.tre");
+        assertThat(invalid(base + "stacks:\n  data: {stack: " + lower(anotherThan(cloud)) + "-polaris}\n").getMessage())
+            .contains("is not on the project's cloud");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesCatalogsInAProjectThatIsNotAData(AfonCloud cloud) {
+        assertThat(invalid(valid(cloud) + "catalogs: [cvd]\n").getMessage()).contains("catalogs");
+        assertThat(invalid(ProjectFixtures.identityExample(cloud) + "catalogs: [cvd]\n").getMessage()).contains("catalogs");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void readsTheIdentityThatADataProjectTrustsWithTheAudienceOfItsOwnByDefault(AfonCloud cloud) {
+        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
+        assertThat(project.identity().issuerUrl()).isEqualTo("https://id.example.org/realms/polaris");
+        assertThat(project.identity().acr()).isEqualTo("mfa");
+        assertThat(project.identity().audience()).isEqualTo("provider-lon");
+        assertThat(project.identity().project()).isNull();
+        assertThat(project.identityProject()).isNull();
+        DataProject named = ProjectFixtures.data(ProjectFixtures.dataExample(cloud).replace("acr: mfa}", "acr: mfa, audience: lon-data, project: idp}"));
+        assertThat(named.identity().audience()).isEqualTo("lon-data");
+        assertThat(named.identityProject()).isEqualTo("idp");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesADataProjectWithNoIdentityOrAnInsecureOne(AfonCloud cloud) {
+        String base = ProjectFixtures.dataExample(cloud);
+        assertThat(invalid(base.replace("identity: {issuerUrl: \"https://id.example.org/realms/polaris\", acr: mfa}\n", "")).problems())
+            .contains("identity.issuerUrl is required", "identity.acr is required");
+        assertThat(invalid(base.replace("https://id", "http://id")).problems()).contains("identity.issuerUrl must be an https URL, as every consumer pins it");
+        assertThat(invalid(base.replace("acr: mfa}", "acr: mfa, clients: {}}")).problems()).anyMatch(p -> p.startsWith("identity.clients is not a known key"));
     }
 }

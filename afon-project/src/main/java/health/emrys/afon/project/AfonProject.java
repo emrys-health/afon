@@ -18,9 +18,9 @@ import java.util.regex.Pattern;
  * The deployer writes the file, from what the contracts say, so that Afon needs nothing of the registry beyond it.
  * <p>
  * What a project is made of depends on its {@link ProjectRole}, so there is a type for each, which has just what that role needs:
- * a {@link TreProject} and an {@link IdentityProject}.  This is what they have in common.
+ * a {@link TreProject}, an {@link IdentityProject} and a {@link DataProject}.  This is what they have in common.
  */
-public sealed interface AfonProject permits TreProject, IdentityProject {
+public sealed interface AfonProject permits TreProject, IdentityProject, DataProject {
 
     /**
      * @return the project's immutable id
@@ -76,17 +76,19 @@ public sealed interface AfonProject permits TreProject, IdentityProject {
     @NonNull StackId stack();
 
     /**
-     * @return the project's researchers, by email: those of a TRE project, none for an identity project, which no one uses
+     * @return the project's members, by email: those of a TRE project, none for an identity project, which no one uses
      */
     default @NonNull List<TreProject.Member> members() {
         return List.of();
     }
 
     /**
-     * @return what the function of the type of the project gives: one for a TRE project, the other for an identity project
+     * @return the id of the identity project, ie the project with the role {@link ProjectRole#IDENTITY}, that deploys the central identity that the
+     * project uses, or {@code null} if it uses none that Afon deployed: a TRE project and a data project use the central identity, the identity
+     * project is it
      */
-    default <R> R by(Function<TreProject, R> tre, Function<IdentityProject, R> identity) {
-        return this instanceof TreProject treProject ? tre.apply(treProject) : identity.apply((IdentityProject) this);
+    default @Nullable String identityProject() {
+        return null;
     }
 
     /**

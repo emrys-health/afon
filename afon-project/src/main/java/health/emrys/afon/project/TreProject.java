@@ -19,19 +19,24 @@ import java.util.Map;
  * @param nodePool  the nodes of its cluster, see {@link AfonProject#nodePool()}
  * @param dnsDelegation how the DNS zones of its domains are delegated, see {@link AfonProject#dnsDelegation()}
  * @param identity  how the project uses the central identity that issues its tokens
- * @param providers the Data Providers' project catalogs, reached directly
- * @param members   the project's researchers, at least one, which {@code up} makes the project's group have, and no others
+ * @param dataProviders the Data Providers' project catalogs, reached directly
+ * @param members   the project's members, at least one, which {@code up} makes the project's group have, and no others
  * @param create    what outlives the nightly teardown
  * @param git       the project's own Git, or {@code null} if Git is deployed with the TRE, as it is by the stacks of a TRE that declare it
  * @param tre       the project's TRE
  */
 public record TreProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
-                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<Provider> providers, @NonNull List<Member> members, @NonNull Create create, @Nullable Git git,
+                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<DataProvider> dataProviders, @NonNull List<Member> members, @NonNull Create create, @Nullable Git git,
                          @NonNull Tre tre) implements AfonProject {
 
     @Override
     public ProjectRole role() {
         return ProjectRole.TRE;
+    }
+
+    @Override
+    public @Nullable String identityProject() {
+        return identity.project();
     }
 
     /**
@@ -66,21 +71,28 @@ public record TreProject(@NonNull ProjectId id, @NonNull AfonCloud cloud, @Nulla
     }
 
     /**
-     * A Provider's project catalog.
+     * A Data Provider's project catalog.
      *
      * @param id          the id of the catalog, unique in the project
-     * @param catalogUri  the Provider's catalog endpoint, its Iceberg REST catalog, eg the one of its Polaris
+     * @param catalogUri  the Data Provider's catalog endpoint, its Iceberg REST catalog, eg the one of its Polaris
      * @param catalogName the catalog's name at that endpoint
-     * @param audience    the audience that the project's TRE token carries for the Provider
+     * @param audience    the audience that the project's TRE token carries for the Data Provider
      * @param bucket      the catalog's bucket, for the whitelist
-     * @param cloud       the cloud of the Provider's storage, which may not be the project's
+     * @param cloud       the cloud of the Data Provider's storage, which may not be the project's
+     * @param project     the id of the data project that the catalog was read from, when the file names one, or {@code null} if the file gives the
+     *                    catalog's endpoint, audience and bucket itself, as it does for a Data Provider that Afon did not deploy
      */
-    public record Provider(@NonNull String id, @NonNull String catalogUri, @NonNull String catalogName,
-                           @NonNull String audience, @NonNull String bucket, @NonNull AfonCloud cloud) {
+    public record DataProvider(@NonNull String id, @NonNull String catalogUri, @NonNull String catalogName,
+                              @NonNull String audience, @NonNull String bucket, @NonNull AfonCloud cloud, @Nullable String project) {
+
+        /** A catalog that the file gives in full. */
+        public DataProvider(String id, String catalogUri, String catalogName, String audience, String bucket, AfonCloud cloud) {
+            this(id, catalogUri, catalogName, audience, bucket, cloud, null);
+        }
     }
 
     /**
-     * A researcher of the project, by the email they are known by in the central identity.
+     * A member of the project, by the email they are known by in the central identity.
      *
      * @param email     their email, in lower case
      * @param firstName their first name, or {@code null}

@@ -145,7 +145,7 @@ public final class ProjectUserProvider implements AfonUserProvider {
     }
 
     /**
-     * Members are authorised on no catalog by this list: a Provider grants them, per project.
+     * Members are authorised on no catalog by this list: a Data Provider grants them, per project.
      */
     @Override
     public boolean isAuthorised(String username, String catalogName) {

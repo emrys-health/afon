@@ -20,6 +20,9 @@ final class ProjectFixtures {
     /** The example project, a template. */
     static final Path EXAMPLE = Path.of("src/test/resources/project.yaml");
 
+    /** The example of the data project, a template. */
+    static final Path DATA_EXAMPLE = Path.of("src/test/resources/data-project.yaml");
+
     /** The example of the identity project, a template. */
     static final Path IDENTITY_EXAMPLE = Path.of("src/test/resources/identity-project.yaml");
 
@@ -42,6 +45,26 @@ final class ProjectFixtures {
         AfonProject project = FileProjectProvider.parse(yaml);
         assertThat(project).isInstanceOf(IdentityProject.class);
         return (IdentityProject) project;
+    }
+
+    /**
+     * @return the data project that the text defines
+     */
+    static DataProject data(String yaml) {
+        AfonProject project = FileProjectProvider.parse(yaml);
+        assertThat(project).isInstanceOf(DataProject.class);
+        return (DataProject) project;
+    }
+
+    /**
+     * @return the example data project, for the cloud
+     */
+    static String dataExample(AfonCloud cloud) {
+        try {
+            return render(Files.readString(DATA_EXAMPLE), cloud);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**

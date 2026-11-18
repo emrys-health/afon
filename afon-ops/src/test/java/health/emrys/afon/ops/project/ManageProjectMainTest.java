@@ -70,7 +70,7 @@ class ManageProjectMainTest {
     void validatesAProjectFile(AfonCloud cloud) throws Exception {
         setUp(cloud);
         assertThat(command.run(new String[]{"validate", PROJECT})).isZero();
-        assertThat(out.toString()).contains("is a valid tre project: xyz-yyyy-nnnn on " + lower(cloud) + ", made from the active config, with 2 provider(s)");
+        assertThat(out.toString()).contains("is a valid tre project: xyz-yyyy-nnnn on " + lower(cloud) + ", made from the active config, with 2 Data Provider catalog(s)");
     }
 
     @ParameterizedTest
@@ -558,7 +558,7 @@ class ManageProjectMainTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void refusesAnIdentityProjectThatIsNotThereIsNotOneOrIsOnAnotherCloud(AfonCloud cloud) throws Exception {
+    void refusesAnIdentityProjectThatIsNotThereOrIsNotOne(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
                           ProjectTemplates.example(cloud).replace("identity:\n", NAMES_THE_IDENTITY));
@@ -572,11 +572,21 @@ class ManageProjectMainTest {
         assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isEqualTo(1);
         assertThat(err.toString()).contains("but idp has the role tre");
 
-        // an identity project of another cloud
+        assertThat(ran).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void usesAnIdentityProjectOfAnotherCloudByItsOwnKubeConfig(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"),
+                          ProjectTemplates.example(cloud).replace("identity:\n", NAMES_THE_IDENTITY));
         AfonCloud other = AfonCloud.values()[(cloud.ordinal() + 1) % AfonCloud.values().length];
         ProjectTemplates.writeIdentity(home, "idp", other);
-        assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isEqualTo(1);
-        assertThat(err.toString()).contains("is on " + lower(cloud) + ", but the identity project idp it names is on " + lower(other));
+        assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isZero();
+        // the kubeconfig of the identity's cluster is written by the script of the identity's cloud, for its stack, in its own home
+        assertThat(out.toString()).contains(lower(other) + "-update-kube-config " + lower(other) + "-keycloak")
+                                  .doesNotContain(lower(cloud) + "-update-kube-config");
         assertThat(ran).isEmpty();
     }
 
@@ -613,6 +623,8 @@ class ManageProjectMainTest {
         assertThat(file).content().contains("id: abc-def", "cloud: " + lower(cloud), "env: dev", "<identity-project>");
         assertThat(init.run(new String[]{"init", "idp", lower(cloud), "--role", "identity"})).isZero();
         assertThat(home.resolve("projects/idp/project.yaml")).content().contains("role: identity", "env: <env>", "<egress-ip>");
+        assertThat(init.run(new String[]{"init", "lon", lower(cloud), "--role", "data", "--made-from", "dev"})).isZero();
+        assertThat(home.resolve("projects/lon/project.yaml")).content().contains("role: data", "env: dev", "<egress-ip>", "catalogs: []");
         assertThat(out.toString()).contains("complete what is in <angle brackets>", "manage-project validate abc-def");
         // what is left to complete is what validate says is wrong
         assertThat(init.run(new String[]{"validate", "abc-def"})).isEqualTo(1);
@@ -628,7 +640,7 @@ class ManageProjectMainTest {
         assertThat(init.run(new String[]{"init", "abc-def", "mars"})).isEqualTo(2);
         assertThat(err.toString()).contains("<cloud> should be one of");
         assertThat(init.run(new String[]{"init", "abc-def", lower(cloud), "--role", "boss"})).isEqualTo(2);
-        assertThat(err.toString()).contains("--role should be identity or tre");
+        assertThat(err.toString()).contains("--role should be identity, tre or data");
         assertThat(init.run(new String[]{"init", "Bad_Id", lower(cloud)})).isEqualTo(2);
         assertThat(home.resolve("projects")).doesNotExist();
     }
@@ -857,5 +869,113 @@ class ManageProjectMainTest {
         assertThat(command.run(new String[]{"validate", PROJECT, "--until", "tre"})).isEqualTo(2);
         assertThat(err.toString()).contains("--until is for up, down and nightly");
         assertThat(ran).isEmpty();
+    }
+
+    // the data project
+
+    private void setUpData(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        ProjectTemplates.writeData(home, "lon", cloud);
+    }
+
+    private void configureData() throws Exception {
+        Path envConfig = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
+        assertThat(command.run(new String[]{"configure", "lon", "--made-from", "dev"})).isZero();
+    }
+
+    private List<String> inData(String... args) {
+        List<String> all = new ArrayList<>(List.of("--home", home.resolve("projects/lon/home").toString(), "--cdktf",
+                                                   home.resolve("cdktf-lon").toString()));
+        all.addAll(List.of(args));
+        return all;
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void validatesAndPlansTheDataProject(AfonCloud cloud) throws Exception {
+        setUpData(cloud);
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"validate", "lon"})).isZero();
+        assertThat(out.toString()).contains("is a valid data project: lon on " + c + ", made from the active config").doesNotContain("provider");
+        out.reset();
+        assertThat(command.run(new String[]{"plan", "lon"})).isZero();
+        assertThat(out.toString()).contains("Project lon on " + c + ", with the role data", "1. create (" + c + "-create), state lon/" + c + "-create",
+                                            "2. data (" + c + "-polaris), state lon/" + c + "-polaris");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void bringsUpTheDataProjectAsItsCreateScriptAndItsPolarisStack(AfonCloud cloud) throws Exception {
+        setUpData(cloud);
+        configureData();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"up", "lon"})).isZero();
+        assertThat(ran).containsExactly(inData(c + "-create", c + "-polaris"), inData("db-whitelist", c),
+            inData("dns-create-zones", c, c + "-polaris"), inData("manage-stack", "setup", c + "-polaris"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesDownTheDataProjectLeavingItsStorageAndRebuildsNothingAtNight(AfonCloud cloud) throws Exception {
+        setUpData(cloud);
+        configureData();
+        String c = lower(cloud);
+        assertThat(command.run(new String[]{"down", "lon"})).isZero();
+        assertThat(ran).containsExactly(inData("manage-stack", "delete", c + "-polaris"));
+        assertThat(out.toString()).contains("Left as they are: the Data Provider's storage").doesNotContain("manage-identity close");
+        ran.clear();
+        assertThat(command.run(new String[]{"nightly", "lon"})).isZero();
+        assertThat(ran).isEmpty();
+        assertThat(out.toString()).contains("Nothing to run: no stage of project lon lives for a day");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void configuresTheDataProjectWithItsCatalogsWithoutTheMessageOfAnUnreadTreProvider(AfonCloud cloud) throws Exception {
+        setUpData(cloud);
+        configureData();
+        assertThat(out.toString()).contains("Configured project lon").doesNotContain("Not configured yet");
+        assertThat(Files.readString(home.resolve("config-lon").resolve("catalogs-" + lower(cloud) + ".properties")))
+            .contains(cloud.name() + "_CATALOG_IDS=cvd,dbt");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void bringsUpADataProjectThatNamesTheIdentityProjectWritingItsKubeConfigFirst(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        AfonCloud other = AfonCloud.values()[(cloud.ordinal() + 1) % AfonCloud.values().length];
+        ProjectTemplates.writeIdentity(home, "idp", other);
+        Path file = home.resolve("projects/lon/project.yaml");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, ProjectTemplates.dataExample(cloud).replace("identity: {", "identity: {project: idp, "));
+        assertThat(command.run(new String[]{"up", "lon", "--dry-run"})).isZero();
+        String c = lower(cloud);
+        String o = lower(other);
+        assertThat(out.toString()).contains("[2/2] data (before): ", o + "-update-kube-config " + o + "-keycloak", "manage-stack setup " + c + "-polaris");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void validatesATreProjectThatNamesTheCatalogOfADataProject(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvAccounts.ACCOUNTS);
+        Files.writeString(env.resolve("afon-" + c + ".properties"), cloud.name() + "_POLARIS_DOMAIN_NAME=" + c + "-polaris.dev.click\n");
+        Files.writeString(env.resolve("catalogs.properties"), "");
+        Path data = home.resolve("projects/lon/project.yaml");
+        Files.createDirectories(data.getParent());
+        Files.writeString(data, ProjectTemplates.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
+        Path file = home.resolve("projects/" + PROJECT + "/project.yaml");
+        Files.writeString(file, Files.readString(file).replaceAll("(?s)dataProviders:.*?\nmembers:", "dataProviders:\n  named:\n    - {project: lon, catalogs: [cvd]}\nmembers:"));
+        assertThat(command.run(new String[]{"validate", PROJECT})).isZero();
+        assertThat(out.toString()).contains("is a valid tre project", "with 1 Data Provider catalog(s)");
+
+        // a Data Provider's project that is not there is a problem of the file
+        Files.delete(data);
+        out.reset();
+        assertThat(command.run(new String[]{"validate", PROJECT})).isEqualTo(1);
+        assertThat(err.toString()).contains("dataProviders.named[0].project names lon, which has no file");
     }
 }

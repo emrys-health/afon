@@ -30,7 +30,7 @@ public class ConfigureUsersMain {
     private PolarisUserManager polarisUsers;
 
     public ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider) {
-        this(userProvider, propertyProvider, null);
+        this(userProvider, propertyProvider, (String) null);
     }
 
     /**
@@ -41,6 +41,12 @@ public class ConfigureUsersMain {
         this.userProvider     = userProvider;
         this.propertyProvider = propertyProvider;
         this.identityProvider = new KeyCloakProvider(propertyProvider, keycloakEndpoint);
+    }
+
+    ConfigureUsersMain(AfonUserProvider userProvider, AfonPropertyProvider propertyProvider, IdentityProvider identityProvider) {
+        this.userProvider     = userProvider;
+        this.propertyProvider = propertyProvider;
+        this.identityProvider = identityProvider;
     }
 
     /** The argument giving where KeyCloak is reached, eg {@code --keycloak-endpoint=localhost:54321}. */
@@ -64,6 +70,7 @@ public class ConfigureUsersMain {
         responses.add(identityProvider.createConfidentialClient(
                 adminToken, KEYCLOAK_REALM,
                 propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
+        trustTheAdminClientAtTheDataProvider();
         for (AfonUser user : userProvider.getAdmins()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
             if (user.username().equals(propertyProvider.getValue(USER_ID))) {
@@ -71,6 +78,25 @@ public class ConfigureUsersMain {
             }
         }
         return responses;
+    }
+
+    /**
+     * The Polaris of a Data Provider, which has an audience and an {@code acr} that it requires of every token, would refuse its own admin client, which
+     * makes its catalogs and has no second factor: so the tokens of {@link AfonProperty#POLARIS_ID} carry them.  No client that a person signs in with is given them: their
+     * tokens have the {@code acr} of their login.
+     */
+    private void trustTheAdminClientAtTheDataProvider() {
+        if (!isSet(OIDC_AUDIENCE) || !isSet(OIDC_ACR)) {
+            return;
+        }
+        String client = propertyProvider.getValue(POLARIS_ID);
+        identityProvider.ensureClientAudience(client, propertyProvider.getValue(OIDC_AUDIENCE));
+        identityProvider.ensureClientAcr(client, propertyProvider.getValue(OIDC_ACR));
+    }
+
+    /** The config template has the keys of a project's, empty, so that a key alone is not a Data Provider. */
+    private boolean isSet(AfonProperty property) {
+        return propertyProvider.hasProperty(property) && !propertyProvider.getValue(property).isBlank();
     }
 
     /**

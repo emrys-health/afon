@@ -51,4 +51,37 @@ public class KeyCloakHelper {
         env.put("quarkus.oidc.token.issuer", "any");
         return env;
     }
+
+    /**
+     * What the Polaris of a Data Provider requires of a token, in place of accepting any that its Keycloak signed.
+     *
+     * @param issuer       the issuer of the central identity, pinned: a token whose {@code iss} is another is refused
+     * @param audience     the audience that is the Data Provider's own, which the tokens of the TREs and of its admins carry: one without it is refused, so a
+     *                     token meant for another Data Provider, or for the TRE itself, cannot be replayed here
+     * @param acr          the {@code acr} that proves a second factor, eg {@code mfa}: a token of a password alone is refused
+     * @param projectClaim the claim that names the project, a list: it selects which of the principal's roles are active, only the one of the project the
+     *                     token is for, {@code <project>Project}, so that a member of two projects reads in each only what that project may
+     */
+    public record Trust(String issuer, String audience, String acr, String projectClaim) {
+    }
+
+    /**
+     * As {@link #polarisOidcEnv(String, String, String)}, with the trust of a Data Provider: the issuer is pinned, in place of {@code any}, the audience
+     * and the {@code acr} are required, and the project claim chooses the active role.  The names are written as an environment variable takes
+     * them, which the stack turns into the name of the variable that sets each: a quoted key of a map, as the claim {@code acr} is, and an index, as
+     * the mapping of roles has.
+     */
+    public static Map<String, String> polarisOidcEnv(String authServerUrl, String clientId, String clientSecret, Trust trust) {
+        Map<String, String> env = polarisOidcEnv(authServerUrl, clientId, clientSecret);
+        env.put("quarkus.oidc.token.issuer", trust.issuer());
+        env.put("quarkus.oidc.token.audience", trust.audience());
+        env.put("quarkus.oidc.token.required-claims.\"acr\"", trust.acr());
+        // the roles of the token are the project that it names, and they become the principal role of that project and no other: a role that the token
+        // does not name is not active, so that the roles that a member has for other projects do not give a token of this one their access
+        env.put("quarkus.oidc.roles.role-claim-path", trust.projectClaim());
+        env.put("polaris.oidc.principal-roles-mapper.filter", ".+");
+        env.put("polaris.oidc.principal-roles-mapper.mappings[0].regex", "(.+)");
+        env.put("polaris.oidc.principal-roles-mapper.mappings[0].replacement", "PRINCIPAL_ROLE:$1Project");
+        return env;
+    }
 }

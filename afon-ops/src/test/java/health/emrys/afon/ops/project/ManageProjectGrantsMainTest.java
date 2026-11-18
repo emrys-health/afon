@@ -1,0 +1,131 @@
+package health.emrys.afon.ops.project;
+
+import health.emrys.afon.polaris.config.PolarisProjectGrants;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+/**
+ * What a Data Provider grants a project, by the command: it calls Polaris only for an action it understands.
+ */
+class ManageProjectGrantsMainTest {
+
+    private static final String ALICE = "11111111-aaaa-bbbb-cccc-000000000001";
+    private static final String BOB = "22222222-aaaa-bbbb-cccc-000000000002";
+
+    @TempDir
+    Path dir;
+
+    private final PolarisProjectGrants grants = mock(PolarisProjectGrants.class);
+    private final ByteArrayOutputStream out = new ByteArrayOutputStream();
+    private final ByteArrayOutputStream err = new ByteArrayOutputStream();
+    private ManageProjectGrantsMain command;
+    private boolean polarisCalled;
+
+    @BeforeEach
+    void command() {
+        command = new ManageProjectGrantsMain(() -> {
+            polarisCalled = true;
+            return grants;
+        }, new PrintStream(out), new PrintStream(err));
+    }
+
+    private Path members(String content) throws IOException {
+        return Files.writeString(dir.resolve("members.txt"), content);
+    }
+
+    @Test
+    void grantsTheProjectTheNamespaceAndMakesItsMembersThoseTheFileListsWithoutBlanksCommentsOrRepeats() throws Exception {
+        Path file = members("# the contract's members\n" + ALICE + "\n\n  " + BOB + "  \n" + ALICE + "\n");
+        when(grants.grant(anyString(), anyString(), anyString(), any()))
+            .thenReturn(new PolarisProjectGrants.Members(List.of("afon:" + ALICE), List.of("afon:old")));
+
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", file.toString()})).isZero();
+
+        verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE, BOB));
+        assertThat(out.toString()).contains("Project cvd-2026 may read cvd.released, read-only, and has 2 member(s)", "Added afon:" + ALICE, "Removed afon:old");
+    }
+
+    @Test
+    void grantsAnotherNamespaceIfGiven() throws Exception {
+        Path file = members(ALICE + "\n");
+        when(grants.grant(anyString(), anyString(), anyString(), any())).thenReturn(new PolarisProjectGrants.Members(List.of(), List.of()));
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", file.toString(), "--namespace", "cvd_2026"})).isZero();
+        verify(grants).grant("cvd-2026", "cvd", "cvd_2026", List.of(ALICE));
+    }
+
+    @Test
+    void refusesAFileThatIsNotThereOrListsNoMember() throws Exception {
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", dir.resolve("none.txt").toString()})).isEqualTo(1);
+        assertThat(err.toString()).contains("No file");
+        err.reset();
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", members("# nobody\n\n").toString()})).isEqualTo(1);
+        assertThat(err.toString()).contains("lists no member", "use revoke");
+        verify(grants, never()).grant(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void addsAndRemovesAMemberAndRevokesAndReleases() throws Exception {
+        when(grants.revoke("cvd-2026", "cvd")).thenReturn(List.of("afon:" + ALICE));
+
+        assertThat(command.run(new String[]{"add-member", "cvd-2026", ALICE})).isZero();
+        assertThat(command.run(new String[]{"remove-member", "cvd-2026", BOB})).isZero();
+        assertThat(command.run(new String[]{"revoke", "cvd-2026", "cvd"})).isZero();
+        assertThat(command.run(new String[]{"release", "cvd", "patients"})).isZero();
+
+        verify(grants).addMember("cvd-2026", ALICE);
+        verify(grants).removeMember("cvd-2026", BOB);
+        verify(grants).release("cvd", "patients", "released");
+        assertThat(out.toString()).contains("Added afon:" + ALICE + " to project cvd-2026", "Removed afon:" + BOB + " from project cvd-2026",
+                                            "Project cvd-2026 may no longer read cvd; 1 member(s) lost its role", "Moved patients of cvd from staging to released");
+    }
+
+    @Test
+    void saysWhyPolarisRefusedAndFails() throws Exception {
+        doThrow(new IOException("Polaris could not make the principal role cvd-2026Project: HTTP 403")).when(grants).addMember(anyString(), anyString());
+        assertThat(command.run(new String[]{"add-member", "cvd-2026", ALICE})).isEqualTo(1);
+        assertThat(err.toString()).contains("HTTP 403");
+        err.reset();
+        doThrow(new IllegalArgumentException("'x' is not the id of a user")).when(grants).removeMember(anyString(), anyString());
+        assertThat(command.run(new String[]{"remove-member", "cvd-2026", "x"})).isEqualTo(1);
+        assertThat(err.toString()).contains("is not the id of a user");
+    }
+
+    @Test
+    void callsPolarisOnlyForAnActionItUnderstands() {
+        assertThat(command.run(new String[]{})).isZero();
+        assertThat(out.toString()).contains("Usage: manage-project-grants");
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"add-member", "cvd-2026"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"revoke", "cvd-2026", "cvd", "--namespace", "x"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"release", "cvd"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"dance"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"grant", "--bogus", "x"})).isEqualTo(2);
+        assertThat(polarisCalled).isFalse();
+        verifyNoInteractions(grants);
+    }
+
+    @Test
+    void readsTheMembersOfAFile() throws Exception {
+        assertThat(ManageProjectGrantsMain.members(members(ALICE + "\n# c\n" + BOB + "\n"))).containsExactly(ALICE, BOB);
+        assertThatThrownBy(() -> ManageProjectGrantsMain.members(dir.resolve("absent"))).isInstanceOf(IOException.class);
+    }
+}

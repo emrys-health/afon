@@ -103,6 +103,17 @@ public final class ProjectEnv {
      * @param env the config the project is made from, with its references resolved, or {@code null} for no names
      */
     public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig, Properties env) {
+        return derive(project, identityKubeconfig, null, env);
+    }
+
+    /**
+     * As {@link #derive(AfonProject, Path, Properties)}, with the cloud of the identity project's cluster, which differs from the project's when the
+     * identity is on another cloud, eg a Data Provider on Azure that uses an identity on AWS: the kubectl context of the port-forward to Keycloak is then
+     * checked to be of that cloud.
+     *
+     * @param identityCloud the cloud of the identity project, or {@code null} if it names none
+     */
+    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig, AfonCloud identityCloud, Properties env) {
         AfonCloud cloud = project.cloud();
         String prefix = cloud.name() + "_";
         Map<String, String> common = new LinkedHashMap<>();
@@ -110,6 +121,9 @@ public final class ProjectEnv {
         common.put(PROJECT_ID.getName(), project.id().value());
         if (identityKubeconfig != null) {
             common.put(KEYCLOAK_KUBECONFIG.getName(), identityKubeconfig.toString());
+            if (identityCloud != null && identityCloud != cloud) {
+                common.put(KEYCLOAK_CLOUD.getName(), identityCloud.toString().toLowerCase(java.util.Locale.ROOT));
+            }
         }
         if (project.egressIp() != null) {
             cloudSpecific.put(prefix + "EGRESS_IP", project.egressIp());
@@ -124,9 +138,23 @@ public final class ProjectEnv {
                                               .collect(Collectors.joining(",")));
         }
         if (project instanceof IdentityProject identity) {
-            // it deploys the identity, so it uses no other: nothing of the clients, the Providers or the TRE, and no external identity
+            // it deploys the identity, so it uses no other: nothing of the clients, the Data Providers or the TRE, and no external identity
             if (identity.domain() != null) {
                 cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", identity.domain());
+            }
+        } else if (project instanceof DataProject data) {
+            // a Data Provider deploys its Polaris, with nothing of the clients, the Data Providers or the TRE, and it trusts the central identity, which
+            // is at the host of its issuer: that is its OIDC domain, as the config reads the issuer as being at the OIDC domain of the cloud
+            if (data.domain() != null) {
+                cloudSpecific.put(prefix + "POLARIS_DOMAIN_NAME", data.domain());
+            }
+            DataProject.Identity identity = data.identity();
+            common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
+            common.put(OIDC_ACR.getName(), identity.acr());
+            common.put(OIDC_AUDIENCE.getName(), identity.audience());
+            String issuerHost = issuerHost(identity.issuerUrl());
+            if (issuerHost != null) {
+                cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", issuerHost);
             }
         } else {
             deriveTre((TreProject) project, prefix, common, cloudSpecific);
@@ -156,6 +184,16 @@ public final class ProjectEnv {
         return byFile;
     }
 
+    /** @return the host of an issuer URL, or {@code null} if it has none */
+    private static String issuerHost(String issuerUrl) {
+        try {
+            String host = java.net.URI.create(issuerUrl).getHost();
+            return host == null || host.isBlank() ? null : host;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private static void deriveTre(TreProject project, String prefix, Map<String, String> common, Map<String, String> cloudSpecific) {
         TreProject.Identity identity = project.identity();
         common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
@@ -175,6 +213,12 @@ public final class ProjectEnv {
         common.put(TRE_TEARDOWN_TIME_ZONE.getName(), project.tre().timeZone());
 
         cloudSpecific.put(prefix + "KEYCLOAK_EXTERNAL", "true");
+        // the TRE's OIDC domain is the identity's, which the issuer names: the config reads the issuer as being at the OIDC domain of the cloud, and the
+        // identity is not at the env's own, when it is deployed by a project, so it would otherwise be refused
+        String issuerHost = issuerHost(identity.issuerUrl());
+        if (issuerHost != null) {
+            cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", issuerHost);
+        }
         cloudSpecific.put(prefix + "AUDIT_BUCKET", project.create().auditBucket());
         if (project.create().gitBucket() != null) {
             cloudSpecific.put(prefix + "GITEA_BUCKET", project.create().gitBucket());
@@ -203,7 +247,12 @@ public final class ProjectEnv {
         }
         // the config the project is made from, with its references resolved, which the names of the project's resources depend on (the account)
         Properties envProperties = envProperties(envConfig);
-        Map<String, Map<String, String>> derived = derive(project, identityKubeconfig(project, afonHome), envProperties);
+        IdentityRef identityRef = identityRef(project, afonHome);
+        Map<String, Map<String, String>> derived = derive(project, identityRef == null ? null : identityRef.kubeconfig(),
+                                                          identityRef == null ? null : identityRef.cloud(), envProperties);
+        if (project instanceof DataProject data) {
+            admitTheTres(data, afonHome, envProperties, derived);
+        }
         try {
             copyTree(envConfig, target);
             for (Map.Entry<String, Map<String, String>> file : derived.entrySet()) {
@@ -211,6 +260,9 @@ public final class ProjectEnv {
             }
             reevaluateDependents(target, derived);
             Files.copy(projectFile, target.resolve(FileProjectProvider.FILE), StandardCopyOption.REPLACE_EXISTING);
+            if (project instanceof TreProject tre && tre.dataProviders().stream().anyMatch(provider -> provider.project() != null)) {
+                writeResolvedProviders(tre, target.resolve(FileProjectProvider.FILE));
+            }
             Files.createDirectories(cdktfDir(afonHome, project));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot configure project " + project.id() + ": the config env is " + target, e);
@@ -219,14 +271,72 @@ public final class ProjectEnv {
     }
 
     /**
-     * @return the kubeconfig of the cluster of the identity project that the project names, where its stack writes it, or {@code null} if it names none
+     * A Data Provider's Polaris is reached by the TREs that read its catalogs, so it admits their egress IPs, in addition to the addresses that its config
+     * already allows, in {@code <CLOUD>_POLARIS_ALLOWED_CIDRS}, which the deploy and {@code polaris-whitelist} both restrict its ingress to.  With no TRE naming
+     * it, the property is left as the config has it: a Polaris with none is open, as it is for any other stack, and is guarded by its token checks alone.
+     */
+    private static void admitTheTres(DataProject data, Path afonHome, Properties env, Map<String, Map<String, String>> derived) {
+        List<String> egress = TreEgress.of(afonHome, data);
+        if (egress.isEmpty()) {
+            return;
+        }
+        String property = data.cloud().name() + "_POLARIS_ALLOWED_CIDRS";
+        Set<String> cidrs = new LinkedHashSet<>();
+        for (String configured : env.getProperty(property, "").split(",")) {
+            if (!configured.isBlank()) {
+                cidrs.add(configured.trim());
+            }
+        }
+        egress.forEach(ip -> cidrs.add(ip + "/32"));
+        derived.computeIfAbsent("afon-" + data.cloud().toString().toLowerCase(Locale.ROOT) + ".properties", file -> new LinkedHashMap<>())
+               .put(property, String.join(",", cidrs));
+    }
+
+    /**
+     * Writes the catalogs that the project names of the Data Providers' projects as they were resolved, each in full, in the copy of the project
+     * file that the config holds, as the record of what was deployed: the file is read where the Data Providers' projects are not looked up, ie by the
+     * commands that run in the project's home, which then see what was deployed, not what the Data Providers' files say now.  The comments of the file
+     * are lost in the copy.
+     */
+    private static void writeResolvedProviders(TreProject project, Path copy) throws IOException {
+        Map<String, Object> root = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()))
+            .load(Files.readString(copy, StandardCharsets.UTF_8));
+        List<Map<String, Object>> dataProviders = new ArrayList<>();
+        for (TreProject.DataProvider provider : project.dataProviders()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", provider.id());
+            entry.put("catalogUri", provider.catalogUri());
+            entry.put("catalogName", provider.catalogName());
+            entry.put("audience", provider.audience());
+            entry.put("bucket", provider.bucket());
+            entry.put("cloud", provider.cloud().toString().toLowerCase(java.util.Locale.ROOT));
+            dataProviders.add(entry);
+        }
+        root.put("dataProviders", new LinkedHashMap<>(Map.of("defined", dataProviders)));
+        org.yaml.snakeyaml.DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
+        options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        options.setIndent(2);
+        options.setIndicatorIndent(2);
+        options.setIndentWithIndicator(true);
+        Files.writeString(copy, "# The dataProviders are the catalogs that the project names of its Data Providers' projects, resolved by configure.\n"
+                                + new org.yaml.snakeyaml.Yaml(options).dump(root), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * The identity project that a project names: where the kubeconfig of its cluster is, and its cloud.
+     */
+    record IdentityRef(Path kubeconfig, AfonCloud cloud) {
+    }
+
+    /**
+     * @return the cluster of the identity project that the project names, where its stack writes the kubeconfig, or {@code null} if it names none
      * @throws ProjectException if the identity project has no file, or is not an identity project
      */
-    static Path identityKubeconfig(AfonProject project, Path afonHome) {
-        if (!(project instanceof TreProject tre) || tre.identity().project() == null) {
+    static IdentityRef identityRef(AfonProject project, Path afonHome) {
+        String id = project.identityProject();
+        if (id == null) {
             return null;
         }
-        String id = tre.identity().project();
         FileProjectProvider provider = FileProjectProvider.forProject(afonHome, id);
         if (!provider.exists()) {
             throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
@@ -236,7 +346,7 @@ public final class ProjectEnv {
             throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
                 "identity.project names %s, which is not an identity project", id)));
         }
-        return cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config");
+        return new IdentityRef(cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config"), identity.cloud());
     }
 
     /**

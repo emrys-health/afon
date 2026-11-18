@@ -93,7 +93,7 @@ public interface IdentityProvider {
     HttpResponse createUser(String adminToken, String realm, AfonUser user) throws IOException;
 
     /**
-     * Makes a researcher in the central identity, once, with no password: they are sent an invitation email whose required
+     * Makes a member in the central identity, once, with no password: they are sent an invitation email whose required
      * actions are to verify the email, set a password and enrol a second factor.  Idempotent: an existing user is left as
      * they are.  The user's token names them by the immutable id returned, never by their email.
      *
@@ -107,6 +107,24 @@ public interface IdentityProvider {
     Optional<String> findUser(String email);
 
     /**
+     * Has the tokens of the client carry the audience, so that a Polaris that requires it, as the Polaris of a Data Provider does of every token, accepts
+     * those of the client: the admins' clients, which make its catalogs, as the members' TRE clients carry the audiences of their Data Providers already.
+     * Idempotent.
+     *
+     * @throws IllegalStateException if there is no such client
+     */
+    void ensureClientAudience(String clientId, String audience);
+
+    /**
+     * Has the tokens of a service client, which signs in with its secret and has no second factor to give, say that they have the {@code acr}, so that a
+     * Polaris that requires it of every token, as the Polaris of a Data Provider does, accepts those of its own admin client.  Only for a client that no
+     * person signs in as: the {@code acr} is then the word of whoever holds its secret, not the proof of a second factor.  Idempotent.
+     *
+     * @throws IllegalStateException if there is no such client
+     */
+    void ensureClientAcr(String clientId, String acr);
+
+    /**
      * Sends the invitation to an existing user again: the email whose required actions are to verify the email, set a password and enrol a
      * second factor, as {@link #ensureUser} sends it to a new one, and only then.  For a user who never got it, or let it expire, or lost their
      * second factor.  Unlike the invitation of {@code ensureUser}, a failure to send it is an error.
@@ -117,8 +135,8 @@ public interface IdentityProvider {
 
     /**
      * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client
-     * for the TRE, whose tokens carry the audiences of the project's Provider catalogs, and one for Git, whose tokens carry
-     * no Provider audience.  Each authenticates by {@code private_key_jwt} with the public key it is given, and each token
+     * for the TRE, whose tokens carry the audiences of the project's Data Provider catalogs, and one for Git, whose tokens carry
+     * no Data Provider audience.  Each authenticates by {@code private_key_jwt} with the public key it is given, and each token
      * names the one project it is for, only when the user is a member of the project's group.
      *
      * @param publicKeys the public key (a JWK or a JWK set) of each client, by {@code tre} and {@code git}

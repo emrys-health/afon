@@ -9,6 +9,7 @@ import health.emrys.afon.ops.project.ProjectCommands.Command;
 import health.emrys.afon.ops.scripts.ScriptMain;
 import health.emrys.afon.project.AfonProject;
 import health.emrys.afon.project.FileProjectProvider;
+import health.emrys.afon.project.DataProject;
 import health.emrys.afon.project.IdentityProject;
 import health.emrys.afon.project.ProjectEnv;
 import health.emrys.afon.project.ProjectException;
@@ -80,7 +81,7 @@ public class ManageProjectMain {
     private static final String USAGE = String.join(System.lineSeparator(),
         "Usage: manage-project <action> <project> [" + ENV + " <env>] [" + FROM + " <stage>] [" + UNTIL + " <stage>] [" + DRY_RUN + "], where:",
         "       manage-project find <name>",
-        "       manage-project init <project> <cloud> [" + ROLE + " identity|tre] [" + ENV + " <env>] [" + FORCE + "]",
+        "       manage-project init <project> <cloud> [" + ROLE + " identity|tre|data] [" + ENV + " <env>] [" + FORCE + "]",
         "  <action> is one of:",
         "    init      writes the project file from the template of its role, for the deployer to complete: what is in <angle brackets>",
         "              is what only the deployer knows, so it is not valid until it is replaced.  Never overwrites a file, unless given",
@@ -237,7 +238,7 @@ public class ManageProjectMain {
                 warnOfSharedEgressIp(project);
                 out.printf("%s is a valid %s project: %s on %s, made from %s%s%n", provider.file(), project.role(), project.id(), project.cloud(),
                            project.env() == null ? "the active config" : "config-" + project.env(),
-                           project instanceof TreProject tre ? ", with " + tre.providers().size() + " provider(s)" : "");
+                           project instanceof TreProject tre ? ", with " + tre.dataProviders().size() + " Data Provider catalog(s)" : "");
                 yield 0;
             }
             case "plan" -> {
@@ -383,7 +384,7 @@ public class ManageProjectMain {
         String cloud = positional.get(1);
         Optional<ProjectRole> projectRole = ProjectRole.of(role);
         if (projectRole.isEmpty()) {
-            return usage(ROLE + " should be identity or tre, not '" + role + "'");
+            return usage(ROLE + " should be identity, tre or data, not '" + role + "'");
         }
         AfonCloud projectCloud;
         try {
@@ -459,7 +460,9 @@ public class ManageProjectMain {
                        ProjectEnv.cdktfDir(afonHome, project));
             out.printf("Its commands run in its home %s, where any command of Afon can too: afon-cli.sh manage-project run %s <command>%n",
                        projectHome, project.id());
-            out.println("Not configured yet: the Providers' project catalogs, which the stacks do not read from the project file.");
+            if (project instanceof TreProject) {
+                out.println("Not configured yet: the Data Providers' project catalogs, which the stacks do not read from the project file.");
+            }
             return 0;
         } catch (ProjectException | IllegalArgumentException | IllegalStateException | UncheckedIOException e) {
             err.println(e.getMessage());
@@ -542,6 +545,9 @@ public class ManageProjectMain {
             if (project instanceof IdentityProject) {
                 out.println("Left as they are: the reserved egress IP, if the project names one, and the project's config and cdktf dirs.  The projects that"
                             + " used this identity are registered in it no more: bring it up again, then run their register stage");
+            } else if (project instanceof DataProject) {
+                out.println("Left as they are: the Data Provider's storage, with the data of its catalogs, the reserved egress IP, if the project names one, and the"
+                            + " project's config and cdktf dirs");
             } else {
                 out.println("Left as they are: the project's buckets, and its clients and group in the central identity, until it is closed:"
                             + " manage-project run " + project.id() + " manage-identity close");
@@ -610,15 +616,15 @@ public class ManageProjectMain {
     }
 
     /**
-     * @return the identity project that the TRE project names, or {@code null} if it is not a TRE project, or names none
+     * @return the identity project that the project names, or {@code null} if it names none: a TRE project and a data project use the central identity
      * @throws ProjectException      if the identity project's file is not valid
-     * @throws IllegalStateException if the project it names is not an identity project of the cloud of this one, or has no file
+     * @throws IllegalStateException if the project it names is not an identity project, or has no file
      */
     private IdentityProject identityProjectOf(AfonProject project) {
-        if (!(project instanceof TreProject tre) || tre.identity().project() == null) {
+        String id = project.identityProject();
+        if (id == null) {
             return null;
         }
-        String id = tre.identity().project();
         FileProjectProvider provider = FileProjectProvider.forProject(afonHome, id);
         if (!provider.exists()) {
             throw new IllegalStateException(String.format("Project %s names the identity project %s, which has no file %s", project.id(), id,
@@ -628,10 +634,8 @@ public class ManageProjectMain {
             throw new IllegalStateException(String.format("Project %s names %s as its identity project, but %s has the role %s", project.id(), id,
                                                           id, provider.getProject().role()));
         }
-        if (identity.cloud() != project.cloud()) {
-            throw new IllegalStateException(String.format("Project %s is on %s, but the identity project %s it names is on %s", project.id(),
-                                                          project.cloud(), id, identity.cloud()));
-        }
+        // the identity may be on another cloud than the project, eg a Data Provider on Azure that uses an identity on AWS: its kubeconfig is written for
+        // its own cloud, and the port-forward to its Keycloak checks the context against KEYCLOAK_CLOUD
         return identity;
     }
 

@@ -17,6 +17,7 @@ final class ProjectTemplates {
 
     private static final Path EXAMPLE = Path.of("../afon-project/src/test/resources/project.yaml");
     private static final Path IDENTITY_EXAMPLE = Path.of("../afon-project/src/test/resources/identity-project.yaml");
+    private static final Path DATA_EXAMPLE = Path.of("../afon-project/src/test/resources/data-project.yaml");
 
     private ProjectTemplates() {
     }
@@ -67,5 +68,25 @@ final class ProjectTemplates {
         Path file = home.resolve("projects").resolve(project).resolve("project.yaml");
         Files.createDirectories(file.getParent());
         return Files.writeString(file, example(cloud));
+    }
+
+    /**
+     * @return the example data project, for the cloud
+     */
+    static String dataExample(AfonCloud cloud) {
+        try {
+            return render(Files.readString(DATA_EXAMPLE), cloud);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @return the example data project, for the cloud, written as the project of the dir {@code <home>/projects/<project>}
+     */
+    static Path writeData(Path home, String project, AfonCloud cloud) throws IOException {
+        Path file = home.resolve("projects").resolve(project).resolve("project.yaml");
+        Files.createDirectories(file.getParent());
+        return Files.writeString(file, dataExample(cloud));
     }
 }

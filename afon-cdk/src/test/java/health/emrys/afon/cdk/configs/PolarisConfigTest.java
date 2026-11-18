@@ -163,4 +163,24 @@ class PolarisConfigTest {
             assertThat(envName).isEqualTo(envName.toUpperCase());
         }
     }
+
+    @Test
+    public void aProviderTrustsTheIssuerTheAudienceAndTheAcrOfItsTokensAndTakesItsRolesFromTheProject() {
+        Map<String, String> properties = KeyCloakHelper.polarisOidcEnv(
+            "http://keycloak/realms/polaris", "id", "secret",
+            new KeyCloakHelper.Trust("https://id.example.org/realms/polaris", "provider-lon", "mfa", "project"));
+        Map<String, String> env = new java.util.HashMap<>();
+        properties.forEach((k, v) -> env.put(PolarisConfig.toEnvironmentVariable(k), v));
+
+        assertThat(env).containsEntry("QUARKUS_OIDC_TOKEN_ISSUER", "https://id.example.org/realms/polaris");
+        assertThat(env).containsEntry("QUARKUS_OIDC_TOKEN_AUDIENCE", "provider-lon");
+        assertThat(env).containsEntry("QUARKUS_OIDC_TOKEN_REQUIRED_CLAIMS__ACR_", "mfa");
+        assertThat(env).containsEntry("QUARKUS_OIDC_ROLES_ROLE_CLAIM_PATH", "project");
+        assertThat(env).containsEntry("POLARIS_OIDC_PRINCIPAL_ROLES_MAPPER_MAPPINGS_0__REPLACEMENT", "PRINCIPAL_ROLE:$1Project");
+    }
+
+    @Test
+    public void theNamesOfTheVariablesAreThoseOfSmallRye() {
+        assertThat(PolarisConfig.toEnvironmentVariable("a.b-c[0].d\"e\"")).isEqualTo("A_B_C_0__D_E_");
+    }
 }

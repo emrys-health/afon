@@ -15,7 +15,7 @@ public class ProjectException extends RuntimeException {
     }
 
     /**
-     * @return the problems, each naming the path of the key it is about, eg {@code providers[1].audience}
+     * @return the problems, each naming the path of the key it is about, eg {@code dataProviders[1].audience}
      */
     public List<String> problems() {
         return problems;
