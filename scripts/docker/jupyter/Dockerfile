@@ -95,5 +95,6 @@ RUN pip install --no-cache-dir --only-binary=:all: \
     "matplotlib==3.10.0" \
     "seaborn==0.13.2" \
     "pyarrow==17.0.0" \
+    "trino==0.340.0" \
     "pytest==8.3.4" \
     "ruff==0.9.6"

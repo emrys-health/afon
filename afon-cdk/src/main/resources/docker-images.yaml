@@ -20,8 +20,8 @@ images:
     category: first-party
   pyspark-notebook:
     image: emryshealth/pyspark-notebook
-    tag: x86_64-spark-4.0.1-vnc-clip-multi_pkg
-    digest: sha256:6e1717857b2cc310f0f0fdadb851dbe3aef15221d2d7b0f1a16b88fdb07689c3
+    tag: x86_64-spark-4.0.1_afon328
+    digest: sha256:587bdc84c43a8b8c025c17a8ccdf172b2c10c0b3bfa277198525ea5a5327326c
     category: first-party
 
   # upstream

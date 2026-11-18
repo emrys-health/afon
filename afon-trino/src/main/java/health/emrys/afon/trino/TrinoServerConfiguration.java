@@ -73,6 +73,7 @@ public class TrinoServerConfiguration {
             """
             connector.name=iceberg
             iceberg.catalog.type=rest
+            iceberg.rest-catalog.view-endpoints-enabled=false
             iceberg.rest-catalog.uri=%s%s/api/catalog/
             iceberg.rest-catalog.warehouse=%s
             iceberg.rest-catalog.vended-credentials-enabled=true
