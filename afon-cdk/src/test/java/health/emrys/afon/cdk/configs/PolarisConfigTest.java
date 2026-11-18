@@ -183,4 +183,24 @@ class PolarisConfigTest {
     public void theNamesOfTheVariablesAreThoseOfSmallRye() {
         assertThat(PolarisConfig.toEnvironmentVariable("a.b-c[0].d\"e\"")).isEqualTo("A_B_C_0__D_E_");
     }
+
+    @Test
+    public void aProviderTrustReachesThePodAsItIsWhenTheExportsAreSourcedByAShell() throws Exception {
+        String exports = PolarisConfig.trustExports("http://keycloak/realms/polaris", "id", "secret",
+            new KeyCloakHelper.Trust("https://id.example.org/realms/polaris", "provider-lon", "mfa", "project"));
+        Process shell = new ProcessBuilder("bash", "-c", exports + "\nenv").redirectErrorStream(true).start();
+        String env = new String(shell.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(shell.waitFor()).as(env).isZero();
+        assertThat(env.lines().toList())
+            .contains("POLARIS_OIDC_PRINCIPAL_ROLES_MAPPER_MAPPINGS_0__REGEX=(.+)",
+                      "POLARIS_OIDC_PRINCIPAL_ROLES_MAPPER_MAPPINGS_0__REPLACEMENT=PRINCIPAL_ROLE:$1Project",
+                      "QUARKUS_OIDC_TOKEN_REQUIRED_CLAIMS__ACR_=mfa",
+                      "QUARKUS_OIDC_TOKEN_AUDIENCE=provider-lon");
+    }
+
+    @Test
+    public void everyOtherPolarisIsExportedAsItWas() {
+        Map<String, String> plain = KeyCloakHelper.polarisOidcEnv("http://keycloak/realms/polaris", "id", "secret");
+        assertThat(PolarisConfig.toExports(plain)).doesNotContain("'");
+    }
 }

@@ -209,7 +209,7 @@ Its Polaris is at the Polaris domain of the env with the project's id as a label
 storage account of its own: see [Names](#names-of-a-projects-resources). The env's domain must have a parent domain, or
 the file names its own, in `stacks.data.domain`.
 
-**3. Check it, see its stages, configure it and bring it up:**
+**3. Check it, see its stages, configure it and bring it up**, and check that its Polaris is serving:
 
 ```shell
 afon-cli.sh manage-project validate lon
@@ -217,6 +217,7 @@ afon-cli.sh manage-project plan lon
 afon-cli.sh manage-project configure lon
 afon-cli.sh manage-project up lon --dry-run
 afon-cli.sh manage-project up lon
+afon-cli.sh manage-project run lon azure-polaris
 ```
 
 `up` runs two stages in the project's home: `create` (`azure-create` for the stack `azure-polaris`, `db-whitelist azure`,
@@ -224,6 +225,11 @@ which allows the project's egress IP on the Postgres, and the zone of its domain
 (`manage-stack setup azure-polaris`, which also creates the catalogs, after `aws-update-kube-config aws-keycloak` has
 written the kubeconfig of `idp`'s cluster, in its own home). `down lon` deletes the stack and leaves its storage, with
 the data of its catalogs.
+
+`azure-polaris` checks each layer, run in the Data Provider's home so that it uses its config: the Azure login, the AKS
+cluster and its nodes, the Polaris pod, the ingress's external IP, the TLS secret, and then real HTTPS requests to its
+domain, anonymous and as the Polaris admin (`POLARIS_ID`). The last one gets a token from the central identity and calls
+this Polaris with it, so it shows that the audience and `acr` that the Data Provider requires are in that client's token.
 
 **Repeat steps 1 to 3 for `nw`**, the second Data Provider: the same commands, with `nw` for `lon`, its own egress IP
 (`afon-egress-ip-nw`), its own audience (`provider-nw`) and its own catalogs, which here are also `cvd` and `dbt`:
@@ -238,6 +244,7 @@ afon-cli.sh manage-project plan nw
 afon-cli.sh manage-project configure nw
 afon-cli.sh manage-project up nw --dry-run
 afon-cli.sh manage-project up nw
+afon-cli.sh manage-project run nw azure-polaris
 ```
 
 **4. Grant a project its catalog** (once its TRE exists, as it needs its members, and for `nw` the same as for `lon`). A

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -414,18 +415,35 @@ public class PolarisConfig extends Construct {
         String url = KeyCloakConfigurer.internalRealmUrl(kcHost, "https");
         String id = properties.getValue(KEYCLOAK_DB_USERNAME);
         String secret = properties.getValue(KEYCLOAK_DB_PASSWORD);
-        Map<String, String> kcProperties = isSet(properties, OIDC_AUDIENCE) && isSet(properties, OIDC_ACR)
-            ? KeyCloakHelper.polarisOidcEnv(url, id, secret,
-                                            new KeyCloakHelper.Trust(properties.getOidcIssuerUrl(cloud), properties.getValue(OIDC_AUDIENCE),
+        return isSet(properties, OIDC_AUDIENCE) && isSet(properties, OIDC_ACR)
+            ? trustExports(url, id, secret, new KeyCloakHelper.Trust(properties.getOidcIssuerUrl(cloud), properties.getValue(OIDC_AUDIENCE),
                                                                      properties.getValue(OIDC_ACR), "project"))
-            : KeyCloakHelper.polarisOidcEnv(url, id, secret);
-        return toExports(kcProperties);
+            : toExports(KeyCloakHelper.polarisOidcEnv(url, id, secret));
+    }
+
+    /**
+     * The exports of a Data Provider's Polaris, which the pod sources in a shell: what the trust adds to the settings of any other Polaris is single-quoted, as
+     * the regex {@code (.+)} would be an array, and the {@code $1} of the replacement would be empty, unquoted.  The other settings are written as they are for
+     * any other Polaris.
+     */
+    static @NonNull String trustExports(String url, String id, String secret, KeyCloakHelper.Trust trust) {
+        Map<String, String> base = KeyCloakHelper.polarisOidcEnv(url, id, secret);
+        Map<String, String> trusted = KeyCloakHelper.polarisOidcEnv(url, id, secret, trust);
+        Set<String> quoted = trusted.entrySet().stream().filter(e -> !e.getValue().equals(base.get(e.getKey()))).map(Map.Entry::getKey)
+                                    .collect(Collectors.toSet());
+        return toExports(trusted, quoted);
     }
 
     static @NonNull String toExports(Map<String, String> properties) {
+        return toExports(properties, Set.of());
+    }
+
+    /** @param quoted the names of the properties whose values are single-quoted */
+    static @NonNull String toExports(Map<String, String> properties, Set<String> quoted) {
         return properties
             .entrySet().stream().map(x ->
-                                         format("export %s=%s", toEnvironmentVariable(x.getKey()), x.getValue())
+                                         format("export %s=%s", toEnvironmentVariable(x.getKey()),
+                                                quoted.contains(x.getKey()) ? "'" + x.getValue().replace("'", "'\\''") + "'" : x.getValue())
             ).collect(Collectors.joining("\n"));
     }
 

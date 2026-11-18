@@ -87,7 +87,12 @@ public final class KeyCloakTunnel {
      */
     public static void run(AfonCloud cloud, AfonPropertyProvider properties, Path kubeConfig, Call call) throws Exception {
         try (KubeClient client = kubeConfig == null ? new KubeClient(properties) : new KubeClient(properties, kubeConfig.toString())) {
-            client.requireContextOf(cloudOfKeycloak(cloud, properties));
+            // the kube config that is given is the identity project's, whose cluster is named after that project, so only its kind is checked
+            if (kubeConfig == null) {
+                client.requireContextOf(cloudOfKeycloak(cloud, properties));
+            } else {
+                client.requireContextKindOf(cloudOfKeycloak(cloud, properties));
+            }
             Optional<String> pod = client.runningPodWithLabel(POD_LABEL);
             if (pod.isEmpty()) {
                 logger.warn("No running pod with the label {} in the kubectl context '{}', as when KeyCloak is another stack's: "

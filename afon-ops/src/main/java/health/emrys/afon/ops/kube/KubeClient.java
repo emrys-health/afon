@@ -92,6 +92,23 @@ public class KubeClient implements AutoCloseable {
      * @throws IllegalStateException if it is not
      */
     public void requireContextOf(AfonCloud cloud) {
+        requireContextKindOf(cloud);
+        // the cluster is named last: arn:aws:eks:<region>:<account>:cluster/<name>, gke_<project>_<region>_<name>, else the context
+        String context = getContext();
+        String cluster = context.substring(Math.max(context.lastIndexOf('/'), context.lastIndexOf('_')) + 1);
+        if (clusterName != null && !clusterName.isBlank() && !cluster.equals(clusterName) && !cluster.endsWith("-" + clusterName)) {
+            throw wrongContext(context, "is not a cluster of this env, ie named " + clusterName + " or <stack>-" + clusterName,
+                               "the cluster of the stack, as CLUSTER_NAME says");
+        }
+    }
+
+    /**
+     * Checks only that the current kubectl context is a cluster of the kind of the cloud's, not whose it is: for the kube config of a cluster that is not
+     * this env's, eg that of the identity project, which a project reaches Keycloak in, and which is named after that project, not after {@code CLUSTER_NAME}.
+     *
+     * @throws IllegalStateException if it is not
+     */
+    public void requireContextKindOf(AfonCloud cloud) {
         String context = getContext();
         boolean eks = context.startsWith("arn:aws:eks:");
         boolean gke = context.startsWith("gke_");
@@ -111,12 +128,6 @@ public class KubeClient implements AutoCloseable {
                     throw wrongContext(context, "is not an AKS cluster", "the Azure one, eg 'afon-cli.sh azure-update-kube-config tre' prints the KUBECONFIG to export");
                 }
             }
-        }
-        // the cluster is named last: arn:aws:eks:<region>:<account>:cluster/<name>, gke_<project>_<region>_<name>, else the context
-        String cluster = context.substring(Math.max(context.lastIndexOf('/'), context.lastIndexOf('_')) + 1);
-        if (clusterName != null && !clusterName.isBlank() && !cluster.equals(clusterName) && !cluster.endsWith("-" + clusterName)) {
-            throw wrongContext(context, "is not a cluster of this env, ie named " + clusterName + " or <stack>-" + clusterName,
-                               "the cluster of the stack, as CLUSTER_NAME says");
         }
     }
 
