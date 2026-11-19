@@ -69,7 +69,7 @@ permissions:
 
 # Never two at once for a cloud: they share its config and its stores.
 concurrency:
-  group: acceptance-tests-container-${{ inputs.cloud }}
+  group: acceptance-tests-container-${{ inputs.cloud || 'aws' }}
   cancel-in-progress: false
 
 env:
@@ -104,13 +104,13 @@ jobs:
             IMAGE_TAG=$(mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout -N)
           fi
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
-          echo "Running in the image ${{ inputs.image }}:$IMAGE_TAG"
+          echo "Running in the image ${{ inputs.image || 'emryshealth/afon-base' }}:$IMAGE_TAG"
 
   acceptance:
     needs: resolve
     runs-on: ubuntu-latest
     # The environment holds the variables of the cloud's login, and is the subject that the cloud's OIDC trust is limited to.
-    environment: smoke-tests-${{ inputs.cloud }}
+    environment: smoke-tests-${{ inputs.cloud || 'aws' }}
     timeout-minutes: 90
     permissions:
       contents: read
@@ -120,8 +120,8 @@ jobs:
       run:
         shell: bash
     env:
-      IMAGE: ${{ inputs.image }}:${{ needs.resolve.outputs.image_tag }}
-      CLOUD: ${{ inputs.cloud }}
+      IMAGE: ${{ inputs.image || 'emryshealth/afon-base' }}:${{ needs.resolve.outputs.image_tag }}
+      CLOUD: ${{ inputs.cloud || 'aws' }}
       CONFIG_ENV: ${{ inputs.config_env || vars.SMOKE_TESTS_CONFIG_ENV || 'emrys2' }}
       CONFIG_TAG: ${{ inputs.config_tag || vars.SMOKE_TESTS_CONFIG_TAG || 'current' }}
       # The environment's variables of the login, see docs/github_workflows.md: secrets of the environment, or the variables of the ones set up before.
@@ -165,7 +165,7 @@ jobs:
 
       # Each login is OIDC: a short-lived token for the identity that smoke-tests-<cloud> is trusted for, see docs/github_workflows.md.
       - name: Log in to AWS
-        if: ${{ inputs.cloud == 'aws' }}
+        if: ${{ (inputs.cloud || 'aws') == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
@@ -173,7 +173,7 @@ jobs:
           role-duration-seconds: 7200
 
       - name: Log in to Azure
-        if: ${{ inputs.cloud == 'azure' }}
+        if: ${{ (inputs.cloud || 'aws') == 'azure' }}
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
@@ -181,7 +181,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Authenticate to GCP
-        if: ${{ inputs.cloud == 'gcp' }}
+        if: ${{ (inputs.cloud || 'aws') == 'gcp' }}
         id: gcp-auth
         uses: google-github-actions/auth@v2
         with:
@@ -190,7 +190,7 @@ jobs:
           create_credentials_file: true
 
       - name: Log in to the gcloud cli
-        if: ${{ inputs.cloud == 'gcp' }}
+        if: ${{ (inputs.cloud || 'aws') == 'gcp' }}
         run: |
           set -euo pipefail
           gcloud auth login --cred-file="${{ steps.gcp-auth.outputs.credentials_file_path }}" --quiet
@@ -283,7 +283,7 @@ jobs:
       - name: Choose the specs
         id: specs
         env:
-          SPECS: ${{ inputs.specs }}
+          SPECS: ${{ inputs.specs || 'project and signing' }}
         run: |
           set -euo pipefail
           case "$SPECS" in
