@@ -36,9 +36,9 @@ import java.util.function.BiFunction;
  * </pre>
  * <ul>
  *   <li>{@code create} makes the project's clients, group and token claims, or converges them; {@code <dir>} holds the
- *       public key, as a JWK, of each of the project's clients, {@code tre.jwk} and {@code git.jwk}, which the TRE operator
- *       gives: the private keys stay with the operator, and the Git client has none if the project has no Git of its own.  It is the {@code keys} dir of the project's own dir if not given,
- *       see {@link FileProjectProvider#keysDir};</li>
+ *       secret of each of the project's clients, {@code tre.secret} and {@code git.secret}, which {@code project-secret} makes and
+ *       the project's config is given too: the Git client has none if the project has no Git of its own.  It is the {@code keys} dir of the
+ *       project's own dir if not given, see {@link FileProjectProvider#keysDir};</li>
  *   <li>{@code add-member} makes the member in the central identity if absent, with an invitation email, adds them to the
  *       project's group, and prints their user id, which each Data Provider whose contract names them makes their principal from;</li>
  *   <li>{@code remove-member} removes the member from the group and ends their sessions;</li>
@@ -58,15 +58,15 @@ import java.util.function.BiFunction;
  */
 public class ManageIdentityMain {
 
-    private static final String PUBLIC_KEYS = "--public-keys";
+    private static final String SECRETS = "--secrets";
     private static final String FIRST_NAME = "--first-name";
     private static final String LAST_NAME = "--last-name";
     private static final String KUBECONFIG = "--kubeconfig";
 
     private static final String USAGE = String.join(System.lineSeparator(),
         "Usage: manage-identity <action> <project> [<args>], where <action> is one of:",
-        "  create [" + PUBLIC_KEYS + " <dir>]  makes the project's clients, group and token claims, or converges them;",
-        "                                  <dir> holds tre.jwk and git.jwk, the public key of each client: the " + FileProjectProvider.KEYS_DIR + " dir",
+        "  create [" + SECRETS + " <dir>]  makes the project's clients, group and token claims, or converges them;",
+        "                                  <dir> holds tre.secret and git.secret, the secret of each client: the " + FileProjectProvider.KEYS_DIR + " dir",
         "                                  of the project's own dir if not given",
         "  add-member <email> [" + FIRST_NAME + " <name>] [" + LAST_NAME + " <name>]",
         "                                  makes the member if absent, adds them to the project's group, prints their user id",
@@ -124,7 +124,7 @@ public class ManageIdentityMain {
         List<String> positional = new ArrayList<>();
         for (int i = 1; i < args.length; i++) {
             if (args[i].startsWith("--")) {
-                if (!List.of(PUBLIC_KEYS, FIRST_NAME, LAST_NAME, KUBECONFIG).contains(args[i]) || i + 1 >= args.length) {
+                if (!List.of(SECRETS, FIRST_NAME, LAST_NAME, KUBECONFIG).contains(args[i]) || i + 1 >= args.length) {
                     return usage("Unknown option, or no value for " + args[i]);
                 }
                 options.put(args[i], args[++i]);
@@ -154,7 +154,7 @@ public class ManageIdentityMain {
             rest = positional.subList(1, positional.size());
         }
         return switch (action) {
-            case "create" -> rest.isEmpty() ? with(project, options, (p, e) -> create(p, e, options)) : usage("create takes " + PUBLIC_KEYS + " <dir>, and no other argument");
+            case "create" -> rest.isEmpty() ? with(project, options, (p, e) -> create(p, e, options)) : usage("create takes " + SECRETS + " <dir>, and no other argument");
             case "add-member" -> rest.size() == 1 ? with(project, options, (p, e) -> addMember(p, e, rest.get(0), options))
                                                   : usage("add-member takes one <email>");
             case "remove-member" -> rest.size() == 1 ? with(project, options, (p, e) -> removeMember(p, e, rest.get(0)))
@@ -219,29 +219,34 @@ public class ManageIdentityMain {
     }
 
     private void create(TreProject project, String endpoint, Map<String, String> options) throws IOException {
-        Path dir = options.containsKey(PUBLIC_KEYS) ? Path.of(options.get(PUBLIC_KEYS))
+        Path dir = options.containsKey(SECRETS) ? Path.of(options.get(SECRETS))
                                                     : FileProjectProvider.keysDir(afonHome, project.id().value());
-        Map<String, String> keys = new LinkedHashMap<>();
-        keys.put("tre", read(dir.resolve("tre.jwk")));
+        Map<String, String> secrets = new LinkedHashMap<>();
+        secrets.put("tre", read(dir.resolve("tre.secret")));
         if (project.git() != null) {
-            keys.put("git", read(dir.resolve("git.jwk")));
+            secrets.put("git", read(dir.resolve("git.secret")));
         }
-        identity.apply(project, endpoint).ensureProject(project, keys);
+        identity.apply(project, endpoint).ensureProject(project, secrets);
         out.printf("Project %s is made in the central identity: client %s%s, and a group %s%n", project.id(),
                    project.identity().treClient(), project.git() == null ? "" : " and " + project.identity().gitClient(), project.id());
     }
 
-    private static String read(Path key) throws IOException {
-        if (!Files.isRegularFile(key)) {
-            throw new IOException("No public key " + key + ": the TRE operator gives tre.jwk and git.jwk, to put in the project's " + FileProjectProvider.KEYS_DIR + " dir");
+    private static String read(Path secret) throws IOException {
+        if (!Files.isRegularFile(secret)) {
+            throw new IOException("No secret " + secret + ": make it with project-secret, which puts tre.secret and git.secret in the project's " + FileProjectProvider.KEYS_DIR + " dir");
         }
-        return Files.readString(key, StandardCharsets.UTF_8);
+        return Files.readString(secret, StandardCharsets.UTF_8).strip();
     }
 
     private void addMember(TreProject project, String endpoint, String email, Map<String, String> options) {
         IdentityProvider provider = identity.apply(project, endpoint);
         String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME));
         provider.addMember(project, userId);
+        record(project, () -> ProjectMembers.add(ProjectMembers.file(afonHome, project.id().value()), userId, email.toLowerCase(java.util.Locale.ROOT)));
+        if (project.members().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
+            err.printf("Note: %s is not listed in the members of %s: the next sync-members, and so up, takes them out of the group. List them there to keep them.%n",
+                       email, project.id());
+        }
         out.println(userId);
     }
 
@@ -252,6 +257,7 @@ public class ManageIdentityMain {
             throw new IOException("No user " + email + " in the central identity");
         }
         provider.removeMember(project, userId.get());
+        record(project, () -> ProjectMembers.remove(ProjectMembers.file(afonHome, project.id().value()), userId.get()));
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
     }
 
@@ -278,7 +284,25 @@ public class ManageIdentityMain {
                 out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId, project.id());
             }
         });
+        record(project, () -> ProjectMembers.write(ProjectMembers.file(afonHome, project.id().value()), wanted));
         out.printf("Project %s has %d member%s%n", project.id(), wanted.size(), wanted.size() == 1 ? "" : "s");
+    }
+
+    @FunctionalInterface
+    private interface Recording {
+        void run() throws IOException;
+    }
+
+    /**
+     * Keeps the project's members file as the group is: what needs the members' ids reads it, rather than have them copied by hand.  The group in the identity is
+     * what changed, so a file that cannot be written is a warning, not a failure.
+     */
+    private void record(TreProject project, Recording recording) {
+        try {
+            recording.run();
+        } catch (IOException e) {
+            err.printf("Could not write the members file %s of project %s: %s%n", ProjectMembers.file(afonHome, project.id().value()), project.id(), e.getMessage());
+        }
     }
 
     private void close(TreProject project, String endpoint) {

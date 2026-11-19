@@ -52,6 +52,48 @@ class ProcessExecutorTest {
     }
 
     @Test
+    void pointsKubectlOfACommandOfAProjectHomeAtTheClusterOfTheProject() throws IOException {
+        Path kube = Files.createDirectories(dir.resolve("cdktf-lon/kube"));
+        Path config = Files.writeString(kube.resolve("azure-polaris.config"), "x");
+        Files.createSymbolicLink(kube.resolve("current.config"), config);
+        List<String> command = List.of("x", "--home", "/h", "--cdktf", dir.resolve("cdktf-lon").toString(), "kube-polaris-whitelist", "azure", "set");
+        ProcessBuilder inherits = new ProcessBuilder(command);
+        inherits.environment().put("KUBECONFIG", "/the/deployers/kubeconfig");
+
+        ProcessExecutor.withKubeconfigOfTheProject(inherits, command);
+
+        // the only kubeconfig of the project, not the link to it, and not the deployer's
+        assertThat(inherits.environment()).containsEntry("KUBECONFIG", config.toString());
+    }
+
+    @Test
+    void takesTheKubeconfigThatCurrentLinksToWhenTheProjectHasSeveral() throws IOException {
+        Path kube = Files.createDirectories(dir.resolve("cdktf-p/kube"));
+        Files.writeString(kube.resolve("a-stack.config"), "x");
+        Path second = Files.writeString(kube.resolve("b-stack.config"), "x");
+        Files.createSymbolicLink(kube.resolve("current.config"), second);
+
+        assertThat(ProcessExecutor.kubeconfigOf(List.of("x", "--home", "/h", "--cdktf", dir.resolve("cdktf-p").toString()))).isEqualTo(kube.resolve("current.config"));
+    }
+
+    @Test
+    void leavesKubectlAloneWhereTheProjectHasNoKubeconfigOrTheCommandIsNotOfAProjectHome() throws IOException {
+        // no cdktf dir, a cdktf dir with no kube dir, a kube dir with none, and several with no link to say which
+        assertThat(ProcessExecutor.kubeconfigOf(List.of("x", "--home", "/h"))).isNull();
+        assertThat(ProcessExecutor.kubeconfigOf(List.of("x", "--home", "/h", "--cdktf", dir.resolve("none").toString()))).isNull();
+        Path kube = Files.createDirectories(dir.resolve("cdktf-q/kube"));
+        assertThat(ProcessExecutor.kubeconfigOf(List.of("x", "--home", "/h", "--cdktf", dir.resolve("cdktf-q").toString()))).isNull();
+        Files.writeString(kube.resolve("a.config"), "x");
+        Files.writeString(kube.resolve("b.config"), "x");
+        assertThat(ProcessExecutor.kubeconfigOf(List.of("x", "--home", "/h", "--cdktf", dir.resolve("cdktf-q").toString()))).isNull();
+
+        ProcessBuilder own = new ProcessBuilder("x", "manage-identity");
+        own.environment().put("KUBECONFIG", "/the/deployers/kubeconfig");
+        ProcessExecutor.withKubeconfigOfTheProject(own, List.of("x", "manage-identity", "--cdktf", dir.resolve("cdktf-q").toString()));
+        assertThat(own.environment()).containsEntry("KUBECONFIG", "/the/deployers/kubeconfig");
+    }
+
+    @Test
     void failsToRunACommandThatIsNotThere() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ProcessExecutor().run(List.of(dir.resolve("missing.sh").toString()), Map.of()))
             .isInstanceOf(IOException.class);

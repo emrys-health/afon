@@ -47,6 +47,8 @@ class ProjectWhitelistTest {
         Files.createDirectories(file.getParent());
         Files.writeString(file, yaml);
         TreProject tre = (TreProject) FileProjectProvider.forProject(home, "xyz-yyyy-nnnn").getProject();
+        Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn/keys"));
+        Files.writeString(home.resolve("projects/xyz-yyyy-nnnn/keys/tre.secret"), "secret-of-the-client\n");
         return ProjectEnv.configure(tre, env, home, file);
     }
 

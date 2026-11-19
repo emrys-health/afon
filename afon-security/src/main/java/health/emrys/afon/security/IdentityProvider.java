@@ -136,12 +136,12 @@ public interface IdentityProvider {
     /**
      * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client
      * for the TRE, whose tokens carry the audiences of the project's Data Provider catalogs, and one for Git, whose tokens carry
-     * no Data Provider audience.  Each authenticates by {@code private_key_jwt} with the public key it is given, and each token
+     * no Data Provider audience.  Each authenticates with the secret it is given, which is the one the TRE is configured with, and each token
      * names the one project it is for, only when the user is a member of the project's group.
      *
-     * @param publicKeys the public key (a JWK or a JWK set) of each client, by {@code tre} and {@code git}
+     * @param secrets the secret of each client, by {@code tre} and {@code git}: the client's own, made for the project, not the env's
      */
-    void ensureProject(TreProject project, Map<String, String> publicKeys);
+    void ensureProject(TreProject project, Map<String, String> secrets);
 
     /**
      * Adds the user to the project's group, so that they can get a token for the project.

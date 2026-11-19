@@ -6,6 +6,7 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Properties;
 
 import static health.emrys.afon.config.AfonProperty.ENV_NAME;
 import static health.emrys.afon.config.AfonProperty.OIDC_ISSUER_URL;
@@ -80,11 +82,12 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void configuresFromTheEnvWithTheDerivedPropertiesWrittenOverIt(AfonCloud cloud) throws IOException {
         OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
 
         assertThat(config).isEqualTo(home.resolve("config-xyz-yyyy-nnnn"));
         assertThat(home.resolve("cdktf-xyz-yyyy-nnnn")).isDirectory();
-        assertThat(config.resolve("secret.properties")).hasContent("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n");
+        assertThat(config.resolve("secret.properties")).content().startsWith("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n").contains("OAUTH2_CLIENT_SECRET=secret-of-xyz-yyyy-nnnn");
         assertThat(config.resolve("project.yaml")).hasSameTextualContentAs(setup.projectFile());
         // the env is left as it was
         assertThat(setup.envConfig().resolve("afon.properties")).content().doesNotContain("Derived");
@@ -102,10 +105,13 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void configuringAgainReplacesWhatItMadeAndKeepsNothingStale(AfonCloud cloud) throws IOException {
         OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
         ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
         assertThat(Files.readString(config.resolve("afon.properties")).split("Derived from project.yaml", -1)).hasSize(2);
         Files.writeString(setup.envConfig().resolve("afon-" + lower(cloud) + ".properties"), cloud.name() + "_REGION=another-region\n");
+        ProjectFixtures.writeSecrets(home);
         ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
         assertThat(new FilePropertyProvider(config.toString()).getValue(AfonProperty.valueOf(cloud.name() + "_REGION"))).isEqualTo("another-region");
     }
@@ -116,6 +122,7 @@ class ProjectEnvTest {
         OnCloud setup = on(cloud);
         String file = "afon-" + lower(cloud) + ".properties";
         Files.delete(setup.envConfig().resolve(file));
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
         assertThat(config.resolve(file)).content().contains(cloud.name() + "_AUDIT_BUCKET=xyz-yyyy-nnnn-audit");
     }
@@ -135,6 +142,7 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void configuresTheCatalogsOfTheDataProvidersAsCatalogsFromAnotherSource(AfonCloud cloud) throws IOException {
         OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
 
         var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
@@ -205,14 +213,17 @@ class ProjectEnvTest {
         Path file = Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn")).resolve("project.yaml");
         Files.writeString(file, yaml);
         // the identity project is made first
+        ProjectFixtures.writeSecrets(home);
         assertThatThrownBy(() -> ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file))
             .isInstanceOf(ProjectException.class).hasMessageContaining("identity.project names idp, which has no file");
         Path identityFile = Files.createDirectories(home.resolve("projects/idp")).resolve("project.yaml");
         Files.writeString(identityFile, ProjectFixtures.identityExample(cloud));
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(ProjectFixtures.tre(yaml), envConfig, home, file);
         assertThat(config.resolve("afon.properties")).content()
             .contains("KEYCLOAK_KUBECONFIG=" + home.resolve("cdktf-idp/kube/" + lower(cloud) + "-keycloak.config"));
         // a project that names none has none
+        ProjectFixtures.writeSecrets(home);
         Path other = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("xyz-yyyy-nnnn", "abc-def")), envConfig, home, file);
         assertThat(other.resolve("afon.properties")).content().doesNotContain("KEYCLOAK_KUBECONFIG");
     }
@@ -237,6 +248,7 @@ class ProjectEnvTest {
     void refusesTheConfigOfTheProjectItselfAsItsEnv(AfonCloud cloud) throws IOException {
         OnCloud setup = on(cloud);
         Path own = Files.createDirectories(ProjectEnv.configDir(home, setup.project()));
+        ProjectFixtures.writeSecrets(home);
         assertThatThrownBy(() -> ProjectEnv.configure(setup.project(), own, home, setup.projectFile()))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("is that of the project itself");
     }
@@ -253,6 +265,7 @@ class ProjectEnvTest {
     @EnumSource(AfonCloud.class)
     void refusesAConfigThatIsNotADir(AfonCloud cloud) throws IOException {
         OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
         assertThatThrownBy(() -> ProjectEnv.configure(setup.project(), home.resolve("missing"), home, setup.projectFile()))
             .isInstanceOf(IllegalArgumentException.class);
     }
@@ -276,6 +289,7 @@ class ProjectEnvTest {
         AfonProject project = new FileProjectProvider(file).getProject();
         Path env = Files.createDirectories(home.resolve("config-dev"));
         Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(project, env, home, file);
         assertThat(config).isEqualTo(home.resolve("config-idp"));
         assertThat(home.resolve("cdktf-idp")).isDirectory();
@@ -290,6 +304,7 @@ class ProjectEnvTest {
         Files.writeString(file, yaml);
         Path env = Files.createDirectories(home.resolve("config-dev"));
         Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + envProperties);
+        ProjectFixtures.writeSecrets(home);
         return new FilePropertyProvider(ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file).toString());
     }
 
@@ -314,6 +329,7 @@ class ProjectEnvTest {
         Path env = Files.createDirectories(home.resolve("config-dev"));
         Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS + "POLARIS_DB_HOST=db.example.org\n");
         Files.writeString(env.resolve("secret.properties"), "KEYCLOAK_DB_URL=jdbc:postgresql://${POLARIS_DB_HOST}:5432/keycloak-dev?sslmode=require\n");
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
         // the env's database is left to the env, and the project's is its own: the last line of the file wins, as it does when it is sourced
         assertThat(Files.readString(env.resolve("secret.properties"))).doesNotContain("keycloak-idp");
@@ -334,6 +350,7 @@ class ProjectEnvTest {
         Files.writeString(env.resolve("catalogs.properties"), "");
         Files.writeString(env.resolve("catalogs-" + lower(cloud) + ".properties"), cloud.name() + "_CATALOG_IDS=" + lower(cloud) + "\n"
             + cloud.name() + "_CATALOG_NAME_" + lower(cloud) + "=" + lower(cloud) + "\n" + cloud.name() + "_CATALOG_TYPE_" + lower(cloud) + "=internal\n");
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
         assertThat(config).isEqualTo(home.resolve("config-lon"));
         AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
@@ -362,6 +379,7 @@ class ProjectEnvTest {
             Files.writeString(env.resolve("catalogs-" + lower(each) + ".properties"), each.name() + "_CATALOG_IDS=" + lower(each) + "," + lower(each) + "_external\n"
                 + each.name() + "_CATALOG_TYPE_" + lower(each) + "=internal\n" + each.name() + "_CATALOG_TYPE_" + lower(each) + "_external=external\n");
         }
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
         var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
         assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).containsExactly("cvd", "dbt");
@@ -375,9 +393,161 @@ class ProjectEnvTest {
             Files.writeString(setup.envConfig().resolve("catalogs-" + lower(each) + ".properties"), each.name() + "_CATALOG_IDS=" + lower(each) + "\n"
                 + each.name() + "_CATALOG_TYPE_" + lower(each) + "=internal\n");
         }
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
         var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
         assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).contains("aws", "azure", "gcp");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aTreSignsItsMembersInWithTheClientOfItsProjectAndItsSecret(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+
+        AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_ID)).isEqualTo("xyz-yyyy-nnnn-tre");
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET)).isEqualTo("secret-of-xyz-yyyy-nnnn");
+        // both are kept with the env's, in secret.properties, which is read after afon.properties: an id in afon.properties would be overridden by the env's
+        assertThat(config.resolve("secret.properties")).content().contains("OAUTH2_CLIENT_ID=xyz-yyyy-nnnn-tre", "OAUTH2_CLIENT_SECRET=secret-of-xyz-yyyy-nnnn");
+        assertThat(config.resolve("afon.properties")).content().doesNotContain("OAUTH2_CLIENT");
+        assertThat(properties.getSecretProperties()).containsKeys("OAUTH2_CLIENT_ID", "OAUTH2_CLIENT_SECRET");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theClientOfTheProjectWinsOverTheOneThatTheEnvKeepsInItsSecrets(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
+        Files.writeString(setup.envConfig().resolve("secret.properties"),
+                          "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\nOAUTH2_CLIENT_ID=env-client\nOAUTH2_CLIENT_SECRET=env-secret\n");
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+
+        AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_ID)).isEqualTo("xyz-yyyy-nnnn-tre");
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET)).isEqualTo("secret-of-xyz-yyyy-nnnn");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToConfigureATreWithoutTheSecretOfItsClient(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        assertThatThrownBy(() -> ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile()))
+            .isInstanceOf(ProjectException.class).hasMessageContainingAll("no secret for the TRE client xyz-yyyy-nnnn-tre", "project-secret xyz-yyyy-nnnn tre");
+        Path keys = Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn/keys"));
+        Files.writeString(keys.resolve("tre.secret"), "  \n");
+        assertThatThrownBy(() -> ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile()))
+            .isInstanceOf(ProjectException.class).hasMessageContaining("no secret for the TRE client");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesTheProjectsThatAreNotTresNoClientOfTheirOwn(AfonCloud cloud) throws IOException {
+        Path file = home.resolve("data.yaml");
+        Files.writeString(file, ProjectFixtures.dataExample(cloud));
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\nOAUTH2_CLIENT_ID=env-client\n" + ACCOUNTS);
+        Files.writeString(env.resolve("secret.properties"), "OAUTH2_CLIENT_SECRET=env-secret\n");
+        Files.writeString(env.resolve("catalogs.properties"), "");
+        Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
+        AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_ID)).isEqualTo("env-client");
+        assertThat(properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET)).isEqualTo("env-secret");
+    }
+
+    @Test
+    void findsTheConfigOfAnEnvInTheAfonHomeFromTheHomeOfAProject() throws IOException {
+        Path afonHome = Files.createDirectories(home.resolve("afon"));
+        Path env = Files.createDirectories(afonHome.resolve("config-dev"));
+        Files.createDirectories(afonHome.resolve("projects/xyz-yyyy-nnnn"));
+        // the home of a project links the entries of the Afon home, but no env
+        Path projectHome = Files.createDirectories(home.resolve("project-home"));
+        Files.createSymbolicLink(projectHome.resolve("projects"), afonHome.resolve("projects"));
+
+        assertThat(ProjectEnv.envConfigDir(projectHome, "dev").toRealPath()).isEqualTo(env.toRealPath());
+        // the Afon home itself, as before, and an env that is nowhere is where it would be in the home that is asked
+        assertThat(ProjectEnv.envConfigDir(afonHome, "dev")).isEqualTo(afonHome.resolve("config-dev"));
+        assertThat(ProjectEnv.envConfigDir(afonHome, "missing")).isEqualTo(afonHome.resolve("config-missing"));
+        assertThat(ProjectEnv.envConfigDir(projectHome, "missing")).isEqualTo(projectHome.resolve("config-missing"));
+    }
+
+    @Test
+    void readsTheFilesOfEveryCloudOfAnEnvWhateverCloudTheRunIsOf() throws IOException {
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n");
+        Files.writeString(env.resolve("afon-aws.properties"), "AWS_ACCOUNT=111\n");
+        Files.writeString(env.resolve("afon-azure.properties"), "AZURE_SUBSCRIPTION=sub-1\n");
+        String previous = System.getProperty("afon.cloud");
+        System.setProperty("afon.cloud", "aws");
+        try {
+            // a TRE project on AWS reads the env of a Data Provider on Azure: the account of Azure is the env's, though the run is of AWS
+            Properties properties = ProjectEnv.envProperties(env);
+            assertThat(properties.getProperty("AZURE_SUBSCRIPTION")).isEqualTo("sub-1");
+            assertThat(properties.getProperty("AWS_ACCOUNT")).isEqualTo("111");
+        } finally {
+            if (previous == null) {
+                System.clearProperty("afon.cloud");
+            } else {
+                System.setProperty("afon.cloud", previous);
+            }
+        }
+    }
+
+    @Test
+    void replacesTheLineThatAssignsAPropertyWhereItIsAndSaysWhichAreAbsent() {
+        java.util.Map<String, String> derived = new java.util.LinkedHashMap<>();
+        derived.put("A", "new");
+        derived.put("B_C", "");
+        derived.put("D", "absent");
+
+        ProjectEnv.Replaced replaced = ProjectEnv.replaceAssignments("A=1\nX=${A}\nB_C=3\nA=4\n", derived);
+        // each in its place, the later line for a property that is given taken out, and the one that no line assigns left to be written
+        assertThat(replaced.text()).isEqualTo("A=new\nX=${A}\nB_C=\n");
+        assertThat(replaced.absent()).containsOnlyKeys("D");
+
+        // a name that only begins like another, a comment, and a value holding an = are not assignments of it
+        assertThat(ProjectEnv.replaceAssignments("A_B=1\n# A=2\nX=A=3\nA=4", java.util.Map.of("A", "n")).text()).isEqualTo("A_B=1\n# A=2\nX=A=3\nA=n");
+        // the end of the text is kept as it was, and nothing is replaced where nothing is derived
+        assertThat(ProjectEnv.replaceAssignments("X=1\nA=2", java.util.Map.of("A", "n")).text()).isEqualTo("X=1\nA=n");
+        assertThat(ProjectEnv.replaceAssignments("", java.util.Map.of("A", "n")).absent()).containsOnlyKeys("A");
+        assertThat(ProjectEnv.replaceAssignments("A=1\n", java.util.Map.of()).text()).isEqualTo("A=1\n");
+    }
+
+    @Test
+    void aDerivedPropertyStaysAboveTheLinesThatAreSetInTermsOfIt() throws Exception {
+        OnCloud setup = on(AfonCloud.AZURE);
+        ProjectFixtures.writeSecrets(home);
+        Files.writeString(setup.envConfig().resolve("afon-azure.properties"),
+                          "AZURE_STORAGE_ACCOUNT=${ENV_NAME}afonstorage\nAZURE_GITEA_BUCKET=${AZURE_STORAGE_ACCOUNT}-gitea\nAZURE_REGION=a-region\nAZURE_KEYCLOAK_EXTERNAL=false\n");
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+
+        Path file = config.resolve("afon-azure.properties");
+        String text = Files.readString(file);
+        // one line for the account, derived, above the line that uses it: a shell reads the file top down, and stops at a variable that is unset
+        assertThat(text.lines().filter(line -> line.startsWith("AZURE_STORAGE_ACCOUNT="))).hasSize(1).allMatch(line -> line.startsWith("AZURE_STORAGE_ACCOUNT=afonstorage"));
+        assertThat(text.indexOf("AZURE_STORAGE_ACCOUNT=")).isLessThan(text.indexOf("AZURE_GITEA_BUCKET="));
+        Process process = new ProcessBuilder("bash", "-c", "set -eu; source " + file + "; echo \"$AZURE_STORAGE_ACCOUNT\"").redirectErrorStream(true).start();
+        String out = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(process.waitFor()).as(out).isZero();
+        assertThat(out.strip()).startsWith("afonstorage");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aDerivedPropertyReplacesTheInheritedOneInsteadOfRepeatingIt(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        ProjectFixtures.writeSecrets(home);
+        Files.writeString(setup.envConfig().resolve("secret.properties"),
+                          "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\nOAUTH2_CLIENT_ID=env-client\nOAUTH2_CLIENT_SECRET=env-secret\n");
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+
+        String secrets = Files.readString(config.resolve("secret.properties"));
+        assertThat(secrets.lines().filter(line -> line.startsWith("OAUTH2_CLIENT_ID="))).containsExactly("OAUTH2_CLIENT_ID=xyz-yyyy-nnnn-tre");
+        assertThat(secrets.lines().filter(line -> line.startsWith("OAUTH2_CLIENT_SECRET="))).containsExactly("OAUTH2_CLIENT_SECRET=secret-of-xyz-yyyy-nnnn");
+        // what the env has that is not derived is kept, and the env itself is left as it was
+        assertThat(secrets).startsWith("KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\n").doesNotContain("env-secret").doesNotContain("env-client");
+        assertThat(setup.envConfig().resolve("secret.properties")).content().contains("OAUTH2_CLIENT_SECRET=env-secret");
     }
 
     private static boolean cloudOf(String id, AfonCloud cloud) {
@@ -396,6 +566,7 @@ class ProjectEnvTest {
             Files.createDirectories(idp.getParent());
             Files.writeString(idp, ProjectFixtures.identityExample(identityCloud));
             Files.writeString(file, ProjectFixtures.dataExample(cloud).replace("identity: {", "identity: {project: idp, "));
+            ProjectFixtures.writeSecrets(home);
             Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
             AfonPropertyProvider properties = new FilePropertyProvider(config.toString());
             // the kubeconfig is that of the identity's stack, wherever it is, and its cloud is named only if it differs

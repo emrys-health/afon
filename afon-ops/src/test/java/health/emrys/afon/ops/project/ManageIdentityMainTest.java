@@ -68,17 +68,17 @@ class ManageIdentityMainTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     @SuppressWarnings("unchecked")
-    void createsTheProjectWithThePublicKeysGiven(AfonCloud cloud) throws Exception {
+    void createsTheProjectWithTheSecretsGiven(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path keys = Files.createTempDirectory("keys");
-        Files.writeString(keys.resolve("tre.jwk"), "{\"kty\":\"RSA\",\"n\":\"a\",\"e\":\"AQAB\"}");
-        Files.writeString(keys.resolve("git.jwk"), "{\"kty\":\"RSA\",\"n\":\"b\",\"e\":\"AQAB\"}");
-        assertThat(command.run(new String[]{"create", PROJECT, "--public-keys", keys.toString()})).isZero();
+        Files.writeString(keys.resolve("tre.secret"), "a-secret");
+        Files.writeString(keys.resolve("git.secret"), "b-secret");
+        assertThat(command.run(new String[]{"create", PROJECT, "--secrets", keys.toString()})).isZero();
         ArgumentCaptor<Map<String, String>> captured = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<TreProject> project = ArgumentCaptor.forClass(TreProject.class);
         verify(identity).ensureProject(project.capture(), captured.capture());
         assertThat(project.getValue().id().value()).isEqualTo("xyz-yyyy-nnnn");
-        assertThat(captured.getValue()).containsOnlyKeys("tre", "git");
+        assertThat(captured.getValue()).containsOnlyKeys("tre", "git").containsEntry("tre", "a-secret").containsEntry("git", "b-secret");
         assertThat(out.toString()).contains("xyz-yyyy-nnnn-tre", "xyz-yyyy-nnnn-git");
     }
 
@@ -100,6 +100,9 @@ class ManageIdentityMainTest {
         verify(identity).addMember(any(TreProject.class), eq("id-grace"));
         verify(identity).removeMember(any(TreProject.class), eq("id-old"));
         assertThat(out.toString()).contains("Added grace@example.org (id-grace)", "Removed old@example.org (id-old)", "has 2 members");
+        // the ids of the group are kept in the project's dir, as the group is
+        assertThat(ProjectMembers.read(ProjectMembers.file(home, PROJECT))).containsExactly(
+            Map.entry("id-ada", "ada@example.org"), Map.entry("id-grace", "grace@example.org"));
     }
 
     @ParameterizedTest
@@ -108,8 +111,8 @@ class ManageIdentityMainTest {
     void createsWithTheKeysOfTheProjectDirByDefault(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path keys = Files.createDirectories(home.resolve("projects/" + PROJECT + "/keys"));
-        Files.writeString(keys.resolve("tre.jwk"), "{\"kty\":\"RSA\",\"n\":\"a\",\"e\":\"AQAB\"}");
-        Files.writeString(keys.resolve("git.jwk"), "{\"kty\":\"RSA\",\"n\":\"b\",\"e\":\"AQAB\"}");
+        Files.writeString(keys.resolve("tre.secret"), "a-secret");
+        Files.writeString(keys.resolve("git.secret"), "b-secret");
         assertThat(command.run(new String[]{"create", PROJECT})).isZero();
         ArgumentCaptor<Map<String, String>> captured = ArgumentCaptor.forClass(Map.class);
         verify(identity).ensureProject(any(TreProject.class), captured.capture());
@@ -125,7 +128,7 @@ class ManageIdentityMainTest {
                            .replace("  git:\n    domain: git.xyz-yyyy-nnnn.example.org\n", "");
         Files.writeString(home.resolve("projects/" + PROJECT + "/project.yaml"), yaml);
         Path keys = Files.createDirectories(home.resolve("projects/" + PROJECT + "/keys"));
-        Files.writeString(keys.resolve("tre.jwk"), "{\"kty\":\"RSA\",\"n\":\"a\",\"e\":\"AQAB\"}");
+        Files.writeString(keys.resolve("tre.secret"), "a-secret");
         assertThat(command.run(new String[]{"create", PROJECT})).isZero();
         ArgumentCaptor<Map<String, String>> captured = ArgumentCaptor.forClass(Map.class);
         verify(identity).ensureProject(any(TreProject.class), captured.capture());
@@ -138,7 +141,7 @@ class ManageIdentityMainTest {
     void failsWithoutKeysInTheProjectDir(AfonCloud cloud) throws Exception {
         setUp(cloud);
         assertThat(command.run(new String[]{"create", PROJECT})).isEqualTo(1);
-        assertThat(err.toString()).contains("No public key", "tre.jwk", "keys dir");
+        assertThat(err.toString()).contains("No secret", "tre.secret", "keys dir");
         verifyNoInteractions(identity);
     }
 
@@ -147,8 +150,8 @@ class ManageIdentityMainTest {
     void failsWhenAKeyIsMissing(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path keys = Files.createTempDirectory("keys");
-        assertThat(command.run(new String[]{"create", PROJECT, "--public-keys", keys.toString()})).isEqualTo(1);
-        assertThat(err.toString()).contains("No public key", "tre.jwk");
+        assertThat(command.run(new String[]{"create", PROJECT, "--secrets", keys.toString()})).isEqualTo(1);
+        assertThat(err.toString()).contains("No secret", "tre.secret");
         verifyNoInteractions(identity);
     }
 
@@ -160,6 +163,40 @@ class ManageIdentityMainTest {
         assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example", "--first-name", "Alice"})).isZero();
         verify(identity).addMember(any(TreProject.class), eq("the-user-id"));
         assertThat(out.toString().trim()).isEqualTo("the-user-id");
+        assertThat(ProjectMembers.read(ProjectMembers.file(home, PROJECT))).containsExactly(Map.entry("the-user-id", "alice@tre.example"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void warnsThatAMemberAddedByHandWhoIsNotListedIsTakenOutByTheNextSync(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.ensureUser("alice@tre.example", null, null)).thenReturn("id-alice");
+        when(identity.ensureUser("ADA@example.org", null, null)).thenReturn("id-ada");
+
+        assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example"})).isZero();
+        assertThat(err.toString()).contains("alice@tre.example is not listed in the members of " + PROJECT, "sync-members");
+        err.reset();
+
+        // a member that the project's file lists is not warned about
+        assertThat(command.run(new String[]{"add-member", PROJECT, "ADA@example.org"})).isZero();
+        assertThat(err.toString()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void keepsEachMemberAddedInTheMembersFileOfTheProjectOnce(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.ensureUser("alice@tre.example", null, null)).thenReturn("id-alice");
+        when(identity.ensureUser("bob@tre.example", null, null)).thenReturn("id-bob");
+        when(identity.ensureUser("Alice@TRE.example", null, null)).thenReturn("id-alice");
+        assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example"})).isZero();
+        assertThat(command.run(new String[]{"add-member", PROJECT, "bob@tre.example"})).isZero();
+        assertThat(command.run(new String[]{"add-member", PROJECT, "Alice@TRE.example"})).isZero();
+
+        assertThat(ProjectMembers.read(ProjectMembers.file(home, PROJECT))).containsExactly(
+            Map.entry("id-alice", "alice@tre.example"), Map.entry("id-bob", "bob@tre.example"));
+        // the file is the project's, where the grants of a Data Provider find it
+        assertThat(Files.readString(home.resolve("projects/" + PROJECT + "/members.csv"))).contains("id-alice,alice@tre.example\n", "id-bob,bob@tre.example\n");
     }
 
     @ParameterizedTest
@@ -169,6 +206,17 @@ class ManageIdentityMainTest {
         when(identity.findUser("alice@tre.example")).thenReturn(Optional.of("the-user-id"));
         assertThat(command.run(new String[]{"remove-member", PROJECT, "alice@tre.example"})).isZero();
         verify(identity).removeMember(any(TreProject.class), eq("the-user-id"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void forgetsARemovedMemberInTheMembersFile(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        ProjectMembers.write(ProjectMembers.file(home, PROJECT), new java.util.LinkedHashMap<>(Map.of("the-user-id", "alice@tre.example", "other-id", "o@tre.example")));
+        when(identity.findUser("alice@tre.example")).thenReturn(Optional.of("the-user-id"));
+        assertThat(command.run(new String[]{"remove-member", PROJECT, "alice@tre.example"})).isZero();
+
+        assertThat(ProjectMembers.read(ProjectMembers.file(home, PROJECT))).containsExactly(Map.entry("other-id", "o@tre.example"));
     }
 
     @ParameterizedTest
@@ -214,8 +262,8 @@ class ManageIdentityMainTest {
     void reachesKeycloakAtItsDomainNameUnlessGivenAKubeconfig(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path keys = Files.createDirectories(home.resolve("projects/" + PROJECT + "/keys"));
-        Files.writeString(keys.resolve("tre.jwk"), "{\"kty\":\"RSA\",\"n\":\"a\",\"e\":\"AQAB\"}");
-        Files.writeString(keys.resolve("git.jwk"), "{\"kty\":\"RSA\",\"n\":\"b\",\"e\":\"AQAB\"}");
+        Files.writeString(keys.resolve("tre.secret"), "a-secret");
+        Files.writeString(keys.resolve("git.secret"), "b-secret");
         assertThat(command.run(new String[]{"create", PROJECT})).isZero();
         assertThat(endpoints).containsExactly((String) null);
         assertThat(tunnels).isEmpty();
@@ -226,8 +274,8 @@ class ManageIdentityMainTest {
     void reachesKeycloakThroughAPortForwardInTheClusterOfTheKubeconfig(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path keys = Files.createDirectories(home.resolve("projects/" + PROJECT + "/keys"));
-        Files.writeString(keys.resolve("tre.jwk"), "{\"kty\":\"RSA\",\"n\":\"a\",\"e\":\"AQAB\"}");
-        Files.writeString(keys.resolve("git.jwk"), "{\"kty\":\"RSA\",\"n\":\"b\",\"e\":\"AQAB\"}");
+        Files.writeString(keys.resolve("tre.secret"), "a-secret");
+        Files.writeString(keys.resolve("git.secret"), "b-secret");
         Path kubeConfig = Files.writeString(home.resolve("identity.config"), "apiVersion: v1\n");
         assertThat(command.run(new String[]{"create", PROJECT, "--kubeconfig", kubeConfig.toString()})).isZero();
         assertThat(endpoints).containsExactly("localhost:54321");
@@ -239,9 +287,9 @@ class ManageIdentityMainTest {
     void closesTheTunnelWhenTheActionFails(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Path kubeConfig = Files.writeString(home.resolve("identity.config"), "apiVersion: v1\n");
-        // no public keys, so that the creation fails
+        // no secrets, so that the creation fails
         assertThat(command.run(new String[]{"create", PROJECT, "--kubeconfig", kubeConfig.toString()})).isEqualTo(1);
-        assertThat(err.toString()).contains("No public key");
+        assertThat(err.toString()).contains("No secret");
         assertThat(tunnels).endsWith("close");
     }
 

@@ -30,8 +30,8 @@ import static java.lang.String.format;
 public class StepOperations {
 
     /** The label of the Polaris pods, and the port that they listen on, see PolarisConfig */
-    static final String POLARIS_POD_LABEL = "app=polaris";
-    static final int    POLARIS_PORT      = 8181;
+    public static final String POLARIS_POD_LABEL = "app=polaris";
+    public static final int    POLARIS_PORT      = 8181;
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepOperations.class);
 

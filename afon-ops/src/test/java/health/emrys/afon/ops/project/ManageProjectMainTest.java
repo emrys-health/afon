@@ -41,6 +41,9 @@ class ManageProjectMainTest {
     /** Writes the project of the example on the cloud, and makes the command that acts on it. */
     private void setUp(AfonCloud cloud) throws Exception {
         ProjectTemplates.write(home, PROJECT, cloud);
+        // the secret of the TRE client, which project-secret makes and configure puts in the config of the TRE
+        Files.createDirectories(home.resolve("projects/" + PROJECT + "/keys"));
+        Files.writeString(home.resolve("projects/" + PROJECT + "/keys/tre.secret"), "secret-of-the-client\n");
         ManageProjectMain.Executor executor = new ManageProjectMain.Executor() {
             @Override
             public int run(List<String> argv) {

@@ -106,6 +106,8 @@ class ProjectConfigShellTest {
     private Path configured(AfonCloud cloud, String yaml) throws IOException {
         Path file = Files.writeString(home.resolve("project.yaml"), yaml);
         AfonProject project = FileProjectProvider.parse(yaml);
+        Path keys = Files.createDirectories(home.resolve("projects").resolve(project.id().value()).resolve("keys"));
+        Files.writeString(keys.resolve("tre.secret"), "secret-of-the-client\n");
         return ProjectEnv.configure(project, envConfig(cloud), home, file);
     }
 

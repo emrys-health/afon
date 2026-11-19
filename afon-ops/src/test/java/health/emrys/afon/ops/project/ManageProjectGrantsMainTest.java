@@ -40,12 +40,21 @@ class ManageProjectGrantsMainTest {
     private ManageProjectGrantsMain command;
     private boolean polarisCalled;
 
+    /** The emails that the project's file lists, or null for a project that this home has no file of. */
+    private List<String> listed;
+
     @BeforeEach
     void command() {
         command = new ManageProjectGrantsMain(() -> {
             polarisCalled = true;
             return grants;
-        }, new PrintStream(out), new PrintStream(err));
+        }, new PrintStream(out), new PrintStream(err), dir, project -> listed);
+    }
+
+    private void membersFileOfTheProject(String content) throws IOException {
+        Path file = ProjectMembers.file(dir, "cvd-2026");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, content);
     }
 
     private Path members(String content) throws IOException {
@@ -62,6 +71,73 @@ class ManageProjectGrantsMainTest {
 
         verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE, BOB));
         assertThat(out.toString()).contains("Project cvd-2026 may read cvd.released, read-only, and has 2 member(s)", "Added afon:" + ALICE, "Removed afon:old");
+    }
+
+    @Test
+    void grantsFromTheMembersFileOfTheProjectIfNoneIsGiven() throws Exception {
+        Path file = ProjectMembers.file(dir, "cvd-2026");
+        Files.createDirectories(file.getParent());
+        // as manage-identity writes it: a comment, and a line for each member with the email after the user id
+        Files.writeString(file, "# the members\n" + ALICE + ",alice@tre.example\n" + BOB + ",bob@tre.example\n");
+        when(grants.grant(anyString(), anyString(), anyString(), any())).thenReturn(new PolarisProjectGrants.Members(List.of(), List.of()));
+
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isZero();
+
+        verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE, BOB));
+    }
+
+    @Test
+    void grantsFromTheMembersFileWhenItIsTheMembersTheProjectFileLists() throws Exception {
+        membersFileOfTheProject(ALICE + ",Alice@Tre.example\n" + BOB + ",bob@tre.example\n");
+        listed = List.of("alice@tre.example", "BOB@tre.example");
+        when(grants.grant(anyString(), anyString(), anyString(), any())).thenReturn(new PolarisProjectGrants.Members(List.of(), List.of()));
+
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isZero();
+
+        verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE, BOB));
+    }
+
+    @Test
+    void refusesToGrantFromAMembersFileThatDiffersFromTheMembersTheProjectFileLists() throws Exception {
+        // bob is listed and not yet synced, and carol is in the file and is not listed
+        membersFileOfTheProject(ALICE + ",alice@tre.example\n33333333-aaaa-bbbb-cccc-000000000003,carol@tre.example\n");
+        listed = List.of("alice@tre.example", "bob@tre.example");
+
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("not in the members file: bob@tre.example", "in the members file, not listed: carol@tre.example",
+                                            "manage-identity sync-members");
+        assertThat(polarisCalled).isFalse();
+    }
+
+    @Test
+    void doesNotCheckAFileGivenNorAProjectThatThisHomeHasNoFileOf() throws Exception {
+        when(grants.grant(anyString(), anyString(), anyString(), any())).thenReturn(new PolarisProjectGrants.Members(List.of(), List.of()));
+        // a file that is given is what is asked for
+        listed = List.of("someone.else@tre.example");
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", members(ALICE + "\n").toString()})).isZero();
+        // and a TRE that Afon did not deploy has no file to compare with
+        listed = null;
+        membersFileOfTheProject(ALICE + ",alice@tre.example\n");
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isZero();
+    }
+
+    @Test
+    void aFileGivenWinsOverTheMembersFileOfTheProject() throws Exception {
+        Path file = ProjectMembers.file(dir, "cvd-2026");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, BOB + ",bob@tre.example\n");
+        when(grants.grant(anyString(), anyString(), anyString(), any())).thenReturn(new PolarisProjectGrants.Members(List.of(), List.of()));
+
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", members(ALICE + "\n").toString()})).isZero();
+
+        verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE));
+    }
+
+    @Test
+    void saysWhereTheMembersFileOfTheProjectComesFromWhenThereIsNone() {
+        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isEqualTo(1);
+        assertThat(err.toString()).contains("members.csv", "manage-identity");
     }
 
     @Test
@@ -110,10 +186,22 @@ class ManageProjectGrantsMainTest {
     }
 
     @Test
+    void reachesPolarisThroughAPortForwardUnlessTheConfigSaysHttps() {
+        assertThat(ManageProjectGrantsMain.viaPortForward(null)).isTrue();
+        assertThat(ManageProjectGrantsMain.viaPortForward("  ")).isTrue();
+        assertThat(ManageProjectGrantsMain.viaPortForward("port-forward")).isTrue();
+        assertThat(ManageProjectGrantsMain.viaPortForward("PORT-FORWARD")).isTrue();
+        assertThat(ManageProjectGrantsMain.viaPortForward("https")).isFalse();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ManageProjectGrantsMain.viaPortForward("ftp"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("POLARIS_ACCESS").hasMessageContaining("'ftp'");
+    }
+
+    @Test
     void callsPolarisOnlyForAnActionItUnderstands() {
         assertThat(command.run(new String[]{})).isZero();
         assertThat(out.toString()).contains("Usage: manage-project-grants");
-        assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd"})).isEqualTo(2);
+        // the members file is the project's own if none is given, so a project and a catalog are all that it needs
+        assertThat(command.run(new String[]{"grant", "cvd-2026"})).isEqualTo(2);
         assertThat(command.run(new String[]{"add-member", "cvd-2026"})).isEqualTo(2);
         assertThat(command.run(new String[]{"revoke", "cvd-2026", "cvd", "--namespace", "x"})).isEqualTo(2);
         assertThat(command.run(new String[]{"release", "cvd"})).isEqualTo(2);

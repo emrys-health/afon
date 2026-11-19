@@ -56,14 +56,36 @@ public final class ProjectEnv {
     }
 
     /**
-     * @return the config dir of the deployer's env, {@code <afon-home>/config-<env>}, which a project is made from
+     * @return the config dir of the deployer's env, {@code <afon-home>/config-<env>}, which a project is made from.  In the home of a project, which
+     * links no env, it is that of the Afon home that the project's home is made from, found through its {@code projects} link, as a project that
+     * names another's, eg a TRE that names a Data Provider, is looked up in the config of that one's env
      * @throws IllegalArgumentException if {@code env} is not the name of an env, ie it could name a path
      */
     public static @NonNull Path envConfigDir(Path afonHome, String env) {
         if (!env.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
             throw new IllegalArgumentException(String.format("'%s' is not the name of an env, eg dev for config-dev", env));
         }
-        return afonHome.resolve(CONFIG_PREFIX + env);
+        Path dir = afonHome.resolve(CONFIG_PREFIX + env);
+        if (!Files.isDirectory(dir)) {
+            Path shared = sharedAfonHome(afonHome);
+            if (shared != null && Files.isDirectory(shared.resolve(CONFIG_PREFIX + env))) {
+                return shared.resolve(CONFIG_PREFIX + env);
+            }
+        }
+        return dir;
+    }
+
+    /**
+     * @return the Afon home that the home of a project is made from, which is where its {@code projects} entry is linked from, or {@code null} if
+     * the home is not a project's, ie its {@code projects} entry is not a link
+     */
+    private static Path sharedAfonHome(Path afonHome) {
+        Path projects = afonHome.resolve(FileProjectProvider.PROJECTS_DIR);
+        try {
+            return Files.isSymbolicLink(projects) ? projects.toRealPath().getParent() : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /**
@@ -212,6 +234,8 @@ public final class ProjectEnv {
         TreProject.Identity identity = project.identity();
         common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
         common.put(OIDC_AUDIENCE.getName(), identity.treClient());
+        // the TRE signs its members in with the project's client, not the env's: its tokens carry the project's audience, claim and acr.  The id and the
+        // secret of the client are written together, see configure
         if (identity.gitClient() != null) {
             common.put(OIDC_GIT_AUDIENCE.getName(), identity.gitClient());
         }
@@ -317,6 +341,12 @@ public final class ProjectEnv {
         if (project instanceof DataProject data) {
             admitTheTres(data, afonHome, envProperties, derived);
         }
+        if (project instanceof TreProject tre) {
+            // both in secret.properties, where the env has them and which is read after afon.properties, so that the env's client id does not override the project's
+            Map<String, String> secrets = derived.computeIfAbsent("secret.properties", file -> new LinkedHashMap<>());
+            secrets.put(OAUTH2_CLIENT_ID.getName(), tre.identity().treClient());
+            secrets.put(OAUTH2_CLIENT_SECRET.getName(), clientSecretOf(tre, afonHome));
+        }
         try {
             copyTree(envConfig, target);
             for (Map.Entry<String, Map<String, String>> file : derived.entrySet()) {
@@ -332,6 +362,30 @@ public final class ProjectEnv {
             throw new UncheckedIOException("Cannot configure project " + project.id() + ": the config env is " + target, e);
         }
         return target;
+    }
+
+    /**
+     * @return the secret of the project's TRE client, which {@code project-secret} made in the project's {@code keys} dir, and which the identity is given
+     * when the project is made in it: the TRE's JupyterHub and the gate in front of it sign members in with it
+     * @throws ProjectException if there is none
+     */
+    static String clientSecretOf(TreProject project, Path afonHome) {
+        Path file = FileProjectProvider.keysDir(afonHome, project.id().value()).resolve("tre.secret");
+        try {
+            String secret = Files.isRegularFile(file) ? Files.readString(file, StandardCharsets.UTF_8).strip() : "";
+            if (secret.isEmpty()) {
+                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                    "no secret for the TRE client %s: make it with afon-cli.sh project-secret %s tre, then configure the project again, as the config of the TRE has it",
+                    project.identity().treClient(), project.id().value())));
+            }
+            if (!SAFE_VALUE.matcher(secret).matches()) {
+                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                    "the secret in %s has a character that a properties file sourced by a shell cannot hold: make another with project-secret --force", file)));
+            }
+            return secret;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read the secret of the TRE client " + project.identity().treClient() + " in " + file, e);
+        }
     }
 
     /**
@@ -417,10 +471,10 @@ public final class ProjectEnv {
      * @return the properties of the config dir that the names of a project's resources are made from, with their references resolved
      */
     public static Properties envProperties(Path envConfig) {
-        Properties properties = new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs")).getProperties();
+        Properties properties = new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs"), true).getProperties();
         // the database of the env's Keycloak, which is a secret, from which the identity project names a database of its own
         try {
-            String url = new FilePropertyProvider(envConfig.toString(), List.of("afon", "secret")).getValue(AfonProperty.KEYCLOAK_DB_URL, "");
+            String url = new FilePropertyProvider(envConfig.toString(), List.of("afon", "secret"), true).getValue(AfonProperty.KEYCLOAK_DB_URL, "");
             if (url != null && !url.isBlank()) {
                 properties.setProperty(AfonProperty.KEYCLOAK_DB_URL.getName(), url.trim());
             }
@@ -483,14 +537,58 @@ public final class ProjectEnv {
     }
 
     private static void append(Path file, Map<String, String> properties) throws IOException {
+        Map<String, String> absent = properties;
         StringBuilder block = new StringBuilder();
         if (Files.exists(file)) {
-            String existing = Files.readString(file, StandardCharsets.UTF_8);
-            block.append(existing.endsWith("\n") || existing.isEmpty() ? "" : "\n");
+            // what the env has of a property that is derived is replaced where it is, not left above a new one: a file with two lines for a key is read as
+            // the last, which is not what it says, and a line that is set in terms of the property, ${NAME}, which the shell evaluates where it reads it, would
+            // see it unset if it were taken out from above that line
+            Replaced replaced = replaceAssignments(Files.readString(file, StandardCharsets.UTF_8), properties);
+            Files.writeString(file, replaced.text(), StandardCharsets.UTF_8);
+            absent = replaced.absent();
+            block.append(replaced.text().endsWith("\n") || replaced.text().isEmpty() ? "" : "\n");
+        }
+        if (absent.isEmpty()) {
+            return;
         }
         block.append('\n').append(BLOCK_HEADER).append('\n');
-        properties.forEach((name, value) -> block.append(name).append('=').append(value).append('\n'));
+        absent.forEach((name, value) -> block.append(name).append('=').append(value).append('\n'));
         Files.writeString(file, block, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
+
+    /**
+     * @param text   the text, with the properties changed where they are assigned
+     * @param absent the properties that the text did not assign, which are left to be written
+     */
+    record Replaced(String text, Map<String, String> absent) {
+    }
+
+    /**
+     * @return the text with the line that first assigns each of the properties, {@code NAME=...}, which a properties file sourced by a shell has one to
+     * a line, giving it the new value where it is, and the later lines that assign it taken out; the names that no line assigns are the absent ones
+     */
+    static Replaced replaceAssignments(String text, Map<String, String> properties) {
+        Map<String, String> absent = new LinkedHashMap<>(properties);
+        if (properties.isEmpty()) {
+            return new Replaced(text, absent);
+        }
+        StringBuilder out = new StringBuilder();
+        String[] lines = text.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int equals = line.indexOf('=');
+            String name = equals > 0 ? line.substring(0, equals) : null;
+            boolean last = i == lines.length - 1;
+            if (name != null && properties.containsKey(name)) {
+                if (absent.remove(name) != null) {
+                    out.append(name).append('=').append(properties.get(name)).append(last ? "" : "\n");
+                }
+                // else a later line for a property that is already given: left out
+            } else {
+                out.append(line).append(last ? "" : "\n");
+            }
+        }
+        return new Replaced(out.toString(), absent);
     }
 
     /**

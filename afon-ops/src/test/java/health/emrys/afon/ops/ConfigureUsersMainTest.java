@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,5 +63,40 @@ class ConfigureUsersMainTest {
 
         verify(identity, never()).ensureClientAudience(anyString(), anyString());
         verify(identity, never()).ensureClientAcr(anyString(), anyString());
+    }
+
+    @Test
+    void registersTheBrowserClientOfTheEnvWhereThereIsNoProject() throws Exception {
+        when(properties.getValue(OAUTH2_CLIENT_ID)).thenReturn("env-client");
+        when(properties.getValue(OAUTH2_CLIENT_SECRET)).thenReturn("env-secret");
+
+        new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
+
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList());
+        verify(identity).configureMfa();
+    }
+
+    @Test
+    void leavesTheClientOfAProjectToTheIdentityThatMakesIt() throws Exception {
+        when(properties.hasProperty(OIDC_PROJECT_CLAIM)).thenReturn(true);
+        when(properties.getValue(OIDC_PROJECT_CLAIM)).thenReturn("project");
+        when(properties.getValue(OAUTH2_CLIENT_ID)).thenReturn("xyz-yyyy-nnnn-tre");
+
+        new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
+
+        verify(identity, never()).registerBrowserClient(anyString(), anyString(), anyList());
+        verify(identity).configureMfa();
+    }
+
+    @Test
+    void registersTheBrowserClientOfTheEnvWhereTheConfigHasTheProjectClaimEmpty() throws Exception {
+        when(properties.hasProperty(OIDC_PROJECT_CLAIM)).thenReturn(true);
+        when(properties.getValue(OIDC_PROJECT_CLAIM)).thenReturn("");
+        when(properties.getValue(OAUTH2_CLIENT_ID)).thenReturn("env-client");
+        when(properties.getValue(OAUTH2_CLIENT_SECRET)).thenReturn("env-secret");
+
+        new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
+
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList());
     }
 }

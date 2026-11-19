@@ -63,10 +63,11 @@ public class GenerateScriptMains {
 
         new ScriptEntry("db", "DbWhitelistMain", "db/whitelist.sh"),
 
-        new ScriptEntry("project", "ProjectKeyMain", "project/key.sh"),
+        new ScriptEntry("project", "ProjectSecretMain", "project/secret.sh"),
         new ScriptEntry("project", "ProjectSmtpMain", "project/smtp.sh"),
 
         new ScriptEntry("aws", "AwsAccountMain", "aws/account.sh"),
+        new ScriptEntry("aws", "AwsSesIdentityMain", "aws/ses-identity.sh"),
         new ScriptEntry("aws", "AwsClusterMain", "aws/cluster.sh", "aws"),
         new ScriptEntry("aws", "AwsCreateFederatedPermissionsMain", "aws/create_federated_permissions.sh"),
         new ScriptEntry("aws", "AwsCreateMain", "aws/create.sh", "aws"),

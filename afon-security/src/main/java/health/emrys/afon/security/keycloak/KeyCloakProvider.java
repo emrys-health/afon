@@ -92,6 +92,8 @@ public class KeyCloakProvider implements IdentityProvider {
     private final String adminPassword;
     private final String loginTheme;
     private Smtp smtp;
+    /** The config that this runs in, if it is made from one: where a project's domains are, when its file does not give them, see {@link #treRedirectUris}. */
+    private AfonPropertyProvider config;
     /**
      * How often, and how long apart, a token request failing with an I/O or server error is tried: up to five minutes, as
      * a KeyCloak starting on a busy cluster has taken three minutes to be ready.
@@ -140,6 +142,7 @@ public class KeyCloakProvider implements IdentityProvider {
                 properties.getValue(KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD),
                 properties.getValue(AFON_THEME, DEFAULT_AFON_THEME));
         this.smtp = Smtp.of(properties);
+        this.config = properties;
     }
 
     /**
@@ -1065,16 +1068,23 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * The exact redirect URIs of the project's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
-     * the remote desktop are served under.
+     * the remote desktop are served under.  The domain is the one that the project's file gives, else the one that its config has, which is derived
+     * from the env's (see {@code ProjectNames}), as a project's TRE has its domains derived unless the file names them.
+     *
+     * @param config the config that the project runs in, or {@code null} if none
      */
-    static List<String> treRedirectUris(TreProject project) {
+    static List<String> treRedirectUris(TreProject project, AfonPropertyProvider config) {
         String property = project.cloud().name() + "_JUPYTER_DOMAIN_NAME";
         String domain = project.tre().domains().get(property);
-        if (domain == null) {
-            throw new IllegalArgumentException(format(
-                "stacks.tre.domains has no %s, which the redirect URIs of the project's TRE client are made from", property));
+        if ((domain == null || domain.isBlank()) && config != null) {
+            domain = config.getProperties().getProperty(property);
         }
-        return callbackURIs(domain);
+        if (domain == null || domain.isBlank()) {
+            throw new IllegalArgumentException(format(
+                "%s is neither in stacks.tre.domains of the project's file nor in its config, which the redirect URIs of the project's TRE client are made from: "
+                + "configure the project, and run this in its home", property));
+        }
+        return callbackURIs(domain.trim());
     }
 
     /**
@@ -1285,7 +1295,7 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void ensureProject(TreProject project, Map<String, String> publicKeys) {
+    public void ensureProject(TreProject project, Map<String, String> secrets) {
         String id = project.id().value();
         TreProject.Identity identity = project.identity();
         try {
@@ -1293,11 +1303,11 @@ public class KeyCloakProvider implements IdentityProvider {
             String realm = KEYCLOAK_REALM;
             ensurePrincipalInUserProfile(token);
             ensureAcrLevel(token, realm, identity.acr());
-            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project), jwks(publicKeys, "tre"),
+            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project, config), secretOf(secrets, "tre"),
                                              ensureBrowserFlow(token, realm, identity.treClient(), id), identity.acr());
             // a project with no Git of its own has Git deployed with its TRE, so no Git client
             String git = project.git() == null ? null
-                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), jwks(publicKeys, "git"),
+                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), secretOf(secrets, "git"),
                                       ensureBrowserFlow(token, realm, identity.gitClient(), id), identity.acr());
             List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
             project.dataProviders().forEach(provider -> treAudiences.add(provider.audience()));
@@ -1318,36 +1328,39 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * @return the JWK set that a client authenticates against: the key given, which is a JWK set or a single JWK
+     * @return the secret that a client authenticates with: the one given, which the TRE is given too
      */
-    private String jwks(Map<String, String> publicKeys, String client) throws IOException {
-        String key = publicKeys.get(client);
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException("No public key for the " + client + " client");
+    private static String secretOf(Map<String, String> secrets, String client) {
+        String secret = secrets.get(client);
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("No secret for the " + client + " client");
         }
-        var node = mapper.readTree(key);
-        if (node.has("d") || node.has("p") || node.has("q")) {
-            throw new IllegalArgumentException(
-                "The " + client + " key holds private key material: give the public key only, as the private key stays with the TRE operator");
+        if (secret.strip().length() > MAX_CLIENT_SECRET_LENGTH) {
+            throw new IllegalArgumentException(format("The secret for the %s client is %d characters, and Keycloak keeps at most %d: make it with project-secret",
+                                                      client, secret.strip().length(), MAX_CLIENT_SECRET_LENGTH));
         }
-        return node.has("keys") ? key : mapper.writeValueAsString(Map.of("keys", List.of(node)));
+        return secret.strip();
     }
+
+    /** The most that Keycloak's database holds of a client's secret: a longer one is a server error, not a refusal. */
+    private static final int MAX_CLIENT_SECRET_LENGTH = 255;
 
     /**
      * Makes, or converges, a project's client: standard flow only (no direct grants, service accounts or implicit flow), with
-     * PKCE, full scope off so that no role but its own reaches a token, and authenticating by {@code private_key_jwt}.  Its login
+     * PKCE allowed and not required, full scope off so that no role but its own reaches a token, and authenticating with the secret that it is given.  Its login
      * is the flow that only the project's members pass, after a second factor, see {@link KeyCloakProjectFlow}.
      *
      * @return the client's internal UUID
      */
-    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String jwks,
+    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String secret,
                                        String browserFlowId, String acr) throws IOException {
         String json = mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("enabled", true),
             Map.entry("protocol", "openid-connect"),
             Map.entry("publicClient", false),
-            Map.entry("clientAuthenticatorType", "client-jwt"),
+            Map.entry("clientAuthenticatorType", "client-secret"),
+            Map.entry("secret", secret),
             Map.entry("standardFlowEnabled", true),
             Map.entry("directAccessGrantsEnabled", false),
             Map.entry("serviceAccountsEnabled", false),
@@ -1358,9 +1371,9 @@ public class KeyCloakProvider implements IdentityProvider {
             // the login that admits only the members, after the second factor
             Map.entry("authenticationFlowBindingOverrides", Map.of("browser", browserFlowId)),
             Map.entry("attributes", Map.of(
-                "use.jwks.string", "true",
-                "jwks.string", jwks,
-                "pkce.code.challenge.method", "S256",
+                // PKCE is asked for by the clients that can send it, not required: JupyterHub's authenticator, in the version that Afon runs, sends no
+                // code_challenge, and a client that requires one would refuse its login.  Empty, so that a client made before as requiring it is changed
+                "pkce.code.challenge.method", "",
                 // asked for by default, and the least that a login may be: a request for less (acr_values=1) is a request for a token
                 // of a password alone, which carries the project claim and the audiences all the same
                 "default.acr.values", acr,

@@ -61,6 +61,7 @@ class DataProviderAdmitsTresTest {
     private AfonPropertyProvider configureLon(AfonCloud cloud, String envExtra) throws IOException {
         Path file = dataFile(cloud);
         Path env = env(cloud, envExtra);
+        ProjectFixtures.writeSecrets(home);
         return new FilePropertyProvider(ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file).toString());
     }
 
@@ -112,6 +113,7 @@ class DataProviderAdmitsTresTest {
         tre(cloud, "xyz-yyyy-nnnn", "", NAMES_LON);
         Path file = dataFile(cloud);
         Path env = env(cloud, "");
+        ProjectFixtures.writeSecrets(home);
         assertThatThrownBy(() -> ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file))
             .isInstanceOf(ProjectException.class)
             .hasMessageContaining("xyz-yyyy-nnnn reads this Data Provider")

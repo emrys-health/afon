@@ -107,10 +107,16 @@ public class ConfigureUsersMain {
     public List<HttpResponse> configureJupyterClient(String jupyterDomain) throws IOException {
         logger.info("Configuring browser client for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
-        responses.addAll(identityProvider.registerBrowserClient(
-                propertyProvider.getValue(OAUTH2_CLIENT_ID),
-                propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
-                KeyCloakProvider.callbackURIs(jupyterDomain)));
+        if (isSet(OIDC_PROJECT_CLAIM)) {
+            // a project's TRE signs in with the client of the project, which the central identity makes when the project is made in it (manage-identity create), with
+            // the project's flow, audiences and claims: registering a browser client of that id would overwrite it with a plain one
+            logger.info("Leaving the client {} to the identity of the project, which makes it", propertyProvider.getValue(OAUTH2_CLIENT_ID, ""));
+        } else {
+            responses.addAll(identityProvider.registerBrowserClient(
+                    propertyProvider.getValue(OAUTH2_CLIENT_ID),
+                    propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
+                    KeyCloakProvider.callbackURIs(jupyterDomain)));
+        }
         // configure MFA so that the realm is only bound to its MFA flows,
         // once the users who must pass through them exist
         responses.addAll(identityProvider.configureMfa());

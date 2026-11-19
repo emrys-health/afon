@@ -110,4 +110,19 @@ final class ProjectFixtures {
         Files.createDirectories(file.getParent());
         return Files.writeString(file, example(cloud));
     }
+    /**
+     * Writes the secret of the TRE client of the projects that the tests use, {@code <home>/projects/<id>/keys/tre.secret}, which {@code project-secret} makes
+     * and {@code configure} puts in the config of a TRE.
+     */
+    static void writeSecrets(java.nio.file.Path home) {
+        try {
+            for (String id : java.util.List.of("xyz-yyyy-nnnn", "abc-def", "xyz-yyyy-nnn2")) {
+                java.nio.file.Path keys = home.resolve("projects").resolve(id).resolve("keys");
+                java.nio.file.Files.createDirectories(keys);
+                java.nio.file.Files.writeString(keys.resolve("tre.secret"), "secret-of-" + id + "\n");
+            }
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
 }

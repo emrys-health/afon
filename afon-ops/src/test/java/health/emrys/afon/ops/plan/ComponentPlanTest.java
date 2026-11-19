@@ -31,6 +31,9 @@ class ComponentPlanTest {
      * Creates each step named after the call that created it.
      */
     private final StepOperations ops = mock(StepOperations.class, (Answer<Object>) invocation -> {
+        if (invocation.getMethod().getName().equals("properties")) {
+            return properties;
+        }
         if (invocation.getMethod().getReturnType() != Step.class) {
             return RETURNS_DEFAULTS.answer(invocation);
         }
@@ -87,6 +90,24 @@ class ComponentPlanTest {
         assertThat(jupyter.domains(AZURE, properties)).containsExactly(AZURE_JUPYTER_DOMAIN_NAME);
         assertThat(jupyter.waitsFor()).isEmpty();
         assertThat(setupOf(jupyter, AWS)).isEmpty();
+    }
+
+    @Test
+    void sparkDoesNotCheckTheWriteForAProjectsTre() {
+        SparkPlan spark = new SparkPlan();
+        properties.setValue(OIDC_PROJECT_CLAIM, "project");
+
+        assertThat(setupOf(spark, AWS)).isEmpty();
+        assertThat(setupOf(spark, AZURE)).isEmpty();
+        assertThat(setupOf(spark, GCP)).isEmpty();
+    }
+
+    @Test
+    void sparkChecksTheWriteWhereTheConfigHasTheProjectClaimEmpty() {
+        SparkPlan spark = new SparkPlan();
+        properties.setValue(OIDC_PROJECT_CLAIM, "  ");
+
+        assertThat(setupOf(spark, AWS)).containsExactly("runSparkWritingTo(aws,aws)");
     }
 
     @Test

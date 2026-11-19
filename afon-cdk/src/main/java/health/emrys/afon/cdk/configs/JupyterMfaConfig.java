@@ -11,6 +11,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.Service;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceMetadata;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpec;
 import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
+import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import software.constructs.Construct;
 
@@ -40,6 +41,15 @@ public class JupyterMfaConfig {
     private static final String              SECRET_NAME  = CdkHelper.PROXY_SERVICE_NAME +"-secret";
     /** oauth2-proxy answers this itself, unauthenticated, so the load balancer can health check it. */
     public static final String               PING_PATH    = "/ping";
+
+    /**
+     * The gate of a project's TRE asks for PKCE (the S256 method) in its authorization requests, as the project's client in the identity may require it, which
+     * the gate's own login would otherwise be refused for lacking.  Not for a stack outside a project, whose client does not.
+     */
+    static List<String> pkceArgs(AfonPropertyProvider properties) {
+        boolean project = properties.hasProperty(AfonProperty.OIDC_PROJECT_CLAIM) && !properties.getValue(AfonProperty.OIDC_PROJECT_CLAIM, "").isBlank();
+        return project ? List.of("--code-challenge-method=S256") : List.of();
+    }
 
     /**
      * @param upstreamUrls the apps the gate fronts: oauth2-proxy mounts each upstream at the path component
@@ -85,6 +95,7 @@ public class JupyterMfaConfig {
             "--skip-provider-button=false",
             "--ping-path=" + PING_PATH,
             format("--redirect-url=https://%s/oauth2/callback", jupyterDomain)));
+        proxyArgs.addAll(pkceArgs(properties));
         // One --upstream per app; oauth2-proxy routes by the path component of each URL.
         upstreamUrls.forEach(url -> proxyArgs.add("--upstream=" + url));
 

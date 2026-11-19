@@ -16,15 +16,11 @@ import org.scalatest.GivenWhenThen
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.{GenericContainer, Network}
 
-import java.math.BigInteger
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest}
 import java.nio.charset.StandardCharsets
-import java.security.KeyPairGenerator
-import java.security.interfaces.RSAPublicKey
 import java.time.Duration
-import java.util.Base64
 import scala.jdk.CollectionConverters._
 
 /**
@@ -139,13 +135,8 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
     mapper.readTree(response.body())
   }
 
-  private def publicKey(): String = {
-    val generator = KeyPairGenerator.getInstance("RSA")
-    generator.initialize(2048)
-    val key = generator.generateKeyPair().getPublic.asInstanceOf[RSAPublicKey]
-    def b64(n: BigInteger) = Base64.getUrlEncoder.withoutPadding().encodeToString(n.toByteArray.dropWhile(_ == 0))
-    s"""{"kty":"RSA","use":"sig","alg":"RS256","kid":"tre","n":"${b64(key.getModulus)}","e":"${b64(key.getPublicExponent)}"}"""
-  }
+  /** The secret of the TRE client, as project-secret makes it: 256 bits as hex, which is what the identity provider is given. */
+  private def clientSecret(): String = java.util.UUID.randomUUID().toString.replace("-", "") + java.util.UUID.randomUUID().toString.replace("-", "")
 
   private def treProject(id: String, provider: String = "lon"): TreProject =
     FileProjectProvider.parse(
@@ -251,7 +242,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
     polaris
     makeCatalog()
     val project = treProject(Project)
-    identity.ensureProject(project, Map("tre" -> publicKey()).asJava)
+    identity.ensureProject(project, Map("tre" -> clientSecret()).asJava)
     letTheClientTakeAPassword(project)
     val alice = member(project, "alice@tre.example")
     val bob = member(project, "bob@tre.example")
@@ -351,7 +342,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
       Given("a project whose TRE is registered for another Data Provider, and a member of it, whom the Data Provider has granted the project's role")
       val w = world
       val foreign = treProject("cfg-2026-0022", "nw")
-      identity.ensureProject(foreign, Map("tre" -> publicKey()).asJava)
+      identity.ensureProject(foreign, Map("tre" -> clientSecret()).asJava)
       letTheClientTakeAPassword(foreign)
       val id = member(foreign, "eve@tre.example")
       grants.grant("cfg-2026-0022", Catalog, "released", java.util.List.of(id))
@@ -369,7 +360,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
     "refuse the token of a login that did not give a second factor" in {
       Given("a member of a project whose client does not say that the second factor was given, as a login by password alone would not")
       val project = treProject(OtherProject)
-      identity.ensureProject(project, Map("tre" -> publicKey()).asJava)
+      identity.ensureProject(project, Map("tre" -> clientSecret()).asJava)
       letTheClientTakeAPassword(project, secondFactor = false)
       val id = member(project, "dan@tre.example")
       grants.grant(OtherProject, Catalog, "released", java.util.List.of(id))
@@ -385,7 +376,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
       makeCatalog(OtherCatalog)
       grants.revoke(OtherProject, Catalog)
       val second = treProject(OtherProject)
-      identity.ensureProject(second, Map("tre" -> publicKey()).asJava)
+      identity.ensureProject(second, Map("tre" -> clientSecret()).asJava)
       letTheClientTakeAPassword(second)
       val both = member(second, "carol@tre.example")
       identity.addMember(w.project, both)

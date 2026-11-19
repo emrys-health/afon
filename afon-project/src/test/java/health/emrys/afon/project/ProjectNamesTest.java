@@ -168,6 +168,7 @@ class ProjectNamesTest {
                               + cloud.name() + "_POLARIS_LOG_BUCKET=${" + cloud.name() + "_STORAGE_ACCOUNT}-polaris-logs\n"
                               + cloud.name() + "_CATALOG_IDS=" + c + "\n");
         Path file = ProjectFixtures.writeExample(home.resolve("project.yaml"), cloud);
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud)), envConfig, home, file);
         String common = Files.readString(config.resolve("afon.properties"));
         assertThat(common).contains("CLUSTER_NAME=xyz-yyyy-nnnn-cluster");
@@ -258,6 +259,7 @@ class ProjectNamesTest {
         Files.writeString(envConfig.resolve("afon-" + lower(cloud) + ".properties"),
                           cloud.name() + "_JUPYTER_DOMAIN_NAME=" + lower(cloud) + "-jupyter.dev.click\n");
         Path file = ProjectFixtures.writeExample(home.resolve("project.yaml"), cloud);
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud)), envConfig, home, file);
         String properties = Files.readString(config.resolve("afon-" + lower(cloud) + ".properties"));
         // the example names its Jupyter domain, which is the one written; the Polaris domain is derived

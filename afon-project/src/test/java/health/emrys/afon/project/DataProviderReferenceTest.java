@@ -102,6 +102,7 @@ class DataProviderReferenceTest {
         provider(cloud);
         Files.writeString(home.resolve("config-dev/secret.properties"), "");
         TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd, dbt]}"));
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(project, home.resolve("config-dev"), home, home.resolve("projects/xyz-yyyy-nnnn/project.yaml"));
 
         var catalogs = new health.emrys.afon.config.AfonCatalogs(new health.emrys.afon.config.FilePropertyProvider(config.toString()));
@@ -219,6 +220,7 @@ class DataProviderReferenceTest {
         provider(cloud);
         TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd]}"));
         Path projectFile = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
+        ProjectFixtures.writeSecrets(home);
         Path config = ProjectEnv.configure(project, home.resolve("config-dev"), home, projectFile);
         // the copy is what the commands in the project's home read, where the Data Providers' projects are not looked up: it holds the catalog in full, as defined
         TreProject copied = (TreProject) new FileProjectProvider(config.resolve("project.yaml")).getProject();

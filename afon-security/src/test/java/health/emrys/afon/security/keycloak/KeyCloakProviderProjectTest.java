@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class KeyCloakProviderProjectTest {
 
-    private static final String JWK = "{\"kty\":\"RSA\",\"n\":\"abc\",\"e\":\"AQAB\"}";
+    private static final String SECRET = "s3cr3t-of-the-client";
 
     /**
      * The project is a template, which every test renders for the cloud it is run on: {@code ${cloud}} is the cloud in lower case and
@@ -127,14 +127,15 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void makesTheTwoClientsTheGroupAndTheClaims(AfonCloud cloud) {
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
 
         String treClient = bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-tre");
-        assertThat(treClient).contains("\"clientAuthenticatorType\":\"client-jwt\"", "\"fullScopeAllowed\":false",
+        assertThat(treClient).contains("\"clientAuthenticatorType\":\"client-secret\"", "\"secret\":\"" + SECRET + "\"", "\"fullScopeAllowed\":false",
                                        "\"directAccessGrantsEnabled\":false", "\"serviceAccountsEnabled\":false",
-                                       "https://jupyter.example.org/hub/oauth_callback", "use.jwks.string");
-        // a single JWK is wrapped as a JWK set
-        assertThat(treClient).contains("keys");
+                                       "https://jupyter.example.org/hub/oauth_callback");
+        assertThat(treClient).doesNotContain("jwks");
+        // PKCE is allowed and not required, so that the logins of JupyterHub, which sends none, are not refused, and a client made before as requiring it is changed
+        assertThat(treClient).contains("\"pkce.code.challenge.method\":\"\"").doesNotContain("S256");
         assertThat(bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-git"))
             .contains("https://git.example.org/user/oauth2/keycloak/callback");
         assertThat(requests).contains("DELETE /admin/realms/polaris/clients/uuid-xyz-yyyy-nnnn-tre/default-client-scopes/roles-id",
@@ -159,7 +160,7 @@ class KeyCloakProviderProjectTest {
     void makesOnlyTheTreClientForAProjectWithNoGitOfItsOwn(AfonCloud cloud) {
         TreProject noGit = (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud).replace(", gitBucket: gitea", "")
                                                                            .replace("  git: {domain: git.example.org}\n", ""));
-        provider.ensureProject(noGit, Map.of("tre", JWK));
+        provider.ensureProject(noGit, Map.of("tre", SECRET));
         bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-tre");
         assertThat(bodies.stream().filter(b -> b.contains("xyz-yyyy-nnnn-git"))).isEmpty();
         assertThat(requests).contains("POST /admin/realms/polaris/groups/gid/role-mappings/clients/uuid-xyz-yyyy-nnnn-tre")
@@ -169,23 +170,51 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void makesTheTreRedirectUrisFromTheJupyterDomainOfTheProjectsCloud(AfonCloud cloud) {
-        assertThat(KeyCloakProvider.treRedirectUris(project(cloud))).containsExactly(
+        assertThat(KeyCloakProvider.treRedirectUris(project(cloud), null)).containsExactly(
             "https://jupyter.example.org/oauth2/callback", "https://jupyter.example.org/hub/oauth_callback");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void refusesAKeyHoldingPrivateKeyMaterial(AfonCloud cloud) {
-        assertThatThrownBy(() -> provider.ensureProject(project(cloud), Map.of("tre", JWK.replace("\"e\"", "\"d\":\"x\",\"e\""), "git", JWK)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("private key material");
-        assertThat(requests).noneMatch(call -> call.startsWith("POST /admin/realms/polaris/clients"));
+    void refusesAClientWithoutASecret(AfonCloud cloud) {
+        assertThatThrownBy(() -> provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", " ")))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No secret for the git client");
+        assertThatThrownBy(() -> provider.ensureProject(project(cloud), Map.of("git", SECRET)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No secret for the tre client");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesASecretThatKeycloakCannotHold(AfonCloud cloud) {
+        assertThatThrownBy(() -> provider.ensureProject(project(cloud), Map.of("tre", "x".repeat(256), "git", SECRET)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("256 characters").hasMessageContaining("at most 255");
+        provider.ensureProject(project(cloud), Map.of("tre", "x".repeat(255), "git", SECRET));
+    }
+
+    private static health.emrys.afon.config.AfonPropertyProvider configWith(java.nio.file.Path dir, String afon) throws IOException {
+        java.nio.file.Files.writeString(dir.resolve("afon.properties"), afon);
+        return new health.emrys.afon.config.FilePropertyProvider(dir.toString(), List.of("afon"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void takesTheJupyterDomainOfTheConfigWhenTheFileGivesNone(AfonCloud cloud, @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws IOException {
+        TreProject noDomain = (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud).replace("tre: {domains: {${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.example.org}}".replace("${CLOUD}", cloud.name()), "tre: {}"));
+        var config = configWith(dir, cloud.name() + "_JUPYTER_DOMAIN_NAME=jupyter.derived.example.org\n");
+
+        assertThat(KeyCloakProvider.treRedirectUris(noDomain, config)).containsExactly(
+            "https://jupyter.derived.example.org/oauth2/callback", "https://jupyter.derived.example.org/hub/oauth_callback");
+        // the file's own domain wins over the config's, and a blank one in the config is none
+        assertThat(KeyCloakProvider.treRedirectUris(project(cloud), config)).first().asString().contains("jupyter.example.org");
+        assertThatThrownBy(() -> KeyCloakProvider.treRedirectUris(noDomain, configWith(dir, cloud.name() + "_JUPYTER_DOMAIN_NAME= \n")))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining(cloud.name() + "_JUPYTER_DOMAIN_NAME").hasMessageContaining("config");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAProjectWithoutAJupyterDomainForItsRedirectUris(AfonCloud cloud) {
         TreProject noDomain = (TreProject) FileProjectProvider.parse(render(TEMPLATE, cloud).replace("tre: {domains: {${CLOUD}_JUPYTER_DOMAIN_NAME: jupyter.example.org}}".replace("${CLOUD}", cloud.name()), "tre: {}"));
-        assertThatThrownBy(() -> provider.ensureProject(noDomain, Map.of("tre", JWK, "git", JWK)))
+        assertThatThrownBy(() -> provider.ensureProject(noDomain, Map.of("tre", SECRET, "git", SECRET)))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining(cloud.name() + "_JUPYTER_DOMAIN_NAME");
     }
 
@@ -294,7 +323,7 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void logsTheMembersInToTheClientAfterTheSecondFactorAndNoOneElse(AfonCloud cloud) {
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
 
         String tre = "xyz-yyyy-nnnn-tre";
         // the login is a flow of the client's own: the cookie or the forms, and then the check of membership, whichever it was
@@ -323,7 +352,7 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void bindsTheLoginAndTheAcrToEachClientInTheSameUpdateThatMakesIt(AfonCloud cloud) {
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
 
         assertThat(bodyOf("POST /admin/realms/polaris/clients", "\"clientId\":\"xyz-yyyy-nnnn-tre\"")).contains(
             "\"authenticationFlowBindingOverrides\":{\"browser\":\"flow-xyz-yyyy-nnnn-tre-browser\"}", "\"default.acr.values\":\"mfa\"", "\"minimum.acr.value\":\"mfa\"");
@@ -334,7 +363,7 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void mapsTheAcrToTheLevelOfTheSecondFactorKeepingTheOtherMappings(AfonCloud cloud) {
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
 
         assertThat(bodyOf("PUT /admin/realms/polaris", "acr.loa.map")).contains("acr.loa.map", "mfa", "2");
     }
@@ -342,11 +371,11 @@ class KeyCloakProviderProjectTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void convergesTheLoginAgainWithoutMakingAnotherOrLeavingItOpen(AfonCloud cloud) {
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
         int executions = flows.flows.values().stream().mapToInt(List::size).sum();
         int configs = flows.configs.size();
 
-        provider.ensureProject(project(cloud), Map.of("tre", JWK, "git", JWK));
+        provider.ensureProject(project(cloud), Map.of("tre", SECRET, "git", SECRET));
 
         assertThat(flows.flows.values().stream().mapToInt(List::size).sum()).isEqualTo(executions);
         assertThat(flows.configs).hasSize(configs);

@@ -13,15 +13,11 @@ import org.scalatest.GivenWhenThen
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
 
-import java.math.BigInteger
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.{KeyFactory, KeyPairGenerator, PrivateKey, Signature}
-import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 import java.util.Base64
 import javax.crypto.Mac
@@ -79,17 +75,8 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     } finally super.afterAll()
   }
 
-  /** A public key as a JWK, as the TRE operator gives it: the private key stays with them. */
-  private def publicKeys(): java.util.Map[String, String] = {
-    def jwk(kid: String): String = {
-      val generator = KeyPairGenerator.getInstance("RSA")
-      generator.initialize(2048)
-      val key = generator.generateKeyPair().getPublic.asInstanceOf[RSAPublicKey]
-      def b64(n: BigInteger) = Base64.getUrlEncoder.withoutPadding().encodeToString(n.toByteArray.dropWhile(_ == 0))
-      s"""{"kty":"RSA","use":"sig","alg":"RS256","kid":"$kid","n":"${b64(key.getModulus)}","e":"${b64(key.getPublicExponent)}"}"""
-    }
-    Map("tre" -> jwk("tre"), "git" -> jwk("git")).asJava
-  }
+  /** The secret of each client of a project, as project-secret makes it: the identity provider and the TRE have the same. */
+  private def secrets(): java.util.Map[String, String] = Map("tre" -> "tre-client-secret", "git" -> "git-client-secret").asJava
 
   private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): TreProject = {
     val git = if (ownGit) s"\n         |  git: {domain: git.$id.example.org}" else ""
@@ -135,35 +122,14 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     output
   }
 
-  /** The private key of a PEM, whichever form openssl made it in, which openssl itself turns into the PKCS#8 that Java reads. */
-  private def privateKeyOf(pem: Path): PrivateKey = {
-    val process = new ProcessBuilder("openssl", "pkcs8", "-topk8", "-nocrypt", "-in", pem.toString, "-outform", "DER").start()
-    val der = process.getInputStream.readAllBytes()
-    assert(process.waitFor() == 0, s"openssl could not read $pem")
-    KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der))
-  }
-
-  /** The assertion by which a client authenticates to the token endpoint, a JWT signed with its private key. */
-  private def clientAssertion(clientId: String, key: PrivateKey): String = {
-    def b64(bytes: Array[Byte]) = Base64.getUrlEncoder.withoutPadding().encodeToString(bytes)
-    val now = System.currentTimeMillis() / 1000
-    val header = b64(s"""{"alg":"RS256","typ":"JWT","kid":"$clientId"}""".getBytes(StandardCharsets.UTF_8))
-    val payload = b64(s"""{"iss":"$clientId","sub":"$clientId","aud":"$baseUrl/realms/$KEYCLOAK_REALM","jti":"${java.util.UUID.randomUUID()}","iat":$now,"exp":${now + 60}}"""
-                        .getBytes(StandardCharsets.UTF_8))
-    val signature = Signature.getInstance("SHA256withRSA")
-    signature.initSign(key)
-    signature.update(s"$header.$payload".getBytes(StandardCharsets.UTF_8))
-    s"$header.$payload.${b64(signature.sign())}"
-  }
-
   /**
-   * What the token endpoint answers a client that presents a code that was never issued, with the assertion: KeyCloak authenticates the client before it
+   * What the token endpoint answers a client that presents a code that was never issued, with its secret: KeyCloak authenticates the client before it
    * looks at the code, so that an answer about the code means that the client was authenticated, and one about the client that it was not.
    */
-  private def tokenEndpointAnswer(clientId: String, assertion: String, redirectUri: String): (Int, String) = {
+  private def tokenEndpointAnswer(clientId: String, secret: String, redirectUri: String): (Int, String) = {
     def enc(value: String) = java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)
     val form = Seq("grant_type" -> "authorization_code", "code" -> "never-issued", "redirect_uri" -> redirectUri, "client_id" -> clientId,
-                   "client_assertion_type" -> "urn:ietf:params:oauth:client-assertion-type:jwt-bearer", "client_assertion" -> assertion)
+                   "client_secret" -> secret)
       .map { case (k, v) => s"${enc(k)}=${enc(v)}" }.mkString("&")
     val request = HttpRequest.newBuilder(URI.create(s"$baseUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/token"))
       .header("Content-Type", "application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(form)).build()
@@ -258,12 +224,12 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     LoginResult(None, "the login did not end", secret)
   }
 
-  /** The claims of the access token that a client is given for a code, which it presents with an assertion signed with its private key, and the verifier of its challenge. */
-  private def exchange(clientId: String, key: PrivateKey, code: String, redirectUri: String, verifier: String): JsonNode = {
+  /** The claims of the access token that a client is given for a code, which it presents with its secret, and the verifier of its challenge. */
+  private def exchange(clientId: String, secret: String, code: String, redirectUri: String, verifier: String): JsonNode = {
     val request = HttpRequest.newBuilder(URI.create(s"$baseUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/token"))
       .header("Content-Type", "application/x-www-form-urlencoded")
       .POST(form(Seq("grant_type" -> "authorization_code", "code" -> code, "redirect_uri" -> redirectUri, "client_id" -> clientId, "code_verifier" -> verifier,
-                     "client_assertion_type" -> "urn:ietf:params:oauth:client-assertion-type:jwt-bearer", "client_assertion" -> clientAssertion(clientId, key)))).build()
+                     "client_secret" -> secret))).build()
     val response = http.send(request, BodyHandlers.ofString())
     assert(response.statusCode() == 200, s"token endpoint: HTTP ${response.statusCode()} ${response.body()}")
     mapper.readTree(Base64.getUrlDecoder.decode(mapper.readTree(response.body()).get("access_token").asText().split("\\.")(1)))
@@ -274,13 +240,6 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     val verifier = Base64.getUrlEncoder.withoutPadding().encodeToString(java.util.UUID.randomUUID().toString.getBytes(StandardCharsets.UTF_8))
     val digest = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII))
     (Base64.getUrlEncoder.withoutPadding().encodeToString(digest), verifier)
-  }
-
-  /** The key pair of a project's TRE client, as the project-key script makes it: the public key for the registration, the private key for the client's assertions. */
-  private def projectKey(id: String): (String, PrivateKey) = {
-    val afonHome = Files.createTempDirectory("afon-home")
-    runScript("project/key.sh", afonHome, id, "tre")
-    (Files.readString(afonHome.resolve(s"projects/$id/keys/tre.jwk")), privateKeyOf(afonHome.resolve(s"keys/$id/tre.pem")))
   }
 
   /** The emails that the mail server has for an address, the newest first. */
@@ -360,20 +319,20 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
 
   "A TRE project registered in the central identity provider" should {
 
-    "have a TRE client and a Git client in the identity provider, which take no password and authenticate by key" in {
+    "have a TRE client and a Git client in the identity provider, which take no password and authenticate by secret" in {
       Given("a TRE project with a Git of its own, registered in the identity provider")
       val project = projectOf("cfg-2026-0001", Seq("data1"))
-      provider.ensureProject(project, publicKeys())
+      provider.ensureProject(project, secrets())
 
-      Then("each of its two clients in the identity provider takes the browser flow only, with no direct grants, service accounts or full scope, and authenticates by a key")
+      Then("each of its two clients in the identity provider takes the browser flow only, with no direct grants, service accounts or full scope, and authenticates by a secret")
       for (id <- Seq("cfg-2026-0001-tre", "cfg-2026-0001-git")) {
         val c = client(id)
         assert(c.get("standardFlowEnabled").asBoolean, id)
         assert(!c.get("directAccessGrantsEnabled").asBoolean, id)
         assert(!c.get("serviceAccountsEnabled").asBoolean, id)
         assert(!c.get("fullScopeAllowed").asBoolean, id)
-        assert(c.get("clientAuthenticatorType").asText == "client-jwt", id)
-        assert(c.get("attributes").get("use.jwks.string").asText == "true", id)
+        assert(c.get("clientAuthenticatorType").asText == "client-secret", id)
+        assert(c.get("attributes").path("use.jwks.string").isMissingNode, id)
       }
       And("each client has the exact redirect URIs of the project's TRE and Git")
       assert(values(client("cfg-2026-0001-tre").get("redirectUris")).toSet ==
@@ -385,7 +344,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     "have only a TRE client in the identity provider when Git is deployed with the TRE" in {
       Given("a TRE project with no Git of its own, registered in the identity provider")
       val project = projectOf("cfg-2026-0009", Seq("data1"), ownGit = false)
-      provider.ensureProject(project, Map("tre" -> publicKeys().get("tre")).asJava)
+      provider.ensureProject(project, Map("tre" -> secrets().get("tre")).asJava)
       val ivy = provider.ensureUser("ivy@tre.example", "Ivy", "I")
       provider.addMember(project, ivy)
 
@@ -395,27 +354,22 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       assert(found.size() == 0)
     }
 
-    "authenticate a project's client in the identity provider by the key that project-key made, and refuse a key that is not its own" in {
-      Given("the key pair of a TRE project's client, made by the project-key script, whose public key the identity provider is given when the project is registered")
+    "authenticate a project's client in the identity provider by its secret, and refuse a secret that is not its own" in {
+      Given("a TRE project's client, whose secret the identity provider is given when the project is registered")
       val id = "cfg-2026-0010"
-      val afonHome = Files.createTempDirectory("afon-home")
-      runScript("project/key.sh", afonHome, id, "tre")
-      val publicKey = Files.readString(afonHome.resolve(s"projects/$id/keys/tre.jwk"))
-      val privateKey = privateKeyOf(afonHome.resolve(s"keys/$id/tre.pem"))
-      provider.ensureProject(projectOf(id, Seq("data1"), ownGit = false), Map("tre" -> publicKey).asJava)
+      val secret = "secret-that-project-secret-made"
+      provider.ensureProject(projectOf(id, Seq("data1"), ownGit = false), Map("tre" -> secret).asJava)
       // the token endpoint of a realm answers plain http from this machine only if the realm does not require https of it
       adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
       val redirectUri = s"https://jupyter.$id.example.org/oauth2/callback"
 
-      When("the TRE client presents the identity provider with an assertion signed with its private key")
-      val authenticated = tokenEndpointAnswer(s"$id-tre", clientAssertion(s"$id-tre", privateKey), redirectUri)
+      When("the TRE client presents the identity provider with its secret")
+      val authenticated = tokenEndpointAnswer(s"$id-tre", secret, redirectUri)
       Then("the identity provider authenticates it, and what its token endpoint refuses is the code, which was never issued")
       assert(authenticated == ((400, "invalid_grant")), authenticated.toString)
 
-      When("the client presents an assertion signed with another key")
-      val other = KeyPairGenerator.getInstance("RSA")
-      other.initialize(2048)
-      val refused = tokenEndpointAnswer(s"$id-tre", clientAssertion(s"$id-tre", other.generateKeyPair().getPrivate), redirectUri)
+      When("the client presents another secret")
+      val refused = tokenEndpointAnswer(s"$id-tre", "another-secret", redirectUri)
       Then("the identity provider does not authenticate it")
       assert(refused._1 == 401 || refused._2.contains("client"), refused.toString)
       assert(refused != authenticated)
@@ -424,7 +378,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     "give a member of the project a token naming the project, and a non-member none" in {
       Given("a TRE project with a Data Provider, registered in the identity provider, with a member in its group, and a user who is not a member")
       val project = projectOf("cfg-2026-0002", Seq("data1"))
-      provider.ensureProject(project, publicKeys())
+      provider.ensureProject(project, secrets())
       val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
       val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
       provider.addMember(project, alice)
@@ -450,8 +404,8 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       Given("two TRE projects registered in the identity provider, alice a member of both, bob of the first only, and rob of the second only")
       val project1 = projectOf("cfg-2026-0007", Seq("data1"))
       val project2 = projectOf("cfg-2026-0008", Seq("data2"))
-      provider.ensureProject(project1, publicKeys())
-      provider.ensureProject(project2, publicKeys())
+      provider.ensureProject(project1, secrets())
+      provider.ensureProject(project2, secrets())
       val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
       val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
       val rob = provider.ensureUser("rob@tre.example", "Rob", "R")
@@ -491,18 +445,18 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     "follow the Data Providers of the project when it is registered again" in {
       Given("a TRE project with one Data Provider, registered in the identity provider, and a member")
       val before = projectOf("cfg-2026-0005", Seq("data1"))
-      provider.ensureProject(before, publicKeys())
+      provider.ensureProject(before, secrets())
       val frank = provider.ensureUser("frank@tre.example", "Frank", "F")
       provider.addMember(before, frank)
       assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data1"))
 
       When("it is registered again with another Data Provider added")
-      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data1", "data2")), publicKeys())
+      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data1", "data2")), secrets())
       Then("its TRE client's token carries the audience of both")
       assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data1", "provider-data2"))
 
       When("it is registered again with the first Data Provider gone")
-      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data2")), publicKeys())
+      provider.ensureProject(projectOf("cfg-2026-0005", Seq("data2")), secrets())
       Then("its TRE client's token no longer carries the audience of the first, and the member is still a member")
       assert(values(tokenOf("cfg-2026-0005-tre", frank).get("aud")).toSet == Set("cfg-2026-0005-tre", "provider-data2"))
       assert(values(tokenOf("cfg-2026-0005-tre", frank).get("project")) == Seq("cfg-2026-0005"))
@@ -511,7 +465,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     "stop naming the project for a member removed from its group, and issue no token once the project is closed" in {
       Given("a TRE project registered in the identity provider, with a member in its group")
       val project = projectOf("cfg-2026-0006", Seq("data1"))
-      provider.ensureProject(project, publicKeys())
+      provider.ensureProject(project, secrets())
       val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
       provider.addMember(project, alice)
       assert(groupMembers("cfg-2026-0006").contains(alice))
@@ -567,11 +521,13 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     "log a member in to the project's TRE client after a second factor, and refuse a user who is not a member, even with the session of another project" in {
       Given("two TRE projects registered in the identity provider, the first with alice as a member and the second with bob")
       val (first, second) = ("cfg-2026-0011", "cfg-2026-0012")
-      val (publicKey, privateKey) = projectKey(first)
+      val afonHome = Files.createTempDirectory("afon-home")
+      runScript("project/secret.sh", afonHome, first, "tre")
+      val secret = Files.readString(afonHome.resolve(s"projects/$first/keys/tre.secret")).strip()
       val firstProject = projectOf(first, Seq("data1"), ownGit = false)
       val secondProject = projectOf(second, Seq("data1"), ownGit = false)
-      provider.ensureProject(firstProject, Map("tre" -> publicKey).asJava)
-      provider.ensureProject(secondProject, Map("tre" -> publicKey).asJava)
+      provider.ensureProject(firstProject, Map("tre" -> secret).asJava)
+      provider.ensureProject(secondProject, Map("tre" -> secret).asJava)
       adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
       val alice = provider.ensureUser("alice@tre.example", "Alice", "A")
       val bob = provider.ensureUser("bob@tre.example", "Bob", "B")
@@ -588,7 +544,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       val aliceLogin = login(browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret))
       Then("the identity provider gives the client a code, whose token says that a second factor was used, and names the project, the user and the audiences")
       assert(aliceLogin.code.isDefined, aliceLogin.page)
-      val token = exchange(s"$first-tre", privateKey, aliceLogin.code.get, redirectUri, verifier)
+      val token = exchange(s"$first-tre", secret, aliceLogin.code.get, redirectUri, verifier)
       assert(token.get("acr").asText == "mfa", token.toString)
       assert(values(token.get("project")) == Seq(first))
       assert(token.get("polaris_principal").asText == s"afon:$alice")
@@ -598,12 +554,12 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       val again = login(new Browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret))
       Then("they are asked for the code of their authenticator, and the token says as much")
       assert(again.code.isDefined, again.page)
-      assert(exchange(s"$first-tre", privateKey, again.code.get, redirectUri, verifier).get("acr").asText == "mfa")
+      assert(exchange(s"$first-tre", secret, again.code.get, redirectUri, verifier).get("acr").asText == "mfa")
 
       When("alice asks, in the request that starts the login, for a level of authentication below the second factor")
       val lowered = login(new Browser, s"$first-tre", redirectUri, challenge, "alice@tre.example", "alice-password", Some(aliceSecret), Some("1"))
       Then("the identity provider still asks for the second factor, or gives no code: no token comes of a password alone")
-      assert(lowered.code.isEmpty || exchange(s"$first-tre", privateKey, lowered.code.get, redirectUri, verifier).get("acr").asText == "mfa",
+      assert(lowered.code.isEmpty || exchange(s"$first-tre", secret, lowered.code.get, redirectUri, verifier).get("acr").asText == "mfa",
              s"a code of a password alone: $lowered")
 
       When("bob, who is not a member of the first project, logs in to its TRE client with the right password")

@@ -79,8 +79,8 @@ public class FileProjectProvider implements AfonProjectProvider {
     public static final String PROJECTS_DIR = "projects";
 
     /**
-     * The dir of a project's dir holding the public keys of its clients, {@code tre.jwk} and {@code git.jwk}, which the TRE
-     * operator gives: only public keys, as the private keys stay with the operator.
+     * The dir of a project's dir holding the secrets of its clients, {@code tre.secret} and {@code git.secret}, which
+     * {@code project-secret} makes: the project's config is given the TRE's, and the central identity the same.
      */
     public static final String KEYS_DIR = "keys";
 

@@ -63,6 +63,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
 
     private final String configDir;
     private final List<String> types;
+    private final boolean allClouds;
     private final Properties  properties;
     private final Set<String> secretKeys = new HashSet<>();
 
@@ -75,8 +76,17 @@ public class FilePropertyProvider implements AfonPropertyProvider {
     }
 
     public FilePropertyProvider(String configDir, List<String> types) {
+        this(configDir, types, false);
+    }
+
+    /**
+     * @param allClouds whether every cloud's files are loaded, whatever cloud the run is of, as for the config of an env that is read for the
+     *                  resources of a project of another cloud, eg that of a Data Provider on Azure, read by a TRE project on AWS
+     */
+    public FilePropertyProvider(String configDir, List<String> types, boolean allClouds) {
         this.configDir = configDir;
         this.types = types;
+        this.allClouds = allClouds;
         this.properties = new Properties();
     }
 
@@ -240,7 +250,7 @@ public class FilePropertyProvider implements AfonPropertyProvider {
         // first add common properties
         files.add(fileForCloud(type, null));
         // then add cloud properties
-        if (cloudPropertySet()) {
+        if (!allClouds && cloudPropertySet()) {
             files.add(fileForCloud(type, cloudPropertyValue()));
         } else {
             ALL_CLOUDS.forEach(c -> files.add(fileForCloud(type, c)));
