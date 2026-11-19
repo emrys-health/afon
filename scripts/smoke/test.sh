@@ -721,6 +721,44 @@ if runs_network_smoke; then
   check_polaris_ingress
 fi
 
+# Prints, for a failed test, what the cluster says about the component it tests, as its failure alone does not say why,
+# and the stack is torn down after the run.  Best effort: a failing kubectl never fails the run further.
+diagnose_failure() {
+  case "$1" in
+    git)
+      banner "Diagnostics of the failed test git: the Gitea pods, events and logs"
+      kubectl get pods,pvc -l app.kubernetes.io/instance=gitea -o wide 2>&1 || true
+      kubectl describe pods -l app.kubernetes.io/instance=gitea 2>&1 | tail -60 || true
+      # The server, and the init containers that set up its database and users, are where a 500 would be explained.
+      kubectl logs -l app.kubernetes.io/instance=gitea --all-containers=true --tail=200 --prefix=true 2>&1 || true
+      kubectl logs -l app.kubernetes.io/instance=gitea --all-containers=true --previous --tail=100 --prefix=true 2>&1 || true
+      banner "End of the diagnostics of the failed test git"
+      ;;
+  esac
+  diagnose_cluster
+}
+
+# Set once the logs of all the pods have been printed: one dump per run is enough, as the pods are the same for every failed test.
+CLUSTER_DIAGNOSED=false
+
+# Prints the state of every pod of the cluster, the warning events, and the tail of the logs of each pod, those that crashed included, as the
+# failed test may have been caused by another component.  Best effort, like diagnose_failure.
+diagnose_cluster() {
+  $CLUSTER_DIAGNOSED && return 0
+  CLUSTER_DIAGNOSED=true
+  banner "Diagnostics of the cluster: all pods, warning events and the tail of the logs of every pod"
+  kubectl get pods -A -o wide 2>&1 || true
+  kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -50 || true
+  local namespace pod
+  while read -r namespace pod; do
+    [ -n "$pod" ] || continue
+    banner "Logs of pod $namespace/$pod"
+    kubectl logs -n "$namespace" "$pod" --all-containers=true --tail="${DIAGNOSE_LOG_LINES:-50}" --prefix=true 2>&1 || true
+    kubectl logs -n "$namespace" "$pod" --all-containers=true --previous --tail=30 --prefix=true 2>/dev/null || true
+  done < <(kubectl get pods -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name 2>/dev/null || true)
+  banner "End of the diagnostics of the cluster"
+}
+
 # The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed
 # capitalised, as are those of the stacks, eg "stack aws-full set up in 17:01".
 PASSED=()
@@ -743,6 +781,7 @@ for test_line in "${TESTS[@]}"; do
     FAILED+=("$result")
     record "$result"
     error "Test ${result#test }: see $(afon_log_file)"
+    diagnose_failure "$name" 2>&1 || true
   fi
 done
 
