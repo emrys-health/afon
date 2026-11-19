@@ -721,6 +721,12 @@ if runs_network_smoke; then
   check_polaris_ingress
 fi
 
+# The file the diagnostics of the failed tests go to, in the logs dir, so that the logs store keeps it with the other logs, which it does for
+# every *.log there, and the console, which a public repo's job log shows to all, has none of the pods' logs.
+diagnostics_file() {
+  echo "$(dirname "$(afon_log_file)")/$CLOUD-full-diagnostics.log"
+}
+
 # Prints, for a failed test, what the cluster says about the component it tests, as its failure alone does not say why,
 # and the stack is torn down after the run.  Best effort: a failing kubectl never fails the run further.
 diagnose_failure() {
@@ -781,7 +787,8 @@ for test_line in "${TESTS[@]}"; do
     FAILED+=("$result")
     record "$result"
     error "Test ${result#test }: see $(afon_log_file)"
-    diagnose_failure "$name" 2>&1 || true
+    diagnose_failure "$name" >> "$(diagnostics_file)" 2>&1 || true
+    warning "Diagnostics of the failed test $name in $(diagnostics_file)"
   fi
 done
 
