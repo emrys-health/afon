@@ -55,10 +55,15 @@ on:
     branches: [main]
     paths:
       - "afon-*/**"
+      - "scripts/**"
+      - "templates/**"
   pull_request:
     branches: [main]
     paths:
       - "afon-*/**"
+      - "scripts/**"
+      - "templates/**"
+
 permissions:
   contents: read
 
