@@ -51,7 +51,14 @@ on:
         description: "The afon-base image, without its tag"
         type: string
         default: emryshealth/afon-base
-
+  push:
+    branches: [main]
+    paths:
+      - "afon-*/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "afon-*/**"
 permissions:
   contents: read
 
