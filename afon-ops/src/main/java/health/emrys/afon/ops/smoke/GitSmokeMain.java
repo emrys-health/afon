@@ -57,6 +57,14 @@ public class GitSmokeMain {
         void sleep(long millis) throws InterruptedException;
     }
 
+    /** Deletes the repository at the URL, as the user, with python as the Jupyter pod has no curl: the URL, user and password are its arguments. */
+    private static final String DELETE_REPO_SCRIPT = String.join("\n",
+        "import sys, base64, urllib.request",
+        "url, user, password = sys.argv[1:4]",
+        "request = urllib.request.Request(url, method='DELETE')",
+        "request.add_header('Authorization', 'Basic ' + base64.b64encode((user + ':' + password).encode()).decode())",
+        "print(urllib.request.urlopen(request).status)");
+
     private final AfonPropertyProvider properties;
 
     public GitSmokeMain(AfonPropertyProvider properties) {
@@ -131,7 +139,19 @@ public class GitSmokeMain {
 
         ExecResult lsRemote = retrying(() -> client.exec(jupyterPod, "git", "ls-remote", repoUrl));
         if (!lsRemote.isSuccess()) {
-            if (!lsRemote.stderr().contains("Repository not found")) {
+            if (isServerError(lsRemote)) {
+                // Gitea still has the repository in its database but not on its volume, eg the volume was recreated: it answers 500, not
+                // "Repository not found", for ever.  The repository only serves this test, so it is dropped, to be created again below.
+                logger.warn("Gitea keeps answering with a server error for {} of {} ({}), so deleting it to create it again", TEST_REPO, user,
+                            Credentials.redact(lsRemote.stderr()).strip());
+                ExecResult deleted = client.exec(jupyterPod, "python3", "-c", DELETE_REPO_SCRIPT,
+                                                 format("http://%s/api/v1/repos/%s/%s", GITEA, user, TEST_REPO), user, password);
+                if (!deleted.isSuccess()) {
+                    errors.add(format("Could not reach %s, and could not delete it: %s | %s", TEST_REPO,
+                                      Credentials.redact(lsRemote.stderr()), Credentials.redact(deleted.stderr())));
+                    return errors;
+                }
+            } else if (!lsRemote.stderr().contains("Repository not found")) {
                 errors.add(format("Could not reach %s: %s", TEST_REPO, Credentials.redact(lsRemote.stderr())));
                 return errors;
             }
