@@ -349,6 +349,37 @@ class ProjectEnvTest {
                                                                                   .filteredOn(id -> cloudOf(id, cloud)).containsExactly("cvd", "dbt");
     }
 
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aDataProviderHoldsOnlyItsOwnCatalogsNotThoseThatTheEnvListsForTheOtherClouds(AfonCloud cloud) throws IOException {
+        Path file = home.resolve("data.yaml");
+        Files.writeString(file, ProjectFixtures.dataExample(cloud));
+        Path env = Files.createDirectories(home.resolve("config-dev"));
+        Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
+        Files.writeString(env.resolve("catalogs.properties"), "");
+        for (AfonCloud each : AfonCloud.values()) {
+            Files.writeString(env.resolve("afon-" + lower(each) + ".properties"), each.name() + "_POLARIS_DOMAIN_NAME=" + lower(each) + "-polaris.dev.click\n");
+            Files.writeString(env.resolve("catalogs-" + lower(each) + ".properties"), each.name() + "_CATALOG_IDS=" + lower(each) + "," + lower(each) + "_external\n"
+                + each.name() + "_CATALOG_TYPE_" + lower(each) + "=internal\n" + each.name() + "_CATALOG_TYPE_" + lower(each) + "_external=external\n");
+        }
+        Path config = ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file);
+        var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
+        assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).containsExactly("cvd", "dbt");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesTheCatalogsOfTheOtherCloudsOfAnEnvToTheProjectsThatAreNotDataProjects(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        for (AfonCloud each : AfonCloud.values()) {
+            Files.writeString(setup.envConfig().resolve("catalogs-" + lower(each) + ".properties"), each.name() + "_CATALOG_IDS=" + lower(each) + "\n"
+                + each.name() + "_CATALOG_TYPE_" + lower(each) + "=internal\n");
+        }
+        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+        var catalogs = new health.emrys.afon.config.AfonCatalogs(new FilePropertyProvider(config.toString()));
+        assertThat(catalogs.all()).extracting(health.emrys.afon.config.AfonCatalog::id).contains("aws", "azure", "gcp");
+    }
+
     private static boolean cloudOf(String id, AfonCloud cloud) {
         return List.of("cvd", "dbt", lower(cloud)).contains(id);
     }

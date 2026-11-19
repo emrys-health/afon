@@ -167,6 +167,16 @@ public final class ProjectEnv {
         if (project instanceof TreProject tre) {
             byFile.putAll(deriveDataProviders(tre, env));
         }
+        if (project instanceof DataProject) {
+            // a Data Provider holds its own catalogs and no others: the stack makes those of every cloud that the config lists, so those of the other
+            // clouds, which the env lists for its own stacks, are emptied (the project's cloud has its own list, from the names of its resources)
+            for (AfonCloud other : AfonCloud.values()) {
+                if (other != cloud) {
+                    byFile.computeIfAbsent("catalogs-" + other.toString().toLowerCase(Locale.ROOT) + ".properties", file -> new LinkedHashMap<>())
+                          .put(other.toString().toUpperCase(Locale.ROOT) + "_CATALOG_IDS", "");
+                }
+            }
+        }
         if (env != null) {
             // the names of the project's resources go first, so that what the file says is not overridden by them
             ProjectNames.derive(project, env, project.env()).forEach((file, names) -> {
@@ -178,7 +188,7 @@ public final class ProjectEnv {
         }
         List<String> problems = new ArrayList<>();
         byFile.values().forEach(properties -> properties.forEach((name, value) -> {
-            if (!SAFE_VALUE.matcher(value).matches()) {
+            if (!value.isEmpty() && !SAFE_VALUE.matcher(value).matches()) {
                 problems.add(String.format("%s '%s' has a character that a properties file sourced by a shell cannot hold", name, value));
             }
         }));

@@ -193,6 +193,10 @@ named by its id, in storage that is the project's own. A Data Provider has no cl
 identity: that is for the TRE projects. `cluster.nodePool` is the small nodes of the identity, as a Data Provider runs
 Polaris only; AWS has none.
 
+**Its catalogs are its own.** The setup of a stack makes the catalogs that the config lists for every cloud, not just
+the stack's, so a Data Provider takes none of the env's: its project's cloud lists `cvd` and `dbt`, and the other clouds
+list none.
+
 **Who can reach its Polaris.** A Data Provider does not list the TREs that read it: they name it, in their own
 `dataProviders.named`. So `configure lon` looks through the projects of the Afon home for the TREs that name a catalog of
 `lon`, and adds the egress IP of each, the one its file names or else the env's `<CLOUD>_EGRESS_IP`, to
@@ -804,7 +808,11 @@ this deployment.
 - **Tried on Azure: `lon`.** The `data` project role is built and tested, with its derived domain, storage, database and
   catalogs, `up` and `down`. `lon`, with its `cvd` and `dbt` catalogs, has been brought up on Azure with `up lon`,
   against the central identity that `idp` deploys on AWS: its Polaris pod is running and ready, with no errors in its
-  log. It was checked by its pod and its log, not yet by `azure-polaris`, nor by listing its catalogs. `nw` has not been
+  log. `azure-polaris` run against it finds every layer healthy: the Azure login, the AKS cluster and its 2 nodes, the
+  Polaris pod, the ingress and its TLS secret, Polaris refusing an anonymous caller, and the catalog API serving. That
+  check listed, besides `cvd` and `dbt`, the catalogs of the env's AWS and GCP stacks, which a Data Provider must not
+  hold: `configure` now empties the catalog ids of the clouds other than the project's, so only its own are made. `lon`
+  has to be configured and deployed again to lose them, and the ones already made deleted. `nw` has not been
   deployed.
 - **Tried on Azure: the Data Provider using the central identity.** A Data Provider's file names the identity, and
   `configure` points its config at it: the OIDC domain is the issuer's host, and the setup of its stack reaches Keycloak
