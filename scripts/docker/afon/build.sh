@@ -137,9 +137,8 @@ if [ "$WHAT" = azure-agent ] || [ "$WHAT" = all ]; then
 fi
 
 if [ "$WHAT" = desktop ] || [ "$WHAT" = all ]; then
-  # shellcheck disable=SC2046
   docker build "${COMMON_ARGS[@]}" $(tags "$DESKTOP_IMAGE") \
     --build-arg "BASE_IMAGE=$DESKTOP_IMAGE:$VERSION" \
-    "$DIR/azure-agent"
-  push "$AGENT_IMAGE"
+    "$DIR/desktop "
+  push "$DESKTOP_IMAGE"
 fi
