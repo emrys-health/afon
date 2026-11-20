@@ -4,6 +4,7 @@ db|db-smoke|
 trino|trino-query-smoke|
 tetragon|tetragon-loki-smoke|
 loki|promtail-loki-smoke|
+failed-login-loki|failed-login-loki-smoke|
 git|git-smoke|
 guacamole-db|guacamole-db-smoke|
 network|network-smoke|
