@@ -71,6 +71,12 @@ public class ConfigureUsersMain {
                 adminToken, KEYCLOAK_REALM,
                 propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
         trustTheAdminClientAtTheDataProvider();
+        if (isSet(OIDC_PROJECT_CLAIM)) {
+            // the identity of a project's TRE is shared: its users are the members, made by manage-identity with their own passwords, and the admins of the env's
+            // users.csv are not the project's to make there, nor to give the password of that file again
+            logger.info("Leaving the users of the central identity to it: the admins of users.csv are not made, nor their passwords set, for a project's TRE");
+            return responses;
+        }
         for (AfonUser user : userProvider.getAdmins()) {
             responses.add(identityProvider.createUser(adminToken, KEYCLOAK_REALM, user));
             if (user.username().equals(propertyProvider.getValue(USER_ID))) {

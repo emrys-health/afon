@@ -1,6 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.security.IdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -98,5 +100,47 @@ class ConfigureUsersMainTest {
         new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
 
         verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList());
+    }
+
+    private static final AfonUser MAURO = new AfonUser("mauro", "pw-mauro", "mauro.talevi@emrys.health", "mauro-talevi", "Mauro", "Talevi");
+    private static final AfonUser WILL = new AfonUser("will", "pw-will", "will@emrys.health", "will", "Will", "X");
+
+    @Test
+    void makesTheAdminUsersOfUsersCsvAndTheClientOfTheUserOutsideAProject() throws Exception {
+        when(users.getAdmins()).thenReturn(List.of(MAURO, WILL));
+        when(properties.getValue(USER_ID)).thenReturn("will");
+
+        new ConfigureUsersMain(users, properties, identity).configureOidcUsers();
+
+        verify(identity).createUser(any(), eq("polaris"), eq(MAURO));
+        verify(identity).createUser(any(), eq("polaris"), eq(WILL));
+        verify(identity).createConfidentialClient(any(), eq("polaris"), eq("will"), eq("pw-will"));
+    }
+
+    @Test
+    void leavesTheUsersOfTheSharedIdentityAloneForAProjectsTre() throws Exception {
+        when(users.getAdmins()).thenReturn(List.of(MAURO, WILL));
+        when(properties.getValue(USER_ID)).thenReturn("will");
+        when(properties.hasProperty(OIDC_PROJECT_CLAIM)).thenReturn(true);
+        when(properties.getValue(OIDC_PROJECT_CLAIM)).thenReturn("project");
+
+        new ConfigureUsersMain(users, properties, identity).configureOidcUsers();
+
+        // no user is made or has a password set, and no client is made for the user, but the realm and the admin client of Polaris still are
+        verify(identity, never()).createUser(any(), anyString(), any());
+        verify(identity, never()).createConfidentialClient(any(), anyString(), eq("will"), anyString());
+        verify(identity).createRealm(any(), eq("polaris"));
+        verify(identity).createConfidentialClient(any(), eq("polaris"), eq("root"), eq("s3cret"));
+    }
+
+    @Test
+    void makesTheAdminUsersWhereTheConfigHasTheProjectClaimEmpty() throws Exception {
+        when(users.getAdmins()).thenReturn(List.of(MAURO));
+        when(properties.hasProperty(OIDC_PROJECT_CLAIM)).thenReturn(true);
+        when(properties.getValue(OIDC_PROJECT_CLAIM)).thenReturn("");
+
+        new ConfigureUsersMain(users, properties, identity).configureOidcUsers();
+
+        verify(identity).createUser(any(), eq("polaris"), eq(MAURO));
     }
 }

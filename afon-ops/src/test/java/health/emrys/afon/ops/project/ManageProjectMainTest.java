@@ -276,6 +276,66 @@ class ManageProjectMainTest {
         assertThat(home.resolve("projects/xyz-yyyy-nnnn/home/config")).isSymbolicLink();
     }
 
+    /** Makes the copy of the project's file in its config older than the file, as it is when the file is changed after {@code configure}. */
+    private void changeTheFileAfterConfigure() throws Exception {
+        Path copy = home.resolve("config-" + PROJECT + "/project.yaml");
+        java.nio.file.Files.setLastModifiedTime(copy, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - 120_000));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToDeployAFileChangedAfterConfigureAndSaysToConfigureAgain(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        changeTheFileAfterConfigure();
+
+        assertThat(command.run(new String[]{"up", PROJECT})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("newer than its copy", "manage-project configure " + PROJECT);
+        assertThat(ran).isEmpty();
+        // configured again, it is deployed
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT})).isZero();
+        assertThat(ran).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void registersAChangedFileAloneAsTheRegistrationReadsTheFileItself(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        changeTheFileAfterConfigure();
+
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "register", "--until", "register"})).isZero();
+
+        assertThat(ran).contains(inProject("manage-identity", "create", PROJECT), inProject("manage-identity", "sync-members", PROJECT));
+        assertThat(err.toString()).doesNotContain("newer than its copy");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aDryRunOfAChangedFileWarnsAndGoesOn(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        changeTheFileAfterConfigure();
+
+        assertThat(command.run(new String[]{"up", PROJECT, "--dry-run"})).isZero();
+
+        assertThat(err.toString()).contains("Warning:", "newer than its copy");
+        assertThat(ran).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aFileNotChangedAfterConfigureIsDeployed(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+
+        assertThat(command.run(new String[]{"up", PROJECT})).isZero();
+
+        assertThat(err.toString()).doesNotContain("newer than its copy");
+    }
+
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void syncsTheMembersAfterTheRegistration(AfonCloud cloud) throws Exception {

@@ -89,6 +89,23 @@ public final class ProjectEnv {
     }
 
     /**
+     * The stacks of a project read the copy of its file that {@code configure} makes in its config, not the file: a file changed since, eg a member added to
+     * it, is not what they deploy.
+     *
+     * @return whether the project's file was changed after {@code configure} made the copy of it; not if there is no copy, which is another matter, that
+     * the project is not configured
+     */
+    public static boolean fileIsNewerThanItsCopy(Path afonHome, AfonProject project, Path projectFile) {
+        Path copy = configDir(afonHome, project).resolve(FileProjectProvider.FILE);
+        try {
+            return Files.isRegularFile(copy) && Files.isRegularFile(projectFile)
+                   && Files.getLastModifiedTime(projectFile).compareTo(Files.getLastModifiedTime(copy)) > 0;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
      * @return the config dir of the project, {@code <afon-home>/config-<project>}
      */
     public static @NonNull Path configDir(Path afonHome, AfonProject project) {

@@ -246,7 +246,7 @@ public class ManageProjectMain {
                 yield 0;
             }
             case "configure" -> configure(project, provider.file(), env != null ? env : project.env());
-            default -> runStages(action, project, fromStage, untilStage, dryRun);
+            default -> runStages(action, project, provider.file(), fromStage, untilStage, dryRun);
         };
     }
 
@@ -470,7 +470,7 @@ public class ManageProjectMain {
         }
     }
 
-    private int runStages(String action, AfonProject project, StageId from, StageId until, boolean dryRun) {
+    private int runStages(String action, AfonProject project, Path projectFile, StageId from, StageId until, boolean dryRun) {
         ProjectPlan plan = ProjectPlan.of(project);
         IdentityProject identityProject;
         try {
@@ -497,6 +497,18 @@ public class ManageProjectMain {
             out.printf("Nothing to run: no stage of project %s %s%n", project.id(),
                        action.equals("nightly") ? "lives for a day, so none is rebuilt at night" : "is left for " + action);
             return 0;
+        }
+        // the stacks read the copy of the project's file in its config, so a file changed since `configure` is not what they would deploy.  The registration reads the
+        // file itself, so it alone is made
+        if (action.equals("up") && ProjectEnv.fileIsNewerThanItsCopy(afonHome, project, projectFile)
+            && commands.stream().anyMatch(command -> !command.skipped() && command.stage() != ProjectPlan.StageId.REGISTER)) {
+            String stale = String.format("The file %s of project %s is newer than its copy in the project's config, which the stacks deploy from: run "
+                                         + "afon-cli.sh manage-project configure %s first", projectFile, project.id(), project.id());
+            if (!dryRun) {
+                err.println(stale);
+                return 1;
+            }
+            err.println("Warning: " + stale);
         }
         if (!dryRun) {
             try {

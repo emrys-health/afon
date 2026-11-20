@@ -391,9 +391,7 @@ The TRE's domains are not defined in the file: they are derived from the env's (
 `up` issues too, once the zones are delegated. Either `up` does the delegation, or you stop after `create`, delegate,
 issue the certificates, and run the rest.
 
-**3. Make the secret of its TRE client.** The TRE's JupyterHub and the gate in front of it sign members in with a client
-of the project's own, `cvd-2026-tre`, which has a secret. This writes a random one, readable by its owner only, to
-`~/.afon/projects/cvd-2026/keys/tre.secret`:
+**3. Make the secret of its TRE client.** The TRE's JupyterHub and the oauth2-proxy gate in front of it sign members in with a client of the project's own, `cvd-2026-tre`, which has a secret. This writes a random one, readable by its owner only, to `~/.afon/projects/cvd-2026/keys/tre.secret`:
 
 ```shell
 afon-cli.sh project-secret cvd-2026 tre
@@ -464,6 +462,10 @@ The `tre` stage does not run the check that Spark writes a table through the TRE
 (`aws_spark_talks_to_catalog_aws`), which the setup of a stack outside a project does: the Polaris of a project's TRE
 admits only the tokens of the project, with its audience, its `acr` and its project claim, and that check signs in as an
 admin user, which has none of them. The members' access is what matters there.
+
+`up` stops, and says to run `configure`, if the project's file has changed since `configure` copied it into the project's
+config, as the stacks deploy from that copy and a member added to the file, say, would not be served by JupyterHub;
+`--from register --until register` alone is made, as the registration reads the file itself, and `--dry-run` only warns.
 
 **IMPORTANT:** The project has names of its own, so it can run next to `emrys2`'s own `aws-full`, and next to other
 projects made from the same env, see [Names](#names-of-a-projects-resources). It still uses the egress IP of `emrys2`
@@ -752,6 +754,9 @@ served by JupyterHub unless they are also listed as members, by the same email, 
 `users.csv`, or the deploy refuses; to be a member under an email that an admin has, take the admin out of `users.csv`:
 see [Users](configuration.md#users).
 
+The setup of a project's TRE leaves the users of the central identity alone: it does not make the users of `users.csv`
+there, nor set their passwords again, so a password that someone chose through an invitation is not reset by it.
+
 ## Setting up SMTP
 
 The central identity's Keycloak emails each member the invitation to verify their email, set a password and enrol
@@ -897,8 +902,7 @@ say what the receiver found (`spf=pass`, `dkim=pass`, `dmarc=pass`).
   and JupyterHub's `GenericOAuthenticator` takes a `client_id` and a `client_secret` only. A key is to be used again when
   they can present it.
 - **PKCE.** The gate in front of JupyterHub asks for PKCE (the S256 method) in a project's TRE. The project's client
-  allows it and does not require it: JupyterHub's own sign-in, behind the gate and with the same client, sends none in
-  the version that Afon runs, so a client that required it would let only the gate sign in.
+  allows it and does not require it: JupyterHub's own sign-in, behind the oauth2-proxy gate and with the same client, sends none in the version that Afon runs, so a client that required it would let only the gate sign in.
 - **How members authenticate.** Each member signs in as themselves, in the browser flow, with their own password and a
   second factor. Their email is only their identifier: it is their username in the identity provider, and `sync-members`
   uses it to find or create their account. The first time, they get an invitation email to verify the email, set a
@@ -973,11 +977,6 @@ built** means that the code is not there; **not tried** means that it is, but ha
 
 ### Members, invitations and the setup of a TRE
 
-- **Not built: the setup of a project's TRE still resets the passwords of the admin users.** It makes the users of the
-  env's `users.csv` in the central identity with the passwords of that file, so a password that one of them set through
-  an invitation is reset by it. A project's TRE should not touch the users of the shared identity.
-- **Not built: `up` does not notice a changed project file.** The TRE reads the copy of `project.yaml` that `configure`
-  makes in its config, so a member added to the file is not served by JupyterHub until `configure` is run again.
 - **Not built: the invitation has no way back to the TRE.** The page that ends it, "Your account has been updated", has
   no link, as the invitation names no client to go back to: the member opens the TRE's address.
 - **Not done: SES delivers only to verified identities.** While the account is in the SES sandbox, each recipient, or its
