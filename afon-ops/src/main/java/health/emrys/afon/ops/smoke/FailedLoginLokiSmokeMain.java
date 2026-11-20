@@ -121,11 +121,13 @@ public class FailedLoginLokiSmokeMain {
 
         try (KubeClient client = new KubeClient(properties);
              LokiClient loki = new LokiClient(client, properties)) {
+            logger.info("Checking OAuth2-Proxy logs...");
             errors.addAll(found(loki, "the oauth2-proxy gate's request that started the login", gateQuery(marker), start));
             if (Boolean.parseBoolean(properties.getCloudValue(cloud, KEYCLOAK_EXTERNAL, "false").trim())) {
                 logger.warn("Not checked that KeyCloak logged the failed login: it is another stack's, as {}_KEYCLOAK_EXTERNAL=true, so its logs are not in this cluster's Loki",
                             cloud.name());
             } else {
+                logger.info("Checking KeyCloak logs...");
                 errors.addAll(found(loki, "KeyCloak's " + LOGIN_ERROR + " event", keyCloakQuery(username), start));
             }
         }
@@ -164,7 +166,11 @@ public class FailedLoginLokiSmokeMain {
             logger.info("Submitting KeyCloak's login form as {} with a wrong password", username);
             return http.execute(post, response -> {
                 Header location = response.getFirstHeader("Location");
-                EntityUtils.consume(response.getEntity());
+                String html   = EntityUtils.toString(response.getEntity());
+                String expectedMsg = "Invalid username or password.";
+                if (!html.contains(expectedMsg)) { // this is a bit fragile as it depends on exact wording. So, just log it.
+                    logger.warn("Was expecting to see '{}' in the HTML but got:\n{}", expectedMsg, html);
+                }
                 return new LoginResult(response.getCode(), location == null ? null : location.getValue());
             });
         }
