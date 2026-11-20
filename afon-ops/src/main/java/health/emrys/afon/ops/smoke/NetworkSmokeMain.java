@@ -452,7 +452,28 @@ public class NetworkSmokeMain {
         return pod.contains(SparkNames.from(properties).master());
     }
 
+    /** The label of the notebook pods, which the network policy of the notebooks selects. */
+    static final String NOTEBOOK_POD_LABEL = "afon-role=jupyter-singleuser";
+
+    /**
+     * @return whether the config is of a project's TRE, which names the claim that its tokens carry the project in: set, and not blank
+     */
+    static boolean isProject(AfonPropertyProvider properties) {
+        return properties.hasProperty(OIDC_PROJECT_CLAIM) && !properties.getValue(OIDC_PROJECT_CLAIM, "").isBlank();
+    }
+
     protected List<String> jupyterPods() throws Exception {
+        if (isProject(properties)) {
+            // JupyterHub serves the members of a project's TRE, and not the admin that this signs in as, which it has no user of: the notebook of a member who is
+            // signed in is checked, if one runs, which no one is made to start
+            List<String> running = client.runningPodWithLabel(NOTEBOOK_POD_LABEL).map(List::of).orElse(List.of());
+            if (running.isEmpty()) {
+                logger.warn("No notebook pod runs, as no member of the project is signed in to its TRE: the checks of the notebook pods are not made");
+            } else {
+                logger.info("Checking the Jupyter pod of a member who is signed in: {}", running);
+            }
+            return running;
+        }
         List<String> pods = new ArrayList<>();
         pods.add(new JupyterHubSpawner(client).spawnWithJupyterToken(properties));
         logger.info("Checking Jupyter pods: {}", pods);

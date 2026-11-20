@@ -523,9 +523,17 @@ afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
 ```
 
 Without the grant a token of the project reads nothing. Then check that `lon` is serving only its own catalogs, `cvd` and
-`dbt`, and, from a notebook of the TRE, that the token it holds, `OIDC_TOKEN`, names the project (the claim `project`),
-has `provider-lon` among its audiences and `acr: mfa`. If `lon` refuses it, that decoded token says which of the three is
-missing.
+`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/ProjectReadsDataProvider.ipynb`, which is
+run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`, `provider-lon`
+among its audiences, `acr: mfa`), that the notebook pod cannot call the Data Provider's Polaris directly, that Spark
+reads a table that `lon` has released, and that it is refused one that it has not. It needs two tables on `lon`, one
+released and one left in `staging`, which the Data Provider makes (`manage-project-grants release cvd <table>` moves
+one). It says `PASS`, `FAIL` or `INCONCLUSIVE` for each step, and the first `FAIL` says where to look.
+
+The whitelist of the TRE, the hosts of the Data Provider's Polaris and storage that Spark may reach, and what the pods
+may not, is tested by `network-smoke`, run in the project's home: `afon-cli.sh manage-project run cvd-2026
+network-smoke`. A project's TRE has no user of its own to spawn a notebook as, so it checks the notebook pod of a member
+who is signed in, and skips those checks, saying so, if no one is.
 
 ## A second TRE project
 
@@ -734,12 +742,15 @@ so that a project is never brought up that nobody can sign in to. To change the 
 `manage-project run <project> manage-identity sync-members`. The emails are compared in lower case.
 
 The members are also the users of the TRE's own services: JupyterHub and its remote desktop serve each of them, by their
-email, and have them from the TRE's deployment, so a member added later signs in to the central identity at once, but is
-served by JupyterHub only after the TRE is deployed again (`manage-project up <project> --from tre`). Members have no
-password in the TRE: they sign in with the one they set in the central identity. The users of `users.csv` in the env that
-the project is made from are its **admins**, who set it up and run its smoke tests, and who are not served by JupyterHub
-unless they are also listed as members, by the same email, which must then be their username in `users.csv`: see
-[Users](configuration.md#users).
+email, and have them from the TRE's deployment, which reads the copy of `project.yaml` that `configure` makes in the
+project's config. So a member added later signs in to the central identity at once, but is served by JupyterHub only
+after `configure` has copied the changed file and the TRE has been deployed again: `manage-project configure <project>`,
+then `manage-project up <project> --from register`, which makes the member in the identity and then deploys the TRE.
+Members have no password in the TRE: they sign in with the one they set in the central identity. The users of `users.csv`
+in the env that the project is made from are its **admins**, who set it up and run its smoke tests, and who are not
+served by JupyterHub unless they are also listed as members, by the same email, which must then be their username in
+`users.csv`, or the deploy refuses; to be a member under an email that an admin has, take the admin out of `users.csv`:
+see [Users](configuration.md#users).
 
 ## Setting up SMTP
 
@@ -946,30 +957,15 @@ built** means that the code is not there; **not tried** means that it is, but ha
 
 ### The TREs reading the Data Providers
 
-- **Not tried: a member reading a catalog of `lon`.** The grant has been run, and the allow-list admits the TRE; a table
-  has still to be released, and read with the session code of the `lon` catalog (`test_lon_cvd`) from a notebook.
-- **Partly built: Spark reads the catalogs of the Data Providers, Trino does not.** `configure` writes them into the
-  project's catalogs file, as catalogs from the Data Provider source, which `AfonCatalogs.bySource("data-provider")`
-  reads. The PySpark session code that `GeneratePySparkKeycloakMain` and `GeneratePySparkContextMain` write has a catalog
-  for each, named after its id (`test_lon_cvd`), at the Data Provider's own endpoint, with the notebook's `OIDC_TOKEN`;
-  it is only the code, not tried against a Data Provider. Trino has none: each of its catalogs starts with a credential
-  of its own, which a Data Provider's Polaris would refuse for lack of its audience and `acr`.
-- **Built, not tried: the whitelist of the TRE.** The domains that the TRE may resolve have, for each catalog from a Data
-  Provider, the host of its Polaris and its storage: the `blob` endpoint of an Azure storage account, the regional
-  endpoint of an AWS bucket, in the region of the TRE's config, as the Data Provider's is not known, and
-  `storage.googleapis.com` on GCP. They are derived from the catalogs by `WhitelistConfig`, so nothing is added to
-  `whitelist.yaml`, and a config outside a project has none. `network-smoke`, run in the project's home, is what tests
-  it, and it has not been run against a project's TRE.
-- **Not tried: the read across clouds.** An AWS Spark or Trino reading Azure storage with the credentials that the Data
-  Provider's Polaris vends, behind a storage firewall, which there is none of yet.
+- **Not built: Trino does not read the catalogs of the Data Providers.** Each of its catalogs starts with a credential of
+  its own, which a Data Provider's Polaris would refuse for lack of its audience and `acr`; Spark, which reads them with
+  the member's token, does.
+- **Not tried: Trino across clouds, and behind a storage firewall.** An AWS Trino reading Azure storage with the
+  credentials that the Data Provider's Polaris vends; and any read behind a storage firewall, which there is none of yet.
+  Spark on AWS reads the storage of `lon` on Azure.
 
 ### What the TRE's tools check
 
-- **Not tried: a member signing in to the TRE.** The project's client, with its secret, is the one that JupyterHub and
-  the gate read, and the gate's login is reached. Not shown: a member signing in through the gate and the hub's own login
-  behind it, and the token in a notebook, with the project claim, the audience of the Data Provider and `acr: mfa`. A
-  TRE's JupyterHub serves the members that it was deployed with, so a member added after is served after `manage-project
-  configure <project>`, which copies the project's file, and `manage-project up <project> --from register`.
 - **Not built: the TRE's tools do not check the audience, the project claim or the `acr` of a token.** The tokens carry
   them, and the Data Providers check them. It is to do for each tool that takes a token: Trino, Spark and Gitea. A key in
   place of the secret waits for oauth2-proxy and JupyterHub's authenticator to be able to present one, see [Client
@@ -987,9 +983,10 @@ built** means that the code is not there; **not tried** means that it is, but ha
 - **Not done: SES delivers only to verified identities.** While the account is in the SES sandbox, each recipient, or its
   domain, has to be verified, and invitations may be filed as spam until the sending domain has DKIM and a DMARC policy:
   see [Setting up SMTP](#setting-up-smtp). Production access removes the first.
-- **Not tried: `dbt-2026`, and the smoke tests of a TRE.** A second TRE from the same env, next to `cvd-2026`, and the
-  smoke tests of a TRE, which sign in as a user, against a project's Polaris, which admits only the tokens of the
-  project.
+- **Not tried: `dbt-2026`, and the smoke tests of a TRE that sign in as a user.** A second TRE from the same env, next to
+  `cvd-2026`, and the smoke tests that sign in as a user of `users.csv`, who is only an admin in a project's TRE, against
+  a project's Polaris, which admits only the tokens of the project. `network-smoke` does not, and has been run against
+  `cvd-2026`.
 - **Not built: the restriction of the admin side of Keycloak on AWS.** It is the listener rules of the load balancer
   (`AWS_KEYCLOAK_ALLOWED_CIDRS`), which `kube-keycloak-whitelist` does not change.
 

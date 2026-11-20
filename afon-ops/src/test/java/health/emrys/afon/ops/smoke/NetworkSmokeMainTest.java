@@ -1,10 +1,13 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperty.OIDC_PROJECT_CLAIM;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NetworkSmokeMainTest {
@@ -69,5 +72,21 @@ class NetworkSmokeMainTest {
 
         assertThat(results).hasSize(2).allMatch(ExecResult::isSuccess);
         assertThat(results.get(0)).isSameAs(OK);
+    }
+
+    @Test
+    void aTreIsAProjectsWhenItsConfigNamesTheProjectClaim() {
+        AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
+        // the config template has the key empty, or not at all, as a stack outside a project has it
+        assertThat(NetworkSmokeMain.isProject(properties)).isFalse();
+        properties.setValue(OIDC_PROJECT_CLAIM, "  ");
+        assertThat(NetworkSmokeMain.isProject(properties)).isFalse();
+        properties.setValue(OIDC_PROJECT_CLAIM, "project");
+        assertThat(NetworkSmokeMain.isProject(properties)).isTrue();
+    }
+
+    @Test
+    void theNotebookPodsAreFoundByTheLabelThatTheirNetworkPolicySelects() {
+        assertThat(NetworkSmokeMain.NOTEBOOK_POD_LABEL).isEqualTo("afon-role=jupyter-singleuser");
     }
 }
