@@ -30,6 +30,7 @@ AFON_ROOT="$(cd "$DIR/../../.." && pwd)"
 BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base}"
 CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
 AGENT_IMAGE="${AGENT_IMAGE:-emryshealth/afon-azure-agent}"
+DESKTOP_IMAGE="${DESKTOP_IMAGE:~emryshealth/afon-desktop""
 ZIP=""
 PLATFORM=linux/amd64
 PUSH=false
@@ -53,6 +54,7 @@ if [ -n "$REGISTRY" ]; then
   BASE_IMAGE="$REGISTRY/$BASE_IMAGE"
   CLI_IMAGE="$REGISTRY/$CLI_IMAGE"
   AGENT_IMAGE="$REGISTRY/$AGENT_IMAGE"
+  DESKTOP_IMAGE="$REGISTRY/$DESKTOP_IMAGE"
 fi
 
 cd "$AFON_ROOT"
@@ -130,6 +132,14 @@ if [ "$WHAT" = azure-agent ] || [ "$WHAT" = all ]; then
   # shellcheck disable=SC2046
   docker build "${COMMON_ARGS[@]}" $(tags "$AGENT_IMAGE") \
     --build-arg "BASE_IMAGE=$CLI_IMAGE:$VERSION" \
+    "$DIR/azure-agent"
+  push "$AGENT_IMAGE"
+fi
+
+if [ "$WHAT" = desktop ] || [ "$WHAT" = all ]; then
+  # shellcheck disable=SC2046
+  docker build "${COMMON_ARGS[@]}" $(tags "$DESKTOP_IMAGE") \
+    --build-arg "BASE_IMAGE=$DESKTOP_IMAGE:$VERSION" \
     "$DIR/azure-agent"
   push "$AGENT_IMAGE"
 fi

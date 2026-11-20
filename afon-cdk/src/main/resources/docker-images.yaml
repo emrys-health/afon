@@ -19,8 +19,8 @@ images:
     digest: sha256:a354e9fa84bd594ad1570ee8033b3a02626986e2ee3b5c2e64369f94342c537e
     category: first-party
   pyspark-notebook:
-    image: emryshealth/pyspark-notebook
-    tag: x86_64-spark-4.0.1_afon402
+    image: emryshealth/afon-desktop
+    tag: afon407
     digest: sha256:1d0350512144937e2f7b446fd857b03dddedc90fd5f8aaebdb2c464c3303ce75
     category: first-party
 
