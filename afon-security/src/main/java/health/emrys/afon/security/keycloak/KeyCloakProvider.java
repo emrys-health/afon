@@ -1074,6 +1074,13 @@ public class KeyCloakProvider implements IdentityProvider {
      * @param config the config that the project runs in, or {@code null} if none
      */
     static List<String> treRedirectUris(TreProject project, AfonPropertyProvider config) {
+        return callbackURIs(treDomain(project, config));
+    }
+
+    /**
+     * @return the Jupyter domain of the project's TRE: the one that the project's file gives, else the one that its config has
+     */
+    static String treDomain(TreProject project, AfonPropertyProvider config) {
         String property = project.cloud().name() + "_JUPYTER_DOMAIN_NAME";
         String domain = project.tre().domains().get(property);
         if ((domain == null || domain.isBlank()) && config != null) {
@@ -1084,7 +1091,7 @@ public class KeyCloakProvider implements IdentityProvider {
                 "%s is neither in stacks.tre.domains of the project's file nor in its config, which the redirect URIs of the project's TRE client are made from: "
                 + "configure the project, and run this in its home", property));
         }
-        return callbackURIs(domain.trim());
+        return domain.trim();
     }
 
     /**
@@ -1096,6 +1103,11 @@ public class KeyCloakProvider implements IdentityProvider {
 
     @Override
     public String ensureUser(String email, String firstName, String lastName) {
+        return ensureUser(email, firstName, lastName, null);
+    }
+
+    @Override
+    public String ensureUser(String email, String firstName, String lastName, String clientId) {
         String username = email.toLowerCase(Locale.ROOT);
         try {
             String token = adminToken();
@@ -1128,7 +1140,7 @@ public class KeyCloakProvider implements IdentityProvider {
             }
             setPrincipalAttribute(token, id);
             if (created) {
-                invite(token, id, username);
+                invite(token, id, username, clientId);
             }
             return id;
         } catch (IOException e) {
@@ -1197,17 +1209,64 @@ public class KeyCloakProvider implements IdentityProvider {
      * Sends the invitation email.  It needs SMTP configured on the realm, so that a failure is a warning: the user exists
      * and can be invited again.
      */
-    private void invite(String token, String id, String username) throws IOException {
-        HttpResponse response = sendInvitation(token, id, username);
+    private void invite(String token, String id, String username, String clientId) throws IOException {
+        HttpResponse response = sendInvitation(token, id, username, clientId);
         if (isFailure(response)) {
             logger.warn("Could not send the invitation email to {} (HTTP {}): is SMTP configured on the realm?", username,
                         response.getCode());
         }
     }
 
-    private HttpResponse sendInvitation(String token, String id, String username) throws IOException {
+    /**
+     * Sends the invitation, naming the client if there is one that exists, so that the page that ends the required actions links back to its {@code baseUrl}.
+     * Only {@code client_id} is given, and no {@code redirect_uri}, which would have to be one that the client registers: the identity refuses the call otherwise.
+     * If it refuses the call with the client, eg because the client is disabled, the invitation is sent without it, as it must still be sent.
+     */
+    private HttpResponse sendInvitation(String token, String id, String username, String clientId) throws IOException {
         String uri = format("/admin/realms/%s/users/%s/execute-actions-email", KEYCLOAK_REALM, id);
-        return putJson(token, uri, mapper.writeValueAsString(INVITATION_ACTIONS), "the invitation of " + username);
+        String body = mapper.writeValueAsString(INVITATION_ACTIONS);
+        String what = "the invitation of " + username;
+        if (clientId != null && !clientId.isBlank() && clientUuid(token, KEYCLOAK_REALM, clientId) != null) {
+            HttpResponse response = putJson(token, uri + "?client_id=" + java.net.URLEncoder.encode(clientId, java.nio.charset.StandardCharsets.UTF_8), body, what);
+            if (!isFailure(response)) {
+                return response;
+            }
+            logger.warn("The identity refused the invitation of {} naming the client {} (HTTP {}): sending it without", username, clientId, response.getCode());
+        }
+        return putJson(token, uri, body, what);
+    }
+
+    @Override
+    public int removeSecondFactor(String email) {
+        String address = email.toLowerCase(Locale.ROOT);
+        try {
+            String token = adminToken();
+            String id = userIdOf(token, address);
+            if (id == null) {
+                throw new IllegalStateException("No user " + address + " in the central identity");
+            }
+            int removed = 0;
+            for (Map<String, Object> credential : getList(token, format("/admin/realms/%s/users/%s/credentials", KEYCLOAK_REALM, id),
+                                                           "the credentials of " + address)) {
+                if ("otp".equals(credential.get("type"))) {
+                    HttpResponse response = restClient.delete(format("/admin/realms/%s/users/%s/credentials/%s", KEYCLOAK_REALM, id, credential.get("id")), token);
+                    if (isFailure(response)) {
+                        throw new IOException(format("Could not remove the authenticator %s of %s: HTTP %d", credential.get("id"), address, response.getCode()));
+                    }
+                    removed++;
+                }
+            }
+            if (removed > 0) {
+                // a session that passed the second factor with the device that is gone is ended, as it is for a member removed from a project
+                HttpResponse logout = restClient.post(format("/admin/realms/%s/users/%s/logout", KEYCLOAK_REALM, id), "", token);
+                if (isFailure(logout)) {
+                    throw new IOException(format("Could not end the sessions of %s: HTTP %d", address, logout.getCode()));
+                }
+            }
+            return removed;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to remove the authenticators of KeyCloak user " + address, e);
+        }
     }
 
     @Override
@@ -1277,6 +1336,11 @@ public class KeyCloakProvider implements IdentityProvider {
 
     @Override
     public void invite(String email) {
+        invite(email, null);
+    }
+
+    @Override
+    public void invite(String email, String clientId) {
         String address = email.toLowerCase(Locale.ROOT);
         try {
             String token = adminToken();
@@ -1284,7 +1348,7 @@ public class KeyCloakProvider implements IdentityProvider {
             if (id == null) {
                 throw new IllegalStateException("No user " + address + " in the central identity: add them to a project first");
             }
-            HttpResponse response = sendInvitation(token, id, address);
+            HttpResponse response = sendInvitation(token, id, address, clientId);
             if (isFailure(response)) {
                 throw new IllegalStateException(format(
                     "Could not send the invitation email to %s (HTTP %d): is SMTP configured on the realm? See KEYCLOAK_SMTP_HOST", address, response.getCode()));
@@ -1303,11 +1367,12 @@ public class KeyCloakProvider implements IdentityProvider {
             String realm = KEYCLOAK_REALM;
             ensurePrincipalInUserProfile(token);
             ensureAcrLevel(token, realm, identity.acr());
-            String tre = ensureProjectClient(token, realm, identity.treClient(), treRedirectUris(project, config), secretOf(secrets, "tre"),
+            String treDomain = treDomain(project, config);
+            String tre = ensureProjectClient(token, realm, identity.treClient(), callbackURIs(treDomain), "https://" + treDomain + "/", secretOf(secrets, "tre"),
                                              ensureBrowserFlow(token, realm, identity.treClient(), id), identity.acr());
             // a project with no Git of its own has Git deployed with its TRE, so no Git client
             String git = project.git() == null ? null
-                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), secretOf(secrets, "git"),
+                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), "https://" + project.git().domain() + "/", secretOf(secrets, "git"),
                                       ensureBrowserFlow(token, realm, identity.gitClient(), id), identity.acr());
             List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
             project.dataProviders().forEach(provider -> treAudiences.add(provider.audience()));
@@ -1352,7 +1417,7 @@ public class KeyCloakProvider implements IdentityProvider {
      *
      * @return the client's internal UUID
      */
-    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String secret,
+    private String ensureProjectClient(String token, String realm, String clientId, List<String> redirectUris, String baseUrl, String secret,
                                        String browserFlowId, String acr) throws IOException {
         String json = mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
@@ -1367,6 +1432,8 @@ public class KeyCloakProvider implements IdentityProvider {
             Map.entry("implicitFlowEnabled", false),
             Map.entry("fullScopeAllowed", false),
             Map.entry("redirectUris", redirectUris),
+            // the home page of the client, which the page that ends an invitation links back to, for a member who has just set their password
+            Map.entry("baseUrl", baseUrl),
             Map.entry("webOrigins", List.of("+")),
             // the login that admits only the members, after the second factor
             Map.entry("authenticationFlowBindingOverrides", Map.of("browser", browserFlowId)),

@@ -32,6 +32,7 @@ import java.util.function.BiFunction;
  * manage-identity remove-member &lt;project&gt; &lt;email&gt;
  * manage-identity sync-members &lt;project&gt;
  * manage-identity invite &lt;project&gt; &lt;email&gt;
+ * manage-identity remove-authenticator &lt;project&gt; &lt;email&gt;
  * manage-identity close &lt;project&gt;
  * </pre>
  * <ul>
@@ -73,6 +74,7 @@ public class ManageIdentityMain {
         "  remove-member <email>           removes the member from the group and ends their sessions",
         "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
         "  invite <email>                  sends the invitation again to a member who is in the central identity (it fails if it cannot be sent)",
+        "  remove-authenticator <email>    removes the member's authenticators and ends their sessions, so that they enrol a new one, eg from the invitation",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -136,7 +138,7 @@ public class ManageIdentityMain {
         // <project> is left out in the home of a project, whose config has its id
         int withoutProject = switch (action) {
             case "create", "close", "sync-members" -> 0;
-            case "add-member", "remove-member", "invite" -> 1;
+            case "add-member", "remove-member", "invite", "remove-authenticator" -> 1;
             default -> -1;
         };
         String project;
@@ -161,6 +163,8 @@ public class ManageIdentityMain {
                                                      : usage("remove-member takes one <email>");
             case "invite" -> rest.size() == 1 ? with(project, options, (p, e) -> invite(p, e, rest.get(0))) : usage("invite takes one <email>");
             case "sync-members" -> rest.isEmpty() ? with(project, options, this::syncMembers) : usage("sync-members takes no argument");
+            case "remove-authenticator" -> rest.size() == 1 ? with(project, options, (p, e) -> removeAuthenticator(p, e, rest.get(0)))
+                                                           : usage("remove-authenticator takes one <email>");
             case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
@@ -240,7 +244,7 @@ public class ManageIdentityMain {
 
     private void addMember(TreProject project, String endpoint, String email, Map<String, String> options) {
         IdentityProvider provider = identity.apply(project, endpoint);
-        String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME));
+        String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME), project.identity().treClient());
         provider.addMember(project, userId);
         record(project, () -> ProjectMembers.add(ProjectMembers.file(afonHome, project.id().value()), userId, email.toLowerCase(java.util.Locale.ROOT)));
         if (project.members().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
@@ -261,8 +265,18 @@ public class ManageIdentityMain {
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
     }
 
+    private void removeAuthenticator(TreProject project, String endpoint, String email) {
+        int removed = identity.apply(project, endpoint).removeSecondFactor(email);
+        if (removed == 0) {
+            out.printf("%s has no authenticator: nothing is removed%n", email);
+        } else {
+            out.printf("Removed %d authenticator%s of %s, and ended their sessions: they enrol a new one from the invitation, "
+                       + "afon-cli.sh manage-project run %s manage-identity invite %s%n", removed, removed == 1 ? "" : "s", email, project.id(), email);
+        }
+    }
+
     private void invite(TreProject project, String endpoint, String email) {
-        identity.apply(project, endpoint).invite(email);
+        identity.apply(project, endpoint).invite(email, project.identity().treClient());
         out.printf("Sent the invitation to %s%n", email);
     }
 
@@ -271,7 +285,7 @@ public class ManageIdentityMain {
         Map<String, String> current = provider.members(project);
         Map<String, String> wanted = new LinkedHashMap<>();
         for (TreProject.Member member : project.members()) {
-            String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName());
+            String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName(), project.identity().treClient());
             wanted.put(userId, member.email());
             if (!current.containsKey(userId)) {
                 provider.addMember(project, userId);

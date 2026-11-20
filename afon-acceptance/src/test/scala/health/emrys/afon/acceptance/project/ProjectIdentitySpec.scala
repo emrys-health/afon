@@ -270,15 +270,17 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
    *
    * @return the secret of the authenticator that they enrolled
    */
-  private def acceptInvitation(email: String, password: String): String = {
+  private def walkInvitation(email: String, password: String): (String, String) = {
     val browser = new Browser
     var secret: Option[String] = None
+    var lastPage = ""
     var response = browser.send(HttpRequest.newBuilder(URI.create(linkOfInvitationTo(email))).GET())
     for (_ <- 1 to 10 if response != null) {
       if (response.statusCode() / 100 == 3) {
         response = browser.send(HttpRequest.newBuilder(URI.create(baseUrl).resolve(response.headers().firstValue("Location").orElseThrow())).GET())
       } else {
         val page = response.body()
+        lastPage = page
         val action = "(?s)<form[^>]*\\saction=\"([^\"]+)\"".r.findFirstMatchIn(page).map(_.group(1).replace("&amp;", "&"))
         val link = "href=\"([^\"]*login-actions[^\"]*)\"".r.findFirstMatchIn(page).map(_.group(1).replace("&amp;", "&"))
         if (action.isDefined) {
@@ -295,8 +297,10 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       }
     }
     assert(secret.isDefined, s"the invitation to $email did not have them enrol an authenticator")
-    secret.get
+    (secret.get, lastPage)
   }
+
+  private def acceptInvitation(email: String, password: String): String = walkInvitation(email, password)._1
 
   private def clientUuid(clientId: String): String =
     get(s"/admin/realms/$KEYCLOAK_REALM/clients?clientId=$clientId").get(0).get("id").asText()
@@ -373,6 +377,22 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       Then("the identity provider does not authenticate it")
       assert(refused._1 == 401 || refused._2.contains("client"), refused.toString)
       assert(refused != authenticated)
+    }
+
+    "link back to the TRE from the page that ends the invitation of a member, when the invitation names the TRE's client" in {
+      Given("a TRE project registered in the identity provider, whose client has the TRE's address as its home page")
+      val id = "cfg-2026-0030"
+      provider.ensureProject(projectOf(id, Seq("data1"), ownGit = false), secrets())
+      val home = s"https://jupyter.$id.example.org/"
+
+      When("a member is made with an invitation that names the client, and accepts it")
+      provider.ensureUser("carol@tre.example", "Carol", "C", s"$id-tre")
+      val (_, finalPage) = walkInvitation("carol@tre.example", "carol-password")
+
+      Then("the page that ends the invitation links back to the home page of the client")
+      // the link of the page, whose element has no id in every theme: it is the address that the member follows
+      assert(finalPage.contains(s"href=\"$home\""), s"no link to $home in: $finalPage")
+      assert(finalPage.contains("Back to Application"), s"the link has no text saying where it leads, in: $finalPage")
     }
 
     "give a member of the project a token naming the project, and a non-member none" in {

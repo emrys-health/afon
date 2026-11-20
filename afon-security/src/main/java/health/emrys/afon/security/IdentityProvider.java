@@ -102,6 +102,17 @@ public interface IdentityProvider {
     String ensureUser(String email, String firstName, String lastName);
 
     /**
+     * As {@link #ensureUser(String, String, String)}, with the invitation naming a client of the identity, so that the page that ends the required actions has a
+     * link back to its home page, its {@code baseUrl}, eg the TRE's address, for a member who has just set their password.  The invitation is sent without it if the
+     * client does not exist, or the identity refuses it.
+     *
+     * @param clientId the client that the invitation names, or {@code null} for none
+     */
+    default String ensureUser(String email, String firstName, String lastName, String clientId) {
+        return ensureUser(email, firstName, lastName);
+    }
+
+    /**
      * @return the immutable id of the user with this email, if there is one
      */
     Optional<String> findUser(String email);
@@ -132,6 +143,25 @@ public interface IdentityProvider {
      * @throws IllegalStateException if there is no user with this email, or the email cannot be sent, eg for want of an SMTP server
      */
     void invite(String email);
+
+    /**
+     * As {@link #invite(String)}, with the invitation naming a client, as {@link #ensureUser(String, String, String, String)} does.
+     *
+     * @param clientId the client that the invitation names, or {@code null} for none
+     */
+    default void invite(String email, String clientId) {
+        invite(email);
+    }
+
+    /**
+     * Removes the user's authenticators, their one-time password credentials, and ends their sessions, so that they enrol a new one: from an invitation, whose
+     * actions include it, or at their next sign in.  For a member who lost the device of their second factor, or whose is to be made again under the same name.
+     * Their password and the rest of the account are left as they are.
+     *
+     * @return the number of authenticators removed, none if the user had none
+     * @throws IllegalStateException if there is no user with this email
+     */
+    int removeSecondFactor(String email);
 
     /**
      * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client

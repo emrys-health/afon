@@ -134,6 +134,9 @@ class KeyCloakProviderProjectTest {
                                        "\"directAccessGrantsEnabled\":false", "\"serviceAccountsEnabled\":false",
                                        "https://jupyter.example.org/hub/oauth_callback");
         assertThat(treClient).doesNotContain("jwks");
+        // the home pages of the clients, which the page that ends an invitation links back to
+        assertThat(treClient).contains("\"baseUrl\":\"https://jupyter.example.org/\"");
+        assertThat(bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-git")).contains("\"baseUrl\":\"https://git.example.org/\"");
         // PKCE is allowed and not required, so that the logins of JupyterHub, which sends none, are not refused, and a client made before as requiring it is changed
         assertThat(treClient).contains("\"pkce.code.challenge.method\":\"\"").doesNotContain("S256");
         assertThat(bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-git"))
@@ -413,6 +416,128 @@ class KeyCloakProviderProjectTest {
         assertThat(bodyOf("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email", "VERIFY_EMAIL"))
             .contains("UPDATE_PASSWORD", "CONFIGURE_TOTP");
         assertThat(requests).doesNotContain("POST /admin/realms/polaris/users");
+    }
+
+    /** The queries of the invitations sent, as they were received: empty for one with none. */
+    private final List<String> invitationQueries = new CopyOnWriteArrayList<>();
+
+    /** A KeyCloak that has the user, and the client or not, and answers an invitation that names the client with the code, and any other with 204. */
+    private void keycloakWithClient(boolean clientExists, int codeWithClient) {
+        keycloak.removeContext("/");
+        keycloak.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            // as it was sent, not decoded
+            String query = exchange.getRequestURI().getRawQuery();
+            String call = exchange.getRequestMethod() + " " + path;
+            requests.add(call);
+            if (path.endsWith("/protocol/openid-connect/token")) {
+                reply(exchange, 200, "{\"access_token\":\"the-token\"}");
+            } else if (call.equals("GET /admin/realms/polaris/users")) {
+                reply(exchange, 200, "[{\"id\":\"the-user-id\"}]");
+            } else if (call.equals("GET /admin/realms/polaris/clients")) {
+                reply(exchange, 200, clientExists ? "[{\"id\":\"uuid\"}]" : "[]");
+            } else if (call.equals("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email")) {
+                invitationQueries.add(query == null ? "" : query);
+                reply(exchange, query != null && query.contains("client_id=") ? codeWithClient : 204, "");
+            } else {
+                reply(exchange, 404, "");
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theInvitationNamesTheClientSoThatItsFinalPageLinksBackToIt(AfonCloud cloud) {
+        keycloakWithClient(true, 204);
+
+        provider.invite("alice@tre.example", "xyz-yyyy-nnnn-tre");
+
+        // only the client, and no redirect_uri, which the client would have to register
+        assertThat(invitationQueries).containsExactly("client_id=xyz-yyyy-nnnn-tre");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theInvitationNamesNoClientWhenNoneIsGivenOrTheClientIsNotThere(AfonCloud cloud) {
+        keycloakWithClient(false, 204);
+
+        provider.invite("alice@tre.example", "xyz-yyyy-nnnn-tre");
+        provider.invite("alice@tre.example", null);
+        provider.invite("alice@tre.example");
+
+        assertThat(invitationQueries).containsExactly("", "", "");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theInvitationIsSentWithoutTheClientWhenTheIdentityRefusesItWithTheClient(AfonCloud cloud) {
+        // eg the client is disabled: the invitation must still be sent
+        keycloakWithClient(true, 400);
+
+        provider.invite("alice@tre.example", "xyz-yyyy-nnnn-tre");
+
+        assertThat(invitationQueries).containsExactly("client_id=xyz-yyyy-nnnn-tre", "");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void theClientIdOfTheInvitationIsEncoded(AfonCloud cloud) {
+        keycloakWithClient(true, 204);
+
+        provider.invite("alice@tre.example", "a b&c");
+
+        assertThat(invitationQueries).containsExactly("client_id=a+b%26c");
+    }
+
+    /** A KeyCloak that has the user of the email, or none, with the credentials, which the removal of one is answered with 204. */
+    private void keycloakWithCredentials(boolean userExists, String credentials) {
+        keycloak.removeContext("/");
+        keycloak.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            String call = exchange.getRequestMethod() + " " + path;
+            requests.add(call);
+            if (path.endsWith("/protocol/openid-connect/token")) {
+                reply(exchange, 200, "{\"access_token\":\"the-token\"}");
+            } else if (call.equals("GET /admin/realms/polaris/users")) {
+                reply(exchange, 200, userExists ? "[{\"id\":\"the-user-id\"}]" : "[]");
+            } else if (call.equals("GET /admin/realms/polaris/users/the-user-id/credentials")) {
+                reply(exchange, 200, credentials);
+            } else {
+                reply(exchange, call.startsWith("POST") ? 201 : 204, "");
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void removesTheAuthenticatorsOfAUserAndEndsTheirSessionsAndKeepsTheirPassword(AfonCloud cloud) {
+        keycloakWithCredentials(true, "[{\"id\":\"c1\",\"type\":\"password\"},{\"id\":\"c2\",\"type\":\"otp\"},{\"id\":\"c3\",\"type\":\"otp\"}]");
+
+        assertThat(provider.removeSecondFactor("Alice@Tre.Example")).isEqualTo(2);
+
+        assertThat(requests).contains("DELETE /admin/realms/polaris/users/the-user-id/credentials/c2",
+                                      "DELETE /admin/realms/polaris/users/the-user-id/credentials/c3",
+                                      "POST /admin/realms/polaris/users/the-user-id/logout");
+        assertThat(requests).doesNotContain("DELETE /admin/realms/polaris/users/the-user-id/credentials/c1");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void removesNothingAndEndsNoSessionsOfAUserWithNoAuthenticator(AfonCloud cloud) {
+        keycloakWithCredentials(true, "[{\"id\":\"c1\",\"type\":\"password\"}]");
+
+        assertThat(provider.removeSecondFactor("alice@tre.example")).isZero();
+
+        assertThat(requests).noneMatch(call -> call.startsWith("DELETE") || call.endsWith("/logout"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToRemoveTheAuthenticatorsOfAUserWhoIsNotInTheIdentity(AfonCloud cloud) {
+        keycloakWithCredentials(false, "[]");
+
+        assertThatThrownBy(() -> provider.removeSecondFactor("nobody@tre.example")).isInstanceOf(IllegalStateException.class)
+                                                                                    .hasMessageContaining("No user nobody@tre.example");
     }
 
     @ParameterizedTest

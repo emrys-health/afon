@@ -93,8 +93,8 @@ class ManageIdentityMainTest {
     void syncsTheGroupToTheMembersTheFileLists(AfonCloud cloud) throws Exception {
         listMembers(cloud, "members:\n  - ada@example.org\n  - {email: grace@example.org, firstName: Grace, lastName: Hopper}\n");
         when(identity.members(any(TreProject.class))).thenReturn(Map.of("id-ada", "ada@example.org", "id-old", "old@example.org"));
-        when(identity.ensureUser("ada@example.org", null, null)).thenReturn("id-ada");
-        when(identity.ensureUser("grace@example.org", "Grace", "Hopper")).thenReturn("id-grace");
+        when(identity.ensureUser("ada@example.org", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-ada");
+        when(identity.ensureUser("grace@example.org", "Grace", "Hopper", "xyz-yyyy-nnnn-tre")).thenReturn("id-grace");
         assertThat(command.run(new String[]{"sync-members", PROJECT})).isZero();
         verify(identity, never()).addMember(any(TreProject.class), eq("id-ada"));
         verify(identity).addMember(any(TreProject.class), eq("id-grace"));
@@ -159,7 +159,7 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void addsAMemberMakingTheUserAndPrintsTheirId(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.ensureUser("alice@tre.example", "Alice", null)).thenReturn("the-user-id");
+        when(identity.ensureUser("alice@tre.example", "Alice", null, "xyz-yyyy-nnnn-tre")).thenReturn("the-user-id");
         assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example", "--first-name", "Alice"})).isZero();
         verify(identity).addMember(any(TreProject.class), eq("the-user-id"));
         assertThat(out.toString().trim()).isEqualTo("the-user-id");
@@ -170,8 +170,8 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void warnsThatAMemberAddedByHandWhoIsNotListedIsTakenOutByTheNextSync(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.ensureUser("alice@tre.example", null, null)).thenReturn("id-alice");
-        when(identity.ensureUser("ADA@example.org", null, null)).thenReturn("id-ada");
+        when(identity.ensureUser("alice@tre.example", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-alice");
+        when(identity.ensureUser("ADA@example.org", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-ada");
 
         assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example"})).isZero();
         assertThat(err.toString()).contains("alice@tre.example is not listed in the members of " + PROJECT, "sync-members");
@@ -186,9 +186,9 @@ class ManageIdentityMainTest {
     @EnumSource(AfonCloud.class)
     void keepsEachMemberAddedInTheMembersFileOfTheProjectOnce(AfonCloud cloud) throws Exception {
         setUp(cloud);
-        when(identity.ensureUser("alice@tre.example", null, null)).thenReturn("id-alice");
-        when(identity.ensureUser("bob@tre.example", null, null)).thenReturn("id-bob");
-        when(identity.ensureUser("Alice@TRE.example", null, null)).thenReturn("id-alice");
+        when(identity.ensureUser("alice@tre.example", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-alice");
+        when(identity.ensureUser("bob@tre.example", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-bob");
+        when(identity.ensureUser("Alice@TRE.example", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-alice");
         assertThat(command.run(new String[]{"add-member", PROJECT, "alice@tre.example"})).isZero();
         assertThat(command.run(new String[]{"add-member", PROJECT, "bob@tre.example"})).isZero();
         assertThat(command.run(new String[]{"add-member", PROJECT, "Alice@TRE.example"})).isZero();
@@ -332,7 +332,7 @@ class ManageIdentityMainTest {
     void invitesAMemberAgain(AfonCloud cloud) throws Exception {
         setUp(cloud);
         assertThat(command.run(new String[]{"invite", PROJECT, "ada@example.org"})).isZero();
-        verify(identity).invite("ada@example.org");
+        verify(identity).invite("ada@example.org", "xyz-yyyy-nnnn-tre");
         assertThat(out.toString()).contains("Sent the invitation to ada@example.org");
     }
 
@@ -341,7 +341,7 @@ class ManageIdentityMainTest {
     void failsWhenTheInvitationCannotBeSent(AfonCloud cloud) throws Exception {
         setUp(cloud);
         org.mockito.Mockito.doThrow(new IllegalStateException("Could not send the invitation email to ada@example.org (HTTP 500)"))
-                           .when(identity).invite("ada@example.org");
+                           .when(identity).invite("ada@example.org", "xyz-yyyy-nnnn-tre");
         assertThat(command.run(new String[]{"invite", PROJECT, "ada@example.org"})).isEqualTo(1);
         assertThat(err.toString()).contains("Could not send the invitation email");
     }
@@ -352,6 +352,40 @@ class ManageIdentityMainTest {
         setUp(cloud);
         assertThat(command.run(new String[]{"invite", PROJECT})).isEqualTo(2);
         assertThat(command.run(new String[]{"invite", PROJECT, "a@example.org", "b@example.org"})).isEqualTo(2);
-        verify(identity, never()).invite(any());
+        verify(identity, never()).invite(any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void removesTheAuthenticatorsOfAMemberAndSaysHowTheyEnrolANewOne(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.removeSecondFactor("ada@example.org")).thenReturn(2);
+
+        assertThat(command.run(new String[]{"remove-authenticator", PROJECT, "ada@example.org"})).isZero();
+
+        assertThat(out.toString()).contains("Removed 2 authenticators of ada@example.org", "manage-identity invite ada@example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void saysThatAMemberWithNoAuthenticatorHasNoneToRemove(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.removeSecondFactor("ada@example.org")).thenReturn(0);
+
+        assertThat(command.run(new String[]{"remove-authenticator", PROJECT, "ada@example.org"})).isZero();
+
+        assertThat(out.toString()).contains("ada@example.org has no authenticator");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsToRemoveTheAuthenticatorsOfAnUnknownUserAndTakesOneEmail(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.removeSecondFactor("bob@tre.example")).thenThrow(new IllegalStateException("No user bob@tre.example in the central identity"));
+
+        assertThat(command.run(new String[]{"remove-authenticator", PROJECT, "bob@tre.example"})).isEqualTo(1);
+        assertThat(err.toString()).contains("No user bob@tre.example");
+        assertThat(command.run(new String[]{"remove-authenticator", PROJECT})).isEqualTo(2);
+        assertThat(command.run(new String[]{"remove-authenticator", PROJECT, "a@example.org", "b@example.org"})).isEqualTo(2);
     }
 }

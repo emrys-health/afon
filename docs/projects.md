@@ -694,10 +694,13 @@ your machine:
 afon-cli.sh manage-project run cvd-2026 manage-identity add-member <email>
 afon-cli.sh manage-project run cvd-2026 manage-identity remove-member <email>
 afon-cli.sh manage-project run cvd-2026 manage-identity sync-members
+afon-cli.sh manage-project run cvd-2026 manage-identity invite <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity remove-authenticator <email>
 ```
 
-`add-member` and `remove-member` change one member at a time. A project that lists its `members` in its
-`project.yaml` has them made for it: see [Members](#members).
+`add-member` and `remove-member` change one member at a time. A project that lists its `members` in its `project.yaml`
+has them made for it: see [Members](#members). `invite` sends a member the invitation again, and `remove-authenticator`
+removes their authenticators, so that they enrol a new one from it: see [Setting up SMTP](#setting-up-smtp).
 
 The state of a project's stacks is stored by `cdktf-store`, as the tag `current`, under the project's id, so apart from
 that of any env.
@@ -734,6 +737,13 @@ project's members those in it, and refuses if the file is not the members that `
 are not in it and those that are not listed, so that a grant never gives access to someone the project does not list, nor
 leaves out one that it does: `sync-members` puts it right. `--members <file>` names another file, one user id for each
 line, or `<user id>,<email>`, which is not checked. The file is rewritten from the group, so it is not edited by hand.
+
+The invitation names the project's TRE client, so that the page that ends it, "Your account has been updated", has a
+**Back to application** link to the TRE's address (the `baseUrl` that the client is made with, `https://<the Jupyter
+domain>/`): the member follows it and signs in. It is a link, not an automatic redirect, and the member first confirms,
+from the emailed link, that they want to run the actions. The invitation is sent without the link if the client does not
+exist yet or the identity refuses it. A client made before this has no `baseUrl` until `manage-identity create` is run
+for the project again, which `up` does in its `register` stage.
 
 The invitation is an email that the central identity's Keycloak sends, so it needs an SMTP server: see [Setting up
 SMTP](#setting-up-smtp), which also says how to send an invitation again.
@@ -854,16 +864,41 @@ the cluster to the server:
 afon-cli.sh manage-project run cvd-2026 manage-identity invite <email>
 ```
 
-To send the invitation again, to a member who never got it, let it expire (it is valid for 12 hours, and once), or
-lost their second factor, run the same command. It sends the same email, and fails, saying so, if the member is not
-in the central identity or the email cannot be sent. If they lost their second factor, remove their authenticator in the
-Keycloak admin console first.
+To send the invitation again, to a member who never got it, let it expire (it is valid for 12 hours, and once), or lost
+their second factor, run the same command. It sends the same email, and fails, saying so, if the member is not in the
+central identity or the email cannot be sent. The invitation always asks the member to set a password and enrol an
+authenticator, so a member who has done both is asked to do both again. A member who lost their second factor, or is to
+enrol again under the same device name, has their authenticators removed first, which also ends their sessions; their
+password is left as it is, and the next invitation has them enrol a new one:
 
-**Who SES delivers to, with `aws-ses-identity`.** Until AWS takes the account out of the SES sandbox, every recipient
-must be a verified identity of the region, an address, or a domain, which makes every address under it a valid recipient,
-so a new member of `rob@example.org` is refused (the `554` above) unless that address, or `example.org`, is verified; the
-domain that the mail is sent from does not make the recipients valid. `afon-cli.sh aws-ses-identity` does what is
-needed, in the region of `KEYCLOAK_SMTP_HOST` unless `--region` says another:
+```shell
+afon-cli.sh manage-project run cvd-2026 manage-identity remove-authenticator <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity invite <email>
+```
+
+**The SES account has to be taken out of the sandbox.** A new SES account is in its **sandbox**, which sends only to
+verified identities, so an invitation to a member whose address nobody verified is refused (the `554` above). Before
+inviting members, upgrade the account to production access, which lets mail go to any address, with no identity to
+verify. `afon-cli.sh aws-ses-identity production-access` asks AWS for it, in the region of `KEYCLOAK_SMTP_HOST` unless
+`--region` says another. It says what it would ask and sends nothing until `--yes` is added, so run it first without:
+
+```shell
+afon-cli.sh aws-ses-identity production-access \
+  --website-url https://<a page that describes the organisation or the service> \
+  --description "<what is sent, to whom, from which address>"
+afon-cli.sh aws-ses-identity production-access ... --yes    # sends the request
+afon-cli.sh aws-ses-identity account                        # production True when AWS has approved it, and the quota
+```
+
+AWS reviews the request, usually within a few minutes, and may write to the account's contact address with questions. 
+What it looks at is the website, and the description of the use: say that it is transactional email only (invitations to verify an email, set a password and enrol a second factor), from which address (`KEYCLOAK_SMTP_FROM`), to members that an
+administrator names one by one, a few messages a day, and that no one is mailed in bulk. Say only what is true: the
+account's suppression list for bounces and complaints is on by default, and nothing else need be claimed about
+monitoring.
+
+Until it is approved, or for a test, a recipient can be verified instead: an address, whose owner clicks a link that SES
+emails them, or a domain, which makes every address under it a valid recipient once the DKIM records that SES prints are
+published in its DNS. The domain that the mail is sent from does not make the recipients valid.
 
 ```shell
 afon-cli.sh aws-ses-identity list
@@ -872,14 +907,10 @@ afon-cli.sh aws-ses-identity create example.org        # prints the three DKIM r
 afon-cli.sh aws-ses-identity status example.org        # SUCCESS, and sending true, when it can be sent to
 afon-cli.sh aws-ses-identity dns example.org           # the records again
 afon-cli.sh aws-ses-identity delete rob@example.org    # to have the link sent again, by making it again
-afon-cli.sh aws-ses-identity account                   # whether the account is out of the sandbox, and its quota
-afon-cli.sh aws-ses-identity production-access \
-  --website-url https://example.org --description "<what is sent, to whom>"
 ```
 
-`production-access` says what it would ask of AWS, and asks it only with `--yes`; AWS reviews the request, usually within
-a day, and then mail goes to any address, with no identity to verify. An address that is a group that only forwards has
-no inbox to read the link in: its members read it, if the group accepts mail from outside, and a domain is then easier.
+An address that is a group that only forwards has no inbox to read the link in: its members read it, if the group accepts
+mail from outside, and a domain is then easier.
 
 A domain identity also publishes DKIM records, which helps an invitation reach the inbox of the member instead of the
 spam folder, where one from a sender that the receiver does not trust yet may go; the headers of a received invitation
@@ -977,11 +1008,6 @@ built** means that the code is not there; **not tried** means that it is, but ha
 
 ### Members, invitations and the setup of a TRE
 
-- **Not built: the invitation has no way back to the TRE.** The page that ends it, "Your account has been updated", has
-  no link, as the invitation names no client to go back to: the member opens the TRE's address.
-- **Not done: SES delivers only to verified identities.** While the account is in the SES sandbox, each recipient, or its
-  domain, has to be verified, and invitations may be filed as spam until the sending domain has DKIM and a DMARC policy:
-  see [Setting up SMTP](#setting-up-smtp). Production access removes the first.
 - **Not tried: `dbt-2026`, and the smoke tests of a TRE that sign in as a user.** A second TRE from the same env, next to
   `cvd-2026`, and the smoke tests that sign in as a user of `users.csv`, who is only an admin in a project's TRE, against
   a project's Polaris, which admits only the tokens of the project. `network-smoke` does not, and has been run against

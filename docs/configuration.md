@@ -326,7 +326,9 @@ In a project, the users of `users.csv` are its **admins**, who bootstrap and ope
 `project.yaml` are the TRE's other users (see [Members](projects.md#members)).  Outside a project, every user of `users.csv`
 is both, as it has always been.
 
-- An admin has a KeyCloak login with the password of `users.csv`, Polaris principals and a Gitea account, as described above.
+- An admin has a KeyCloak login with the password of `users.csv`, Polaris principals and a Gitea account, as described
+  above. In a project's TRE the Keycloak login is not made, nor its password set, by the setup: the identity is shared,
+  and the setup leaves its users to it, so the admins have the Polaris principals and the Gitea account only.
 - A member has no password here: the central identity invites it when `manage-identity sync-members` adds it to the
   project's group.  It is not given a KeyCloak login, Polaris principal or Gitea account by the setup of a stack, and its username is
   its email, as it is in the central identity.
