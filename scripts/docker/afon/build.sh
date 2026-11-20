@@ -5,8 +5,8 @@
 # Pipelines agent entrypoint.  The version is the project version (from mvn), and
 # the tags are taken from it and from git.
 #
-# usage: scripts/docker/afon/build.sh [--push] [--registry <registry>] [--platform <platform>] [--zip <zip>] [base|cli|azure-agent|all]
-#   base|cli|azure-agent|all
+# usage: scripts/docker/afon/build.sh [--push] [--registry <registry>] [--platform <platform>] [--zip <zip>] [base|cli|azure-agent|desktop|all]
+#   base|cli|azure-agent|desktop|all
 #             the images to build (default: all).  cli needs the base image of the same version, and agent the cli
 #             image of the same version, so build those first.
 #   --zip     the pre-built afon-cli zip for the cli image.  Defaults to afon-distribution/target/afon-<version>-cli.zip,
@@ -30,7 +30,7 @@ AFON_ROOT="$(cd "$DIR/../../.." && pwd)"
 BASE_IMAGE="${BASE_IMAGE:-emryshealth/afon-base}"
 CLI_IMAGE="${CLI_IMAGE:-emryshealth/afon-cli}"
 AGENT_IMAGE="${AGENT_IMAGE:-emryshealth/afon-azure-agent}"
-DESKTOP_IMAGE="${DESKTOP_IMAGE:~emryshealth/afon-desktop""
+DESKTOP_IMAGE="${DESKTOP_IMAGE:-emryshealth/afon-desktop}"
 ZIP=""
 PLATFORM=linux/amd64
 PUSH=false
@@ -43,7 +43,7 @@ while [ $# -gt 0 ]; do
     --platform) PLATFORM="$2"; shift ;;
     --registry) REGISTRY="$2"; shift ;;
     --zip) ZIP="$2"; shift ;;
-    base|cli|azure-agent|all) WHAT="$1" ;;
+    base|cli|azure-agent|desktop|all) WHAT="$1" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -137,8 +137,7 @@ if [ "$WHAT" = azure-agent ] || [ "$WHAT" = all ]; then
 fi
 
 if [ "$WHAT" = desktop ] || [ "$WHAT" = all ]; then
-  docker build "${COMMON_ARGS[@]}" $(tags "$DESKTOP_IMAGE") \
-    --build-arg "BASE_IMAGE=$DESKTOP_IMAGE:$VERSION" \
-    "$DIR/desktop "
+  # shellcheck disable=SC2046
+  docker build "${COMMON_ARGS[@]}" $(tags "$DESKTOP_IMAGE") "$DIR/desktop"
   push "$DESKTOP_IMAGE"
 fi

@@ -1,7 +1,5 @@
 # Uses Spark 4
-# Build it with:
-# docker build -t emryshealth/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg .
-# docker push emryshealth/pyspark-notebook:x86_64-spark-4.0.1-vnc-clip-multi_pkg
+# Build it with: scripts/docker/afon/build.sh [--push] desktop
 #FROM quay.io/jupyter/base-notebook:lab-4.1.5
 FROM jupyter/pyspark-notebook:x86_64-spark-3.5.0
 

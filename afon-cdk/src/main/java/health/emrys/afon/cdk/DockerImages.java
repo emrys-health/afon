@@ -33,7 +33,7 @@ public final class DockerImages {
     public static final String KEYCLOAK_IMAGE            = reference("keycloak");
 
     public static final String SPARK_IMAGE               = reference("spark");
-    public static final String PYSPARK_NOTEBOOK_IMAGE    = reference("pyspark-notebook");
+    public static final String AFON_DESKTOP_IMAGE        = reference("afon-desktop");
 
     public static final String GITEA_IMAGE               = reference("gitea");
 

@@ -712,7 +712,7 @@ public class JupyterHubConfig {
                """.formatted(
             PROXY_API_SVC, PROXY_API,
             HUB_SVC, HUB_PORT,
-            images.pysparkNotebook(), SINGLEUSER_PORT,
+            images.afonDesktop(), SINGLEUSER_PORT,
             HUB_BASE_URL, GUACAMOLE_USER,
             issuer, jupyterDomain(),
             pythonSetOf(userProvider.getMembers().stream().map(AfonUser::email).toList()),

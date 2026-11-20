@@ -99,7 +99,7 @@ public final class DockerImageResolver {
     public String polarisAdminTool() { return reference("polaris-admin-tool"); }
     public String keycloak()         { return reference("keycloak"); }
     public String spark()            { return reference("spark"); }
-    public String pysparkNotebook()  { return reference("pyspark-notebook"); }
+    public String afonDesktop()      { return reference("afon-desktop"); }
     public String gitea()            { return reference("gitea"); }
     public String jupyterhubHub()    { return reference("jupyterhub-hub"); }
     public String jupyterhubProxy()  { return reference("jupyterhub-proxy"); }
