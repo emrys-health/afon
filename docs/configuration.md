@@ -115,6 +115,24 @@ afon-cli.sh config-status
 If found, it will output the content of the file `afon.md` in the config dir, which can be used to 
 provide information to the user of the config content.  It will also list the files in the config dir.
 
+### What a new deployer should set
+
+`secret.properties` in the template has some keys with no value, which an env made from the template, not copied from another, must fill in.  A key left empty is present, so it is not reported as missing: the value is used as it is.
+
+#### Browser login of Jupyter and Guacamole
+
+For the browser login of Jupyter and Guacamole, `OAUTH2_CLIENT_ID` and `OAUTH2_CLIENT_SECRET` are not looked up in KeyCloak: they are chosen by the deployer, and the setup (`ConfigureUsersMain.configureJupyterClient`) creates the KeyCloak browser client with them, while JupyterHub and oauth2-proxy sign in with the same pair.  Nothing has to exist beforehand.  If they are blank, KeyCloak is asked for a client with an empty id and secret and answers `400`, and the setup stops with `Failed to provision KeyCloak browser client`, caused by `Could not create KeyCloak browser client : HTTP 400`.
+
+| Property               | Set to                                                                                   |
+|------------------------|------------------------------------------------------------------------------------------|
+| `OAUTH2_CLIENT_ID`     | any stable name, eg `afon-jupyter` or `<env>-browser`                                    |
+| `OAUTH2_CLIENT_SECRET` | a long random string, eg `openssl rand -hex 32`                                          |
+| `OAUTH2_COOKIE_SECRET` | a random string of 16, 24 or 32 bytes, as oauth2-proxy requires, eg `openssl rand -hex 16` |
+
+Keep the pair as it is once the client exists: KeyCloak's database outlives the cluster, and the next setup overwrites the client with whatever the config says, so changing one side only breaks the login.  A project's TRE (`OIDC_PROJECT_CLAIM` set) does not use these as a deployer's choice: its client is made by the central identity, see [projects](projects.md).
+
+If the setup fails with `Failed to provision KeyCloak browser client`, read the `Caused by:` line: an `HTTP 400` points at blank values here, whereas a failure of the token request points at `KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME` and `KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD`, or at KeyCloak not being reachable.
+
 ### Creating an env from an existing one
 
 A new env, eg `emrys3` for the smoke tests, is quickest to make from an env that works, eg `emrys2`: copy its config dir and change what is specific to the env.  This lists what, and the setup in the clouds that goes with it.
