@@ -4,12 +4,15 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.security.IdentityProvider;
+import health.emrys.afon.security.IdentityProvider.RedirectStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static health.emrys.afon.config.AfonProperty.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -74,7 +77,7 @@ class ConfigureUsersMainTest {
 
         new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
 
-        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList());
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList(), eq(RedirectStrategy.REPLACE));
         verify(identity).configureMfa();
     }
 
@@ -86,7 +89,7 @@ class ConfigureUsersMainTest {
 
         new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
 
-        verify(identity, never()).registerBrowserClient(anyString(), anyString(), anyList());
+        verify(identity, never()).registerBrowserClient(anyString(), anyString(), anyList(), any());
         verify(identity).configureMfa();
     }
 
@@ -99,7 +102,7 @@ class ConfigureUsersMainTest {
 
         new ConfigureUsersMain(users, properties, identity).configureJupyterClient("jupyter.example.org");
 
-        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList());
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList(), eq(RedirectStrategy.REPLACE));
     }
 
     private static final AfonUser MAURO = new AfonUser("mauro", "pw-mauro", "mauro.talevi@emrys.health", "mauro-talevi", "Mauro", "Talevi");
@@ -142,5 +145,38 @@ class ConfigureUsersMainTest {
         new ConfigureUsersMain(users, properties, identity).configureOidcUsers();
 
         verify(identity).createUser(any(), eq("polaris"), eq(MAURO));
+    }
+
+    @Test
+    void registersOnlyTheBrowserClientForAStackDeployingJupyter() throws Exception {
+        when(properties.getValue(OAUTH2_CLIENT_ID)).thenReturn("env-client");
+        when(properties.getValue(OAUTH2_CLIENT_SECRET)).thenReturn("env-secret");
+
+        new ConfigureUsersMain(users, properties, identity).registerJupyterClient("jupyter.example.org");
+
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList(), eq(RedirectStrategy.REPLACE));
+        // the realm's MFA is that of the KeyCloak, configured with its users
+        verify(identity, never()).configureMfa();
+    }
+
+    @Test
+    void registersTheBrowserClientWithTheRedirectStrategyOfTheConfig() throws Exception {
+        when(properties.getValue(OAUTH2_CLIENT_ID)).thenReturn("env-client");
+        when(properties.getValue(OAUTH2_CLIENT_SECRET)).thenReturn("env-secret");
+        when(properties.getValue(OIDC_REDIRECT_STRATEGY, "")).thenReturn("merge");
+
+        new ConfigureUsersMain(users, properties, identity).registerJupyterClient("jupyter.example.org");
+
+        verify(identity).registerBrowserClient(eq("env-client"), eq("env-secret"), anyList(), eq(RedirectStrategy.MERGE));
+    }
+
+    @Test
+    void aRedirectStrategyThatIsNotKnownFailsBeforeAnythingIsRegistered() throws Exception {
+        when(properties.getValue(OIDC_REDIRECT_STRATEGY, "")).thenReturn("true");
+
+        assertThatThrownBy(() -> new ConfigureUsersMain(users, properties, identity).registerJupyterClient("jupyter.example.org"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("OIDC_REDIRECT_STRATEGY: A redirect strategy should be 'replace' or 'merge', not 'true'");
+        verify(identity, never()).registerBrowserClient(anyString(), anyString(), anyList(), any());
     }
 }

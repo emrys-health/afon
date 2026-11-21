@@ -989,9 +989,22 @@ public class StepActions {
      *                         {@code null} for its public domain name
      */
     public void configureOidcUsersFor(AfonCloud cloud, String keycloakEndpoint) throws Exception {
+        configureUsersMain(cloud, ConfigureUsersMain.OIDC_USERS_ONLY_ARG, keycloakEndpoint);
+    }
+
+    /**
+     * Registers the Jupyter browser client of the cloud in its KeyCloak, which only the setup of a stack deploying Jupyter does.
+     *
+     * @param keycloakEndpoint as for {@link #configureOidcUsersFor}
+     */
+    public void configureJupyterClientFor(AfonCloud cloud, String keycloakEndpoint) throws Exception {
+        configureUsersMain(cloud, ConfigureUsersMain.JUPYTER_CLIENT_ONLY_ARG, keycloakEndpoint);
+    }
+
+    private void configureUsersMain(AfonCloud cloud, String scope, String keycloakEndpoint) throws Exception {
         executeMainOf(ConfigureUsersMain.class, keycloakEndpoint == null
-            ? new String[]{cloud.toString()}
-            : new String[]{cloud.toString(), ConfigureUsersMain.KEYCLOAK_ENDPOINT_ARG + keycloakEndpoint});
+            ? new String[]{cloud.toString(), scope}
+            : new String[]{cloud.toString(), scope, ConfigureUsersMain.KEYCLOAK_ENDPOINT_ARG + keycloakEndpoint});
     }
 
     /**

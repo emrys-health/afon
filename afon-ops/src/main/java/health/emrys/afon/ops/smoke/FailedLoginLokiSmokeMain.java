@@ -138,6 +138,12 @@ public class FailedLoginLokiSmokeMain {
      * Logs in as a browser would: asks the gate to sign in, which redirects to KeyCloak's login page, then submits that
      * page's form with the unknown username and a wrong password.
      */
+    /** The text of an error page, eg KeyCloak's "Invalid parameter: redirect_uri", without its markup, cut short. */
+    static String textOf(String html) {
+        String text = html.replaceAll("(?is)<(script|style)\\b.*?</\\1>", " ").replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").strip();
+        return text.length() > 300 ? text.substring(0, 300) + "..." : text;
+    }
+
     private LoginResult attemptLogin(String host, String marker, String username) throws IOException {
         String start = format("https://%s/oauth2/start?rd=%s", host, URLEncoder.encode("/" + marker, StandardCharsets.UTF_8));
         logger.info("Starting a login at {}", start);
@@ -148,7 +154,7 @@ public class FailedLoginLokiSmokeMain {
             String page = http.execute(get, context, response -> {
                 String body = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity());
                 if (response.getCode() != 200) {
-                    throw new IOException(format("Expected KeyCloak's login page from %s but got HTTP %d", start, response.getCode()));
+                    throw new IOException(format("Expected KeyCloak's login page from %s but got HTTP %d: %s", start, response.getCode(), textOf(body)));
                 }
                 return body;
             });

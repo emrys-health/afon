@@ -2,6 +2,8 @@
 
 
 ## 1.0-beta-10
+**Milestone:** [1.0-beta-10](https://github.com/emrys-health/afon/milestone/11)
+**Due:** 2026-11-27
 
 ### Upgrade notes
 
@@ -10,6 +12,10 @@
 - **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml`:**
   - The entry is now named `afon-desktop`, as the image it points to (`emryshealth/afon-desktop`), which is unchanged.  No action is needed if you use the `docker-images.yaml` that ships with Afon.
   - A `docker-images.yaml` in the config dir (`$AFON_HOME/config`) replaces the shipped one entirely, so if yours has the entry `pyspark-notebook`, rename it to `afon-desktop`: otherwise the deploy cannot find the desktop image of JupyterHub.
+- **The Jupyter browser client is registered by the stacks that deploy Jupyter ([#289](https://github.com/emrys-health/afon/issues/289)):**
+  - The setup step that configures the OIDC users no longer registers the browser client: a new step, `configure_jupyter_client_for_cloud_<cloud>`, of the stacks that deploy Jupyter, does, so setting up a Polaris-only or KeyCloak-only stack leaves the client of the Jupyter stack as it is.  `afon-cli.sh configure-users <cloud>` does both, as before. The setup now fails if the client cannot be created or updated, instead of using the old redirect URIs, and warns, naming them, of the redirect URIs it overwrites.
+  - New optional `OIDC_REDIRECT_STRATEGY` (`afon.properties`, `replace` or `merge`, `replace` when empty): with `merge`, the setup adds the redirect URIs of its Jupyter to those of a browser client that is already there instead of replacing them, so that clouds sharing a KeyCloak realm, eg in a test env set up together, can all log in.  Leave it as `replace` in production; any other value fails the setup.
+  - New command `afon-cli.sh purge-redirect-uris <cloud> [--dry-run]`, which takes the redirect URIs off the browser client that are not the callbacks of the Jupyter domain of any cloud of the config, eg those of a cloud that is no longer deployed, which `OIDC_REDIRECT_STRATEGY=merge` leaves there.
 
 
 ## 1.0-beta-9

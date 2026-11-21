@@ -349,6 +349,12 @@ public enum AfonProperty {
 
     OAUTH2_CLIENT_ID("OAUTH2_CLIENT_ID"),
     OAUTH2_CLIENT_SECRET("OAUTH2_CLIENT_SECRET"),
+    /**
+     * What registering the Jupyter browser client does to the redirect URIs of a client that is already there: {@code replace} them with its own, or {@code merge} its own
+     * into them.  {@code merge} is for clouds that share a KeyCloak realm, and so the client, eg those of a test env set up together: each keeps its Jupyter's callbacks,
+     * and those of a cloud that is no longer deployed stay, see {@code purge-redirect-uris}.  Optional: {@code replace} when blank or unset.
+     */
+    OIDC_REDIRECT_STRATEGY("OIDC_REDIRECT_STRATEGY"),
     OAUTH2_COOKIE_SECRET("OAUTH2_COOKIE_SECRET"),
 
     // JUPYTER

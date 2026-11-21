@@ -435,6 +435,17 @@ public class StepOperations {
     }
 
     /**
+     * Registers the browser client that logins to the cloud's Jupyter go through in its KeyCloak, as {@link #configureOidcUsersFor} has
+     * made the realm.  Only for a stack deploying Jupyter: the client is one per KeyCloak, whose redirect URIs it overwrites.
+     */
+    public Step configureJupyterClientFor(AfonCloud cloud) {
+        return new Step(format("configure_jupyter_client_for_cloud_%s", cloud),
+                format("configure the Jupyter browser client for cloud `%s`", cloud),
+                () -> actions.withKeyCloakTunnel(cloud, properties,
+                                                 endpoint -> actions.configureJupyterClientFor(cloud, endpoint)));
+    }
+
+    /**
      * Restricts the Polaris ingress of the cluster of the current kubectl context to the configured CIDRs and the cluster's own
      * addresses, as {@code kube-polaris-whitelist <cloud> set [--caller]} does, so that Polaris is always restricted, whether or not
      * the CIDRs are configured, unlike the deploy, which leaves it open if they are not.

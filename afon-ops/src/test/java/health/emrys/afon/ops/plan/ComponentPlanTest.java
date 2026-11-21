@@ -89,7 +89,8 @@ class ComponentPlanTest {
         assertThat(jupyter.domains(AWS, properties)).containsExactly(AWS_JUPYTER_DOMAIN_NAME);
         assertThat(jupyter.domains(AZURE, properties)).containsExactly(AZURE_JUPYTER_DOMAIN_NAME);
         assertThat(jupyter.waitsFor()).isEmpty();
-        assertThat(setupOf(jupyter, AWS)).isEmpty();
+        // the browser client is the Jupyter stack's to register, not that of the KeyCloak and Polaris ones, which would overwrite it
+        assertThat(setupOf(jupyter, AWS)).containsExactly("configureJupyterClientFor(aws)");
     }
 
     @Test

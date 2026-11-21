@@ -542,7 +542,8 @@ Once deployed, you can check the OIDC provider is ready with `afon-cli.sh check-
 ### Setup AWS Keycloak only
 
 To deploy the AWS Keycloak stack and configure it with the realm, the `POLARIS_ID` client and the users (and
-their confidential clients), plus the Jupyter browser client if `AWS_JUPYTER_DOMAIN_NAME` is set:
+their confidential clients), and the realm's MFA if `AWS_JUPYTER_DOMAIN_NAME` is set.  The Jupyter browser client is not registered here, but by the setup
+of the stack that deploys Jupyter, eg `aws-full` (step `configure_jupyter_client_for_cloud_aws`), so that this stack cannot overwrite it:
 
 ```shell
 afon-cli.sh manage-stack setup aws-keycloak

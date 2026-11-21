@@ -155,7 +155,8 @@ class StackPlanFactoryTest {
             login("aws"), deleteConflicting("aws-full"),
             "deployStack(aws-full)",
             waitForPolarisAndKeycloakIn("aws", true), "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
-            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "runSparkWritingTo(aws,aws)",
+            "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "configureJupyterClientFor(aws)",
+            "runSparkWritingTo(aws,aws)",
             "setupComplete(aws-full)", "whitelistPolaris(aws,false)");
         for (String cloud : List.of("azure", "gcp")) {
             String stack = cloud + "-polaris";
@@ -286,7 +287,8 @@ class StackPlanFactoryTest {
         assertThat(derived(SETUP, "azure-full")).containsExactly(
             login("azure"), deleteConflicting("azure-full"), "deployStack(azure-full)",
             waitForPolarisAndKeycloakIn("azure", true), "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
-            "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "runSparkWritingTo(azure,azure)",
+            "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "configureJupyterClientFor(azure)",
+            "runSparkWritingTo(azure,azure)",
             "setupComplete(azure-full)", "whitelistPolaris(azure,false)");
     }
 

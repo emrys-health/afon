@@ -6,7 +6,9 @@ import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -61,25 +63,83 @@ public interface IdentityProvider {
     ) throws IOException;
 
     /**
+     * What registering a browser client does to the redirect URIs that the client already has, as an OAuth2 client has a list of the {@code redirect_uri}s that
+     * its authorization requests may have (RFC 6749, 3.1.2), which a provider can read and write back.
+     */
+    enum RedirectStrategy {
+        /** The client has the redirect URIs that are registered, and no other: those of an earlier registration are dropped.  The default. */
+        REPLACE,
+        /**
+         * The client has those that it had, and those that are registered, eg for clouds that share the realm, and so the client, to each keep its Jupyter's callbacks.
+         * A provider that cannot read the redirect URIs of a client must throw {@link UnsupportedOperationException} for it.
+         */
+        MERGE;
+
+        /**
+         * @param value {@code replace} or {@code merge}, in any case, or blank or {@code null} for {@link #REPLACE}
+         * @throws IllegalArgumentException if it is anything else, as a value that is not known must not fall back to replacing, which is what it may have been set to avoid
+         */
+        public static RedirectStrategy parse(String value) {
+            if (value == null || value.isBlank()) {
+                return REPLACE;
+            }
+            for (RedirectStrategy strategy : values()) {
+                if (strategy.name().equalsIgnoreCase(value.trim())) {
+                    return strategy;
+                }
+            }
+            throw new IllegalArgumentException(String.format("A redirect strategy should be '%s' or '%s', not '%s'",
+                                                             REPLACE.name().toLowerCase(Locale.ROOT), MERGE.name().toLowerCase(Locale.ROOT), value));
+        }
+    }
+
+    /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
      * oauth2-proxy and JupyterHub use to log users in.
      *
      * @param clientId the OAUTH2 client ID
      * @param clientSecret the OAUTH2 client secret
      * @param redirectUris the exact callback URLs, e.g. {@link KeyCloakProvider#callbackURIs(String)}
+     * @param strategy what to do to the redirect URIs of a client that is already there
      */
-    List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris);
+    List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris, RedirectStrategy strategy);
+
+    /** As {@link #registerBrowserClient(String, String, List, RedirectStrategy)}, replacing the redirect URIs of a client that is already there. */
+    default List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
+        return registerBrowserClient(clientId, clientSecret, redirectUris, RedirectStrategy.REPLACE);
+    }
 
     /**
      * Creates a confidential client for the OAuth2 authorization-code (browser) flow: standard flow
-     * on, direct grants and service accounts off, with the given redirect URIs whitelisted.
+     * on, direct grants and service accounts off, with the given redirect URIs whitelisted.  A client that is already there is updated,
+     * its redirect URIs by the strategy.
      */
     List<HttpResponse> createBrowserClient(String adminToken,
                               String realm,
                               String clientId,
                               String clientSecret,
-                              List<String> redirectUris
+                              List<String> redirectUris,
+                              RedirectStrategy strategy
     ) throws IOException;
+
+    /** As {@link #createBrowserClient(String, String, String, String, List, RedirectStrategy)}, replacing the redirect URIs of a client that is already there. */
+    default List<HttpResponse> createBrowserClient(String adminToken, String realm, String clientId, String clientSecret, List<String> redirectUris)
+        throws IOException {
+        return createBrowserClient(adminToken, realm, clientId, clientSecret, redirectUris, RedirectStrategy.REPLACE);
+    }
+
+    /**
+     * Takes off the browser client the redirect URIs that are not among those to keep, eg those of a Jupyter that is no longer deployed, which
+     * registering the client with {@link RedirectStrategy#MERGE} leaves on it.  Nothing else of the client changes.
+     *
+     * @param clientId     the OAUTH2 client ID
+     * @param clientSecret the OAUTH2 client secret, which the update needs as registering does
+     * @param keep         the redirect URIs that stay, ie the callbacks of the Jupyter of every cloud
+     * @param dryRun       whether to only say which would be taken off
+     * @return the redirect URIs taken off, or, in a dry run, that would be, none if the client is not there
+     * @throws IOException if the client could not be read, or updated
+     */
+    List<String> purgeBrowserClientRedirectUris(String clientId, String clientSecret, Collection<String> keep, boolean dryRun) throws IOException;
 
     /**
      * Makes every browser login to this realm present a TOTP second factor, while leaving headless

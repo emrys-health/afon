@@ -563,12 +563,12 @@ public class KeyCloakProvider implements IdentityProvider {
      * @param redirectUris the {@link #callbackURIs(String)}
      */
     @Override
-    public List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris) {
+    public List<HttpResponse> registerBrowserClient(String clientId, String clientSecret, List<String> redirectUris, RedirectStrategy strategy) {
         List<HttpResponse> responses = new ArrayList<>();
         try {
             String adminToken = adminToken();
             responses.add(createRealm(adminToken, KEYCLOAK_REALM));
-            responses.addAll(createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret, redirectUris));
+            responses.addAll(createBrowserClient(adminToken, KEYCLOAK_REALM, clientId, clientSecret, redirectUris, strategy));
             logger.info(
                 "KeyCloak realm '{}' provisioned with browser client '{}' (redirects {})",
                 KEYCLOAK_REALM, clientId, redirectUris);
@@ -587,10 +587,35 @@ public class KeyCloakProvider implements IdentityProvider {
                                                   String realm,
                                                   String clientId,
                                                   String clientSecret,
-                                                  List<String> redirectUris
+                                                  List<String> redirectUris,
+                                                  RedirectStrategy strategy
     ) throws IOException {
         List<HttpResponse> responses = new ArrayList<>();
-        String json = mapper.writeValueAsString(Map.ofEntries(
+        String json = browserClientJson(clientId, clientSecret, redirectUris);
+        HttpResponse created = postJson(
+            adminToken, format("/admin/realms/%s/clients", realm), json, "browser client " + clientId);
+        responses.add(created);
+        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
+            // KeyCloak's DB outlives the cluster, so a client provisioned by an earlier deploy survives
+            // with whatever redirect URIs it was created with. Creating-if-absent would leave those
+            // stale — the browser then arrives with an unregistered redirect_uri and KeyCloak rejects
+            // the login with "Invalid parameter: redirect_uri". Overwrite so the client converges on
+            // the URIs this deploy actually uses.
+            HttpResponse updated = updateBrowserClient(adminToken, realm, clientId, clientSecret, redirectUris, strategy);
+            responses.add(updated);
+            if (isFailure(updated)) {
+                throw new IOException(format("Could not update the browser client %s of realm %s: %s", clientId, realm,
+                                             updated == null ? "it could not be looked up" : describe(updated)));
+            }
+        }
+        // Human logins go through this client; copy their username into the claim Polaris maps on so
+        // the captured login token resolves to that user's Polaris principal (e.g. "will").
+        responses.add(ensureClientMapper(adminToken, realm, clientId, usernamePrincipalMapper()));
+        return responses;
+    }
+
+    private String browserClientJson(String clientId, String clientSecret, List<String> redirectUris) throws IOException {
+        return mapper.writeValueAsString(Map.ofEntries(
             Map.entry("clientId", clientId),
             Map.entry("secret", clientSecret),
             Map.entry("enabled", true),
@@ -603,30 +628,15 @@ public class KeyCloakProvider implements IdentityProvider {
             // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
             Map.entry("webOrigins", List.of("+"))
         ));
-        HttpResponse created = postJson(
-            adminToken, format("/admin/realms/%s/clients", realm), json, "browser client " + clientId);
-        responses.add(created);
-        if (created != null && created.getCode() == HttpStatus.SC_CONFLICT) {
-            // KeyCloak's DB outlives the cluster, so a client provisioned by an earlier deploy survives
-            // with whatever redirect URIs it was created with. Creating-if-absent would leave those
-            // stale — the browser then arrives with an unregistered redirect_uri and KeyCloak rejects
-            // the login with "Invalid parameter: redirect_uri". Overwrite so the client converges on
-            // the URIs this deploy actually uses.
-            responses.add(updateBrowserClient(adminToken, realm, clientId, json));
-        } else if (isFailure(created)) {
-            logger.warn("Could not create browser client {}", clientId);
-        }
-        // Human logins go through this client; copy their username into the claim Polaris maps on so
-        // the captured login token resolves to that user's Polaris principal (e.g. "will").
-        responses.add(ensureClientMapper(adminToken, realm, clientId, usernamePrincipalMapper()));
-        return responses;
     }
 
     /**
      * Overwrites an existing client's representation, looking up its internal UUID by {@code clientId}
-     * (the admin API keys updates on the UUID, not the human-readable client ID).
+     * (the admin API keys updates on the UUID, not the human-readable client ID).  Its redirect URIs are replaced by the given ones, or, with
+     * {@link RedirectStrategy#MERGE}, added to: for clouds that share this KeyCloak's realm, and so the client, to each keep their Jupyter's callbacks.
      */
-    private HttpResponse updateBrowserClient(String adminToken, String realm, String clientId, String json)
+    private HttpResponse updateBrowserClient(String adminToken, String realm, String clientId, String clientSecret, List<String> redirectUris,
+                                             RedirectStrategy strategy)
         throws IOException {
         String uuid = clientUuid(adminToken, realm, clientId);
         if (uuid == null) {
@@ -634,13 +644,83 @@ public class KeyCloakProvider implements IdentityProvider {
             return null;
         }
         String uri = format("/admin/realms/%s/clients/%s", realm, uuid);
-        HttpResponse response = putJson(adminToken, uri, json, "browser client " + clientId);
+        List<String> existing = existingRedirectUris(adminToken, uri, clientId);
+        List<String> registered = redirectUris;
+        if (strategy == RedirectStrategy.MERGE) {
+            registered = new ArrayList<>(new LinkedHashSet<>(existing));
+            registered.addAll(redirectUris.stream().filter(added -> !existing.contains(added)).toList());
+            logger.info("Keeping the redirect URIs of browser client {}, as the strategy is {}: {}", clientId, strategy, registered);
+        } else {
+            warnIfDropping(clientId, existing, redirectUris);
+        }
+        HttpResponse response = putJson(adminToken, uri, browserClientJson(clientId, clientSecret, registered), "browser client " + clientId);
         if (isFailure(response)) {
             logger.warn("Could not update browser client {}", clientId);
         } else {
             logger.info("Updated existing KeyCloak browser client {}", clientId);
         }
         return response;
+    }
+
+    private static String describe(HttpResponse response) {
+        return "HTTP " + response.getCode() + " " + HttpResponses.contentOf(response);
+    }
+
+    @Override
+    public List<String> purgeBrowserClientRedirectUris(String clientId, String clientSecret, Collection<String> keep, boolean dryRun) throws IOException {
+        String adminToken = adminToken();
+        String uuid       = clientUuid(adminToken, KEYCLOAK_REALM, clientId);
+        if (uuid == null) {
+            logger.info("Browser client {} is not in realm {}, so has no redirect URIs to purge", clientId, KEYCLOAK_REALM);
+            return List.of();
+        }
+        String uri = format("/admin/realms/%s/clients/%s", KEYCLOAK_REALM, uuid);
+        List<String> existing = readRedirectUris(adminToken, uri);
+        List<String> stale    = existing.stream().filter(existingUri -> !keep.contains(existingUri)).toList();
+        if (stale.isEmpty() || dryRun) {
+            return stale;
+        }
+        List<String> kept = existing.stream().filter(keep::contains).toList();
+        HttpResponse response = putJson(adminToken, uri, browserClientJson(clientId, clientSecret, kept), "browser client " + clientId);
+        if (isFailure(response)) {
+            throw new IOException(format("Could not purge the redirect URIs of the browser client %s of realm %s: %s", clientId, KEYCLOAK_REALM,
+                                         response == null ? "no response" : describe(response)));
+        }
+        logger.info("Purged the redirect URIs of browser client {}: {}", clientId, stale);
+        return stale;
+    }
+
+    /** The redirect URIs that the client has, or none if they cannot be read. */
+    private List<String> existingRedirectUris(String adminToken, String uri, String clientId) {
+        try {
+            return readRedirectUris(adminToken, uri);
+        } catch (IOException | RuntimeException e) {
+            logger.debug("Could not read the redirect URIs of browser client {}: {}", clientId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** @throws IOException if the client could not be read, as none would then be taken for there being none */
+    private List<String> readRedirectUris(String adminToken, String uri) throws IOException {
+        return restClient.get(uri, adminToken, response -> {
+            if (response.getCode() != HttpStatus.SC_OK) {
+                throw new IOException(format("Could not read the client at %s: HTTP %d", uri, response.getCode()));
+            }
+            Object found = mapper.readValue(response.getEntity().getContent(), Map.class).get("redirectUris");
+            return found instanceof List<?> list ? list.stream().map(String::valueOf).toList() : List.<String>of();
+        });
+    }
+
+    /**
+     * Warns of the redirect URIs that overwriting the client takes off it: those of another cloud's Jupyter, if the clouds share this
+     * KeyCloak's realm, which then cannot log in any more.  Not an error, as a client left by an earlier deploy has stale ones too.
+     */
+    private void warnIfDropping(String clientId, List<String> existing, List<String> redirectUris) {
+        List<String> dropped = existing.stream().filter(existingUri -> !redirectUris.contains(existingUri)).toList();
+        if (!dropped.isEmpty()) {
+            logger.warn("Overwriting the redirect URIs of browser client {} drops {}: if they are another cloud's Jupyter, the clouds share this KeyCloak's "
+                        + "realm, so only the last set up can log in.  Set {} to merge to keep them", clientId, dropped, OIDC_REDIRECT_STRATEGY);
+        }
     }
 
     @Override

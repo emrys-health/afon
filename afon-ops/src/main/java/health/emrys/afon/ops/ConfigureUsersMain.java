@@ -7,6 +7,7 @@ import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisUserManager;
 import health.emrys.afon.security.IdentityProvider;
+import health.emrys.afon.security.IdentityProvider.RedirectStrategy;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 import org.slf4j.Logger;
@@ -51,6 +52,13 @@ public class ConfigureUsersMain {
 
     /** The argument giving where KeyCloak is reached, eg {@code --keycloak-endpoint=localhost:54321}. */
     public static final String KEYCLOAK_ENDPOINT_ARG = "--keycloak-endpoint=";
+    /** The argument leaving the Jupyter browser client to the stacks that deploy Jupyter: their setup registers it, see {@link #JUPYTER_CLIENT_ONLY_ARG}. */
+    public static final String OIDC_USERS_ONLY_ARG = "--oidc-users-only";
+    /**
+     * The argument registering only the Jupyter browser client, which the setup of a stack deploying Jupyter does: the client is the cloud's, one per
+     * KeyCloak, so a stack that does not deploy Jupyter, eg the Polaris-only and KeyCloak-only ones, must not register, ie overwrite, it.
+     */
+    public static final String JUPYTER_CLIENT_ONLY_ARG = "--jupyter-client-only";
 
     /**
      * Provisions the realm, the {@link AfonProperty#POLARIS_ID} bootstrap client, and each
@@ -111,6 +119,33 @@ public class ConfigureUsersMain {
      * and the users who must be able to pass through the MFA flow.
      */
     public List<HttpResponse> configureJupyterClient(String jupyterDomain) throws IOException {
+        List<HttpResponse> responses = new ArrayList<>(registerJupyterClient(jupyterDomain));
+        // configure MFA so that the realm is only bound to its MFA flows,
+        // once the users who must pass through them exist
+        responses.addAll(identityProvider.configureMfa());
+        return responses;
+    }
+
+    /**
+     * What registering the browser client does to the redirect URIs of an existing one: {@link AfonProperty#OIDC_REDIRECT_STRATEGY}.
+     *
+     * @throws IllegalArgumentException if it is not one that is known
+     */
+    RedirectStrategy redirectStrategy() {
+        try {
+            return RedirectStrategy.parse(propertyProvider.getValue(OIDC_REDIRECT_STRATEGY, ""));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(OIDC_REDIRECT_STRATEGY + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Registers the browser client used for interactive (Jupyter) logins at the Jupyter domain, with the callbacks of that domain: an existing
+     * client has its redirect URIs replaced, or, with {@link #redirectStrategy()} merge, added to.
+     *
+     * @throws RuntimeException if the client could not be created or updated, as nobody could then log in to Jupyter
+     */
+    public List<HttpResponse> registerJupyterClient(String jupyterDomain) throws IOException {
         logger.info("Configuring browser client for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
         if (isSet(OIDC_PROJECT_CLAIM)) {
@@ -121,11 +156,9 @@ public class ConfigureUsersMain {
             responses.addAll(identityProvider.registerBrowserClient(
                     propertyProvider.getValue(OAUTH2_CLIENT_ID),
                     propertyProvider.getValue(OAUTH2_CLIENT_SECRET),
-                    KeyCloakProvider.callbackURIs(jupyterDomain)));
+                    KeyCloakProvider.callbackURIs(jupyterDomain),
+                    redirectStrategy()));
         }
-        // configure MFA so that the realm is only bound to its MFA flows,
-        // once the users who must pass through them exist
-        responses.addAll(identityProvider.configureMfa());
         return responses;
     }
 
@@ -166,7 +199,14 @@ public class ConfigureUsersMain {
                                         .filter(endpoint -> !endpoint.isEmpty())
                                         .reduce((first, last) -> last)
                                         .orElse(null);
-        String[] args = Arrays.stream(allArgs).filter(arg -> !arg.startsWith(KEYCLOAK_ENDPOINT_ARG)).toArray(String[]::new);
+        boolean oidcUsersOnly     = Arrays.asList(allArgs).contains(OIDC_USERS_ONLY_ARG);
+        boolean jupyterClientOnly = Arrays.asList(allArgs).contains(JUPYTER_CLIENT_ONLY_ARG);
+        if (oidcUsersOnly && jupyterClientOnly) {
+            throw new IllegalArgumentException(OIDC_USERS_ONLY_ARG + " and " + JUPYTER_CLIENT_ONLY_ARG + " exclude each other");
+        }
+        String[] args = Arrays.stream(allArgs)
+                              .filter(arg -> !arg.startsWith(KEYCLOAK_ENDPOINT_ARG) && !arg.equals(OIDC_USERS_ONLY_ARG) && !arg.equals(JUPYTER_CLIENT_ONLY_ARG))
+                              .toArray(String[]::new);
 
         if (args.length != 1 && args.length != 2) {
             System.out.printf("%s requires arguments: cloud", ConfigureUsersMain.class.getSimpleName());
@@ -184,19 +224,34 @@ public class ConfigureUsersMain {
         var app = new ConfigureUsersMain(userProvider, propertyProvider, keycloakEndpoint);
 
         if (catalogName == null) {
-            try {
-                app.configureOidcUsers();
-                Thread.sleep(1000L); // yuck! But KeyCloak appears to asynchronously register users
-            } catch (Exception e) {
-                logger.error("Failed to configure OIDC users {}: {}",
-                        userProvider.getUserNames(), e.getMessage(), e);
-                throw new RuntimeException(e);
+            if (!oidcUsersOnly) {
+                app.redirectStrategy(); // fails at once if it is not one that is known, before anything is done
+            }
+            if (!jupyterClientOnly) {
+                try {
+                    app.configureOidcUsers();
+                    Thread.sleep(1000L); // yuck! But KeyCloak appears to asynchronously register users
+                } catch (Exception e) {
+                    logger.error("Failed to configure OIDC users {}: {}",
+                            userProvider.getUserNames(), e.getMessage(), e);
+                    throw new RuntimeException(e);
+                }
             }
 
             String jupyterDomain = jupyterDomain(cloud, propertyProvider);
+            if (jupyterClientOnly && jupyterDomain == null) {
+                throw new IllegalStateException(cloud.name() + "_JUPYTER_DOMAIN_NAME is not set, so there is no Jupyter browser client to register");
+            }
             if (jupyterDomain != null) {
                 try {
-                    app.configureJupyterClient(jupyterDomain);
+                    if (jupyterClientOnly) {
+                        app.registerJupyterClient(jupyterDomain);
+                    } else if (oidcUsersOnly) {
+                        // the realm's MFA is the KeyCloak's, not the Jupyter stack's, as it is for the users
+                        app.identityProvider.configureMfa();
+                    } else {
+                        app.configureJupyterClient(jupyterDomain);
+                    }
                 } catch (Exception e) {
                     logger.error("Failed to configure Jupyter client for jupyter domain {}: {}",
                             jupyterDomain, e.getMessage(), e);
