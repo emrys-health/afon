@@ -492,6 +492,7 @@ setup_stacks() {
       result="stack $stack failed to set up in $(elapsed_since $start): see $(AFON_LOGGING_FILE="$(stack_log_name "$stack")" afon_log_file)"
       record "$result: tests not run"
       error "Stack ${result#stack }: not running the tests"
+      diagnose_failed_setup "$stack"
       exit 1
     fi
     result="stack $stack set up in $(elapsed_since $start) (log in $(AFON_LOGGING_FILE="$(stack_log_name "$stack")" afon_log_file))"
@@ -708,23 +709,62 @@ esac
 
 cd "$AFON_ROOT"
 
-start_results
-# On every exit, however the script exits: finishes any set up stacks
-trap finish_stacks EXIT
-trap 'INTERRUPTED=true; exit 130' INT
-trap 'INTERRUPTED=true; exit 143' TERM
-check_certs "$SETUP"
-setup_stacks "$SETUP"
-
-update_kube_config
-if runs_network_smoke; then
-  check_polaris_ingress
-fi
-
-# The file the diagnostics of the failed tests go to, in the logs dir, so that the logs store keeps it with the other logs, which it does for
-# every *.log there, and the console, which a public repo's job log shows to all, has none of the pods' logs.
+# The file the diagnostics of the failed tests, or of a failed setup of the stack $1, go to, in the logs dir, so that the logs store keeps it with
+# the other logs, which it does for every *.log there, and the console, which a public repo's job log shows to all, has none of the pods' logs.
+# The stack of the tests is the full one of the cloud.
 diagnostics_file() {
-  echo "$(dirname "$(afon_log_file)")/$CLOUD-full-diagnostics.log"
+  echo "$(dirname "$(afon_log_file)")/${1:-$CLOUD-full}-diagnostics.log"
+}
+
+# Filters stdin, what the pods log, so that no secret is stored in the clear, the repo being public: the values of passwords, secrets, tokens
+# and keys, as in the commands and the errors that Afon logs (kube/Credentials), and also bearer tokens, JWTs and JSON fields as the pods print them.
+mask_secrets() {
+  perl -pe '
+    s/(--[a-z-]*(?:password|passwd|secret|token)=)\S+/$1<redacted>/gi;
+    s{([a-z][a-z0-9+.-]*://[^/\s:@]+:)[^/\s@]+(@)}{$1<redacted>$2}gi;
+    s/([?&;](?:password|passwd|pwd|secret|token)=)[^&;\s"\x27]+/$1<redacted>/gi;
+    s/(\b[a-z0-9_.-]*(?:password|passwd|secret|token|access_key|api_?key|private_key)\s*[=:]\s*)(?!<redacted>)[^\s"\x27,;]+/$1<redacted>/gi;
+    s/("[a-z0-9_.-]*(?:password|passwd|secret|token|access_key|api_?key|private_key|credential)[a-z0-9_.-]*"\s*:\s*)"[^"]*"/$1"<redacted>"/gi;
+    s/(bearer\s+)[A-Za-z0-9._~+\/=-]+/$1<redacted>/gi;
+    s/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/<redacted-jwt>/g;
+  '
+}
+
+# Runs $2... , one of the diagnostics, for the stack $1 (the full one of the cloud if empty), and appends what it prints, with the secrets masked,
+# to its diagnostics file.  Done through a file, not a pipe, so that what the diagnostics set, eg CLUSTER_DIAGNOSED, stays set.  Never fails.
+save_diagnostics() {
+  local stack="$1" raw
+  shift
+  raw=$(mktemp)
+  "$@" > "$raw" 2>&1 || true
+  mask_secrets < "$raw" >> "$(diagnostics_file "$stack")" || true
+  rm -f "$raw"
+  warning "Diagnostics in $(diagnostics_file "$stack")"
+}
+
+# The diagnostics of a stack whose setup failed, before it is torn down: points a kubeconfig of its own at the stack's cluster, if it exists, and
+# prints what diagnose_cluster does.  The cluster may not exist if the setup failed early, which the diagnostics then say.
+diagnose_failed_setup() {
+  local stack="$1" output
+  output=$(mktemp)
+  save_diagnostics "$stack" diagnose_setup_of "$stack" "$output"
+  rm -f "$output"
+}
+
+diagnose_setup_of() {
+  local stack="$1" output="$2" kube_config
+  banner "Diagnostics of the failed setup of stack $stack"
+  if ! run_afon "${stack%%-*}-update-kube-config" "$stack" > "$output" 2>&1; then
+    echo "No kubeconfig for stack $stack, so no cluster to read the pods of:"
+    tail -5 "$output"
+    return 0
+  fi
+  kube_config=$(sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' "$output" | tail -1)
+  if [ -z "$kube_config" ] || [ ! -s "$kube_config" ]; then
+    echo "No kubeconfig for stack $stack, so no cluster to read the pods of"
+    return 0
+  fi
+  KUBECONFIG="$kube_config" diagnose_cluster
 }
 
 # Prints, for a failed test, what the cluster says about the component it tests, as its failure alone does not say why,
@@ -765,6 +805,19 @@ diagnose_cluster() {
   banner "End of the diagnostics of the cluster"
 }
 
+start_results
+# On every exit, however the script exits: finishes any set up stacks
+trap finish_stacks EXIT
+trap 'INTERRUPTED=true; exit 130' INT
+trap 'INTERRUPTED=true; exit 143' TERM
+check_certs "$SETUP"
+setup_stacks "$SETUP"
+
+update_kube_config
+if runs_network_smoke; then
+  check_polaris_ingress
+fi
+
 # The results of the passed and failed tests, eg "test network passed in 02:11", recorded as they are, and printed
 # capitalised, as are those of the stacks, eg "stack aws-full set up in 17:01".
 PASSED=()
@@ -787,8 +840,7 @@ for test_line in "${TESTS[@]}"; do
     FAILED+=("$result")
     record "$result"
     error "Test ${result#test }: see $(afon_log_file)"
-    diagnose_failure "$name" >> "$(diagnostics_file)" 2>&1 || true
-    warning "Diagnostics of the failed test $name in $(diagnostics_file)"
+    save_diagnostics "" diagnose_failure "$name"
   fi
 done
 

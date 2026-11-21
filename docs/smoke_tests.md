@@ -188,7 +188,8 @@ independently of the source tree, and a test whose command is unknown fails.
 - `--setup` sets up, ie deploys and configures, the comma-separated stacks first, in order, with the afon command
   `manage-stack setup <stack>`, eg `--setup aws-full,azure-polaris,gcp-polaris`, each logging to the file
   `<stack-id>.log` in `$AFON_HOME/logs`, whatever `--logging-file` says. The tests are not run if a setup
-  fails. The stacks, including one whose setup failed part way, are left up, and the commands deleting them are
+  fails. Its pods' logs are then saved (see
+  [Diagnostics of a failure](#diagnostics-of-a-failure)). The stacks, including one whose setup failed part way, are left up, and the commands deleting them are
   printed on exit, unless `--teardown` is given.
 - `--teardown` tears down the set up stacks on exit, logging to the `<stack-id>.log` of their setup, in reverse order, with the afon command
   `manage-stack delete <stack>`, whether the tests passed or failed, or a setup failed. The suite fails if a teardown
@@ -270,6 +271,17 @@ changed fails it until it is redeployed, as its network policies hold the old li
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
 `$AFON_HOME/logs/<cloud>-full.log`, the log of the stack they run against (or the file named by `--logging-file`), so that runs for different clouds at the same time each have a log of their own, and to the console as set by `--logging-console`. The script ends with a summary, and
 exits non-zero if any test failed.
+
+### Diagnostics of a failure
+
+A stack that fails to set up, or a test that fails, is explained by what its pods logged, which the teardown deletes. So, before any teardown, the
+suite saves the state of the stack's cluster in `$AFON_HOME/logs/<stack-id>-diagnostics.log`: for a failed test, that of the full stack of the
+cloud, `<cloud>-full-diagnostics.log`; for a failed setup, that of the stack, which says so if its cluster does not exist yet. It holds all
+the pods, the warning events and the tail of the log of every pod (`DIAGNOSE_LOG_LINES`, default 50 lines), with the log of the previous
+container (30 lines) of those that restarted, and more for a failed `git` test. The logs store keeps every `*.log` of that dir, so
+`logs-store pull` retrieves it. Nothing of it goes to the console, which a public repo's job log shows to all, and the values of passwords,
+secrets, tokens and keys, bearer tokens and JWTs in it are masked (`mask_secrets`). A pod whose log cannot be read is noted in it, and never
+fails the run or stops the teardown.
 
 The results of each run are also written to `$AFON_HOME/smoke/tests/results-<stack-id>-<yyyymmdd-hhmmss>.txt`, without any
 logging, so that they can be read even when the console is swamped, eg with `--logging-console INFO`, or a teardown
