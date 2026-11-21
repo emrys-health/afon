@@ -9,7 +9,7 @@
 
 **IMPORTANT:** one-off steps when upgrading from 1.0-beta-9:
 
-- **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml`:**
+- **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml` ([#407](https://github.com/emrys-health/afon/issues/407)):**
   - The entry is now named `afon-desktop`, as the image it points to (`emryshealth/afon-desktop`), which is unchanged.  No action is needed if you use the `docker-images.yaml` that ships with Afon.
   - A `docker-images.yaml` in the config dir (`$AFON_HOME/config`) replaces the shipped one entirely, so if yours has the entry `pyspark-notebook`, rename it to `afon-desktop`: otherwise the deploy cannot find the desktop image of JupyterHub.
 - **The Jupyter browser client is registered by the stacks that deploy Jupyter ([#289](https://github.com/emrys-health/afon/issues/289)):**
