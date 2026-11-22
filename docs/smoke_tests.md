@@ -12,7 +12,7 @@ The shared Spark Connect server registers no catalogs and holds no Polaris crede
 the catalogs it uses, authenticated with the user's OIDC token, and Polaris authorises that user through their own
 principal role (see [architecture](architecture.md#spark-integration)).
 
-The notebook [SparkConnectOidcTest.ipynb](../scripts/smoke/notebooks/SparkConnectOidcTest.ipynb) checks that, each check
+The notebook [spark-connect-oidc-test.ipynb](../scripts/smoke/notebooks/spark-connect-oidc-test.ipynb) checks that, each check
 being an assertion, so that the run fails on any regression:
 
 | Check                                                                                                                                                                   | Expected                                   |
@@ -22,6 +22,9 @@ being an assertion, so that the run fails on any regression:
 | 3. A catalog with an invalid token, or with no token at all                                                                                                             | `NotAuthorizedException`                   |
 | 4. A valid token on a catalog the user is not authorised for (`aws_forbidden`)                                                                                          | `ForbiddenException` (403)                 |
 
+Check 1 reads the table that the `spark-polaris` smoke test writes to the stack's own catalog, so that test must have been run on the
+stack first: the setup of a stack no longer writes it.
+
 Check 2 switches to each catalog by name (`spark.catalog.setCurrentCatalog`), as referring to a table in a catalog
 Spark does not know would be read as a namespace in its default catalog, with a misleading error.
 
@@ -30,7 +33,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ## Requirements
 
-- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and its kubeconfig, `$AFON_CDKTF/kube/<stack-id>.config`, given by `KUBECONFIG` (or by `AFON_STACK=<stack-id>`). `~/.kube/config` is not used. `afon-cli.sh <cloud>-update-kube-config tre` writes it and prints the `export`.
+- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and its kubeconfig, `$AFON_CDKTF/kube/<stack-id>.config`, given by `KUBECONFIG` (or by `AFON_STACK=<stack-id>`). `~/.kube/config` is not used. `afon-cli.sh <cloud>-update-kube-config tre` writes it and prints the `export`. `smoke-notebook` runs that command itself if `KUBECONFIG` is not set.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
   `<CLOUD>_OIDC_DOMAIN_NAME` or else `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
@@ -52,7 +55,9 @@ exist before checking privileges, so reading a table in an empty catalog would n
   ./afon.sh -a configure-users <cloud> all
   ```
 
-- `AFON_CATALOG` containing the table `AFON_TABLE` (default `namespaceph.test_table`, created at setup).
+- `AFON_CATALOG` containing the table `AFON_TABLE` (default `admin.deployments`). The setup of a stack no longer writes it: it is written by the
+  `spark-polaris` smoke test (see [The Spark write test](#the-spark-write-test)), so run that first, eg
+  `afon-cli.sh smoke-test <cloud> --tests spark-polaris`, or `afon-cli.sh spark-polaris-smoke`. Without it, check 1 fails, as the table does not exist.
 - `curl`, `python3` and [uv](https://docs.astral.sh/uv/): the notebook runs in the common Python environment
   `scripts/python/.venv`, which is created and synced on first use (it includes `pyspark-client`).
   `afon-cli.sh smoke-notebook` sets it up and checks it first, with `afon-cli.sh python-setup`, which can also be run on its own: it
@@ -82,7 +87,7 @@ The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
 6. stops the port-forward, whether the run passed or failed.
 
-The executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/SparkConnectOidcTest.ipynb`, leaving the original
+The executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/spark-connect-oidc-test.ipynb`, leaving the original
 clean. The script exits non-zero if any check fails. The token is never printed.
 
 To get the same token yourself, eg to run the notebook some other way, use:
@@ -170,8 +175,13 @@ lines starting with `#` are ignored. For example:
 ```
 name|command|args
 network|network-smoke|
+spark-polaris|spark-polaris-smoke|
 spark-connect|spark-connect-smoke|
 ```
+
+`<cloud>` in a test's args is replaced by the `<cloud>` of the stack tested, so that the one file serves every cloud: the last test of the
+suite, `notebooks|smoke-notebook|<cloud>`, runs the notebooks of [Running from your machine](#running-from-your-machine) against that cloud, after the other tests,
+and so after `spark-polaris`, which writes the table that the notebook `spark-connect-oidc-test` reads.
 
 The suite runs every afon command, the tests' as well as those setting up, tearing down or reaching the stacks, with
 `afon.sh`, as `./afon.sh -a <command> -- <args>`, or with `afon-cli.sh`, as `afon-cli.sh <command> <args>`, given
@@ -271,6 +281,19 @@ changed fails it until it is redeployed, as its network policies hold the old li
 So the results only depend on the env's config and stacks, whoever runs the suite. All the selected tests are run, even if some fail. Their logging goes to the afon log file,
 `$AFON_HOME/logs/<cloud>-full.log`, the log of the stack they run against (or the file named by `--logging-file`), so that runs for different clouds at the same time each have a log of their own, and to the console as set by `--logging-console`. The script ends with a summary, and
 exits non-zero if any test failed.
+
+#### The Spark write test
+
+The `spark-polaris` test (`spark-polaris-smoke`) checks that Spark writes a table through the Polaris of the stack to the stack's own
+catalog, `aws`, `azure` or `gcp` as the `TRE_CLOUD` says, and reads it back. It is the check that the setup of a stack used to end with:
+a failing check now fails the smoke tests, and not a setup that has already deployed and configured a working stack.
+
+The Spark is the session of the test's own process, signed in as the configured admin user, and Polaris is called from the machine
+running the test, through a port-forward to its pod, or through its public domain name if `POLARIS_ACCESS=https`. The test writes the table that
+`trino` and `spark-connect` read, so the suite runs it before them, after `keycloak` and `db`, which it needs. It fails if Polaris refuses the write.
+
+It is skipped, and passes, for a project's TRE (the config has `OIDC_PROJECT_CLAIM`): its Polaris admits only the tokens of the project, with its
+audience, its `acr` and its project claim, which that user cannot present. Making the smoke tests work against it is separate work.
 
 ### Diagnostics of a failure
 

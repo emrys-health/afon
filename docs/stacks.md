@@ -514,7 +514,6 @@ Steps executed:
 3. `deploy_aws_full_stack` — deploy AWS full stack
 4. `wait_on_emryspolaris` — wait for DNS to propagate
 5. `create_all_catalogs_for_cloud_aws` — create all catalogs in AWS Polaris
-6. `aws_spark_talks_to_cloud_aws` — smoke test: Spark writes and reads via Polaris
 
 ### Access Polaris and Jupyter
 

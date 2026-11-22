@@ -9,14 +9,19 @@
 
 **IMPORTANT:** one-off steps when upgrading from 1.0-beta-9:
 
-- **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml` ([#407](https://github.com/emrys-health/afon/issues/407)):**
-  - The entry is now named `afon-desktop`, as the image it points to (`emryshealth/afon-desktop`), which is unchanged.  No action is needed if you use the `docker-images.yaml` that ships with Afon.
-  - A `docker-images.yaml` in the config dir (`$AFON_HOME/config`) replaces the shipped one entirely, so if yours has the entry `pyspark-notebook`, rename it to `afon-desktop`: otherwise the deploy cannot find the desktop image of JupyterHub.
 - **The Jupyter browser client is registered by the stacks that deploy Jupyter ([#289](https://github.com/emrys-health/afon/issues/289)):**
   - The setup step that configures the OIDC users no longer registers the browser client: a new step, `configure_jupyter_client_for_cloud_<cloud>`, of the stacks that deploy Jupyter, does, so setting up a Polaris-only or KeyCloak-only stack leaves the client of the Jupyter stack as it is.  `afon-cli.sh configure-users <cloud>` does both, as before. The setup now fails if the client cannot be created or updated, instead of using the old redirect URIs, and warns, naming them, of the redirect URIs it overwrites.
   - New optional `OIDC_REDIRECT_STRATEGY` (`afon.properties`, `replace` or `merge`, `replace` when empty): with `merge`, the setup adds the redirect URIs of its Jupyter to those of a browser client that is already there instead of replacing them, so that clouds sharing a KeyCloak realm, eg in a test env set up together, can all log in.  Leave it as `replace` in production; any other value fails the setup.
   - New command `afon-cli.sh purge-redirect-uris <cloud> [--dry-run]`, which takes the redirect URIs off the browser client that are not the callbacks of the Jupyter domain of any cloud of the config, eg those of a cloud that is no longer deployed, which `OIDC_REDIRECT_STRATEGY=merge` leaves there.
-
+- **The Spark write of the table is no longer a setup step; the `spark-polaris` smoke test does it ([#406](https://github.com/emrys-health/afon/issues/406)):**
+  - The setup of a stack no longer ends with the step `<cloud>_spark_talks_to_catalog_<cloud>`, which had Spark write a test table through Polaris and read it back, so a failing check no longer fails a setup of a stack that is already deployed and configured.  The same write and read is now the smoke test `spark-polaris` (`afon-cli.sh spark-polaris-smoke`), listed before `trino` and `spark-connect` in `scripts/smoke/tests-full.csv`, so the CI smoke runs include it.
+  - The table `admin.deployments` (`POLARIS_NAMESPACE_EXTERNAL`, `POLARIS_TABLE_NAME`) is therefore written by that smoke test: run it, eg `afon-cli.sh smoke-test <cloud> --tests spark-polaris`, before what reads the table, ie the smoke tests `trino`, `spark-connect` and the notebook `spark-connect-oidc-test.ipynb`, which fail without it.  The suite runs it before them.  It is skipped, and passes, for a project's TRE.
+  - New smoke test `notebooks`, the last of the regression suite, which runs the smoke notebooks (`afon-cli.sh smoke-notebook <cloud>`) after the other tests; `<cloud>` in the args of a test of a suite file is replaced by the cloud tested.  Run on its own, `smoke-notebook` now gets the kubeconfig of the stack itself, with `<cloud>-update-kube-config tre`, if `KUBECONFIG` is not set, and expands the `${ENV_NAME}` of the domain names it reads from the config.
+  - `check-oidc` now tests that KeyCloak is serving through its public discovery path, instead of `/realms/master`, which `<CLOUD>_KEYCLOAK_ALLOWED_CIDRS` restricts, so it no longer reports a KeyCloak as not ready to a machine outside of the allowed addresses.
+  - The smoke notebooks are renamed in kebab-case: `SparkConnectOidcTest.ipynb` is now `spark-connect-oidc-test.ipynb`, and `ProjectReadsDataProvider.ipynb` is `project-reads-data-provider.ipynb`.  Their names in `notebooks.csv`, eg `oidc`, are unchanged.
+- **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml` ([#407](https://github.com/emrys-health/afon/issues/407)):**
+  - The entry is now named `afon-desktop`, as the image it points to (`emryshealth/afon-desktop`), which is unchanged.  No action is needed if you use the `docker-images.yaml` that ships with Afon.
+  - A `docker-images.yaml` in the config dir (`$AFON_HOME/config`) replaces the shipped one entirely, so if yours has the entry `pyspark-notebook`, rename it to `afon-desktop`: otherwise the deploy cannot find the desktop image of JupyterHub.
 
 ## 1.0-beta-9
 

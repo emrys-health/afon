@@ -156,7 +156,6 @@ class StackPlanFactoryTest {
             "deployStack(aws-full)",
             waitForPolarisAndKeycloakIn("aws", true), "deployComplete(aws-full)", "configureOidcUsersFor(aws)",
             "createAllCatalogsFor(aws)", "configurePolarisUsersOnAllCatalogsFor(aws)", "configureJupyterClientFor(aws)",
-            "runSparkWritingTo(aws,aws)",
             "setupComplete(aws-full)", "whitelistPolaris(aws,false)");
         for (String cloud : List.of("azure", "gcp")) {
             String stack = cloud + "-polaris";
@@ -288,7 +287,6 @@ class StackPlanFactoryTest {
             login("azure"), deleteConflicting("azure-full"), "deployStack(azure-full)",
             waitForPolarisAndKeycloakIn("azure", true), "deployComplete(azure-full)", "configureOidcUsersFor(azure)",
             "createAllCatalogsFor(azure)", "configurePolarisUsersOnAllCatalogsFor(azure)", "configureJupyterClientFor(azure)",
-            "runSparkWritingTo(azure,azure)",
             "setupComplete(azure-full)", "whitelistPolaris(azure,false)");
     }
 
@@ -297,7 +295,7 @@ class StackPlanFactoryTest {
         properties.setValue(AWS_KEYCLOAK_EXTERNAL, "false");
         assertThat(derived(SETUP, "aws-lab")).first().isEqualTo(login("aws"));
         assertThat(derived(SETUP, "aws-lab")).element(1).isEqualTo(deleteConflicting("aws-lab"));
-        assertThat(derived(SETUP, "aws-lab")).contains("deployComplete(aws-lab)", "runSparkWritingTo(aws,aws)", "setupComplete(aws-lab)")
+        assertThat(derived(SETUP, "aws-lab")).contains("deployComplete(aws-lab)", "setupComplete(aws-lab)")
                                               .last().isEqualTo("whitelistPolaris(aws,false)");
         // it deploys its own Polaris and KeyCloak, so holds what the other stacks hold
         assertThat(factory.conflicts(StackId.parse("aws-lab"), "aws-polaris", properties)).isTrue();

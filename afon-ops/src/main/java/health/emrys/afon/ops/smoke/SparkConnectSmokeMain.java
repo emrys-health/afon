@@ -29,7 +29,7 @@ import static java.lang.String.format;
 /**
  * You need have some data in Polaris to run this, eg:
  * ./afon.sh -a exec -ec ops.spark.SparkTestWriter -ea "aws aws test_namespace test_table a,b,c" -lc INFO
- * or use the default that access the table that was created at Setup time
+ * or use the default that access the table that was written by spark-polaris-smoke
  * <p>
  * ./afon.sh -a exec -ec ops.smoke.SparkConnectSmokeMain -ea "aws" -lc INFO
  * <p>

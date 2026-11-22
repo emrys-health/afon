@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.kube.tools;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;

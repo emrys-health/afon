@@ -25,7 +25,7 @@
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
 # 'check-oidc <cloud>', then
 # gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user',
-# port-forwards the Spark Connect driver of the current kubectl context, then runs the notebook with
+# port-forwards the Spark Connect driver of the cluster of the stack (KUBECONFIG, else that of '<cloud>-update-kube-config tre'), then runs the notebook with
 # 'jupyter-execute'.  The commands are run as 'smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
 # $AFON_HOME/config/*.properties, or those of --env (AFON_HOME defaults to ~/.afon), for the notebook.  Only those properties
@@ -145,8 +145,24 @@ if [ ! -d "$CONFIG_DIR" ]; then
   exit 1
 fi
 
-prop() {
+# The raw value of the property $1, as written in the config, eg aws-oidc.${ENV_NAME}.click.
+raw_prop() {
   grep -h "^$1=" "$CONFIG_DIR"/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
+}
+
+# The value of the property $1, with the references to other properties, ${NAME}, replaced by their values, as the config does, eg
+# aws-oidc.emrys2.click.  A reference to a property that is not set is left as it is.  Nested references are resolved, up to 5 deep.
+prop() {
+  local value name replacement rest depth=0
+  value=$(raw_prop "$1")
+  while [ "$depth" -lt 5 ] && [[ "$value" =~ \$\{([A-Za-z0-9_]+)\} ]]; do
+    name="${BASH_REMATCH[1]}"
+    replacement=$(raw_prop "$name")
+    [ -n "$replacement" ] || break
+    value="${value//\$\{$name\}/$replacement}"
+    depth=$((depth + 1))
+  done
+  printf '%s\n' "$value"
 }
 
 require() {
@@ -192,13 +208,26 @@ export OIDC_TOKEN
 export POLARIS_DOMAIN_NAME="$POLARIS_HOST"
 export OIDC_DOMAIN_NAME="$OIDC_HOST"
 # The catalogs of the cloud, named <cloud> and <cloud>_forbidden, as the notebook defaults to those of AWS, which the
-# Polaris of another cloud has too, but without the table that the setup of its stack writes to its own catalog.
+# Polaris of another cloud has too, but without the table that the smoke test spark-polaris writes to the catalog of its own stack, which must have been run first.
 export AFON_CATALOG="${AFON_CATALOG:-$(echo "$CLOUD" | tr '[:upper:]' '[:lower:]')}"
 export AFON_FORBIDDEN_CATALOG="${AFON_FORBIDDEN_CATALOG:-${AFON_CATALOG%%_*}_forbidden}"
 
+# The kubeconfig of the stack, if KUBECONFIG is not set already, eg by the regression suite: that of the full stack cluster of the
+# cloud in the env, with the afon command '<cloud>-update-kube-config tre', which prints it.  The default ~/.kube/config is neither written nor read.
 if [ -z "${KUBECONFIG:-}" ]; then
-  echo "KUBECONFIG is not set: point it at the kubeconfig of the stack, eg with the afon command '<cloud>-update-kube-config tre', which prints it" >&2
-  exit 1
+  KUBE_CONFIG_OUTPUT=$(afon "$CLOUD-update-kube-config" tre 2>&1) || {
+    printf '%s\n' "$KUBE_CONFIG_OUTPUT" | tail -20 >&2
+    echo "Could not get the kubeconfig of the $CLOUD stack: is it deployed?  Or set KUBECONFIG to its kubeconfig" >&2
+    exit 1
+  }
+  KUBECONFIG=$(printf '%s\n' "$KUBE_CONFIG_OUTPUT" | sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' | tail -1)
+  unset KUBE_CONFIG_OUTPUT
+  if [ -z "$KUBECONFIG" ] || [ ! -s "$KUBECONFIG" ]; then
+    echo "No kubeconfig for the $CLOUD stack: set KUBECONFIG to its kubeconfig" >&2
+    exit 1
+  fi
+  export KUBECONFIG
+  echo "Using the kubeconfig $KUBECONFIG"
 fi
 # Forwards the driver's port to a free local port, which kubectl picks and reports, so that runs at the same time, eg for
 # different clouds, do not compete for one.

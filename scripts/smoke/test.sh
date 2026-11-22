@@ -46,7 +46,8 @@
 # With afon.sh, the commands are checked against the afon-ops *Main
 # classes of the source tree when the suite file is read, as afon.sh exits zero on an unknown command.
 # With --cli, afon-cli.sh resolves them, failing a test whose command is unknown.
-# Fields are separated by '|', so that args may contain commas. Blank lines and lines starting with '#' are ignored.
+# Fields are separated by '|', so that args may contain commas.  <cloud> in the args is replaced by the cloud of the stack
+# tested, eg 'notebooks|smoke-notebook|<cloud>'. Blank lines and lines starting with '#' are ignored.
 #
 # Each test is run as an afon command, and passes if it exits zero.  All the tests are run, even if some fail.
 # Their logging goes to the afon log file, $AFON_HOME/logs/<cloud>-full.log (or the --logging-file), and to the console as set by
@@ -77,6 +78,8 @@ SCRIPT_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SO
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFAULT_SUITE_FILE="$AFON_ROOT/scripts/smoke/tests-full.csv"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
+# the generator of the *Main classes of the script commands, eg smoke-notebook for SmokeNotebookMain, which are not in the source tree
+SCRIPT_MAINS_FILE="$AFON_ROOT/afon-ops/src/main/codegen/GenerateScriptMains.java"
 # The dir of the results files, one per run, eg results-<stack-id>-<yyyymmdd-hhmmss>.txt.
 RESULTS_DIR="${AFON_HOME:-$HOME/.afon}/smoke/tests"
 # Turns off the Maven loggers of afon.sh reporting a test's non-zero exit, as the exec plugin's stack trace and
@@ -260,7 +263,8 @@ afon_command_line() {
 is_ops_command() {
   local class
   class=$(echo "$1" | awk -F- '{ for (i = 1; i <= NF; i++) printf "%s", toupper(substr($i, 1, 1)) substr($i, 2) }')
-  [ -n "$(find "$OPS_JAVA_DIR" -iname "${class}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)" ]
+  [ -n "$(find "$OPS_JAVA_DIR" -iname "${class}Main.java" -not -path '*/ops/scripts/*' 2>/dev/null | head -1)" ] \
+    || grep -q "\"${class}Main\"" "$SCRIPT_MAINS_FILE" 2>/dev/null
 }
 
 usage() {
@@ -825,7 +829,9 @@ FAILED=()
 for test_line in "${TESTS[@]}"; do
   name=$(test_field "$test_line" 1)
   command=$(test_field "$test_line" 2)
+  # <cloud> in the args is the cloud of the stack tested, so that the suite serves every cloud
   args=$(test_field "$test_line" 3)
+  args="${args//<cloud>/$CLOUD}"
   is_selected "$name" || continue
   banner "Running test $name: $(afon_command_line "$command" $args)"
   start=$SECONDS

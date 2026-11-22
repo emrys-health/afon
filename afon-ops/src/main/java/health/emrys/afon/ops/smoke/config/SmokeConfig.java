@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
+import static health.emrys.afon.config.AfonProperty.OIDC_PROJECT_CLAIM;
 import static health.emrys.afon.config.AfonProperty.TRE_CLOUD;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static java.lang.String.format;
@@ -31,6 +32,13 @@ public class SmokeConfig {
      */
     public static AfonPropertyProvider smokeTestProperties() {
         return new FilePropertyProvider();
+    }
+
+    /**
+     * @return whether the config is of a project's TRE, which names the claim that its tokens carry the project in: set, and not blank
+     */
+    public static boolean isProject(AfonPropertyProvider properties) {
+        return properties.hasProperty(OIDC_PROJECT_CLAIM) && !properties.getValue(OIDC_PROJECT_CLAIM, "").isBlank();
     }
 
     public SmokeConfig(AfonPropertyProvider properties) {

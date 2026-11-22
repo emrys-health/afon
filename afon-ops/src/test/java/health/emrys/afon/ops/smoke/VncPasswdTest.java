@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.ops.kube.tools.VncPasswd;
 import org.junit.jupiter.api.Test;
 
 import java.util.HexFormat;

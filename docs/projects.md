@@ -458,10 +458,9 @@ afon-cli.sh manage-project up cvd-2026
 be up; see below) and `tre` (`manage-stack setup aws-full`). If one fails, fix the cause and resume with
 `manage-project up cvd-2026 --from <stage>`.
 
-The `tre` stage does not run the check that Spark writes a table through the TRE's Polaris
-(`aws_spark_talks_to_catalog_aws`), which the setup of a stack outside a project does: the Polaris of a project's TRE
-admits only the tokens of the project, with its audience, its `acr` and its project claim, and that check signs in as an
-admin user, which has none of them. The members' access is what matters there.
+The smoke test `spark-polaris`, which has Spark write a table through Polaris and read it back, skips a project's TRE:
+the Polaris of a project's TRE admits only the tokens of the project, with its audience, its `acr` and its project claim,
+and the test signs in as an admin user, which has none of them. The members' access is what matters there.
 
 `up` stops, and says to run `configure`, if the project's file has changed since `configure` copied it into the project's
 config, as the stacks deploy from that copy and a member added to the file, say, would not be served by JupyterHub;
@@ -525,7 +524,7 @@ afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
 ```
 
 Without the grant a token of the project reads nothing. Then check that `lon` is serving only its own catalogs, `cvd` and
-`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/ProjectReadsDataProvider.ipynb`, which is
+`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/project-reads-data-provider.ipynb`, which is
 run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`, `provider-lon`
 among its audiences, `acr: mfa`), that the notebook pod cannot call the Data Provider's Polaris directly, that Spark
 reads a table that `lon` has released, and that it is refused one that it has not. It needs two tables on `lon`, one

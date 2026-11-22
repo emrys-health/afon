@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.LokiClient;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -34,7 +35,7 @@ import java.util.regex.Pattern;
 
 import static health.emrys.afon.config.AfonCloudProperty.JUPYTER_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_EXTERNAL;
-import static health.emrys.afon.ops.smoke.LokiClient.withRetries;
+import static health.emrys.afon.ops.kube.tools.LokiClient.withRetries;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static java.lang.String.format;
 

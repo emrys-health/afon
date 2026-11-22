@@ -14,6 +14,7 @@ import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.CurlCommand;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.kube.tools.VncPasswd;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisRestClient;
 import health.emrys.afon.polaris.config.PolarisRestClientFactory;
@@ -48,6 +49,7 @@ import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_ALLOWED_CIDRS;
 import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_EXTERNAL;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.isProject;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
@@ -454,13 +456,6 @@ public class NetworkSmokeMain {
 
     /** The label of the notebook pods, which the network policy of the notebooks selects. */
     static final String NOTEBOOK_POD_LABEL = "afon-role=jupyter-singleuser";
-
-    /**
-     * @return whether the config is of a project's TRE, which names the claim that its tokens carry the project in: set, and not blank
-     */
-    static boolean isProject(AfonPropertyProvider properties) {
-        return properties.hasProperty(OIDC_PROJECT_CLAIM) && !properties.getValue(OIDC_PROJECT_CLAIM, "").isBlank();
-    }
 
     protected List<String> jupyterPods() throws Exception {
         if (isProject(properties)) {

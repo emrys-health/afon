@@ -3,14 +3,15 @@ package health.emrys.afon.ops.smoke;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.kube.tools.LokiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 
-import static health.emrys.afon.ops.smoke.LokiClient.startTimeOf;
-import static health.emrys.afon.ops.smoke.LokiClient.withRetries;
+import static health.emrys.afon.ops.kube.tools.LokiClient.startTimeOf;
+import static health.emrys.afon.ops.kube.tools.LokiClient.withRetries;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static java.lang.String.format;
 

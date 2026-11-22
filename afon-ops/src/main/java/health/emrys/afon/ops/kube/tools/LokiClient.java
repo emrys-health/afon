@@ -1,4 +1,4 @@
-package health.emrys.afon.ops.smoke;
+package health.emrys.afon.ops.kube.tools;
 
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import health.emrys.afon.cdk.components.MonitoringComponent;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.tools.PortForwarder;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.apache.hc.client5.http.classic.methods.HttpGet;

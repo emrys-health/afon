@@ -1,6 +1,7 @@
 name|command|args
 keycloak|key-cloak-smoke|
 db|db-smoke|
+spark-polaris|spark-polaris-smoke|
 trino|trino-query-smoke|
 tetragon|tetragon-loki-smoke|
 loki|promtail-loki-smoke|
@@ -11,3 +12,4 @@ network|network-smoke|
 spark-connect|spark-connect-smoke|
 spark-gcs-read|spark-connect-gcs-read-smoke|
 spark-s3-read|spark-connect-s3-read-smoke|
+notebooks|smoke-notebook|<cloud>

@@ -94,30 +94,12 @@ class ComponentPlanTest {
     }
 
     @Test
-    void sparkDoesNotCheckTheWriteForAProjectsTre() {
+    void sparkAddsNothingToTheSetupAsItsWriteIsASmokeTest() {
         SparkPlan spark = new SparkPlan();
-        properties.setValue(OIDC_PROJECT_CLAIM, "project");
 
         assertThat(setupOf(spark, AWS)).isEmpty();
         assertThat(setupOf(spark, AZURE)).isEmpty();
         assertThat(setupOf(spark, GCP)).isEmpty();
-    }
-
-    @Test
-    void sparkChecksTheWriteWhereTheConfigHasTheProjectClaimEmpty() {
-        SparkPlan spark = new SparkPlan();
-        properties.setValue(OIDC_PROJECT_CLAIM, "  ");
-
-        assertThat(setupOf(spark, AWS)).containsExactly("runSparkWritingTo(aws,aws)");
-    }
-
-    @Test
-    void sparkChecksItWritesThroughThePolarisOfTheCloudToItsOwnCatalog() {
-        SparkPlan spark = new SparkPlan();
-
-        assertThat(setupOf(spark, AWS)).containsExactly("runSparkWritingTo(aws,aws)");
-        assertThat(setupOf(spark, AZURE)).containsExactly("runSparkWritingTo(azure,azure)");
-        assertThat(setupOf(spark, GCP)).containsExactly("runSparkWritingTo(gcp,gcp)");
         assertThat(spark.domains(AWS, properties)).isEmpty();
     }
 

@@ -35,10 +35,13 @@ public class SparkTestReader extends SparkRunner {
         String tableFQN = tableFQN(catalogName, namespace, tableName);
         logger.info("Reading from table {}", tableFQN);
         Dataset<Row> table = spark.table(tableFQN);
-        table.show();
         List<Row> rows = table.collectAsList();
         List<String> read = rows.stream().map(r -> r.getAs("value").toString()).toList();
-        logger.info("Read values {}, expected {}", read, values);
+        if (read.isEmpty()) {
+            throw new IllegalStateException("The table " + tableFQN + " has no rows");
+        }
+        // the table is not shown: the read succeeding, with rows, is what matters
+        logger.info("Read {} rows from {}", read.size(), tableFQN);
     }
 
     public static void main(String[] args) {

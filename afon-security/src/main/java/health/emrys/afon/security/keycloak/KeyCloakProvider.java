@@ -1897,12 +1897,14 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Convenience check used by callers to wait until KeyCloak is serving requests.
+     * Convenience check used by callers to wait until KeyCloak is serving requests, which asks for the public discovery metadata of
+     * the {@code master} realm, as the setup does, and not for the realm itself: that is restricted, with the admin paths, to the
+     * addresses of {@code <CLOUD>_KEYCLOAK_ALLOWED_CIDRS}, so would refuse a caller outside of them, though KeyCloak is serving.
      */
     @Override
     public boolean isReady() {
         try {
-            return restClient.get("/realms/master", null, response -> response.getCode() == HttpStatus.SC_OK);
+            return restClient.get("/realms/master/.well-known/openid-configuration", null, response -> response.getCode() == HttpStatus.SC_OK);
         } catch (IOException e) {
             return false;
         }

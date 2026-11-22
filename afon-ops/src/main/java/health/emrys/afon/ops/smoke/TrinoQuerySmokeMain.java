@@ -7,6 +7,7 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
+import health.emrys.afon.ops.kube.tools.LokiClient;
 import health.emrys.afon.project.ProjectUserProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
@@ -14,7 +15,6 @@ import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -34,7 +34,7 @@ import static health.emrys.afon.cdk.configs.TrinoWorkloads.TRINO_NAMESPACE;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_NAMESPACE_EXTERNAL;
 import static health.emrys.afon.ops.config.OpsDefaults.POLARIS_TABLE_NAME;
 import static health.emrys.afon.ops.kube.KubeClient.nameOfPod;
-import static health.emrys.afon.ops.smoke.LokiClient.withRetries;
+import static health.emrys.afon.ops.kube.tools.LokiClient.withRetries;
 import static health.emrys.afon.trino.TrinoServerConfiguration.TOKEN_EXTRA_CREDENTIAL;
 import static java.lang.String.format;
 
