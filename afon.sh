@@ -2,6 +2,8 @@
 set -euo pipefail
 
 AFON_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The dir the command was run from, as the scripts run from their own dir: a script that takes a local path resolves it against this.
+export AFON_CALLER_DIR="${AFON_CALLER_DIR:-$PWD}"
 OPS_JAVA_DIR="$AFON_ROOT/afon-ops/src/main/java/health/emrys/afon/ops"
 # Shared with afon-cli.sh and afon-cli-scripts.sh: debug_enable, debug_disable.
 source "$AFON_ROOT/scripts/debug/debug-source.sh"

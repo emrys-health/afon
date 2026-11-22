@@ -24,6 +24,8 @@ usage(){
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The dir the command was run from, as the scripts run from their own dir: a script that takes a local path resolves it against this.
+export AFON_CALLER_DIR="${AFON_CALLER_DIR:-$PWD}"
 AFON_HOME="${AFON_HOME:-}"
 AFON_CLI_DIR="${AFON_CLI_DIR:-}"
 AFON_CLOUD="${AFON_CLOUD:-}"

@@ -1,5 +1,7 @@
 package health.emrys.afon.trino;
 
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import org.jspecify.annotations.NonNull;
@@ -89,6 +91,50 @@ public class TrinoServerConfiguration {
             getOauthScope(),
             fileSystemProperties(catalogName),
             additionalProperties()
+        );
+    }
+
+    /**
+     * The placeholder with which a Data Provider's catalog starts: the catalog needs some static authentication to be valid, and the Data
+     * Provider's Polaris takes only a member's own token, which Trino passes for each query, so nothing the server holds can be a credential
+     * of it.  It is only ever sent to the proxy that serves the catalog (see {@link #dataProviderCatalogProperties}), which does not check it.
+     */
+    static final String STARTUP_TOKEN = "no-token-until-a-member-queries";
+
+    /**
+     * The file of a catalog that a Data Provider serves, which a TRE project reads, see {@link AfonCatalogs.Source#DATA_PROVIDER}: the name the
+     * catalog has at the Data Provider, and the storage plugin of the Data Provider's cloud, not the TRE's.  It holds none of the server's
+     * credentials, as the Data Provider's Polaris takes only the token of the member who queries, which it checks for its audience, its second factor
+     * and its project, and which Trino passes on as for any catalog (see {@link #TOKEN_EXTRA_CREDENTIAL}), so that no OAuth server of this stack is
+     * involved.
+     *
+     * <p>Trino's client calls the catalog's endpoint to configure it before any query, with the static authentication of the catalog, which the
+     * Data Provider's Polaris would refuse, so the endpoint is that of a proxy in the TRE that answers that call and passes the rest on, with the
+     * member's token, to the Data Provider's.
+     *
+     * @param catalog a catalog from {@link AfonCatalogs.Source#DATA_PROVIDER}
+     * @param uri     the endpoint that Trino calls for it, the proxy's
+     */
+    public String dataProviderCatalogProperties(AfonCatalog catalog, String uri) {
+        if (catalog.source() != AfonCatalogs.Source.DATA_PROVIDER) {
+            throw new IllegalArgumentException("Catalog '" + catalog.id() + "' is not from a Data Provider, but from the " + catalog.source());
+        }
+        return format(
+            """
+            connector.name=iceberg
+            iceberg.catalog.type=rest
+            iceberg.rest-catalog.view-endpoints-enabled=false
+            iceberg.rest-catalog.uri=%s
+            iceberg.rest-catalog.warehouse=%s
+            iceberg.rest-catalog.vended-credentials-enabled=true
+            iceberg.rest-catalog.security=OAUTH2
+            iceberg.rest-catalog.session=USER
+            iceberg.rest-catalog.oauth2.token=%s
+            %s""",
+            uri,
+            catalog.name(), // the Data Provider's Polaris catalog name
+            STARTUP_TOKEN,
+            fileSystemProperties(catalog.cloud().toString())
         );
     }
 

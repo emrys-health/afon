@@ -147,6 +147,7 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubeEstimatorMain", "kube/estimator.sh"),
         new ScriptEntry("kube", "KubePodsMain", "kube/pods.sh"),
         new ScriptEntry("kube", "KubeLogsMain", "kube/logs.sh"),
+        new ScriptEntry("kube", "KubeUserCpMain", "kube/user-cp.sh"),
         new ScriptEntry("kube", "KubePolarisDbMain", "kube/polaris-db.sh"),
         new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh"),
         new ScriptEntry("kube", "KubeKeycloakWhitelistMain", "kube/keycloak-whitelist.sh"),

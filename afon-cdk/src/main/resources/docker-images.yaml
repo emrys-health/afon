@@ -86,6 +86,12 @@ images:
     tag: 8.11.1
     digest: sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69
     category: third-party
+  nginx:
+    # the proxy in front of the Data Providers' catalogs of a project's TRE, for Trino
+    image: nginxinc/nginx-unprivileged
+    tag: 1.27-alpine
+    digest: sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0
+    category: third-party
   registry:
     # the local registry of the signing acceptance test
     image: registry

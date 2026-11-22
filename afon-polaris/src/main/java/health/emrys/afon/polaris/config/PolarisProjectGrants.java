@@ -192,13 +192,33 @@ public class PolarisProjectGrants {
     }
 
     /**
-     * Moves a table that is checked from {@value #STAGING} to the namespace that the projects read.
+     * Moves a table that is checked from {@value #STAGING} to the namespace that the projects read.  It is safe to repeat: a table that is in that namespace
+     * already, and not in {@value #STAGING}, has been released, and is left as it is.  A table that is in both is not, as which of the two the projects
+     * are to read is not for this to say, and the move is refused by Polaris.
+     *
+     * @return whether the table was moved, {@code false} if it had been released already
      */
-    public void release(String catalog, String table, String namespace) throws IOException, IncorrectConfigException {
+    public boolean release(String catalog, String table, String namespace) throws IOException, IncorrectConfigException {
         requireName("catalog", catalog);
         requireName("table", table);
         requireName("namespace", namespace);
+        if (!tableExists(catalog, STAGING, table) && tableExists(catalog, namespace, table)) {
+            logger.info("{} of {} is in {} already, and not in {}: nothing to release", table, catalog, namespace, STAGING);
+            return false;
+        }
         ok(configurer.renameTable(catalog, STAGING, namespace, table), "move " + table + " from " + STAGING + " to " + namespace);
+        return true;
+    }
+
+    /**
+     * @return whether the namespace of the catalog has the table
+     */
+    public boolean tableExists(String catalog, String namespace, String table) throws IOException {
+        try {
+            return configurer.tableNamesOf(catalog, namespace).contains(table);
+        } catch (ParseException e) {
+            throw new IOException(e);
+        }
     }
 
     private List<String> principalsWith(String role) throws IOException {

@@ -152,6 +152,8 @@ public class TrinoWorkloads {
             .dependsOn(dependsOn)
             .provisioners(CdkUtils.uponCreateRun(CdkUtils.escapeTerraformTemplate(createCertificateCommand())))
             .build();
+        // The catalogs of the Data Providers, which Trino reaches through a proxy of the TRE's, see TrinoCatalogProxy
+        TrinoCatalogProxy.deploy(scope, dependsOn, images, afonCatalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER));
         List<ITerraformDependable> releaseDependsOn = new ArrayList<>(dependsOn);
         releaseDependsOn.add(credential);
         releaseDependsOn.add(certificate);
@@ -345,7 +347,19 @@ public class TrinoWorkloads {
             }
             catalogs.put(catalogName, trinoConfig.catalogProperties(catalogName));
         }
+        for (AfonCatalog catalog : afonCatalogs.bySource(AfonCatalogs.Source.DATA_PROVIDER)) {
+            String name = dataProviderCatalogName(catalog);
+            catalogs.put(name, trinoConfig.dataProviderCatalogProperties(catalog, TrinoCatalogProxy.uriOf(name)));
+        }
         return catalogs;
+    }
+
+    /**
+     * The name in Trino of a catalog that a Data Provider serves: its id, lower case, as Trino requires, which is not that of a catalog of the
+     * stack's own, nor of another Data Provider, as the ids of one config are unique.
+     */
+    static String dataProviderCatalogName(AfonCatalog catalog) {
+        return catalog.id().toLowerCase(java.util.Locale.ROOT);
     }
 
 

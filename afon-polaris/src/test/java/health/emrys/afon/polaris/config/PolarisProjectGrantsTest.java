@@ -163,6 +163,33 @@ class PolarisProjectGrantsTest {
     }
 
     @Test
+    void leavesATableThatIsReleasedAlreadyAsItIsSoReleasingIsSafeToRepeat() throws Exception {
+        when(configurer.tableNamesOf("cvd", "staging")).thenReturn(List.of());
+        when(configurer.tableNamesOf("cvd", "released")).thenReturn(List.of("patients"));
+
+        assertThat(grants.release("cvd", "patients", "released")).isFalse();
+
+        verify(configurer, never()).renameTable(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void stillMovesATableThatIsInBothSoThatPolarisRefusesTheClashItself() throws Exception {
+        when(configurer.tableNamesOf("cvd", "staging")).thenReturn(List.of("patients"));
+        when(configurer.tableNamesOf("cvd", "released")).thenReturn(List.of("patients"));
+
+        assertThat(grants.release("cvd", "patients", "released")).isTrue();
+
+        verify(configurer).renameTable("cvd", "staging", "released", "patients");
+    }
+
+    @Test
+    void releasesATableThatIsOnlyInStagingAndSaysSo() throws Exception {
+        when(configurer.tableNamesOf("cvd", "staging")).thenReturn(List.of("patients"));
+
+        assertThat(grants.release("cvd", "patients", "released")).isTrue();
+    }
+
+    @Test
     void saysWhatPolarisRefusedWithItsCode() throws Exception {
         ClassicHttpResponse refused = mock(ClassicHttpResponse.class);
         when(refused.getCode()).thenReturn(403);

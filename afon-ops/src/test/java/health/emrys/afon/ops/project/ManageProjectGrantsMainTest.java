@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.project;
 
 import health.emrys.afon.polaris.config.PolarisProjectGrants;
+import health.emrys.afon.ops.kube.tools.PolarisAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -159,8 +160,18 @@ class ManageProjectGrantsMainTest {
     }
 
     @Test
+    void releasingATableThatIsReleasedAlreadySaysSoAndSucceeds() throws Exception {
+        when(grants.release("cvd", "patients", "released")).thenReturn(false);
+
+        assertThat(command.run(new String[]{"release", "cvd", "patients"})).isZero();
+
+        assertThat(out.toString()).contains("patients of cvd is in released already, and not in staging: nothing to move").doesNotContain("Moved");
+    }
+
+    @Test
     void addsAndRemovesAMemberAndRevokesAndReleases() throws Exception {
         when(grants.revoke("cvd-2026", "cvd")).thenReturn(List.of("afon:" + ALICE));
+        when(grants.release("cvd", "patients", "released")).thenReturn(true);
 
         assertThat(command.run(new String[]{"add-member", "cvd-2026", ALICE})).isZero();
         assertThat(command.run(new String[]{"remove-member", "cvd-2026", BOB})).isZero();
@@ -187,12 +198,12 @@ class ManageProjectGrantsMainTest {
 
     @Test
     void reachesPolarisThroughAPortForwardUnlessTheConfigSaysHttps() {
-        assertThat(ManageProjectGrantsMain.viaPortForward(null)).isTrue();
-        assertThat(ManageProjectGrantsMain.viaPortForward("  ")).isTrue();
-        assertThat(ManageProjectGrantsMain.viaPortForward("port-forward")).isTrue();
-        assertThat(ManageProjectGrantsMain.viaPortForward("PORT-FORWARD")).isTrue();
-        assertThat(ManageProjectGrantsMain.viaPortForward("https")).isFalse();
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ManageProjectGrantsMain.viaPortForward("ftp"))
+        assertThat(PolarisAccess.viaPortForward(null)).isTrue();
+        assertThat(PolarisAccess.viaPortForward("  ")).isTrue();
+        assertThat(PolarisAccess.viaPortForward("port-forward")).isTrue();
+        assertThat(PolarisAccess.viaPortForward("PORT-FORWARD")).isTrue();
+        assertThat(PolarisAccess.viaPortForward("https")).isFalse();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> PolarisAccess.viaPortForward("ftp"))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("POLARIS_ACCESS").hasMessageContaining("'ftp'");
     }
 

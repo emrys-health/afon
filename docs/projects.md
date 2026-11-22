@@ -68,7 +68,8 @@ see [Names](#names-of-a-projects-resources).
 
 ## The identity project
 
-**1. Init the project**, making the `project.yaml` file from the template of its role, choosing the name of the project, here `idp`:
+**1. Init the project**, making the `project.yaml` file from the template of its role, choosing the name of the project,
+here `idp`:
 
 ```shell
 afon-cli.sh manage-project init idp aws --role identity --made-from emrys2
@@ -148,7 +149,8 @@ You are logged in to Azure and the config of `emrys2` has the Azure properties t
 you start](#before-you-start) says. Bring up [the identity project](#the-identity-project) first: a Data Provider
 trusts it, and its setup reaches its Keycloak.
 
-**1. Init the project**, making the `project.yaml` file from the template of its role, choosing the name of the project, here `lon`:
+**1. Init the project**, making the `project.yaml` file from the template of its role, choosing the name of the project,
+here `lon`:
 
 ```shell
 afon-cli.sh manage-project init lon azure --role data --made-from emrys2
@@ -304,7 +306,8 @@ yet](#what-is-not-done-yet) for what has been run).
 
 ## A first TRE project
 
-**1. Init the project**, making the `project.yaml` file from the template of its role, which is by default `tre` unless you give a different `--role` flag, choosing the name of the project, here `cvd-2026`:
+**1. Init the project**, making the `project.yaml` file from the template of its role, which is by default `tre` unless
+you give a different `--role` flag, choosing the name of the project, here `cvd-2026`:
 
 ```shell
 afon-cli.sh manage-project init cvd-2026 aws --made-from emrys2
@@ -391,7 +394,9 @@ The TRE's domains are not defined in the file: they are derived from the env's (
 `up` issues too, once the zones are delegated. Either `up` does the delegation, or you stop after `create`, delegate,
 issue the certificates, and run the rest.
 
-**3. Make the secret of its TRE client.** The TRE's JupyterHub and the oauth2-proxy gate in front of it sign members in with a client of the project's own, `cvd-2026-tre`, which has a secret. This writes a random one, readable by its owner only, to `~/.afon/projects/cvd-2026/keys/tre.secret`:
+**3. Make the secret of its TRE client.** The TRE's JupyterHub and the oauth2-proxy gate in front of it sign members in
+with a client of the project's own, `cvd-2026-tre`, which has a secret. This writes a random one, readable by its owner
+only, to `~/.afon/projects/cvd-2026/keys/tre.secret`:
 
 ```shell
 afon-cli.sh project-secret cvd-2026 tre
@@ -524,17 +529,96 @@ afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
 ```
 
 Without the grant a token of the project reads nothing. Then check that `lon` is serving only its own catalogs, `cvd` and
-`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/project-reads-data-provider.ipynb`, which is
-run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`, `provider-lon`
-among its audiences, `acr: mfa`), that the notebook pod cannot call the Data Provider's Polaris directly, that Spark
-reads a table that `lon` has released, and that it is refused one that it has not. It needs two tables on `lon`, one
-released and one left in `staging`, which the Data Provider makes (`manage-project-grants release cvd <table>` moves
-one). It says `PASS`, `FAIL` or `INCONCLUSIVE` for each step, and the first `FAIL` says where to look.
+`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/project-reads-data-provider.ipynb`, which
+is run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`,
+`provider-lon` among its audiences, `acr: mfa`), that the notebook pod cannot call the Data Provider's Polaris directly,
+that Spark reads a table that `lon` has released, and that it is refused one that it has not. It needs two tables on
+`lon`, one released and one left in `staging`, which `lon`'s own smoke test writes (`afon-cli.sh manage-project run lon
+spark-polaris-smoke`, see [The Spark write test](smoke_tests.md#the-spark-write-test)); `manage-project-grants release
+cvd smoke_test` releases the first. It says `PASS`, `FAIL` or `INCONCLUSIVE` for each step, and the first `FAIL` says
+where to look.
+
+**Before running either notebook** (`project-reads-data-provider.ipynb` or `trino-connect-oidc.ipynb`), each Data
+Provider that the TRE names must have the tables that they read, which its smoke test writes, and the project must have
+been let in. Run, for each Data Provider (`lon`, then `nw`):
+
+```shell
+afon-cli.sh manage-project run lon spark-polaris-smoke
+afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
+afon-cli.sh manage-project run lon manage-project-grants release cvd smoke_test
+```
+
+The first writes `cvd.staging.smoke_test` and `cvd.staging.smoke_test_unreleased`, with rows, unless they are there
+already, in `staging` or, for `smoke_test`, in `released`. The second lets the project in, and may have been run already.
+The third releases `smoke_test`, and leaves `smoke_test_unreleased` in `staging`, which the notebooks must be refused.
+All three are safe to repeat: the first writes nothing that exists, the second changes nothing that is as it says, and
+the third says that the table is released already, and moves nothing, when it is in `released` and not in `staging`. A
+table that is in both is a clash, which `release` leaves for Polaris to refuse, as which of the two the projects read is
+for the Data Provider to decide. Without the first, the notebooks find no table: they say `INCONCLUSIVE`, or fail to load
+it. A Data Provider that is rebuilt (`up`) starts with empty catalogs, so run them again after it. If the Data Provider's
+ingress was configured before the TRE's file named it, also admit the TRE, see above.
 
 The whitelist of the TRE, the hosts of the Data Provider's Polaris and storage that Spark may reach, and what the pods
 may not, is tested by `network-smoke`, run in the project's home: `afon-cli.sh manage-project run cvd-2026
 network-smoke`. A project's TRE has no user of its own to spawn a notebook as, so it checks the notebook pod of a member
 who is signed in, and skips those checks, saying so, if no one is.
+
+## Operations and tests
+
+A command is one or the other, so that what is run on a real project is never mixed with what only tries it:
+
+| | Commands | What they do |
+|---|---|---|
+| **Operations**, for a real project | `manage-project` (`init`, `validate`, `plan`, `configure`, `up`, `down`, `nightly`, `run`), `manage-identity`, `manage-project-grants` (`grant`, `revoke`, `add-member`, `remove-member`, `release`), `project-secret`, `aws-ses-identity`, `kube-polaris-whitelist` | Deploy, configure and operate a project, and let projects in. None writes or reads data. |
+| **Tests**, for trying a project | `smoke-test`, `spark-polaris-smoke`, `network-smoke`, `spark-test-importer`, `data-synthetic-ehr`, the notebooks of `scripts/smoke/notebooks` | Write synthetic data (the tables `smoke_test*`, the synthetic EHR) or check behaviour. Never part of an operation, and never run on a real Data Provider's data. |
+
+A test is the same command in a project and outside one, so that a project does not drift from a deployment without: the
+Spark write test writes the stack's own catalog outside a project, and the Data Provider's `staging` namespace in a Data
+Provider's project, with the one code, signing in as the admin of the Polaris it is run for. What a project adds to the
+flow is an operation, `release`.
+
+## How Trino reads a Data Provider
+
+A member queries a Data Provider's catalog from the TRE with Spark, or with Trino, as `lon_cvd` (the catalog's id in
+lower case). Either way the member's own token goes to the Data Provider's Polaris, which alone decides what they may
+read: its audience, its `acr`, the project claim and the member's principal, see [The data projects](#the-data-projects).
+Spark declares each catalog in its session with the member's token, so it needs nothing more. Trino needs a small proxy
+in the TRE, `trino-catalog-proxy`.
+
+**Why.** Before the first query on a catalog, Trino's Iceberg client calls `GET /v1/config` on the catalog's endpoint. No
+member is involved in that call, so it carries the static authentication of the catalog's file, which can only be a
+placeholder, as the file holds none of the TRE's credentials. A Data Provider's Polaris takes nothing but a member's
+token, so it refuses the call (`401`, and `Cannot obtain metadata` in Trino), and no query on the catalog can start. Only
+the calls after it carry the member's token, which Trino sends as the extra credential `token`.
+
+**What the proxy does.** It is an nginx of the TRE's (`nginx-unprivileged`, one pod and a service in Trino's namespace,
+made by `TrinoCatalogProxy` when the TRE has Data Provider catalogs), and Trino's catalog for a Data Provider has its
+address `http://trino-catalog-proxy:8080/<catalog>`, not the Data Provider's. It handles two cases:
+
+1. `GET /v1/config` it answers itself, with the catalog's prefix, which does not change, so that the call never reaches
+   the Data Provider.
+2. Every other request it passes to the Data Provider's endpoint, over TLS that it verifies, with the member's
+   `Authorization` as Trino sent it.
+
+```
+Trino ──(member's token)──► trino-catalog-proxy ──(the same token)──► the Data Provider's Polaris
+        GET /v1/config ──►  answered by the proxy, not passed on
+```
+
+**What it does not do.** It makes up no identity and holds no credential, and it adds, replaces and checks no token, so
+the Data Provider only ever sees the tokens of members, and its rules are as they are for Spark. Nothing is accepted
+there that is not a member's.
+
+**What to know.** The hop from Trino to the proxy is plain HTTP, inside the cluster. A pod that can reach the proxy and
+holds a member's token can use it as that member would, which holding the token allows anyway; the notebook pods' network
+policy does not list the proxy, so they cannot. There is one proxy for all the Data Providers of a TRE, each catalog at a
+path of its own, and the TRE's redeploy updates it. A member can list the tables of a Data Provider's `released`
+namespace (`SHOW TABLES FROM lon_cvd.released`), and not the catalog's schemas (`SHOW SCHEMAS`), which its read-only role
+has no grant to list, so Trino and the Data Provider answer `403` to it, by design. Each Data Provider that the TRE names
+must admit the TRE's egress IP at its ingress, as in [A first TRE project](#a-first-tre-project): one brought up before
+the TRE's file named it answers every call from the TRE with an nginx `403`, which its Polaris never logs. It is checked
+by `scripts/smoke/notebooks/trino-connect-oidc.ipynb`, run by a member, which passes on `cvd-2026` with `lon` and `nw`,
+once each Data Provider's smoke test has written its tables (see [before running either notebook](#a-first-tre-project)).
 
 ## A second TRE project
 
@@ -889,8 +973,9 @@ afon-cli.sh aws-ses-identity production-access ... --yes    # sends the request
 afon-cli.sh aws-ses-identity account                        # production True when AWS has approved it, and the quota
 ```
 
-AWS reviews the request, usually within a few minutes, and may write to the account's contact address with questions. 
-What it looks at is the website, and the description of the use: say that it is transactional email only (invitations to verify an email, set a password and enrol a second factor), from which address (`KEYCLOAK_SMTP_FROM`), to members that an
+AWS reviews the request, usually within a few minutes, and may write to the account's contact address with questions.
+What it looks at is the website, and the description of the use: say that it is transactional email only (invitations to
+verify an email, set a password and enrol a second factor), from which address (`KEYCLOAK_SMTP_FROM`), to members that an
 administrator names one by one, a few messages a day, and that no one is mailed in bulk. Say only what is true: the
 account's suppression list for bounces and complaints is on by default, and nothing else need be claimed about
 monitoring.
@@ -932,7 +1017,8 @@ say what the receiver found (`spf=pass`, `dkim=pass`, `dmarc=pass`).
   and JupyterHub's `GenericOAuthenticator` takes a `client_id` and a `client_secret` only. A key is to be used again when
   they can present it.
 - **PKCE.** The gate in front of JupyterHub asks for PKCE (the S256 method) in a project's TRE. The project's client
-  allows it and does not require it: JupyterHub's own sign-in, behind the oauth2-proxy gate and with the same client, sends none in the version that Afon runs, so a client that required it would let only the gate sign in.
+  allows it and does not require it: JupyterHub's own sign-in, behind the oauth2-proxy gate and with the same client,
+  sends none in the version that Afon runs, so a client that required it would let only the gate sign in.
 - **How members authenticate.** Each member signs in as themselves, in the browser flow, with their own password and a
   second factor. Their email is only their identifier: it is their username in the identity provider, and `sync-members`
   uses it to find or create their account. The first time, they get an invitation email to verify the email, set a
@@ -983,20 +1069,17 @@ built** means that the code is not there; **not tried** means that it is, but ha
 - **Not tried: a refusal at `lon`.** Its Polaris requires the issuer of the identity, its own audience and `acr: mfa` of
   every token, and takes the project claim as the one principal role that is active. A spec runs that in a container,
   where a token for another audience, or without the `acr`, is refused; against `lon` a refusal has not been tried.
-- **Not built: an admin client for each Data Provider.** `POLARIS_ID` is a property of the env, not derived for each
-  project, so the Data Providers made from the same env share one client, which collects the audience of each one that is
-  set up, and whoever holds its secret holds the admin access of all of them.
 - **Not built: a firewall on the storage of a Data Provider.** The storage account of its catalogs is open to any
   network, and protected by its credentials, so a credential that Polaris vends works from any address.
 
 ### The TREs reading the Data Providers
 
-- **Not built: Trino does not read the catalogs of the Data Providers.** Each of its catalogs starts with a credential of
-  its own, which a Data Provider's Polaris would refuse for lack of its audience and `acr`; Spark, which reads them with
-  the member's token, does.
-- **Not tried: Trino across clouds, and behind a storage firewall.** An AWS Trino reading Azure storage with the
-  credentials that the Data Provider's Polaris vends; and any read behind a storage firewall, which there is none of yet.
-  Spark on AWS reads the storage of `lon` on Azure.
+- **Not tried: Trino reading the data files of a Data Provider, across clouds, and behind a storage firewall.** Trino on
+  `cvd-2026` (AWS) lists and loads the released tables of `lon` and `nw` (Azure) through its proxy, with the member's
+  token, and is refused one that is not released; see [How Trino reads a Data
+  Provider](#how-trino-reads-a-data-provider). The tables of the test are empty, so no data file has been read with the
+  credentials that the Data Provider's Polaris vends: that needs a table with rows, and so does any read behind a storage
+  firewall, which there is none of yet. Spark on AWS reads the storage of `lon` on Azure.
 
 ### What the TRE's tools check
 

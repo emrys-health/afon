@@ -1,6 +1,7 @@
 package health.emrys.afon.ops.spark;
 
 import health.emrys.afon.config.*;
+import health.emrys.afon.ops.kube.tools.PolarisAccess;
 import health.emrys.afon.spark.SparkClient;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -9,6 +10,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static health.emrys.afon.config.AfonProperty.OIDC_PROJECT_CLAIM;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
+import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
+import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
+import static health.emrys.afon.config.AfonProperty.PROJECT_ID;
 import static org.slf4j.LoggerFactory.getLogger;
 
 abstract public class SparkRunner {
@@ -18,6 +24,60 @@ abstract public class SparkRunner {
 
     protected SparkRunner(AfonPropertyProvider properties) {
         this.properties = properties;
+    }
+
+    /**
+     * @return whether the config is of a project that runs a Data Provider's Polaris: it has a project id, names no claim for the project in its tokens, as a
+     * TRE's does, and has the admin client of its Polaris
+     */
+    public static boolean isDataProject(AfonPropertyProvider properties) {
+        return isSet(properties, PROJECT_ID) && !isSet(properties, OIDC_PROJECT_CLAIM) && isSet(properties, POLARIS_ID);
+    }
+
+    private static boolean isSet(AfonPropertyProvider properties, AfonProperty property) {
+        return properties.hasProperty(property) && !properties.getValue(property, "").isBlank();
+    }
+
+    /**
+     * The user that Spark signs in to Polaris as.  In a Data Provider's project it is Polaris' admin client, as its Polaris takes the tokens of the
+     * members of the projects that it lets in, with their audience, second factor and project, and this client, which is Polaris' own: the
+     * users of {@code users.csv} are not made in the identity by a project.  Elsewhere it is the configured user, as ever.
+     */
+    static AfonUser userFor(AfonPropertyProvider properties, AfonUserProvider users) {
+        if (isDataProject(properties)) {
+            return AfonUserProvider.createUser(properties.getValue(POLARIS_ID), properties.getValue(POLARIS_SECRET));
+        }
+        return users.getConfiguredUser(properties);
+    }
+
+    /** What runs with Polaris reached, which may fail. */
+    @FunctionalInterface
+    interface Action {
+        void run() throws Exception;
+    }
+
+    /**
+     * Runs {@code action} with Polaris reached as this machine can reach a Data Provider's, through a port-forward to its pod, as {@code POLARIS_ACCESS}
+     * says (the default), so that this machine need not be among the addresses that its ingress admits, which the project's Polaris is not.  Elsewhere, or
+     * when the endpoint is given already ({@code POLARIS_ENDPOINT}, by a caller that has made its own), it runs it as it is: at Polaris' public domain name.
+     */
+    static void withPolarisAccess(AfonPropertyProvider properties, AfonCloud cloud, Action action) throws Exception {
+        if (!isDataProject(properties)) {
+            action.run();
+            return;
+        }
+        try (PolarisAccess access = PolarisAccess.open(properties, cloud)) {
+            if (access.endpoint() == null || access.endpoint().equals(System.getProperty(POLARIS_ENDPOINT.getName()))) {
+                action.run();
+                return;
+            }
+            System.setProperty(POLARIS_ENDPOINT.getName(), access.endpoint());
+            try {
+                action.run();
+            } finally {
+                System.clearProperty(POLARIS_ENDPOINT.getName());
+            }
+        }
     }
 
     public static void parseAndExecute(SparkRunner app, AfonPropertyProvider properties, AfonUserProvider users, String[] args) {
@@ -48,10 +108,12 @@ abstract public class SparkRunner {
             if (args.length == 7) {
                 user = AfonUserProvider.createUser(args[5], args[6]);
             } else {
-                user = users.getConfiguredUser(properties);
+                user = userFor(properties, users);
             }
-            SparkSession spark = new SparkClient(cloud, properties, user).sparkSession(catalogName);
-            app.doRun(spark, catalogName, namespace, tableName, lines);
+            withPolarisAccess(properties, cloud, () -> {
+                SparkSession spark = new SparkClient(cloud, properties, user).sparkSession(catalogName);
+                app.doRun(spark, catalogName, namespace, tableName, lines);
+            });
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
             throw new RuntimeException(e);

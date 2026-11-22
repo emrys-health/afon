@@ -107,5 +107,6 @@ public final class DockerImageResolver {
     public String guacd()            { return reference("guacd"); }
     public String oauth2Proxy()      { return reference("oauth2-proxy"); }
     public String curl()             { return reference("curl"); }
+    public String nginx()            { return reference("nginx"); }
     public String postgresAlpine()   { return reference("postgres-alpine"); }
 }

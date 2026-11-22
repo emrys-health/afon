@@ -7,9 +7,7 @@ import health.emrys.afon.project.FileProjectProvider;
 import health.emrys.afon.project.ProjectEnv;
 import health.emrys.afon.project.TreProject;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
-import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.tools.PortForwarder;
-import health.emrys.afon.ops.steps.StepOperations;
+import health.emrys.afon.ops.kube.tools.PolarisAccess;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
 import health.emrys.afon.polaris.config.PolarisProjectGrants;
 
@@ -27,7 +25,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static health.emrys.afon.config.AfonProperty.POLARIS_ACCESS;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
 /**
@@ -67,7 +64,7 @@ public class ManageProjectGrantsMain {
         "  remove-member <project> <user id>  takes the project's role from the member",
         "  revoke <project> <catalog>             ends the project's access to the catalog",
         "  release <catalog> <table> [" + NAMESPACE + " <namespace>]",
-        "                              moves the table from " + PolarisProjectGrants.STAGING + " to the namespace that the projects read",
+        "                              moves the table from " + PolarisProjectGrants.STAGING + " to the namespace that the projects read, unless it is there already",
         "<project> is the id of the TRE project that reads the catalog.  It is run in the home of a Data Provider's project, in its cloud:",
         "  manage-project run <provider> manage-project-grants <action> ..., with the Polaris admin credentials of that project's config");
 
@@ -191,8 +188,11 @@ public class ManageProjectGrantsMain {
     }
 
     private int release(String catalog, String table, String namespace) throws Exception {
-        grants.get().release(catalog, table, namespace);
-        out.printf("Moved %s of %s from %s to %s%n", table, catalog, PolarisProjectGrants.STAGING, namespace);
+        if (grants.get().release(catalog, table, namespace)) {
+            out.printf("Moved %s of %s from %s to %s%n", table, catalog, PolarisProjectGrants.STAGING, namespace);
+        } else {
+            out.printf("%s of %s is in %s already, and not in %s: nothing to move%n", table, catalog, namespace, PolarisProjectGrants.STAGING);
+        }
         return 0;
     }
 
@@ -245,22 +245,6 @@ public class ManageProjectGrantsMain {
     }
 
     /**
-     * Whether Polaris is reached through a port-forward to its pod, as {@code POLARIS_ACCESS} says, the default, or through its public domain name,
-     * {@code https}: the ingress of a Data Provider admits only the addresses that it is configured with, which need not include this machine.
-     *
-     * @throws IllegalArgumentException if it is neither
-     */
-    static boolean viaPortForward(String access) {
-        if (access == null || access.isBlank() || access.equalsIgnoreCase("port-forward")) {
-            return true;
-        }
-        if (access.equalsIgnoreCase("https")) {
-            return false;
-        }
-        throw new IllegalArgumentException(String.format("%s should be 'https' or 'port-forward', not '%s'", POLARIS_ACCESS, access));
-    }
-
-    /**
      * @param open what is opened to reach Polaris, which the caller closes when the command is done
      */
     private static PolarisProjectGrants ofTheProviderInThisHome(List<AutoCloseable> open) throws Exception {
@@ -272,18 +256,9 @@ public class ManageProjectGrantsMain {
         AfonCloud cloud = AfonCloud.valueOf(name.trim().toUpperCase(Locale.ROOT));
         // as seen by the cloud whose Polaris it calls, at its endpoint
         AfonPropertyProvider properties = new OpsPropertyProvider().forCloud(cloud);
-        String given = System.getProperty(POLARIS_ENDPOINT.getName());
-        if (given == null && viaPortForward(properties.getValue(POLARIS_ACCESS, "port-forward"))) {
-            KubeClient client = new KubeClient(properties);
-            open.add(client);
-            client.requireContextOf(cloud);
-            String pod = client.runningPodWithLabel(StepOperations.POLARIS_POD_LABEL).orElseThrow(() -> new IllegalStateException(
-                "No running pod with the label " + StepOperations.POLARIS_POD_LABEL + " in the kubectl context '" + client.getContext() + "'"));
-            PortForwarder forward = new PortForwarder(client, "default", pod, 0, StepOperations.POLARIS_PORT);
-            open.add(forward);
-            given = "localhost:" + forward.localPort();
-        }
-        properties.setValue(POLARIS_ENDPOINT, given != null ? given : new PolarisEndpoint(cloud, properties).getEndpoint());
+        PolarisAccess access = PolarisAccess.open(properties, cloud);
+        open.add(access);
+        properties.setValue(POLARIS_ENDPOINT, access.endpoint() != null ? access.endpoint() : new PolarisEndpoint(cloud, properties).getEndpoint());
         return new PolarisProjectGrants(properties);
     }
 
