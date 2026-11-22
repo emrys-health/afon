@@ -388,4 +388,28 @@ class ManageIdentityMainTest {
         assertThat(command.run(new String[]{"remove-authenticator", PROJECT})).isEqualTo(2);
         assertThat(command.run(new String[]{"remove-authenticator", PROJECT, "a@example.org", "b@example.org"})).isEqualTo(2);
     }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void printsTheUserIdOfAMemberAloneAndChangesNothing(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.findUser("ada@example.org")).thenReturn(java.util.Optional.of("11111111-aaaa-bbbb-cccc-000000000001"));
+
+        assertThat(command.run(new String[]{"user-id", PROJECT, "ada@example.org"})).isZero();
+
+        assertThat(out.toString().strip()).isEqualTo("11111111-aaaa-bbbb-cccc-000000000001");
+        verify(identity, never()).ensureUser(any(), any(), any(), any());
+        verify(identity, never()).addMember(any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsToGiveTheUserIdOfAnUnknownUserAndTakesOneEmail(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        when(identity.findUser("bob@tre.example")).thenReturn(java.util.Optional.empty());
+
+        assertThat(command.run(new String[]{"user-id", PROJECT, "bob@tre.example"})).isEqualTo(1);
+        assertThat(err.toString()).contains("No user bob@tre.example in the central identity");
+        assertThat(command.run(new String[]{"user-id", PROJECT})).isEqualTo(2);
+    }
 }

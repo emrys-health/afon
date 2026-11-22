@@ -5,7 +5,7 @@
 #   afon-cli.sh manage-project plan ${id}
 #   afon-cli.sh manage-project configure ${id}
 #   afon-cli.sh manage-project up ${id}
-# The private key of its TRE client is made by: afon-cli.sh project-key ${id} tre
+# The secret of its TRE client, which configure needs, is made by: afon-cli.sh project-secret ${id} tre
 # See docs/projects.md.
 project:
   id: ${id}

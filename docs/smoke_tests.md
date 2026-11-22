@@ -305,8 +305,12 @@ afon-cli.sh manage-project run lon spark-polaris-smoke
 ```
 
 Releasing `smoke_test` (`afon-cli.sh manage-project run lon manage-project-grants release cvd smoke_test`) gives the projects that `lon` has let in a table with
-rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-reads-data-provider.ipynb` with Spark, `trino-connect-oidc.ipynb` with Trino), and
-leaves `smoke_test_unreleased` in `staging`, which they must be refused. Writing the tables is a test, never part of an operation: nothing that deploys or
+rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb` with Spark, `project-trino-reads-data-providers.ipynb` with Trino), and
+leaves `smoke_test_unreleased` in `staging`, which they must be refused. Until [#411](https://github.com/emrys-health/afon/issues/411) (smoke tests that sign in as a user) is built, those two notebooks can only be run interactively, by a member who is signed in to the TRE's
+JupyterHub, in a notebook of their own pod, which has `OIDC_TOKEN` only after that sign-in: they are not run by `smoke-test` or `smoke-notebook`, nor from the CLI.
+See [Projects](projects.md#a-first-tre-project).
+
+Writing the tables is a test, never part of an operation: nothing that deploys or
 operates a project writes data. The test writes a table only if it is in neither `staging` nor `released`, and `release` of a table that is in `released` and not in `staging`
 says so and moves nothing, so the two can be repeated.
 

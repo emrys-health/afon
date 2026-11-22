@@ -264,11 +264,32 @@ so catalogs that an earlier deployment made stay: delete one through Polaris's o
 `catalog_admin` first, then `DELETE /api/management/v1/catalogs/<name>`), as `manage-polaris-catalogs delete` looks a
 catalog up in the config, which no longer lists it.
 
-**4. Grant a project its catalog** (once its TRE exists, as it needs its members, and for `nw` the same as for `lon`). A
-Data Provider lets a project in by its own grants, in its own Polaris, with its own admin credentials: the TRE side never
-does. In the home of the Data Provider's project, for the `cvd` catalog of `lon` and the project `cvd-2026`, whose
-members are read from the project's own `members.csv`, which `manage-identity` writes as it adds and removes them (see
-[Members](#members)), so no user id is copied by hand:
+**4. Grant a project its catalog** (once its TRE exists, as it needs its members, and for `nw` the same as for `lon`).
+
+A project reads a Data Provider's data only if three parties each do their part, and no party can do another's. The Data
+Provider decides what a project reads; the TRE's side decides who its members are; the central identity decides who may
+sign in. This is what each controls:
+
+| | Controls | Does not control |
+|---|---|---|
+| **The Data Provider** (the operator of its project, with its Polaris admin credentials, `POLARIS_ID` and `POLARIS_SECRET` in its config) | Its Polaris and its catalogs. The namespaces of a catalog: `staging`, where it makes and checks its tables, which no project reads, and `released`, which projects read. Which tables are released. Which projects read which catalog: the project's principal role and catalog role. Which members of a project have a principal, and so may read. Which addresses its ingress admits, `<CLOUD>_POLARIS_ALLOWED_CIDRS`. | Who the members of a project are, how they sign in, and what a TRE does with what it reads. |
+| **The TRE project** (its operator) | Its own `project.yaml`: its members, which is the authority for who is in the project, its egress IP, and the Data Providers and catalogs that it names in `dataProviders`, which is a request to read, not a grant. Its client and its secret. | What a Data Provider lets it read. It cannot make a role, a principal or a grant in a Data Provider's Polaris, and adding a member to its group gives no access to a Data Provider's data. |
+| **The central identity** (the operator of the identity project) | Who exists, their second factor, and the group of each project. It issues a project's token only to a member of the project's group, after the second factor, and puts in it the project, the audiences of the Data Providers that the project names, and `acr`. | Whether a Data Provider admits the holder of a token. A token alone reads nothing. |
+
+So, for a member to read a table, all four of these hold, and the TRE's side can make only the first:
+
+1. **The member has a token** for the project: they are in the project's `members`, so in its group in the identity, and
+   have signed in with their second factor. (The TRE's side, and the identity.)
+2. **The Data Provider's ingress admits the TRE's egress IP.** (The Data Provider; derived from the TRE's file, see step
+   5.)
+3. **The Data Provider has a principal for the member, with the project's role,** which is what `grant` makes below. A
+   member who is in the group and has no principal there reads nothing. (The Data Provider.)
+4. **The table is in `released`.** (The Data Provider, with `release`.)
+
+The Data Provider lets a project in, with its own grants, in its own Polaris and with its own admin credentials. The
+TRE's side never does. Running the grant of the Data Provider's project gives the project `cvd-2026` access to the `cvd` 
+catalog of `lon`. Its members are those of the project's `members.csv`, which `manage-identity` keeps up to
+date as it adds and removes members (see [Members](#members)), so no user id is copied by hand:
 
 ```shell
 afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
@@ -280,10 +301,23 @@ with `POLARIS_ACCESS=https` it calls Polaris at its public domain name, and the 
 
 It makes, for the project, a principal role `cvd-2026Project` and a catalog role `cvd-2026Reader` in the catalog, with
 read-only access to the namespace `released` (or the one given with `--namespace`), and nothing else: no write, and not
-`staging`, where the Data Provider makes and checks its tables. It makes a principal `afon:<user id>` for each member
-in the file, who then has the project's role. The file is the authority, as `members` is: a member not in it loses
-the role, and a principal with no role left is deleted. It is safe to repeat. The same command changes one member or
-ends the access, or moves a table that was checked from `staging` to `released`:
+`staging`, where the Data Provider makes and checks its tables. It makes a principal `afon:<user id>` for each member in
+the file, who then has the project's role. The names are the whitelist: a token whose project claim or user claim names
+no role or principal that exists reads nothing, as its Polaris checks the tokens.
+
+Whose list of members it grants is the Data Provider's choice:
+- **The TRE's list (the default).** The members of `members.csv` of the project, so that the Data Provider admits the
+  people whom the TRE's side says are in the project. The file is the authority, as `members` is: a member not in it
+  loses the role, and a principal with no role left is deleted. It is checked against the members that the project's
+  `project.yaml` lists, and refused if they differ, so that the two cannot drift: the fix is `manage-identity
+  sync-members` in the TRE's home.
+- **The Data Provider's own list.** `--members <file>`, one user id for each line, or `<user id>,<email>`, for a Data
+  Provider that grants only the members that its contract names, which may be fewer than the project's. It is not checked
+  against the project's file: the Data Provider is the authority for what it grants, and a member of the project who is
+  not in it reads nothing from this Data Provider.
+
+It is safe to repeat. The same command changes one member, ends the access, or moves a table that was checked from
+`staging` to `released`, which is the Data Provider's step, never the TRE's:
 
 ```shell
 afon-cli.sh manage-project run lon manage-project-grants add-member cvd-2026 <user id>
@@ -292,17 +326,34 @@ afon-cli.sh manage-project run lon manage-project-grants release cvd patients
 afon-cli.sh manage-project run lon manage-project-grants revoke cvd-2026 cvd
 ```
 
-Because the names are the allowlist, a token whose project claim or user claim names no role or principal that exists
-reads nothing, as its Polaris checks the tokens (see [What is not done yet](#what-is-not-done-yet)). A
-project whose catalog is its own, as `cvd` is `cvd-2026`'s, is isolated by the catalog; one catalog shared by several
+In these commands `<user id>` is the **Keycloak user id** that the central identity gave the member, a UUID, not their
+email: the principal is `afon:<user id>`, the same id that is the `polaris_principal` claim of their token, and an email
+is refused. To find it from the email, in the TRE project's home, without changing anything:
+
+```shell
+afon-cli.sh manage-project run cvd-2026 manage-identity user-id alice@tre.example
+```
+
+It prints the id alone, one line, and fails, saying so, if the member is not in the central identity (`add-member` makes
+them, and sends the invitation, which `user-id` does not). The id is also in the project's `members.csv`, one `<user
+id>,<email>` line for each member, and `add-member` prints it too, but also makes the member if absent. `grant` reads
+`members.csv` itself, so for the whole project no id is typed.
+
+Taking access away is also the Data Provider's: `revoke` or `remove-member` deletes the role or the principal, and by the
+design its Polaris then refuses that member's tokens, whatever the identity still lets them sign in with. 
+Removing a member from the TRE's `members` does not remove their principal at a Data Provider; the Data
+Provider does that, with `remove-member`, or with a `grant` from a list without them. Credentials for the storage that
+Polaris has already vended work until they expire, which is up to an hour in the design, and a token that the identity
+has issued is valid until it expires.
+
+A project whose catalog is its own, as `cvd` is `cvd-2026`'s, is isolated by the catalog; one catalog shared by several
 projects is only isolated by the namespace of each, `--namespace`, so give each its own.
 
 A TRE names the catalogs of a Data Provider in its `dataProviders`, as [below](#a-first-tre-project): it takes the
 **catalog endpoint** (`https://azure-polaris.lon.emrys2.click/api/catalog`), the **audience** that its tokens carry for
-it (`provider-lon`) and the **storage account** of the catalog from the Data Provider's project. The Data Provider
-decides what a project reads: it lets a project in by its own grants, which are made with `manage-project-grants`; who
-the project's members are is the TRE's, from its `members.csv` (see below, and [What is not done
-yet](#what-is-not-done-yet) for what has been run).
+it (`provider-lon`) and the **storage account** of the catalog from the Data Provider's project. Naming a Data Provider
+asks to read it; the Data Provider decides, with the grants above. Who the project's members are is the TRE's, from its
+`members.csv` (see below, and [What is not done yet](#what-is-not-done-yet) for what has been run).
 
 ## A first TRE project
 
@@ -502,8 +553,8 @@ afon-cli.sh manage-project run cvd-2026 manage-identity sync-members
 ```
 
 Second, `lon` admits the TRE's egress IP, which it does only for the TREs whose files name it, when it is configured, so
-it is configured again once the TRE's file exists. Only the allow-list of its Polaris ingress changes, so it need not be
-deployed again: `configure` makes the config, and `kube-polaris-whitelist` sets the allow-list from it, on the cluster
+it is configured again once the TRE's file exists. Only the whitelist of its Polaris ingress changes, so it need not be
+deployed again: `configure` makes the config, and `kube-polaris-whitelist` sets the whitelist from it, on the cluster
 that kubectl points at, until the next deploy, which sets it as the config says, with the TRE's address in it:
 
 ```shell
@@ -529,8 +580,8 @@ afon-cli.sh manage-project run lon manage-project-grants grant cvd-2026 cvd
 ```
 
 Without the grant a token of the project reads nothing. Then check that `lon` is serving only its own catalogs, `cvd` and
-`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/project-reads-data-provider.ipynb`, which
-is run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`,
+`dbt`, and test the read from a notebook of the TRE: `scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb`,
+which is run in the TRE by the member, checks the token that the notebook holds, `OIDC_TOKEN` (the claim `project`,
 `provider-lon` among its audiences, `acr: mfa`), that the notebook pod cannot call the Data Provider's Polaris directly,
 that Spark reads a table that `lon` has released, and that it is refused one that it has not. It needs two tables on
 `lon`, one released and one left in `staging`, which `lon`'s own smoke test writes (`afon-cli.sh manage-project run lon
@@ -538,9 +589,19 @@ spark-polaris-smoke`, see [The Spark write test](smoke_tests.md#the-spark-write-
 cvd smoke_test` releases the first. It says `PASS`, `FAIL` or `INCONCLUSIVE` for each step, and the first `FAIL` says
 where to look.
 
-**Before running either notebook** (`project-reads-data-provider.ipynb` or `trino-connect-oidc.ipynb`), each Data
-Provider that the TRE names must have the tables that they read, which its smoke test writes, and the project must have
-been let in. Run, for each Data Provider (`lon`, then `nw`):
+**How the notebooks are run.** Until [#411](https://github.com/emrys-health/afon/issues/411) (smoke tests that sign in as
+a user) is built, `project-spark-reads-data-providers.ipynb` and `project-trino-reads-data-providers.ipynb` can only be
+run interactively, by a member who is signed in to the TRE's JupyterHub, in a notebook of their own pod: the token that
+they check, `OIDC_TOKEN`, is put in the pod's environment by the hub at the member's sign-in, and nothing else has one
+that a project's TRE accepts. They are not run by `smoke-test` or `smoke-notebook` (they are not in `notebooks.csv`,
+which runs notebooks as an admin from `users.csv`) or from the CLI. To run one: sign in to the TRE's JupyterHub as a
+member, copy the notebook into the pod (`afon-cli.sh manage-project run cvd-2026 kube-user-cp --user <you> to <path>`,
+see [Jupyter](jupyter.md#copying-notebooks-to-and-from-jupyter-user-pod), or upload it in JupyterLab), run all its cells,
+and read the summary at the end. `kube-user-cp ... from` copies the notebook with its results back.
+
+**Before running either notebook** (`project-spark-reads-data-providers.ipynb` or
+`project-trino-reads-data-providers.ipynb`), each Data Provider that the TRE names must have the tables that they read,
+which its smoke test writes, and the project must have been let in. Run, for each Data Provider (`lon`, then `nw`):
 
 ```shell
 afon-cli.sh manage-project run lon spark-polaris-smoke
@@ -572,10 +633,11 @@ A command is one or the other, so that what is run on a real project is never mi
 | **Operations**, for a real project | `manage-project` (`init`, `validate`, `plan`, `configure`, `up`, `down`, `nightly`, `run`), `manage-identity`, `manage-project-grants` (`grant`, `revoke`, `add-member`, `remove-member`, `release`), `project-secret`, `aws-ses-identity`, `kube-polaris-whitelist` | Deploy, configure and operate a project, and let projects in. None writes or reads data. |
 | **Tests**, for trying a project | `smoke-test`, `spark-polaris-smoke`, `network-smoke`, `spark-test-importer`, `data-synthetic-ehr`, the notebooks of `scripts/smoke/notebooks` | Write synthetic data (the tables `smoke_test*`, the synthetic EHR) or check behaviour. Never part of an operation, and never run on a real Data Provider's data. |
 
-A test is the same command in a project and outside one, so that a project does not drift from a deployment without: the
-Spark write test writes the stack's own catalog outside a project, and the Data Provider's `staging` namespace in a Data
-Provider's project, with the one code, signing in as the admin of the Polaris it is run for. What a project adds to the
-flow is an operation, `release`.
+A test is the same command in a project and outside one, so that a project does not drift from a deployment without
+(`data-synthetic-ehr` is not yet, see [What is not done yet](#what-is-not-done-yet)): the Spark write test writes the
+stack's own catalog outside a project, and the Data Provider's `staging` namespace in a Data Provider's project, with the
+one code, signing in as the admin of the Polaris it is run for. What a project adds to the flow is an operation,
+`release`.
 
 ## How Trino reads a Data Provider
 
@@ -617,8 +679,9 @@ namespace (`SHOW TABLES FROM lon_cvd.released`), and not the catalog's schemas (
 has no grant to list, so Trino and the Data Provider answer `403` to it, by design. Each Data Provider that the TRE names
 must admit the TRE's egress IP at its ingress, as in [A first TRE project](#a-first-tre-project): one brought up before
 the TRE's file named it answers every call from the TRE with an nginx `403`, which its Polaris never logs. It is checked
-by `scripts/smoke/notebooks/trino-connect-oidc.ipynb`, run by a member, which passes on `cvd-2026` with `lon` and `nw`,
-once each Data Provider's smoke test has written its tables (see [before running either notebook](#a-first-tre-project)).
+by `scripts/smoke/notebooks/project-trino-reads-data-providers.ipynb`, run by a member, which passes on `cvd-2026` with
+`lon` and `nw`, once each Data Provider's smoke test has written its tables (see [before running either
+notebook](#a-first-tre-project)).
 
 ## A second TRE project
 
@@ -779,11 +842,13 @@ afon-cli.sh manage-project run cvd-2026 manage-identity remove-member <email>
 afon-cli.sh manage-project run cvd-2026 manage-identity sync-members
 afon-cli.sh manage-project run cvd-2026 manage-identity invite <email>
 afon-cli.sh manage-project run cvd-2026 manage-identity remove-authenticator <email>
+afon-cli.sh manage-project run cvd-2026 manage-identity user-id <email>
 ```
 
-`add-member` and `remove-member` change one member at a time. A project that lists its `members` in its `project.yaml`
-has them made for it: see [Members](#members). `invite` sends a member the invitation again, and `remove-authenticator`
-removes their authenticators, so that they enrol a new one from it: see [Setting up SMTP](#setting-up-smtp).
+`user-id` prints the member's Keycloak user id, which `manage-project-grants` takes, and changes nothing. `add-member`
+and `remove-member` change one member at a time. A project that lists its `members` in its `project.yaml` has them made
+for it: see [Members](#members). `invite` sends a member the invitation again, and `remove-authenticator` removes their
+authenticators, so that they enrol a new one from it: see [Setting up SMTP](#setting-up-smtp).
 
 The state of a project's stacks is stored by `cdktf-store`, as the tag `current`, under the project's id, so apart from
 that of any env.
@@ -1044,7 +1109,7 @@ afon-cli.sh manage-project down idp
 
 The TRE projects are taken down independently, and the shared identity last, as every project uses it. `down` deletes the
 stacks, the last first. The reserved IP, the buckets and the projects' config and cdktf dirs are left, as an address may
-be on somebody's allow-list.
+be on somebody's whitelist.
 
 `manage-identity close` disables the project's TRE client, so that no token is issued for it. Its group and members stay.
 To open the project again, run `create`, which makes the client enabled again:
@@ -1058,40 +1123,67 @@ each project: `manage-project up <project> --from register`.
 
 ## What is not done yet
 
-What the page above describes has been run on this deployment (the identity on AWS, `lon` on Azure and `cvd-2026` on
-AWS), except what is listed here, which is the way it is meant to work and not yet tried, or is missing. **Not
-built** means that the code is not there; **not tried** means that it is, but has not been run on this deployment.
+What the page above describes has been run on this deployment (the identity on AWS, `lon` and `nw` on Azure and
+`cvd-2026` on AWS), except what is listed here, which is the way it is meant to work and not yet tried, or is missing.
+**Not built** means that the code is not there; **not tried** means that it is, but has not been run on this deployment.
 
 ### The Data Providers
 
-- **Not tried: `nw`.** A second Data Provider, made from the same env, with its own egress IP, its audience
-  (`provider-nw`) and its catalogs, which `cvd-2026` and `dbt-2026` also read. Only `lon` has been brought up.
-- **Not tried: a refusal at `lon`.** Its Polaris requires the issuer of the identity, its own audience and `acr: mfa` of
-  every token, and takes the project claim as the one principal role that is active. A spec runs that in a container,
-  where a token for another audience, or without the `acr`, is refused; against `lon` a refusal has not been tried.
-- **Not built: a firewall on the storage of a Data Provider.** The storage account of its catalogs is open to any
-  network, and protected by its credentials, so a credential that Polaris vends works from any address.
+- **Not tried: a token for another audience, or without the `acr`, at `lon` or `nw`.** Their Polaris requires the issuer
+  of the identity, its own audience and `acr: mfa` of every token, and takes the project claim as the one principal role
+  that is active. A spec runs that in a container, where such a token is refused. Against `lon` and `nw` a refusal has
+  been seen for a token that the identity did not issue (`401`) and for a table that a project may not read, one left in
+  `staging` (`403`), but not for a token of another audience or without the `acr`.
+- **Not built: an admin client for each Data Provider, and the admin principals of a TRE's own Polaris
+  ([#409](https://github.com/emrys-health/afon/issues/409)).** `POLARIS_ID` is a property of the env, not derived for
+  each project, so the Data Providers made from the same env share one client, which collects the audience of each one
+  that is set up, and whoever holds its secret holds the admin access of all of them. A TRE's own Polaris still makes its
+  admin principals from `users.csv`, which the TRE's setup no longer makes users of in the identity.
+- **Not built: `data-synthetic-ehr` in a Data Provider's project.** The test that loads synthetic patients is tied to the
+  site envs and to the Python env. `spark-test-importer`, which it uses, signs in as the Polaris admin client and reaches
+  Polaris by a port-forward in a Data Provider's project, as the Spark write test does, but has not been tried there.
+  Until then a Data Provider's tables with rows come from `spark-polaris-smoke`, see [Operations and
+  tests](#operations-and-tests).
+- **Not built: an IP whitelist on the storage of a Data Provider
+  ([#412](https://github.com/emrys-health/afon/issues/412)).** The storage account of its catalogs is open to any
+  network, and protected only by the credentials that its Polaris vends, so a credential works from any address. The
+  firewall is an whitelist of the egress IPs of the TREs that name the Data Provider (the storage firewall rules of an
+  Azure storage account, or a source IP condition in the policy of an S3 bucket), as the ingress of its Polaris already
+  has; it is not a VPN or a private endpoint. Azure storage IP rules do not apply to traffic from the same Azure region,
+  which goes by private addresses, so a TRE in the region of a Data Provider would need another rule, such as a service
+  endpoint.
 
 ### The TREs reading the Data Providers
 
-- **Not tried: reads behind a storage firewall.** Trino on `cvd-2026` (AWS) reads the released tables of `lon` and `nw`
-  (Azure), data files included, with the member's token and the credentials that the Data Provider's Polaris vends, and
-  is refused a table that is not released; see [How Trino reads a Data Provider](#how-trino-reads-a-data-provider). Spark
-  does the same. Neither has been tried behind a firewall on the storage, which there is none of yet.
+- **Not tried: reads behind an IP whitelist on the storage ([#412](https://github.com/emrys-health/afon/issues/412)).**
+  Trino on `cvd-2026` (AWS) reads the released tables of `lon` and `nw` (Azure), data files included, with the member's
+  token and the credentials that the Data Provider's Polaris vends, and is refused a table that is not released; see [How
+  Trino reads a Data Provider](#how-trino-reads-a-data-provider). Spark does the same. Neither has been tried with the
+  storage restricted to the TRE's egress IP, which there is none of yet.
 
 ### What the TRE's tools check
 
-- **Not built: the TRE's tools do not check the audience, the project claim or the `acr` of a token.** The tokens carry
-  them, and the Data Providers check them. It is to do for each tool that takes a token: Trino, Spark and Gitea. A key in
-  place of the secret waits for oauth2-proxy and JupyterHub's authenticator to be able to present one, see [Client
-  secrets](#client-secrets).
+- **Not built: the TRE's tools do not check the audience, the project claim or the `acr` of a token
+  ([#410](https://github.com/emrys-health/afon/issues/410)).** The tokens carry them, and the Data Providers check them,
+  so the data is protected, but Trino, the oauth2-proxy gate and JupyterHub, and Gitea and VS Code when they exist, do
+  not each require them. A key in place of the secret waits for oauth2-proxy and JupyterHub's authenticator to be able to
+  present one, see [Client secrets](#client-secrets).
 
 ### Members, invitations and the setup of a TRE
 
-- **Not tried: `dbt-2026`, and the smoke tests of a TRE that sign in as a user.** A second TRE from the same env, next to
-  `cvd-2026`, and the smoke tests that sign in as a user of `users.csv`, who is only an admin in a project's TRE, against
-  a project's Polaris, which admits only the tokens of the project. `network-smoke` does not, and has been run against
-  `cvd-2026`.
+- **Not tried: `dbt-2026`.** A second TRE from the same env, next to `cvd-2026`, which reads the `dbt` catalogs of `lon`
+  and `nw`.
+- **Not built: the smoke tests of a TRE that sign in as a user
+  ([#411](https://github.com/emrys-health/afon/issues/411)).** The suite signs in as a user of `users.csv`, who is only
+  an admin in a project's TRE, which admits only the tokens of the project. So the tests that need a token, and the
+  notebooks `project-spark-reads-data-providers` and `project-trino-reads-data-providers`, cannot run from the CLI: the
+  notebooks are run interactively, by a member signed in to the JupyterHub, in their pod. `network-smoke` works, through
+  the pod of a signed-in member, and has been run against `cvd-2026`.
+- **Not built: rotating a client's secret, and stopping a removed member's servers.** `manage-identity rotate-secret`
+  does not exist. A secret can be replaced by hand, with `project-secret <project> tre --force`, then `manage-identity
+  create` to give the identity the new one, `configure` and a redeploy of the TRE, which has not been tried.
+  `manage-identity remove-member` ends the member's sessions in the identity, but a notebook server that they have
+  started in the TRE runs until the TRE is rebuilt; `manage-tre-users stop`, which would end it, is not built.
 - **Not built: the restriction of the admin side of Keycloak on AWS.** It is the listener rules of the load balancer
   (`AWS_KEYCLOAK_ALLOWED_CIDRS`), which `kube-keycloak-whitelist` does not change.
 

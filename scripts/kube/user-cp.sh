@@ -15,8 +15,8 @@
 #   CONTEXT=...    kubectl context to use (defaults to current context)
 #
 # Examples:
-#   ./user-cp.sh to trino-connect-oidc.ipynb
-#   ./user-cp.sh --user mauro from trino-connect-oidc.ipynb results/
+#   ./user-cp.sh to project-trino-reads-data-providers.ipynb
+#   ./user-cp.sh --user mauro from project-trino-reads-data-providers.ipynb results/
 #
 # A local path is relative to the dir that the command is run from.
 #

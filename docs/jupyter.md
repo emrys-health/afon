@@ -38,9 +38,12 @@ Adapt the commands as appropriate for other paths.
 afon-cli.sh kube-user-cp [--user <user>] to <local-path> [<pod-path>]
 afon-cli.sh kube-user-cp [--user <user>] from <pod-path> [<local-path>]
 ```
+A notebook that needs the member's token, `OIDC_TOKEN`, such as `project-spark-reads-data-providers` and `project-trino-reads-data-providers`, can only be
+run interactively in the pod of a member who is signed in to the hub, as the token is put in the pod at sign-in; until [#411](https://github.com/emrys-health/afon/issues/411) nothing runs them from the CLI.
+
 `--user` is the username, or the start of the email, of the pod's user, and is not needed when only one notebook pod is running. A path of the pod is
 relative to its home, unless it starts with `/`. In a project, run it in the project's cluster:
 ```shell
-afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro to trino-connect-oidc.ipynb
-afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro from trino-connect-oidc.ipynb .
+afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro to project-trino-reads-data-providers.ipynb
+afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro from project-trino-reads-data-providers.ipynb .
 ```

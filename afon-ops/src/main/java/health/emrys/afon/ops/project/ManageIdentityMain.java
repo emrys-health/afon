@@ -33,6 +33,7 @@ import java.util.function.BiFunction;
  * manage-identity sync-members &lt;project&gt;
  * manage-identity invite &lt;project&gt; &lt;email&gt;
  * manage-identity remove-authenticator &lt;project&gt; &lt;email&gt;
+ * manage-identity user-id &lt;project&gt; &lt;email&gt;
  * manage-identity close &lt;project&gt;
  * </pre>
  * <ul>
@@ -75,6 +76,7 @@ public class ManageIdentityMain {
         "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
         "  invite <email>                  sends the invitation again to a member who is in the central identity (it fails if it cannot be sent)",
         "  remove-authenticator <email>    removes the member's authenticators and ends their sessions, so that they enrol a new one, eg from the invitation",
+        "  user-id <email>                 prints the user id that the central identity gave the member, which manage-project-grants takes; it changes nothing",
         "  close                           closes the project's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -138,7 +140,7 @@ public class ManageIdentityMain {
         // <project> is left out in the home of a project, whose config has its id
         int withoutProject = switch (action) {
             case "create", "close", "sync-members" -> 0;
-            case "add-member", "remove-member", "invite", "remove-authenticator" -> 1;
+            case "add-member", "remove-member", "invite", "remove-authenticator", "user-id" -> 1;
             default -> -1;
         };
         String project;
@@ -165,6 +167,7 @@ public class ManageIdentityMain {
             case "sync-members" -> rest.isEmpty() ? with(project, options, this::syncMembers) : usage("sync-members takes no argument");
             case "remove-authenticator" -> rest.size() == 1 ? with(project, options, (p, e) -> removeAuthenticator(p, e, rest.get(0)))
                                                            : usage("remove-authenticator takes one <email>");
+            case "user-id" -> rest.size() == 1 ? with(project, options, (p, e) -> userId(p, e, rest.get(0))) : usage("user-id takes one <email>");
             case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
@@ -263,6 +266,16 @@ public class ManageIdentityMain {
         provider.removeMember(project, userId.get());
         record(project, () -> ProjectMembers.remove(ProjectMembers.file(afonHome, project.id().value()), userId.get()));
         out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
+    }
+
+    /**
+     * Prints the user id of the member alone, one line, so that a script can take it: the immutable id that the central identity gave them, which is what
+     * {@code manage-project-grants add-member} and the members file hold.  It makes nothing, unlike {@code add-member}.
+     */
+    private void userId(TreProject project, String endpoint, String email) {
+        String userId = identity.apply(project, endpoint).findUser(email).orElseThrow(() -> new IllegalStateException(
+            "No user " + email + " in the central identity: add-member makes them, and sends the invitation"));
+        out.println(userId);
     }
 
     private void removeAuthenticator(TreProject project, String endpoint, String email) {
