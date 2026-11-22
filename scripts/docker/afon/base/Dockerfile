@@ -9,6 +9,8 @@ ARG EKSCTL_VERSION=v0.215.0
 ARG YQ_VERSION=4.54.1
 ARG KUBELOGIN_VERSION=v0.2.22
 ARG COSIGN_VERSION=v3.1.4
+ARG UV_VERSION=0.12.15
+ARG PYTHON_VERSION=3.12
 ARG EKSCTL_PLATFORM=linux/amd64
 
 FROM eclipse-temurin:${JAVA_VERSION}-jdk-jammy AS jdk
@@ -17,10 +19,12 @@ FROM --platform=${EKSCTL_PLATFORM} weaveworks/eksctl:${EKSCTL_VERSION} AS eksctl
 FROM mikefarah/yq:${YQ_VERSION} AS yq
 FROM ghcr.io/azure/kubelogin:${KUBELOGIN_VERSION} AS kubelogin
 FROM ghcr.io/sigstore/cosign/cosign:${COSIGN_VERSION} AS cosign
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM ubuntu:22.04
 
 ARG TARGETARCH
+ARG PYTHON_VERSION
 
 # The options of every download: fail on an HTTP error, rather than save its body as the file, and retry the transient failures
 ARG CURL_OPTS="-fsSL --retry 5 --retry-delay 10 --retry-all-errors"
@@ -117,6 +121,14 @@ COPY --from=kubelogin /usr/local/bin/kubelogin /usr/local/bin/kubelogin
 RUN curl $CURL_OPTS https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${TARGETARCH} -o /usr/local/bin/kind \
  && chmod 0755 /usr/local/bin/kind
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
+
+# uv, from its image, and the python it sets up the common python env with (scripts/python, requires 3.11 or 3.12, while the python of
+# ubuntu 22.04 is 3.10), installed here so that the notebooks of the smoke tests need no download of it.  Both are readable by any user.
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
+COPY --from=uv /uv /uvx /usr/local/bin/
+RUN uv python install ${PYTHON_VERSION} \
+ && chmod -R a+rX /opt/uv \
+ && uv --version
 
 ARG AFON_VERSION
 ARG AFON_COMMIT

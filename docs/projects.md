@@ -1074,12 +1074,10 @@ built** means that the code is not there; **not tried** means that it is, but ha
 
 ### The TREs reading the Data Providers
 
-- **Not tried: Trino reading the data files of a Data Provider, across clouds, and behind a storage firewall.** Trino on
-  `cvd-2026` (AWS) lists and loads the released tables of `lon` and `nw` (Azure) through its proxy, with the member's
-  token, and is refused one that is not released; see [How Trino reads a Data
-  Provider](#how-trino-reads-a-data-provider). The tables of the test are empty, so no data file has been read with the
-  credentials that the Data Provider's Polaris vends: that needs a table with rows, and so does any read behind a storage
-  firewall, which there is none of yet. Spark on AWS reads the storage of `lon` on Azure.
+- **Not tried: reads behind a storage firewall.** Trino on `cvd-2026` (AWS) reads the released tables of `lon` and `nw`
+  (Azure), data files included, with the member's token and the credentials that the Data Provider's Polaris vends, and
+  is refused a table that is not released; see [How Trino reads a Data Provider](#how-trino-reads-a-data-provider). Spark
+  does the same. Neither has been tried behind a firewall on the storage, which there is none of yet.
 
 ### What the TRE's tools check
 
