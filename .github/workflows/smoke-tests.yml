@@ -112,6 +112,8 @@ jobs:
       AZURE_OIDC_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
       # In the container, so the config, the cdktf dir (with the tofu state and the kubeconfigs) and the logs go with it.
       AFON_HOME: /tmp/afon
+      # Seconds a notebook cell may run before the notebook fails, so that a hung cell does not block the run (default 300).
+      AFON_NOTEBOOK_CELL_TIMEOUT: "300"
       # The environment's variables of the login, see docs/github_workflows.md.  The identifiers of the account are secrets of the environment,
       # so that GitHub masks them from the first step on, in a log that is public; the variables are for the environments set up before.
       AWS_REGION: ${{ vars.AWS_REGION }}
