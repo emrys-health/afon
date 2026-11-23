@@ -26,6 +26,7 @@ import io.kubernetes.client.openapi.models.V1IngressRule;
 import io.kubernetes.client.openapi.models.V1LoadBalancerIngress;
 import io.kubernetes.client.openapi.models.V1Service;
 import org.apache.hc.core5.http.HttpResponse;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +101,9 @@ public class NetworkSmokeMain {
             this::checkVncPasswordIsNotShared,
             this::checkNotebookOnlyReachableFromHubAndGuacamole,
             this::checkNotebookTrustsTrinoOverHttps)));
+        for (String pod : jupyterPods()) {
+            results.addAll(checkCannotSee(pod, new String[] {"spark-master-svc.default.svc.cluster.local:8080"}));
+        }
         return results;
     }
 
@@ -476,7 +480,6 @@ public class NetworkSmokeMain {
     }
 
     private List<ExecResult> checkCannotSeeOtherBuckets(String pod) throws Exception {
-        List<ExecResult> results = new ArrayList<>();
         String[] providers = new String[]{
             "unreachablebucket.eu-west-2.amazonaws.com",
             "unreachablebucket.blob.core.windows.net",
@@ -485,10 +488,16 @@ public class NetworkSmokeMain {
             "pypi.org",
             GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT
             };
-        for (String provider : providers) {
+        List<ExecResult> results = checkCannotSee(pod, providers);
+        return results;
+    }
+
+    private @NonNull List<ExecResult> checkCannotSee(String from, String[] endpoints) throws Exception {
+        List<ExecResult> results = new ArrayList<>();
+        for (String provider : endpoints) {
             // the domains over HTTPS, as a user reaches them; Guacamole is a service of the cluster, over plain HTTP
-            CurlCommand command = provider.contains(":") ? new CurlCommand(client, pod, provider, false)
-                                                         : CurlCommand.https(client, pod, provider, false);
+            CurlCommand command = provider.contains(":") ? new CurlCommand(client, from, provider, false)
+                                                         : CurlCommand.https(client, from, provider, false);
             results.addAll(command.run());
         }
         return results;

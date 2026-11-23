@@ -150,9 +150,7 @@ public class NetworkConfig {
 //        Map<String, Object> manifest = sparkManifest(DRIVER_LABELS,
 //                                                     "spark-driver",
 //                                                     whitelist);
-        Map<String, Object> manifest = connectionManifest(
-            USER_POD_LABELS,
-            List.of());
+        Map<String, Object> manifest = jupyterManifest(USER_POD_LABELS);
         System.out.println(format("echo '%s' | kubectl apply -f -", toCanonicalJson(manifest)));
     }
 
@@ -206,14 +204,11 @@ public class NetworkConfig {
         // pixels travel back on a connection Guacamole itself opened; conntrack permits those
         // replies and the notebook never initiates to Guacamole. Listing it would only have granted
         // the notebook the ability to dial Guacamole, which nothing requires.
+        // The Spark master is deliberately absent too: a notebook reaches Spark only through Spark Connect, and the master's
+        // ports are its web UI, which proxies to the UI of the Spark Connect driver, with every user's queries, and its
+        // submission ports, from which any application could be run on the workers, see jupyterManifest.
         boolean gke = domainPolicy == DomainPolicy.GKE_FQDN;
-        List<NetworkPolicySpecEgressTo> allowedNamespacePeers = new ArrayList<>(List.of(
-            podEgressTo(JupyterHubConfig.HUB_LABELS)));
-        if (gke) {
-            // The Spark master, which on Cilium its own policy allows (see connectionManifest), a name not being what a policy on GKE
-            // can express for a pod of the cluster
-            allowedNamespacePeers.add(podEgressTo(MASTER_LABELS));
-        }
+        List<NetworkPolicySpecEgressTo> allowedNamespacePeers = List.of(podEgressTo(JupyterHubConfig.HUB_LABELS));
         List<NetworkPolicySpecEgress> egress = List.of(
 //            createWebEgressPolicy(),
             createDnsEgressPolicy(domainPolicy),
@@ -393,7 +388,8 @@ public class NetworkConfig {
     }
 
     /**
-     * Whitelists egress to a set of domain names.
+     * Applies the notebooks' Cilium policy, {@link #jupyterManifest}, which denies them the Spark master.  It once whitelisted
+     * egress to a set of domain names, which the notebooks no longer have, and the notes below are of a Cilium policy generally.
      * <p>
      * A Kubernetes {@link NetworkPolicy} only understands CIDRs, so a name whose address is
      * decided by a CDN and changes underneath us cannot be expressed there. Cilium (our CNI) does
@@ -426,7 +422,7 @@ public class NetworkConfig {
     private void lockdownJupyterPods(Map<String, String> labels,
                                      List<ITerraformDependable> dependsOn
     ) {
-        Map<String, Object> manifest = connectionManifest(labels, List.of());
+        Map<String, Object> manifest = jupyterManifest(labels);
         createWhitelistFor(dependsOn, manifest, "jupyterNetworkPolicy",
                            "kubectl delete ciliumnetworkpolicy " + DOMAIN_POLICY_NAME + " -n default");
     }
@@ -453,34 +449,24 @@ public class NetworkConfig {
                         .build();
     }
 
-    private static @NonNull Map<String, Object> connectionManifest(Map<String, String> labels,
-                                                                   List<AllowedDomain> allowedDomains
-    ) {
-        List<Map<String, Object>> allowedEgress = new ArrayList<>();
-        if (!allowedDomains.isEmpty()) {
-            Map<String, Object> dnsVisibility = dnsConfigFor(allowedDomains);
-            allowedEgress.add(dnsVisibility);
-            Map<String, Object> domainEgress = Map.of(
-                "toFQDNs", allowedDomains.stream().map(AllowedDomain::asFqdnSelector).toList(),
-                "toPorts", List.of(Map.of(
-                    "ports", ALLOWED_PORTS.stream()
-                                          .map(port -> Map.of("port", port, "protocol", "TCP"))
-                                          .toList()))
-            );
-            allowedEgress.add(domainEgress);
-        }
-        // Egress to the service of the Spark master, SparkNames#masterService (spark://<master>-svc:7077).
-        // Named rather than listed among the whitelisted domains because a cluster-local name is
-        // not something toFQDNs can express: Cilium's DNS proxy turns an answer into a CIDR
-        // identity, whereas a pod inside the cluster carries a label-derived one, so the FQDN rule
-        // would never match it. Traffic to a ClusterIP is DNAT'd to a backing pod before egress
-        // policy is evaluated in any case, so selecting those pods on the same label the Service
-        // selects on is the rule that actually applies. No toPorts, matching the domain rule
-        // above: every port the master listens on (7077, 6066, 8080) is reachable.
-        Map<String, Object> sparkMasterEgress = Map.of(
-            "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS)));
-        allowedEgress.add(sparkMasterEgress);
-        return manifestUsing(labels, DOMAIN_POLICY_NAME, allowedEgress);
+    /**
+     * The Cilium policy of the notebooks, which allows them nothing, as their {@link NetworkPolicy} already allows what they need,
+     * but denies them the Spark master on every port.  The master is not a peer of theirs: they reach Spark only through Spark
+     * Connect, while the master serves its web UI, which proxies to the UI of the Spark Connect driver, with every user's
+     * queries, and accepts applications, which would run on the workers beside every user's tasks.  A deny wins over any allow,
+     * whatever policy it is in, so a rule added later that lets the notebooks reach the namespace does not let them reach it.
+     */
+    static @NonNull Map<String, Object> jupyterManifest(Map<String, String> labels) {
+        return Map.of(
+            "apiVersion", "cilium.io/v2",
+            "kind", "CiliumNetworkPolicy",
+            "metadata", Map.of(
+                "name", DOMAIN_POLICY_NAME,
+                "namespace", "default"),
+            "spec", Map.of(
+                "endpointSelector", Map.of("matchLabels", labels),
+                "egressDeny", List.of(Map.of(
+                    "toEndpoints", List.of(Map.of("matchLabels", SPARK_MASTER_LABELS))))));
     }
 
     private static @NonNull Map<String, Object> manifestUsing(Map<String, String> labels,
@@ -519,7 +505,7 @@ public class NetworkConfig {
      * <p>
      * Two groups have to be here or the pods lose DNS.
      * <p>
-     * First, the whitelisted domains, reusing the very selectors {@link #connectionManifest} feeds
+     * First, the whitelisted domains, reusing the very selectors {@link #sparkManifest} feeds
      * to {@code toFQDNs}: Cilium only learns an address for a name whose lookup passed the proxy,
      * so a name allowed to connect but not to resolve would never work.
      * <p>

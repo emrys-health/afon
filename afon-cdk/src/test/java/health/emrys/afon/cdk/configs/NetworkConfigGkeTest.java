@@ -100,10 +100,12 @@ class NetworkConfigGkeTest {
     }
 
     @Test
-    void theNotebooksMayReachTheSparkMasterWithTheirOwnNetworkPolicy(@TempDir Path dir) throws Exception {
+    void theNotebooksMayNotReachTheSparkMaster(@TempDir Path dir) throws Exception {
         JsonNode notebooks = policy(plan("gcp-full", dir), "allow-only-specific-egress");
 
-        assertThat(notebooks.toString()).contains("\"spark-role\":\"master\"");
+        // its UI proxies to the Spark Connect driver's, with every user's queries, and its REST server runs any application
+        assertThat(notebooks.isMissingNode()).isFalse();
+        assertThat(notebooks.toString()).doesNotContain("\"spark-role\":\"master\"");
     }
 
     @Test

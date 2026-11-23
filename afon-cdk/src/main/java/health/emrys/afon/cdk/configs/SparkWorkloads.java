@@ -98,13 +98,7 @@ public class SparkWorkloads {
                         "maxWorkers", 2  // Integer type
                     )
                 ),
-                "sparkConf", Map.of(
-                    "spark.kubernetes.container.image", images.spark(),
-                    "spark.master.ui.title", "Prod Spark Cluster",
-                    "spark.master.rest.enabled", "true",
-                    "spark.master.rest.host", "0.0.0.0",
-                    "spark.ui.reverseProxy", "true"
-                )
+                "sparkConf", masterConfig()
             )
         );
 
@@ -200,6 +194,21 @@ public class SparkWorkloads {
     }
 
     /**
+     * The configuration of the master of the {@code SparkCluster}.  Its REST submission server is off: it takes, with no
+     * authentication, an application to run on the workers, beside every user's tasks, or the id of one to kill, and nothing
+     * here submits to it, the operator creating the driver of Spark Connect as a pod of its own, which registers with the
+     * master on 7077.  Its UI does not proxy to those of the drivers and the workers, which would show every user's queries
+     * and executors' logs to whoever reaches it; an administrator reaches each with {@code kubectl port-forward}.
+     */
+    Map<String, String> masterConfig() {
+        return Map.of(
+            "spark.kubernetes.container.image", images.spark(),
+            "spark.master.ui.title", "Prod Spark Cluster",
+            "spark.master.rest.enabled", "false",
+            "spark.ui.reverseProxy", "false");
+    }
+
+    /**
      * Turned all Spark logging on. Probably too much. But watch who ran what against the Iceberg tables with:
      * <code>
      * kubectl logs -f spark-connector-0-driver | grep health.emrys.afon.spark.audit
@@ -210,9 +219,7 @@ public class SparkWorkloads {
         var first = Map.of(
             "spark.kubernetes.container.image", images.spark(),
             "spark.master.ui.title", "Prod Spark Cluster",
-            "spark.master.rest.enabled", "true",
-            "spark.master.rest.host", "0.0.0.0",
-            "spark.ui.reverseProxy", "true",
+            "spark.ui.reverseProxy", "false",
             "spark.master", format("spark://%s:7077", names.masterService()),
             "spark.submit.deployMode", "cluster",
             "spark.executor.cores", "1",
