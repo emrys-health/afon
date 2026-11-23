@@ -219,6 +219,7 @@ public class NetworkConfig {
             createGiteaEgressPolicy(),
             createTrinoEgressPolicy());
         networkPolicyFor(USER_POD_LABELS, egress);
+        sparkMasterIngressPolicy();
 
         if (gke) {
             // The notebooks have no domain to reach: the policy above is all they need.  Only the driver calls what the ingress
@@ -641,6 +642,45 @@ public class NetworkConfig {
             .namespaceSelector(sparkNamespace)
             .podSelector(sparkPods)
             .build();
+    }
+
+    /** The name of the {@link NetworkPolicy} that lets only Spark's own pods reach the master, and only on its RPC port. */
+    static final String SPARK_MASTER_INGRESS_POLICY_NAME = "spark-master-only-from-spark";
+
+    /** The port that the driver and the workers register with the master on. */
+    static final int SPARK_MASTER_RPC_PORT = 7077;
+
+    /**
+     * Lets only the Spark driver and workers reach the master, and only on {@value #SPARK_MASTER_RPC_PORT}, where they register.
+     * No pod may reach its web UI, 8080, which lists every application and worker, nor any other port of it, whatever its own
+     * egress allows: Polaris, Keycloak and the others have none that would stop them.  An administrator sees the UI with
+     * {@code kubectl port-forward pod/<cluster>-master-0 8080}, which reaches it from inside the pod, where no policy applies, as
+     * the kubelet's probes, which come from the node, are not stopped either.
+     */
+    private void sparkMasterIngressPolicy() {
+        List<NetworkPolicySpecIngressFrom> sparkPods = new ArrayList<>();
+        for (Map<String, String> labels : List.of(DRIVER_LABELS, WORKER_LABELS)) {
+            sparkPods.add(NetworkPolicySpecIngressFrom
+                              .builder()
+                              .podSelector(NetworkPolicySpecIngressFromPodSelector.builder().matchLabels(labels).build())
+                              .build());
+        }
+        NetworkPolicySpecIngress fromSpark = NetworkPolicySpecIngress
+            .builder()
+            .from(sparkPods)
+            .ports(List.of(NetworkPolicySpecIngressPorts.builder()
+                                                        .protocol("TCP")
+                                                        .port(String.valueOf(SPARK_MASTER_RPC_PORT))
+                                                        .build()))
+            .build();
+        NetworkPolicy.Builder.create(tfStack, "sparkMasterIngressPolicy")
+                             .metadata(getMetadata(SPARK_MASTER_INGRESS_POLICY_NAME))
+                             .spec(NetworkPolicySpec.builder()
+                                                    .podSelector(NetworkPolicySpecPodSelector.builder().matchLabels(MASTER_LABELS).build())
+                                                    .policyTypes(List.of("Ingress"))
+                                                    .ingress(List.of(fromSpark))
+                                                    .build())
+                             .build();
     }
 
     private void networkPolicyFor(Map<String, String> labels, List<NetworkPolicySpecEgress> egress) {
