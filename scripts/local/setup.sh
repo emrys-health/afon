@@ -231,6 +231,34 @@ install_aws_bundle(){
   fi
 }
 
+# node, with npm and npx, from the official release tarball, as apt and brew offer other major versions (brew's node@22 is keg-only).  The
+# version is the one of the afon-base image.  The distribution is unpacked in /usr/local/node (~/.local/node
+# with NO_SUDO=true), with links to node, npm and npx in the directory of the release binaries.
+install_node(){
+  local os arch version Os arch2 arch3 dir home tmp sudo= tool nodeos found
+  if check_tool_version node >/dev/null; then
+    echo "node is up to date at $(command -v node)"
+    return 0
+  fi
+  release_vars node || return 1
+  nodeos=$os; arch2=$arch; [ "$arch" == amd64 ] && arch2=x64
+  dir=$(bin_dir)
+  if no_sudo; then home=$HOME/.local/node; mkdir -p "$dir"; else home=/usr/local/node; fi
+  if ! no_sudo && { [ ! -w "$dir" ] || [ ! -w "$(dirname "$home")" ]; }; then sudo=sudo; fi
+  tmp=$(mktemp -d)
+  echo "Installing node $version in $home"
+  curl -fsSL "https://nodejs.org/dist/v$version/node-v$version-$nodeos-$arch2.tar.gz" | tar -xz -C "$tmp" \
+    && $sudo rm -rf "$home" && $sudo mkdir -p "$home" "$dir" && $sudo cp -R "$tmp"/node-v"$version"-*/. "$home" \
+    && for tool in node npm npx; do $sudo ln -sf "$home/bin/$tool" "$dir/$tool" || break; done
+  local rc=$?
+  rm -rf "$tmp"
+  [ $rc -eq 0 ] || return 1
+  found=$(command -v node)
+  if [ "$found" != "$dir/node" ]; then
+    echo "WARNING: $found shadows the pinned node installed in $dir: remove it, or fix the PATH" >&2
+  fi
+}
+
 # The gke auth plugin, needed by kubectl to authenticate to GKE, of the same version as gcloud: its own package on linux, as a gcloud
 # installed by apt has its component manager disabled, and a gcloud component on macos.
 install_gke_auth_plugin(){
@@ -299,6 +327,7 @@ setup_tools(){
   install_package git git git
   install_package openjdk-17-jdk openjdk@17 java
   install_package maven maven mvn
+  install_node
   install_gh
   install_docker
   install_jq

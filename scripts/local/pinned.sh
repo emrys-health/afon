@@ -12,6 +12,7 @@ PINNED_git=2.56
 PINNED_java=17.0.20
 PINNED_gh=2.103.0
 PINNED_mvn=3.10.0
+PINNED_node=22.23.4
 PINNED_docker=29.9.1
 PINNED_tofu=1.13.1
 PINNED_kubectl=1.37.1
@@ -81,6 +82,7 @@ installed_version(){
     git) git --version 2>/dev/null | awk '{print $3}' ;;
     java) installed_java -version 2>&1 | head -1 | sed -E 's/.*"([^"]+)".*/\1/' ;;
     mvn) mvn -B --version 2>/dev/null | head -1 | sed $'s/\033\\[[0-9;]*m//g' | awk '{print $3}' ;;
+    node) node --version 2>/dev/null | sed -E 's/^v//' ;;
     docker) docker --version 2>/dev/null | sed -E 's/.*version ([^,]+).*/\1/' ;;
     tofu) tofu --version 2>/dev/null | head -1 | sed 's/OpenTofu v//' ;;
     kubectl) kubectl version --client 2>/dev/null | head -1 | sed 's/.*v//' ;;
@@ -127,7 +129,7 @@ check_tool_versions(){
 
 # The tools relevant to the cloud targeted: all the clouds' if CLOUD is empty.
 pinned_tools(){
-  echo bash git java mvn gh docker tofu kubectl jq yq helm hubble kind cosign
+  echo bash git java mvn node gh docker tofu kubectl jq yq helm hubble kind cosign
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then echo aws eksctl; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then echo az kubelogin; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then echo gcloud; fi
