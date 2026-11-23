@@ -209,7 +209,35 @@ public class SparkWorkloads {
     }
 
     /**
-     * Turned all Spark logging on. Probably too much. But watch who ran what against the Iceberg tables with:
+     * What keeps the users of the one Spark Connect server, whose code runs in the same driver and executors, from each other's
+     * work, as far as settings can; only a server of their own does so wholly:
+     * <ul>
+     *   <li>no UI on the driver: every pod of a worker, where the users' code runs, may reach the driver on any port, and the UI
+     *       shows every session's queries and plans, with the values in them;</li>
+     *   <li>the shuffle and spill files and the cached blocks that the executors write to their local disks are encrypted, with a
+     *       key of the application's, so that what a user's code finds there is not another's data;</li>
+     *   <li>a Python worker serves one task and ends, so that no user's code is left behind in it to run with another's rows;</li>
+     *   <li>the jars that Spark ships come before the user's, so that no class of theirs takes the place of one that every session
+     *       runs, such as Iceberg's;</li>
+     *   <li>the sessions' jobs share the executors fairly, rather than in the order that they come, so that no user's job holds
+     *       every core while another's waits;</li>
+     *   <li>no result to collect larger than half the driver's default memory, which would end every user's session with it.</li>
+     * </ul>
+     */
+    static Map<String, String> isolationConfig() {
+        return Map.of(
+            "spark.ui.enabled", "false",
+            "spark.io.encryption.enabled", "true",
+            "spark.python.worker.reuse", "false",
+            "spark.driver.userClassPathFirst", "false",
+            "spark.executor.userClassPathFirst", "false",
+            "spark.scheduler.mode", "FAIR",
+            "spark.driver.maxResultSize", "512m");
+    }
+
+    /**
+     * Logs at INFO, as DEBUG wrote the data and plans of every user's tasks to the logs of the executors, which their code may read.
+     * Watch who ran what against the Iceberg tables with:
      * <code>
      * kubectl logs -f spark-connector-0-driver | grep health.emrys.afon.spark.audit
      * </code>
@@ -236,9 +264,7 @@ public class SparkWorkloads {
 //                                   ".cloud:google-cloud-storage:2.57.0,software.amazon.awssdk:bundle:2.34.6,org" +
 //                                   ".apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.0,org.apache" +
 //                                   ".hadoop:hadoop-azure:3.3.4,com.azure:azure-storage-file-datalake:12.22.0",
-            "spark.driver.userClassPathFirst", "true",
-            "spark.executor.userClassPathFirst", "true",
-            "spark.log.level", "DEBUG",
+            "spark.log.level", "INFO",
 //            "spark.connect.grpc.interceptor.classes", "org.apache.spark.sql.connect.service.LoggingInterceptor", // No! this logs patient data too!
             "spark.driver.extraJavaOptions", "-Divy.home=/opt/spark/"
         );
@@ -247,6 +273,7 @@ public class SparkWorkloads {
         config.put("spark.sql.queryExecutionListeners", AUDIT_LISTENER);
         config.putAll(first);
         config.putAll(second);
+        config.putAll(isolationConfig());
         return config;
     }
 }

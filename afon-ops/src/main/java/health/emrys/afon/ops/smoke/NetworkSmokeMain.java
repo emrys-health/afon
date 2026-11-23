@@ -102,7 +102,10 @@ public class NetworkSmokeMain {
             this::checkNotebookOnlyReachableFromHubAndGuacamole,
             this::checkNotebookTrustsTrinoOverHttps)));
         for (String pod : jupyterPods()) {
-            results.addAll(checkCannotSee(pod, new String[] {"spark-master-svc.default.svc.cluster.local:8080"}));
+            results.addAll(checkCannotSee(pod, new String[] {
+                "spark-master-svc.default.svc.cluster.local:8080",
+                "spark-connector-0-driver-svc:4040"
+                }));
         }
         return results;
     }
