@@ -44,7 +44,6 @@ exist before checking privileges, so reading a table in an empty catalog would n
   their own Polaris principal role. For example, testing as `will`:
 
   ```
-  mauro,all
   phil,all
   will,aws:aws_trino:azure:gcp
   ```

@@ -44,6 +44,19 @@ run interactively in the pod of a member who is signed in to the hub, as the tok
 `--user` is the username, or the start of the email, of the pod's user, and is not needed when only one notebook pod is running. A path of the pod is
 relative to its home, unless it starts with `/`. In a project, run it in the project's cluster:
 ```shell
-afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro to project-trino-reads-data-providers.ipynb
-afon-cli.sh manage-project run cvd-2026 kube-user-cp --user mauro from project-trino-reads-data-providers.ipynb .
+afon-cli.sh manage-project run cvd-2026 kube-user-cp --user alice@tre.example to project-trino-reads-data-providers.ipynb
+afon-cli.sh manage-project run cvd-2026 kube-user-cp --user alice@tre.example from project-trino-reads-data-providers.ipynb .
 ```
+
+**The pods of a project's users.** `project-pods` lists the notebook pods of a project's members, with their users, and
+deletes those of one user or of all of them, which ends their servers. The hub makes a new pod as soon as a member opens
+the TRE's URL again, with no new sign-in needed if they are still signed in. That gives a member a fresh pod, eg when
+their remote desktop is black because its window manager died (`[fluxbox] <defunct>` in the pod's processes). What the
+member has not saved in the pod is lost, so it asks first, unless given `--yes`, and it needs `--user` or `--all` to
+delete:
+```shell
+afon-cli.sh manage-project run cvd-2026 project-pods
+afon-cli.sh manage-project run cvd-2026 project-pods delete --user alice@tre.example
+afon-cli.sh manage-project run cvd-2026 project-pods delete --all --yes
+```
+`--dry-run` says which pods it would delete and deletes none.

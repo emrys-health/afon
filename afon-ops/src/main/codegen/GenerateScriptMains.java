@@ -63,6 +63,7 @@ public class GenerateScriptMains {
 
         new ScriptEntry("db", "DbWhitelistMain", "db/whitelist.sh"),
 
+        new ScriptEntry("project", "ProjectPodsMain", "project/pods.sh"),
         new ScriptEntry("project", "ProjectSecretMain", "project/secret.sh"),
         new ScriptEntry("project", "ProjectSmtpMain", "project/smtp.sh"),
 
