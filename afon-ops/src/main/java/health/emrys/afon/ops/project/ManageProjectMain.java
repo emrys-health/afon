@@ -5,6 +5,7 @@ import health.emrys.afon.cdk.components.GitComponent;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
+import health.emrys.afon.ops.steps.StepRunner;
 import health.emrys.afon.ops.project.ProjectCommands.Command;
 import health.emrys.afon.ops.scripts.ScriptMain;
 import health.emrys.afon.project.AfonProject;
@@ -40,8 +41,8 @@ import java.util.function.Supplier;
  * manage-project validate &lt;project&gt;
  * manage-project plan &lt;project&gt;
  * manage-project configure &lt;project&gt; [--made-from &lt;env&gt;]
- * manage-project up &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
- * manage-project down &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
+ * manage-project up &lt;project&gt; [--from &lt;stage&gt;[:&lt;step&gt;]] [--until &lt;stage&gt;] [--dry-run]
+ * manage-project down &lt;project&gt; [--from &lt;stage&gt;[:&lt;step&gt;]] [--until &lt;stage&gt;] [--dry-run]
  * manage-project nightly &lt;project&gt; [--from &lt;stage&gt;] [--until &lt;stage&gt;] [--dry-run]
  * manage-project run &lt;project&gt; &lt;command&gt;...
  * </pre>
@@ -56,7 +57,9 @@ import java.util.function.Supplier;
  *   <li>{@code up} runs the stages in order, {@code down} deletes the stacks, the last first, and {@code nightly} deletes and sets up again
  *       what lives for a day, see {@link ProjectCommands}.  Each stage runs in the home of the project, see {@link ProjectHome}, which
  *       needs it to be configured, and the first to fail stops the run, with what to resume from: {@code --from <stage>} runs from that
- *       stage, and {@code --dry-run} lists the commands without running them;</li>
+ *       stage, {@code --from <stage>:<step>} (for {@code up} and {@code down}, and a stage of a stack) from that step of the stack's own, as
+ *       {@code manage-stack setup <stack> <step>} does, so that a deploy that succeeded is not done again, and {@code --dry-run} lists the commands
+ *       without running them;</li>
  *   <li>{@code run} runs a command of Afon in the home of the project, as {@code afon-cli.sh --home <its home> <command>}, so that it uses
  *       the project's config, address and cluster, whatever env is active; what follows the project is the command, as it is;</li>
  *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
@@ -79,7 +82,7 @@ public class ManageProjectMain {
     private static final List<String> RUNS = List.of("up", "down", "nightly");
 
     private static final String USAGE = String.join(System.lineSeparator(),
-        "Usage: manage-project <action> <project> [" + ENV + " <env>] [" + FROM + " <stage>] [" + UNTIL + " <stage>] [" + DRY_RUN + "], where:",
+        "Usage: manage-project <action> <project> [" + ENV + " <env>] [" + FROM + " <stage>[:<step>]] [" + UNTIL + " <stage>] [" + DRY_RUN + "], where:",
         "       manage-project find <name>",
         "       manage-project init <project> <cloud> [" + ROLE + " identity|tre|data] [" + ENV + " <env>] [" + FORCE + "]",
         "  <action> is one of:",
@@ -101,7 +104,9 @@ public class ManageProjectMain {
         "    <afon-home>/" + FileProjectProvider.PROJECTS_DIR + "/<project>/" + FileProjectProvider.FILE,
         "  " + ENV + " is the env whose config configure makes the project from, config-<env>: the env the project names if not given,",
         "    else the active config",
-        "  " + FROM + " is the stage that up, down or nightly start from, eg after a failure: create, identity, git or tre",
+        "  " + FROM + " is the stage that up, down or nightly start from, eg after a failure: create, identity, git or tre.  For up and down, a stage that",
+        "    sets up or deletes a stack, identity, git, tre or data, can be given the step of the stack to resume from, as <stage>:<step>, eg",
+        "    tre:configure_oidc_users_for_cloud_aws, so that a deploy that succeeded is not done again: the steps are those that manage-stack shows",
         "  " + UNTIL + " is the last stage that up, down or nightly run, eg to stop after create and delegate the DNS zones before the rest:",
         "    the stages after it are left for " + FROM + ", which the message at the end of the run gives",
         "  " + DRY_RUN + " lists the commands that up, down or nightly would run, without running them",
@@ -166,6 +171,7 @@ public class ManageProjectMain {
         List<String> positional = new ArrayList<>();
         String env = null;
         String from = null;
+        String fromStep = null;
         String until = null;
         boolean dryRun = false;
         for (int i = 1; i < args.length; i++) {
@@ -199,15 +205,23 @@ public class ManageProjectMain {
             if (!RUNS.contains(action)) {
                 return usage(option[0] + " is for up, down and nightly");
             }
+            String stageName = option[1];
+            if (option[0].equals(FROM) && stageName.contains(":")) {
+                if (!List.of("up", "down").contains(action)) {
+                    return usage("A step to resume from, " + FROM + " <stage>:<step>, is for up and down");
+                }
+                fromStep = stageName.substring(stageName.indexOf(':') + 1);
+                stageName = stageName.substring(0, stageName.indexOf(':'));
+            }
             try {
-                StageId stage = StageId.valueOf(option[1].toUpperCase(Locale.ROOT));
+                StageId stage = StageId.valueOf(stageName.toUpperCase(Locale.ROOT));
                 if (option[0].equals(FROM)) {
                     fromStage = stage;
                 } else {
                     untilStage = stage;
                 }
             } catch (IllegalArgumentException e) {
-                return usage("Unknown stage '" + option[1] + "': one of " + java.util.Arrays.stream(StageId.values()).map(id -> id.name().toLowerCase(Locale.ROOT)).toList());
+                return usage("Unknown stage '" + stageName + "': one of " + java.util.Arrays.stream(StageId.values()).map(id -> id.name().toLowerCase(Locale.ROOT)).toList());
             }
         }
         FileProjectProvider provider;
@@ -246,7 +260,7 @@ public class ManageProjectMain {
                 yield 0;
             }
             case "configure" -> configure(project, provider.file(), env != null ? env : project.env());
-            default -> runStages(action, project, provider.file(), fromStage, untilStage, dryRun);
+            default -> runStages(action, project, provider.file(), fromStage, fromStep, untilStage, dryRun);
         };
     }
 
@@ -470,7 +484,7 @@ public class ManageProjectMain {
         }
     }
 
-    private int runStages(String action, AfonProject project, Path projectFile, StageId from, StageId until, boolean dryRun) {
+    private int runStages(String action, AfonProject project, Path projectFile, StageId from, String step, StageId until, boolean dryRun) {
         ProjectPlan plan = ProjectPlan.of(project);
         IdentityProject identityProject;
         try {
@@ -488,6 +502,9 @@ public class ManageProjectMain {
                 case "down" -> ProjectCommands.down(plan, stacks);
                 default -> ProjectCommands.nightly(plan, stacks);
             }, from);
+            if (step != null) {
+                all = ProjectCommands.resumeAt(all, step);
+            }
             commands = ProjectCommands.until(all, until);
             left = all.subList(commands.size(), all.size());
         } catch (IllegalArgumentException e) {
@@ -541,7 +558,10 @@ public class ManageProjectMain {
             }
             if (status != 0) {
                 err.printf("Stage %s failed with exit status %d.  Resume with: manage-project %s %s --from %s%n", stage, status, action,
-                           project.id(), stage);
+                           project.id(), failedStep == null ? stage : stage + ":" + failedStep);
+                if (failedStep != null) {
+                    err.printf("That resumes the stack from the step that failed, and does not do again the steps before it: --from %s would run them all, deleting the stack first%n", stage);
+                }
                 return 1;
             }
         }
@@ -609,13 +629,37 @@ public class ManageProjectMain {
         if (dryRun) {
             return 0;
         }
+        failedStep = null;
+        // a stack's steps say which of them failed, in a file that they are given, so that what to resume from can be said
+        List<String> args = invocation.args();
+        boolean ofAStack = args.size() >= 3 && args.get(0).equals("manage-stack") && List.of("setup", "delete").contains(args.get(1));
+        Path stepFile = null;
         try {
-            return executor.run(argv);
+            if (ofAStack) {
+                stepFile = Files.createTempFile("afon-failed-step", ".txt");
+            }
+            int status = stepFile == null ? executor.run(argv) : executor.run(argv, java.util.Map.of(StepRunner.FAILED_STEP_FILE, stepFile.toString()));
+            if (status != 0 && stepFile != null) {
+                String name = Files.readString(stepFile).strip();
+                failedStep = name.isEmpty() ? null : name;
+            }
+            return status;
         } catch (IOException e) {
             err.printf("Cannot run %s: %s%n", cli, e.getMessage());
             return FAILED_TO_RUN;
+        } finally {
+            if (stepFile != null) {
+                try {
+                    Files.deleteIfExists(stepFile);
+                } catch (IOException e) {
+                    // a temp file that stays does no harm
+                }
+            }
         }
     }
+
+    /** The step of a stack that the last command to fail was at, or {@code null} if it did not say. */
+    private String failedStep;
 
     /**
      * @return the command line that runs a command of Afon in the home of a project: its home and its cdktf, which are those of the project

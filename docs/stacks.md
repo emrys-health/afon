@@ -635,6 +635,11 @@ afon-cli.sh manage-stack setup aws-full create_all_catalogs_for_cloud_aws
 afon-cli.sh manage-stack run aws-full external-azure create_catalog_azure_external_for_cloud_azure
 ```
 
+A failed run says which step failed, on the console as well as in the log: `Failed at step <name>`. Resuming from it runs
+that step again, and the ones after it, and not the ones before: a deploy that succeeded is not deleted and made again,
+which resuming from the start would do. A step that is not one of the stack's is an error, which lists the steps, and not
+a run of nothing that succeeds.
+
 ### Teardown a deployed stack
 
 The stack teardown can be done via replacing `deploy` with `delete` in the command, eg:

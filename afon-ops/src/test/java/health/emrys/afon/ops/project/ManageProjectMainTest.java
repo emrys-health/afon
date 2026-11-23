@@ -35,6 +35,8 @@ class ManageProjectMainTest {
     /** The env that the commands were given, when they were given some. */
     private final List<Map<String, String>> envs = new ArrayList<>();
     private java.util.function.Predicate<List<String>> failing = argv -> false;
+    /** The step that a stack command that fails says it was at, in the file it is given, or null for one that does not say. */
+    private String failedStep;
     private boolean gitStackDefined;
     private boolean treDeploysGit = true;
 
@@ -55,7 +57,15 @@ class ManageProjectMainTest {
             @Override
             public int run(List<String> argv, Map<String, String> env) {
                 envs.add(env);
-                return run(argv);
+                int result = run(argv);
+                if (result != 0 && failedStep != null && env.containsKey("AFON_FAILED_STEP_FILE")) {
+                    try {
+                        Files.writeString(Path.of(env.get("AFON_FAILED_STEP_FILE")), failedStep);
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                }
+                return result;
             }
         };
         command = new ManageProjectMain(new PrintStream(out), new PrintStream(err), home, executor, () -> "/cli",
@@ -386,6 +396,98 @@ class ManageProjectMainTest {
         configure();
         assertThat(command.run(new String[]{"up", PROJECT, "--from", "tre"})).isZero();
         assertThat(ran).containsExactly(inProject("manage-stack", "setup", c + "-full"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void resumesFromAStepOfAStackSoThatItsDeployIsNotDoneAgain(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        configure();
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "tre:configure_oidc_users_for_cloud_" + c})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-stack", "setup", c + "-full", "configure_oidc_users_for_cloud_" + c));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void resumesADownFromAStepToo(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        configure();
+        assertThat(command.run(new String[]{"down", PROJECT, "--from", "tre:delete_" + c + "_full_stack"})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-stack", "delete", c + "-full", "delete_" + c + "_full_stack"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesAStepThatIsNotOfAStackOrNotAName(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        // create and register are not stacks, so have no steps of their own
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "create:x"})).isEqualTo(2);
+        assertThat(err.toString()).contains("Stage create has no steps to resume from");
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "register:x"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "tre:bad step"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "tre:"})).isEqualTo(2);
+        assertThat(err.toString()).contains("is not the name of a step");
+        assertThat(command.run(new String[]{"nightly", PROJECT, "--from", "tre:x"})).isEqualTo(2);
+        assertThat(err.toString()).contains("is for up and down");
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "bogus:x"})).isEqualTo(2);
+        assertThat(err.toString()).contains("Unknown stage 'bogus'");
+        assertThat(ran).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void aStepOnlyChangesTheFirstStageThatIsRun(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        gitStackDefined = true;
+        configure();
+        // the git stage is before the tre's: only the first, the one resumed, is given the step, and the stage after it is run whole
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "git:deploy_complete_for_" + c + "_git"})).isZero();
+        assertThat(ran).containsExactly(inProject("manage-stack", "setup", c + "-git", "deploy_complete_for_" + c + "_git"),
+                                        inProject("manage-stack", "setup", c + "-full"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void saysWhichStepOfTheStackFailedAsWhatToResumeFrom(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        String c = lower(cloud);
+        configure();
+        failing = argv -> argv.contains("manage-stack");
+        failedStep = "configure_oidc_users_for_cloud_" + c;
+
+        assertThat(command.run(new String[]{"up", PROJECT})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("Stage tre failed with exit status 4",
+                                            "Resume with: manage-project up xyz-yyyy-nnnn --from tre:configure_oidc_users_for_cloud_" + c,
+                                            "does not do again the steps before it");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void resumesFromTheStageAloneWhenTheStackDoesNotSayWhichStepFailed(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+        failing = argv -> argv.contains("manage-stack");
+
+        assertThat(command.run(new String[]{"up", PROJECT})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("Resume with: manage-project up xyz-yyyy-nnnn --from tre").doesNotContain("--from tre:");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesAStackCommandTheFileToSayItsFailedStepIn(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        configure();
+
+        assertThat(command.run(new String[]{"up", PROJECT, "--from", "tre"})).isZero();
+
+        assertThat(envs).hasSize(1);
+        assertThat(envs.get(0)).containsOnlyKeys("AFON_FAILED_STEP_FILE");
     }
 
     @ParameterizedTest

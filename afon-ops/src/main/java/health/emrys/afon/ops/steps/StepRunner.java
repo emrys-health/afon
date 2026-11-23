@@ -5,15 +5,50 @@ import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 public class StepRunner {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
+    /**
+     * The env var that names a file to write the name of the step that failed to, which the command that runs this one reads, eg {@code manage-project}, to say
+     * which step to resume from.
+     */
+    public static final String FAILED_STEP_FILE = "AFON_FAILED_STEP_FILE";
+
     private final StepOperations operations;
+    private final Path failedStepFile;
 
     public StepRunner(AfonUserProvider users) {
-        this.operations = new StepOperations(new StepActions(), new OpsPropertyProvider(), users);
+        this(new StepOperations(new StepActions(), new OpsPropertyProvider(), users), fileFromEnv());
+    }
+
+    StepRunner(StepOperations operations, Path failedStepFile) {
+        this.operations = operations;
+        this.failedStepFile = failedStepFile;
+    }
+
+    private static Path fileFromEnv() {
+        String file = System.getenv(FAILED_STEP_FILE);
+        return file == null || file.isBlank() ? null : Path.of(file);
+    }
+
+    /**
+     * Says which step failed, on the console as well as in the log, as the console logging may be off, and in the file that the caller gave, if it did,
+     * so that the failure says what to resume from.
+     */
+    private void reportFailedStep(String name) {
+        System.err.println("Failed at step " + name + ": resume from it with manage-stack <action> <stack> " + name);
+        if (failedStepFile != null) {
+            try {
+                Files.writeString(failedStepFile, name);
+            } catch (IOException e) {
+                logger.warn("Could not write the failed step {} to {}: {}", name, failedStepFile, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -48,6 +83,7 @@ public class StepRunner {
                     }
                 } catch (Exception e) {
                     logger.error("Failed running step "+step.getName(), e);
+                    reportFailedStep(step.getName());
                     cleanups.runPending();
                     throw new RuntimeException(e);
                 }
@@ -64,6 +100,8 @@ public class StepRunner {
         int    index = steps.stream().map(s -> s.getName()).toList().lastIndexOf(startingWith);
         if (index == -1) {
             logger.error("Step {} not found", startingWith);
+            // a failure, not a run of no steps that succeeds: a misspelt step would otherwise look as if what is after it had been done
+            throw new IllegalArgumentException("No step " + startingWith + " to resume from.  The steps are: " + String.join(", ", steps.stream().map(Step::getName).toList()));
         } else {
             runSteps(steps.subList(index, steps.size()));
         }

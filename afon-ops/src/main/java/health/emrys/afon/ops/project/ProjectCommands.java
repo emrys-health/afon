@@ -212,6 +212,46 @@ final class ProjectCommands {
                                            + commands.stream().map(c -> c.stage().name().toLowerCase()).distinct().toList());
     }
 
+    private static final java.util.regex.Pattern STEP = java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]*");
+
+    /**
+     * Has the first command resume its stack command from the step, as {@code manage-stack setup <stack> <step>} does: the steps of the stack before it are
+     * not run, so that a stage that failed partway, eg after the deploy, is resumed at the step that failed, and what the steps before it did is not done again.
+     *
+     * @param commands the commands, the first of which is of the stage to resume
+     * @return the commands, the first with the step added to its command on the stack
+     * @throws IllegalArgumentException if the step is not a name, or the first command is not of a stack, so has no steps of its own to resume from
+     */
+    static List<Command> resumeAt(List<Command> commands, String step) {
+        if (step == null || !STEP.matcher(step).matches()) {
+            throw new IllegalArgumentException("'" + step + "' is not the name of a step: letters, digits, '_', '.' and '-'");
+        }
+        Command first = commands.isEmpty() ? null : commands.get(0);
+        int index = -1;
+        if (first != null && !first.skipped()) {
+            for (int i = first.run().size() - 1; i >= 0; i--) {
+                List<String> args = first.run().get(i).args();
+                if (args.size() == 3 && args.get(0).equals("manage-stack")) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        if (index < 0) {
+            throw new IllegalArgumentException("Stage " + (first == null ? "" : first.stage().name().toLowerCase() + " ") + "has no steps to resume from: only a stage "
+                                               + "that sets up or deletes a stack has, eg " + List.of(StageId.IDENTITY, StageId.GIT, StageId.TRE, StageId.DATA).stream()
+                                                                                                        .map(id -> id.name().toLowerCase()).toList());
+        }
+        List<Invocation> run = new ArrayList<>(first.run());
+        Invocation stackCommand = run.get(index);
+        List<String> args = new ArrayList<>(stackCommand.args());
+        args.add(step);
+        run.set(index, new Invocation(stackCommand.project(), List.copyOf(args)));
+        List<Command> resumed = new ArrayList<>(commands);
+        resumed.set(0, new Command(first.stage(), first.before(), run, first.note()));
+        return resumed;
+    }
+
     /**
      * @return the commands up to and including those of the stage, or all of them if it is {@code null}
      * @throws IllegalArgumentException if no command is for the stage

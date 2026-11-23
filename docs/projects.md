@@ -142,7 +142,8 @@ made by `dns-create-zones` and delegated by `dns-delegate --route53`, and the AC
 `aws-issue-cert --stack aws-keycloak`, which needs the zone delegated) and `identity` (`manage-stack setup aws-keycloak`,
 which looks the certificate up). The certificate is issued only where `up` delegates, ie with `delegation: route53`, as
 it is validated in the delegated zone; with `manual`, issue it yourself, after you delegate. It stops at the first to
-fail and says how to resume: `manage-project up idp --from <stage>`.
+fail and says how to resume: `manage-project up idp --from <stage>`, or from a step of its stack,
+`--from <stage>:<step>`, see [A first TRE project](#a-first-tre-project).
 
 ## The data projects
 
@@ -559,6 +560,30 @@ afon-cli.sh manage-project up cvd-2026
 (`manage-identity create cvd-2026`: the project's client and group in the central identity, which needs the identity to
 be up; see below) and `tre` (`manage-stack setup aws-full`). If one fails, fix the cause and resume with
 `manage-project up cvd-2026 --from <stage>`.
+
+**Resuming a stage from one of its steps.** A stage that sets up a stack, `identity`, `git`, `tre` or `data`, is made of
+the steps of that stack: its deploy, then what it configures. Resuming from the stage runs all of them again, and
+**deploying a stack that is running deletes it first**, so a stage that failed in a late step, such as the setup of the
+identity's realm after a deploy that succeeded, would make the whole deployment again. Give the step to resume from after
+the stage, as `<stage>:<step>`, and the steps before it are not run:
+
+```shell
+afon-cli.sh manage-project up cvd-2026 --from tre:configure_oidc_users_for_cloud_aws
+```
+
+A stage of a stack that fails says the step that it failed at, and what to resume from, so that it is not typed:
+
+```
+Stage tre failed with exit status 1.  Resume with: manage-project up diab-2026 --from tre:configure_oidc_users_for_cloud_aws
+```
+
+If the stack does not say which step failed, it is `--from tre`, which runs the whole stack again. A step that is not one
+of the stack's is an error that lists the steps.
+
+It is `manage-stack setup aws-full configure_oidc_users_for_cloud_aws` in the project's home, for `up` (and `manage-stack
+delete <stack> <step>` for `down`), and the stages after it run as they would. The steps of each stack are listed in
+[Stacks](stacks.md) and are in the log of the run, `Running step <name>`; `--dry-run` shows the command that would run.
+Only the first stage that is run is given the step, and `create` and `register` have none: they are not stacks.
 
 The smoke test `spark-polaris`, which has Spark write a table through Polaris and read it back, skips a project's TRE:
 the Polaris of a project's TRE admits only the tokens of the project, with its audience, its `acr` and its project claim,
@@ -1379,10 +1404,15 @@ run on this deployment.
 
 ### What has been shown
 
-With the identity, `lon` (catalog `cvd`), `nw` (catalog `diab`), `cvd-2026` (members alice and bob) and
+On 2026-11-23, with the identity, `lon` (catalog `cvd`), `nw` (catalog `diab`), `cvd-2026` (members alice and bob) and
 `diab-2026` (members alice and rob) all up, `cvd-2026` and `diab-2026` at the same time, and each reading the Data
 Provider that its file names:
 
+- **Two TREs of one env come up at the same time.** `manage-project up cvd-2026` and `up diab-2026`, run in two
+  terminals, made two clusters in one account. One of them failed in the setup of the identity's MFA (a call to Keycloak
+  got no answer for eight minutes, then `401` as the admin token had expired, which has no clear cause: the two runs were
+  not in that step together). It was brought up again. Resuming such a failure from its step, `up <project> --from
+  tre:<step>`, does not deploy the stack again: see [A first TRE project](#a-first-tre-project).
 - **Each Data Provider admits only the TRE that names it.** `kube-polaris-whitelist azure show` at `lon` lists the egress
   IP of `cvd-2026` and not that of `diab-2026`, and at `nw` that of `diab-2026` and not that of `cvd-2026`.
 - **Each Data Provider has only the project roles that it grants.** `lon` has the role of `cvd-2026` in `cvd`, and `nw`
@@ -1393,6 +1423,31 @@ Provider that its file names:
 - **A member is refused the other project's Data Provider.** With `TARGET` set to the other project, the same notebook
   passes, meaning that it was refused, for bob in `cvd-2026` against `diab` of `nw`, and for rob in `diab-2026` against
   `cvd` of `lon`. For bob the refusal is the `403` page of `nw`'s ingress, which does not admit `cvd-2026`'s address.
+- **Spark and Trino both read, for every member, on the TREs as their files say.** After the TREs were redeployed from
+  the files that name one catalog each, `project-spark-reads-data-providers.ipynb` and
+  `project-trino-reads-data-providers.ipynb` pass for alice in `cvd-2026` and in `diab-2026`, for bob in `cvd-2026` and
+  for rob in `diab-2026`: Trino in `diab-2026` has the catalog `nw_diab`, which it lacked before.
+- **A member of the project's group with no principal at the Data Provider reads nothing.** `lon` was granted `cvd-2026`
+  for bob alone (`grant cvd-2026 cvd --members <file>`), so alice, in the group, had no principal there: bob still read
+  `cvd`, alice was refused it in `cvd-2026`, and alice still read `diab` of `nw` in `diab-2026`, where her principal is a
+  different one. `grant` without the file gave her the role back, and she read again. `manage-project-grants show`
+  listed who had the role at each step.
+- **After the redeploy, a TRE cannot reach the other project's Data Provider at all.** The Spark driver of a TRE may
+  connect only to the hosts of the Data Providers that its file names (a Cilium policy, `spark-driver-manifest`), so with
+  `TARGET` set to the other project the Spark notebook ends `INCONCLUSIVE`, with `RESTException: Error occurred while
+  processing GET request`, a connection that was not made, and not a refusal: bob in `cvd-2026` against `nw`, which also
+  admitted `cvd-2026`'s address for the test. The request does not reach the Data Provider's ingress or its Polaris.
+- **Polaris itself refuses another project's member.** Three layers stand in front of a Data Provider's Polaris, and the
+  run above stopped at the first: the TRE's own whitelist. For the test, that was opened for the one host
+  (`azure-polaris.nw.emrys2.click` added to the Cilium policy `spark-driver-manifest` of `cvd-2026`) and `nw`'s ingress
+  admitted `cvd-2026`'s address, with both restored afterwards. Bob, in `cvd-2026`, with `TARGET` set to `diab-2026`,
+  then reached `nw`'s Polaris, which refused him on the released table and on the unreleased one:
+  `NotAuthorizedException: Not authorized`, its own `401`. His token has no `provider-nw` audience, which makes the
+  audience check the likeliest, though the message does not say which check of the token refused it: the audience, the
+  project claim or the principal.
+- **Trino has no catalog of the other project's Data Provider.** The Trino notebook with `TARGET` set to the other
+  project passes for alice, bob and rob, meaning that their TRE's Trino has none, so that it cannot read it. That tests
+  the TRE's catalog list, and not the Data Provider's refusal, which the Spark notebook covers.
 - **A member of two projects reads only the Data Provider of the project they signed in to.** Alice, a member of both,
   was refused `cvd` of `lon` in `diab-2026`: her token there carries the project `diab-2026`, which is the principal
   role that her request asks for, and `lon` grants it none, so access follows the project that she works in and not the
@@ -1444,20 +1499,6 @@ Provider that its file names:
 
 ### Members, invitations and the setup of a TRE
 
-- **Not tried: the refusal by a Data Provider's Polaris of another project's member.** What has been shown is the refusal
-  at the Data Provider's ingress, which does not admit the other TRE's address. That stops the request before its Polaris
-  sees it, so that the roles, the audience and the project claim have not been shown to refuse it. To try it, admit the
-  TRE's address at the Data Provider for the test (`kube-polaris-whitelist azure set` with it added), so that Polaris
-  answers `403` itself.
-- **Not tried: a member of a project's group with no principal at the Data Provider.** A member listed in the project's
-  `members` who the Data Provider has not granted (`grant` with `--members` naming only some of them) should read nothing
-  there. It has not been run.
-- **Not tried: Trino in `diab-2026`, and the TREs' catalogs after the change of files.** A TRE deploys the Trino catalogs
-  and the proxy that its file named when it was deployed, and the identity issues its tokens with the audiences of that
-  file until its register stage is run again. `cvd-2026` was deployed before the files named one catalog each, and still
-  has the catalogs of both Data Providers in Trino, and `diab-2026` has no `nw_diab`, as `diab` did not exist, so
-  `project-trino-reads-data-providers.ipynb` cannot pass in it, and the tokens of both carry the audiences of both Data
-  Providers. Redeploying the two TREs (`up`, which deletes and makes the TRE again) puts them as their files say.
 - **Not built: the smoke tests of a TRE that sign in as a user
   ([#411](https://github.com/emrys-health/afon/issues/411)).** The suite signs in as a user of `users.csv`, who is only
   an admin in a project's TRE, which admits only the tokens of the project. So the tests that need a token, and the
