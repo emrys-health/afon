@@ -115,4 +115,44 @@ class NetworkConfigGkeTest {
         assertThat(plan.path("resource").path("null_resource").has("spark-driver-policy")).isTrue();
         assertThat(policy(plan, "allow-only-spark-driver-egress").isMissingNode()).isTrue();
     }
+
+    @Test
+    void onGkeTheUiOfTheDriverAndOfTheWorkersIsTheOnlyPortClosed(@TempDir Path dir) throws Exception {
+        JsonNode plan = plan("gcp-full", dir);
+
+        for (NetworkConfig.SparkUi ui : NetworkConfig.SPARK_UIS) {
+            JsonNode spec    = block(policy(plan, NetworkConfig.uiPolicyName(ui.pod())).path("spec"));
+            JsonNode ingress = spec.path("ingress");
+
+            assertThat(spec.path("policy_types").toString()).as(ui.pod()).isEqualTo("[\"Ingress\"]");
+            assertThat(ingress).as(ui.pod()).hasSize(1);
+            assertThat(ingress.get(0).has("from")).as("from anywhere").isFalse();
+            JsonNode ports = ingress.get(0).path("ports");
+            assertThat(ports).hasSize(2);
+            assertThat(ports.get(0).path("port").asText()).isEqualTo("1");
+            assertThat(ports.get(0).path("end_port").asInt()).isEqualTo(ui.port() - 1);
+            assertThat(ports.get(1).path("port").asText()).isEqualTo(String.valueOf(ui.port() + 1));
+            assertThat(ports.get(1).path("end_port").asInt()).isEqualTo(65535);
+        }
+    }
+
+    @Test
+    void elsewhereCiliumDeniesTheUiOfTheDriverAndOfTheWorkersToEveryPodAndAllowsAllElse(@TempDir Path dir) throws Exception {
+        JsonNode plan = plan("aws-full", dir);
+
+        for (NetworkConfig.SparkUi ui : NetworkConfig.SPARK_UIS) {
+            String   command = plan.path("resource").path("null_resource").path(ui.pod() + "-ui-policy").path("provisioner").get(0)
+                                   .path("local-exec").path("command").asText();
+            JsonNode spec    = JSON.readTree(command.substring(command.indexOf('\'') + 1, command.lastIndexOf('\''))).path("spec");
+
+            assertThat(spec.path("ingress").toString()).as(ui.pod()).isEqualTo("[{\"fromEntities\":[\"all\"]}]");
+            JsonNode deny = spec.path("ingressDeny");
+            assertThat(deny).hasSize(1);
+            assertThat(deny.get(0).path("toPorts").toString()).contains("\"port\":\"" + ui.port() + "\"");
+            // every pod, of every namespace, but not the node, whose kubelet probes the pod
+            assertThat(deny.get(0).path("fromEndpoints").toString())
+                .isEqualTo("[{\"matchExpressions\":[{\"key\":\"k8s:io.kubernetes.pod.namespace\",\"operator\":\"Exists\"}]}]");
+            assertThat(policy(plan, NetworkConfig.uiPolicyName(ui.pod())).isMissingNode()).as("no NetworkPolicy where Cilium is").isTrue();
+        }
+    }
 }

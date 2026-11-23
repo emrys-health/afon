@@ -4,7 +4,9 @@ import health.emrys.afon.cdk.AllowedCidrs;
 import health.emrys.afon.cdk.CdkHelper;
 import health.emrys.afon.cdk.configs.GuacamoleConfig;
 import health.emrys.afon.cdk.configs.JupyterHubConfig;
+import health.emrys.afon.cdk.configs.NetworkConfig;
 import health.emrys.afon.cdk.configs.SparkNames;
+import io.kubernetes.client.openapi.models.V1Pod;
 import health.emrys.afon.cdk.configs.TrinoWorkloads;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
@@ -87,6 +89,7 @@ public class NetworkSmokeMain {
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
         results.addAll(checkGuacamoleOnlyReachableFromOauth2Proxy());
+        results.addAll(checkSparkUisReachableFromNoPod());
         // Only the driver and the workers call what the ingress exposes, so only they may reach the ingress controller, when it is in
         // the cluster: the master is allowed the other domains, but not those, so it is not checked for the domains
         results.addAll(checkNetworkWithPods(
@@ -118,6 +121,41 @@ public class NetworkSmokeMain {
         String polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
         logger.info("Checking Guacamole cannot be reached from {}", polarisPodName);
         return new CurlCommand(client, polarisPodName, GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT, false).run();
+    }
+
+    /**
+     * Checks that no pod can connect to the UI of the Spark master, of the Spark Connect driver or of a worker, which serves the
+     * executors' logs: an administrator sees them with {@code kubectl port-forward}.  From Polaris, which no egress policy limits,
+     * so that only the Spark pods' own ingress policies can stop it.  By whether a TCP connection was made at all, as the driver's
+     * UI is off, and a connection refused would not show that the policy holds.
+     */
+    private List<ExecResult> checkSparkUisReachableFromNoPod() throws Exception {
+        String     polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+        SparkNames sparkNames     = SparkNames.from(properties);
+        List<ExecResult> results  = new ArrayList<>();
+        for (V1Pod pod : client.listPods()) {
+            String name = KubeClient.nameOfPod(pod);
+            int port;
+            if (name == null || pod.getStatus() == null || pod.getStatus().getPodIP() == null) {
+                continue;
+            } else if (name.startsWith(sparkNames.master())) {
+                port = NetworkConfig.SPARK_MASTER_UI_PORT;
+            } else if (name.startsWith(sparkNames.worker())) {
+                port = NetworkConfig.WORKER_UI_PORT;
+            } else if (name.startsWith(SPARK_CONNECTOR_NAME) && name.endsWith("-driver")) {
+                port = NetworkConfig.DRIVER_UI_PORT;
+            } else {
+                continue;
+            }
+            String ip     = pod.getStatus().getPodIP();
+            String target = format("the UI of %s (%s:%d)", name, ip, port);
+            logger.info("Checking {} cannot be reached from {}", target, polarisPodName);
+            ExecResult connect = client.exec(
+                polarisPodName, "curl", "-s", "-o", "/dev/null", "-w", "%{time_connect}", "--connect-timeout", "3",
+                "--max-time", "3", "telnet://" + ip + ":" + port);
+            results.add(notConnected(connect, target));
+        }
+        return results;
     }
 
     public List<ExecResult> checkPolarisCanTalkToDB() throws Exception {

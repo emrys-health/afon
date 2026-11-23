@@ -222,6 +222,7 @@ public class NetworkConfig {
         sparkMasterIngressPolicy();
 
         if (gke) {
+            SPARK_UIS.forEach(ui -> uiClosedOnGke(ui.pod(), ui.labels(), ui.port()));
             // The notebooks have no domain to reach: the policy above is all they need.  Only the driver calls what the ingress
             // exposes, ie Polaris, so only it may reach the ingress controller
             lockdownSparkOnGke(dependsOn, MASTER_LABELS, "spark-master", Map.of(), List.of());
@@ -230,6 +231,10 @@ public class NetworkConfig {
             return;
         }
         lockdownJupyterPods(USER_POD_LABELS, dependsOn);
+        for (SparkUi ui : SPARK_UIS) {
+            createWhitelistFor(dependsOn, uiDenyManifest(ui.pod(), ui.labels(), ui.port()), ui.pod() + "-ui-policy",
+                               "kubectl delete ciliumnetworkpolicy " + uiPolicyName(ui.pod()) + " -n default");
+        }
 
         // only the driver and the executors, which run the users' code in the workers, call what the ingress exposes, ie Polaris,
         // so only they may reach the ingress controller
@@ -642,6 +647,75 @@ public class NetworkConfig {
             .namespaceSelector(sparkNamespace)
             .podSelector(sparkPods)
             .build();
+    }
+
+    /** The port of the UI of the Spark master, which no pod may reach, see {@link #sparkMasterIngressPolicy}. */
+    public static final int SPARK_MASTER_UI_PORT = 8080;
+
+    /** The port of the UI of the Spark Connect driver, {@code spark.ui.port}, which is off, see SparkWorkloads#isolationConfig. */
+    public static final int DRIVER_UI_PORT = 4040;
+
+    /** The port of the UI of a Spark worker, {@code spark.worker.ui.port}, which serves the logs of the executors in it. */
+    public static final int WORKER_UI_PORT = 8081;
+
+    /** A Spark pod, other than the master, and the port of its UI. */
+    record SparkUi(String pod, Map<String, String> labels, int port) {
+    }
+
+    /** The UIs that no pod may reach.  The master's is closed by {@link #sparkMasterIngressPolicy}, with every other port of it. */
+    static final List<SparkUi> SPARK_UIS = List.of(new SparkUi("spark-driver", DRIVER_LABELS, DRIVER_UI_PORT),
+                                                   new SparkUi("spark-worker", WORKER_LABELS, WORKER_UI_PORT));
+
+    static String uiPolicyName(String pod) {
+        return pod + "-ui-closed";
+    }
+
+    /**
+     * The Cilium policy that closes the UI of a Spark pod to every pod, of whatever namespace.  The driver and the workers reach
+     * each other on ports that Spark picks at random, so that what they may reach cannot be listed, as the master's is: the UI is
+     * denied instead, and a deny wins over any allow.  A policy that only denies would make Cilium refuse whatever else comes to the
+     * pod too, as any rule of ingress does, so every source is allowed alongside it, which leaves what reaches the pod as it was.
+     * Only pods are denied, not the node, so that the kubelet's probes are not.  The pod's own processes, the users' code in a
+     * worker among them, reach its UI over localhost, which no policy applies to: they can read the logs it serves from its disk
+     * anyway.  An administrator sees it with {@code kubectl port-forward}, which reaches it in the same way.
+     */
+    static @NonNull Map<String, Object> uiDenyManifest(String pod, Map<String, String> labels, int port) {
+        return Map.of(
+            "apiVersion", "cilium.io/v2",
+            "kind", "CiliumNetworkPolicy",
+            "metadata", Map.of(
+                "name", uiPolicyName(pod),
+                "namespace", "default"),
+            "spec", Map.of(
+                "endpointSelector", Map.of("matchLabels", labels),
+                "ingress", List.of(Map.of("fromEntities", List.of("all"))),
+                "ingressDeny", List.of(Map.of(
+                    // the namespace's key, as an endpoint selector with none is of the policy's namespace only
+                    "fromEndpoints", List.of(Map.of("matchExpressions", List.of(Map.of(
+                        "key", "k8s:io.kubernetes.pod.namespace",
+                        "operator", "Exists")))),
+                    "toPorts", List.of(Map.of("ports", List.of(Map.of("port", String.valueOf(port), "protocol", "TCP"))))))));
+    }
+
+    /**
+     * On GKE, which has no CiliumNetworkPolicy, a {@link NetworkPolicy}, which can only allow: every port over TCP but the UI's, from
+     * anywhere, in two ranges.  Spark uses no other protocol.  GKE lets the node reach a pod whatever its policies, so the kubelet's
+     * probes are not stopped.
+     */
+    private void uiClosedOnGke(String pod, Map<String, String> labels, int port) {
+        NetworkPolicySpecIngress allButUi = NetworkPolicySpecIngress
+            .builder()
+            .ports(List.of(NetworkPolicySpecIngressPorts.builder().protocol("TCP").port("1").endPort(port - 1).build(),
+                           NetworkPolicySpecIngressPorts.builder().protocol("TCP").port(String.valueOf(port + 1)).endPort(65535).build()))
+            .build();
+        NetworkPolicy.Builder.create(tfStack, pod + "UiClosedPolicy")
+                             .metadata(getMetadata(uiPolicyName(pod)))
+                             .spec(NetworkPolicySpec.builder()
+                                                    .podSelector(NetworkPolicySpecPodSelector.builder().matchLabels(labels).build())
+                                                    .policyTypes(List.of("Ingress"))
+                                                    .ingress(List.of(allButUi))
+                                                    .build())
+                             .build();
     }
 
     /** The name of the {@link NetworkPolicy} that lets only Spark's own pods reach the master, and only on its RPC port. */
