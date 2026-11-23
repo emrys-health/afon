@@ -227,4 +227,37 @@ class ManageProjectGrantsMainTest {
         assertThat(ManageProjectGrantsMain.members(members(ALICE + "\n# c\n" + BOB + "\n"))).containsExactly(ALICE, BOB);
         assertThatThrownBy(() -> ManageProjectGrantsMain.members(dir.resolve("absent"))).isInstanceOf(IOException.class);
     }
+
+    @Test
+    void showsWhatEachCatalogHoldsAndWhatTheProjectsHaveWithTheEmailsOfTheirMembers() throws Exception {
+        membersFileOfTheProject(ALICE + ",alice@tre.example\n");
+        when(grants.show(null)).thenReturn(new PolarisProjectGrants.Overview(
+            List.of(new PolarisProjectGrants.CatalogContents("cvd", java.util.Map.of("released", List.of("smoke_test")))),
+            List.of(new PolarisProjectGrants.ProjectAccess("cvd-2026", "cvd-2026Project", List.of("afon:" + ALICE, "afon:" + BOB),
+                                                           List.of(new PolarisProjectGrants.CatalogAccess("cvd", "cvd-2026Reader", List.of("read-only on released")))))));
+
+        assertThat(command.run(new String[]{"show"})).isZero();
+
+        assertThat(out.toString()).contains("Catalogs:", "cvd: released [smoke_test]", "Project cvd-2026 (principal role cvd-2026Project)",
+                                            "members (2): afon:" + ALICE + " (alice@tre.example), afon:" + BOB,
+                                            "cvd: catalog role cvd-2026Reader, read-only on released");
+        assertThat(out.toString()).doesNotContain("afon:" + BOB + " (");
+    }
+
+    @Test
+    void showsOneProjectAndSaysSoWhenItHasNothingHere() throws Exception {
+        when(grants.show("diab-2026")).thenReturn(new PolarisProjectGrants.Overview(List.of(), List.of()));
+
+        assertThat(command.run(new String[]{"show", "diab-2026"})).isZero();
+
+        assertThat(out.toString()).contains("Project diab-2026 has been granted nothing here");
+        verify(grants).show("diab-2026");
+    }
+
+    @Test
+    void showTakesAtMostAProject() {
+        assertThat(command.run(new String[]{"show", "a", "b"})).isEqualTo(2);
+        assertThat(command.run(new String[]{"show", "--namespace", "x"})).isEqualTo(2);
+        verifyNoInteractions(grants);
+    }
 }

@@ -10,9 +10,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import static health.emrys.afon.rest.HttpResponses.isFailure;
@@ -208,6 +211,100 @@ public class PolarisProjectGrants {
         }
         ok(configurer.renameTable(catalog, STAGING, namespace, table), "move " + table + " from " + STAGING + " to " + namespace);
         return true;
+    }
+
+    /** What a project may do in a catalog, by the catalog role that it has there: {@code access} says it in words, eg {@code read-only on released}. */
+    public record CatalogAccess(String catalog, String catalogRole, List<String> access) {
+    }
+
+    /** What a project has at this Data Provider: its principal role, the principals that have it, and its access in each catalog. */
+    public record ProjectAccess(String project, String principalRole, List<String> principals, List<CatalogAccess> catalogs) {
+    }
+
+    /** What a catalog holds: its namespaces, each with the names of its tables. */
+    public record CatalogContents(String catalog, Map<String, List<String>> namespaces) {
+    }
+
+    /** What the Data Provider has granted, and what it holds that it may grant. */
+    public record Overview(List<CatalogContents> catalogs, List<ProjectAccess> projects) {
+    }
+
+    /**
+     * Reads, and changes nothing: what the Data Provider holds in each catalog, and what each project, or the one named, has been granted: the principals
+     * that have its principal role, and the access of its catalog roles.  A project is a principal role that ends in {@code Project}, as
+     * {@link #projectPrincipalRole} makes it, so that the roles that Polaris keeps for itself, and any that the Data Provider made for another use, are
+     * not projects.
+     *
+     * @param project the project to show, or {@code null} for every project
+     */
+    public Overview show(String project) throws IOException {
+        try {
+            // Polaris lists in no fixed order, so everything is sorted, and the same Data Provider shows the same each time
+            List<String> catalogNames = sorted(configurer.catalogNames());
+            List<CatalogContents> contents = new ArrayList<>();
+            for (String catalog : catalogNames) {
+                Map<String, List<String>> namespaces = new LinkedHashMap<>();
+                for (String namespace : sorted(configurer.namespacesOf(catalog))) {
+                    namespaces.put(namespace, sorted(configurer.tableNamesOf(catalog, namespace)));
+                }
+                contents.add(new CatalogContents(catalog, namespaces));
+            }
+            List<String> roles = new ArrayList<>();
+            if (project != null) {
+                String role = projectPrincipalRole(project);
+                if (configurer.principalRoleNames().contains(role)) {
+                    roles.add(role);
+                }
+            } else {
+                for (String role : sorted(configurer.principalRoleNames())) {
+                    if (role.length() > "Project".length() && role.endsWith("Project") && !RESERVED.contains(role)
+                        && NAME.matcher(role.substring(0, role.length() - "Project".length())).matches()) {
+                        roles.add(role);
+                    }
+                }
+            }
+            List<ProjectAccess> projects = new ArrayList<>();
+            for (String role : roles) {
+                List<CatalogAccess> access = new ArrayList<>();
+                for (String catalog : catalogNames) {
+                    for (String catalogRole : sorted(configurer.catalogRolesOf(role, catalog))) {
+                        access.add(new CatalogAccess(catalog, catalogRole, describe(configurer.grantsOf(catalog, catalogRole))));
+                    }
+                }
+                projects.add(new ProjectAccess(role.substring(0, role.length() - "Project".length()), role, sorted(principalsWith(role)), access));
+            }
+            return new Overview(contents, projects);
+        } catch (ParseException e) {
+            throw new IOException(e);
+        }
+    }
+
+    private static List<String> sorted(List<String> names) {
+        return names.stream().sorted().toList();
+    }
+
+    /**
+     * @return the grants in words, one for the privileges on each namespace: {@code read-only on released} if they are exactly {@link #READ_ONLY}, else
+     * the privileges listed; and one for each other grant, on the catalog or a table
+     */
+    static List<String> describe(List<CatalogConfigurer.RoleGrant> grants) {
+        Map<String, Set<String>> byNamespace = new LinkedHashMap<>();
+        List<String> others = new ArrayList<>();
+        for (CatalogConfigurer.RoleGrant grant : grants) {
+            if ("namespace".equals(grant.type())) {
+                byNamespace.computeIfAbsent(grant.target(), key -> new TreeSet<>()).add(grant.privilege());
+            } else {
+                others.add(grant.type() + (grant.target().isEmpty() ? "" : " " + grant.target()) + ": " + grant.privilege());
+            }
+        }
+        Set<String> readOnly = new TreeSet<>();
+        READ_ONLY.forEach(privilege -> readOnly.add(privilege.name()));
+        List<String> words = new ArrayList<>();
+        byNamespace.forEach((namespace, privileges) -> words.add(privileges.equals(readOnly)
+            ? "read-only on " + namespace
+            : "on " + namespace + ": " + String.join(", ", privileges)));
+        words.addAll(others);
+        return words;
     }
 
     /**

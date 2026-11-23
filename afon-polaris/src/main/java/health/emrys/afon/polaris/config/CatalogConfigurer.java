@@ -468,6 +468,64 @@ public class CatalogConfigurer {
         return names;
     }
 
+    /** What a catalog role is granted: the {@code type} of what it is on, {@code catalog}, {@code namespace} or {@code table}, which one, and the privilege. */
+    public record RoleGrant(String type, String target, String privilege) {
+    }
+
+    /**
+     * @return the names of the catalogs of the Polaris
+     */
+    public List<String> catalogNames() throws IOException, ParseException {
+        List<String> names = new ArrayList<>();
+        for (JsonNode node : getNodes(catalogsURI(), "catalogs")) {
+            names.add(node.get("name").asText());
+        }
+        return names;
+    }
+
+    /**
+     * @return the names of the principal roles of the Polaris
+     */
+    public List<String> principalRoleNames() throws IOException, ParseException {
+        List<String> names = new ArrayList<>();
+        for (JsonNode node : getNodes(principalRolesURI(), "roles")) {
+            names.add(node.get("name").asText());
+        }
+        return names;
+    }
+
+    /**
+     * @return the names of the catalog roles of the catalog that the principal role has
+     */
+    public List<String> catalogRolesOf(String principalRoleName, String catalogName) throws IOException, ParseException {
+        List<String> names = new ArrayList<>();
+        for (JsonNode node : getNodes(catalogRolesURI(principalRoleName, catalogName), "roles")) {
+            names.add(node.get("name").asText());
+        }
+        return names;
+    }
+
+    /**
+     * @return what the catalog role is granted in the catalog, each on the catalog, a namespace or a table
+     */
+    public List<RoleGrant> grantsOf(String catalogName, String catalogRoleName) throws IOException, ParseException {
+        List<RoleGrant> grants = new ArrayList<>();
+        for (JsonNode node : getNodes(catalogRolesGrantURI(catalogName, catalogRoleName), "grants")) {
+            String type = node.path("type").asText();
+            String target = "";
+            if (node.has("namespace")) {
+                List<String> parts = new ArrayList<>();
+                node.get("namespace").forEach(part -> parts.add(part.asText()));
+                target = String.join(".", parts);
+                if (node.has("tableName")) {
+                    target += "." + node.get("tableName").asText();
+                }
+            }
+            grants.add(new RoleGrant(type, target, node.path("privilege").asText()));
+        }
+        return grants;
+    }
+
     /**
      * Takes the principal role from the principal, leaving both.
      */

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 
@@ -35,6 +36,7 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
  * manage-project-grants remove-member &lt;project&gt; &lt;user id&gt;
  * manage-project-grants revoke &lt;project&gt; &lt;catalog&gt;
  * manage-project-grants release &lt;catalog&gt; &lt;table&gt; [--namespace &lt;namespace&gt;]
+ * manage-project-grants show [&lt;project&gt;]
  * </pre>
  * <ul>
  *   <li>{@code grant} lets the project read the namespace of the catalog, {@code released} unless another is given, read-only, and makes its members
@@ -44,7 +46,9 @@ import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
  *       by hand: a line is {@code <user id>} or {@code <user id>,<email>}.  It is made again without harm;</li>
  *   <li>{@code add-member} and {@code remove-member} change one member of a project that has been granted;</li>
  *   <li>{@code revoke} ends the project's access to the catalog: eg at the end date of its contract;</li>
- *   <li>{@code release} moves a table, that was made and checked in {@code staging}, to the namespace that the projects read.</li>
+ *   <li>{@code release} moves a table, that was made and checked in {@code staging}, to the namespace that the projects read;</li>
+ *   <li>{@code show} reads, and changes nothing: what each catalog holds, and what each project, or the one named, has been granted: its principal role, its
+ *       members, and its access in each catalog.</li>
  * </ul>
  * {@code <project>} is the id of the TRE project that reads the catalog, which the project claim of its tokens names.  It runs in the home of a Data Provider's
  * project, in its cloud: {@code manage-project run <provider> manage-project-grants ...}, as it is that Data Provider that grants, with its own credentials.
@@ -63,6 +67,8 @@ public class ManageProjectGrantsMain {
         "  add-member <project> <user id>     lets one more member read what the project reads",
         "  remove-member <project> <user id>  takes the project's role from the member",
         "  revoke <project> <catalog>             ends the project's access to the catalog",
+        "  show [<project>]            shows, and changes nothing: what each catalog holds, and what each project, or the one named, has been granted:",
+        "                              its principal role, its members (by user id, with their email if the project's dir has it), and its access in each catalog",
         "  release <catalog> <table> [" + NAMESPACE + " <namespace>]",
         "                              moves the table from " + PolarisProjectGrants.STAGING + " to the namespace that the projects read, unless it is there already",
         "<project> is the id of the TRE project that reads the catalog.  It is run in the home of a Data Provider's project, in its cloud:",
@@ -140,6 +146,8 @@ public class ManageProjectGrantsMain {
                                                                                : usage("revoke takes a <project> and a <catalog>");
                 case "release" -> positional.size() == 2 && !options.containsKey(MEMBERS) ? release(positional.get(0), positional.get(1), namespace)
                                                                                                 : usage("release takes a <catalog> and a <table>");
+                case "show" -> positional.size() <= 1 && options.isEmpty() ? show(positional.isEmpty() ? null : positional.get(0))
+                                                                              : usage("show takes at most a <project>");
                 default -> usage("Unknown action '" + args[0] + "'");
             };
         } catch (IllegalArgumentException | IllegalStateException | IOException e) {
@@ -184,6 +192,40 @@ public class ManageProjectGrantsMain {
     private int revoke(String project, String catalog) throws Exception {
         List<String> removed = grants.get().revoke(project, catalog);
         out.printf("Project %s may no longer read %s; %d member(s) lost its role%n", project, catalog, removed.size());
+        return 0;
+    }
+
+    private int show(String project) throws Exception {
+        PolarisProjectGrants.Overview overview = grants.get().show(project);
+        out.println("Catalogs:");
+        if (overview.catalogs().isEmpty()) {
+            out.println("  none");
+        }
+        for (PolarisProjectGrants.CatalogContents catalog : overview.catalogs()) {
+            StringBuilder namespaces = new StringBuilder();
+            catalog.namespaces().forEach((namespace, tables) -> namespaces.append(namespaces.length() == 0 ? "" : "; ").append(namespace).append(' ').append(tables));
+            out.printf("  %s: %s%n", catalog.catalog(), namespaces.length() == 0 ? "no namespaces" : namespaces);
+        }
+        if (overview.projects().isEmpty()) {
+            out.println(project == null ? "No project has been granted anything here" : "Project " + project + " has been granted nothing here: it has no principal role");
+        }
+        for (PolarisProjectGrants.ProjectAccess access : overview.projects()) {
+            Map<String, String> emails = ProjectMembers.read(ProjectMembers.file(afonHome, access.project()));
+            out.printf("Project %s (principal role %s)%n", access.project(), access.principalRole());
+            out.printf("  members (%d): %s%n", access.principals().size(), access.principals().isEmpty() ? "none" : access.principals().stream()
+                .map(principal -> {
+                    String id = principal.startsWith(PolarisProjectGrants.PRINCIPAL_PREFIX) ? principal.substring(PolarisProjectGrants.PRINCIPAL_PREFIX.length()) : principal;
+                    String email = emails.get(id);
+                    return principal + (email == null || email.isEmpty() ? "" : " (" + email + ")");
+                }).collect(Collectors.joining(", ")));
+            if (access.catalogs().isEmpty()) {
+                out.println("  no access in any catalog");
+            }
+            for (PolarisProjectGrants.CatalogAccess catalog : access.catalogs()) {
+                out.printf("  %s: catalog role %s, %s%n", catalog.catalog(), catalog.catalogRole(),
+                           catalog.access().isEmpty() ? "no privileges" : String.join("; ", catalog.access()));
+            }
+        }
         return 0;
     }
 

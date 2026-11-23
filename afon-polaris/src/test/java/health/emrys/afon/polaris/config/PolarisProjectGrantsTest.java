@@ -199,4 +199,71 @@ class PolarisProjectGrantsTest {
             .hasMessageContaining("could not make the principal role cvd-2026Project").hasMessageContaining("HTTP 403");
         verify(configurer, never()).createPrincipal(anyString());
     }
+
+    private void aDataProviderWithOneProject() throws Exception {
+        when(configurer.catalogNames()).thenReturn(List.of("dbt", "cvd"));
+        when(configurer.namespacesOf("cvd")).thenReturn(List.of("staging", "released"));
+        when(configurer.namespacesOf("dbt")).thenReturn(List.of());
+        when(configurer.tableNamesOf("cvd", "staging")).thenReturn(List.of("smoke_test_unreleased"));
+        when(configurer.tableNamesOf("cvd", "released")).thenReturn(List.of("smoke_test"));
+        // the roles that Polaris and the Data Provider have for their own uses are not projects
+        when(configurer.principalRoleNames()).thenReturn(List.of("service_admin", "cvd-2026Project", "philPrincipal", "Project"));
+        when(configurer.principalsOf("cvd-2026Project")).thenReturn(List.of("afon:" + BOB, "afon:" + ALICE));
+        when(configurer.catalogRolesOf("cvd-2026Project", "cvd")).thenReturn(List.of("cvd-2026Reader"));
+        when(configurer.catalogRolesOf("cvd-2026Project", "dbt")).thenReturn(List.of());
+        when(configurer.grantsOf("cvd", "cvd-2026Reader")).thenReturn(READ_ONLY.stream()
+            .map(privilege -> new CatalogConfigurer.RoleGrant("namespace", "released", privilege.name())).toList());
+    }
+
+    @Test
+    void showsWhatEachCatalogHoldsAndWhatEachProjectHasBeenGranted() throws Exception {
+        aDataProviderWithOneProject();
+
+        PolarisProjectGrants.Overview overview = grants.show(null);
+
+        assertThat(overview.catalogs()).extracting(PolarisProjectGrants.CatalogContents::catalog).containsExactly("cvd", "dbt");
+        assertThat(overview.catalogs().get(0).namespaces()).containsEntry("staging", List.of("smoke_test_unreleased")).containsEntry("released", List.of("smoke_test"));
+        // sorted, whatever order Polaris lists in
+        assertThat(overview.catalogs().get(0).namespaces().keySet()).containsExactly("released", "staging");
+        assertThat(overview.projects()).hasSize(1);
+        PolarisProjectGrants.ProjectAccess project = overview.projects().get(0);
+        assertThat(project.project()).isEqualTo("cvd-2026");
+        assertThat(project.principalRole()).isEqualTo("cvd-2026Project");
+        assertThat(project.principals()).containsExactly("afon:" + ALICE, "afon:" + BOB);
+        assertThat(project.catalogs()).containsExactly(new PolarisProjectGrants.CatalogAccess("cvd", "cvd-2026Reader", List.of("read-only on released")));
+    }
+
+    @Test
+    void showsOneProjectAndNothingForAProjectThatHasNoRole() throws Exception {
+        aDataProviderWithOneProject();
+
+        assertThat(grants.show("cvd-2026").projects()).extracting(PolarisProjectGrants.ProjectAccess::project).containsExactly("cvd-2026");
+        assertThat(grants.show("diab-2026").projects()).isEmpty();
+    }
+
+    @Test
+    void showsChangesNothing() throws Exception {
+        aDataProviderWithOneProject();
+
+        grants.show(null);
+
+        verify(configurer, never()).createPrincipalRole(anyString());
+        verify(configurer, never()).createNamespaceGrant(anyString(), anyString(), anyString(), any());
+        verify(configurer, never()).deletePrincipalRole(anyString());
+        verify(configurer, never()).deleteCatalogRole(anyString(), anyString());
+        verify(configurer, never()).removePrincipalRole(anyString(), anyString());
+    }
+
+    @Test
+    void saysWhatEachPrivilegeIsOnWhenTheAccessIsNotExactlyReadOnly() {
+        List<CatalogConfigurer.RoleGrant> grants = List.of(
+            new CatalogConfigurer.RoleGrant("namespace", "released", "TABLE_READ_DATA"),
+            new CatalogConfigurer.RoleGrant("namespace", "released", "TABLE_WRITE_DATA"),
+            new CatalogConfigurer.RoleGrant("namespace", "staging", "TABLE_READ_DATA"),
+            new CatalogConfigurer.RoleGrant("catalog", "", "CATALOG_MANAGE_CONTENT"),
+            new CatalogConfigurer.RoleGrant("table", "released.patients", "TABLE_READ_DATA"));
+
+        assertThat(PolarisProjectGrants.describe(grants)).containsExactly(
+            "on released: TABLE_READ_DATA, TABLE_WRITE_DATA", "on staging: TABLE_READ_DATA", "catalog: CATALOG_MANAGE_CONTENT", "table released.patients: TABLE_READ_DATA");
+    }
 }
