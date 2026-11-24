@@ -6,6 +6,8 @@ import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.config.AfonCloud;
+import health.emrys.afon.spark.guard.SparkConnectGuardInterceptor;
+import health.emrys.afon.spark.guard.SparkGuardExtensions;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
@@ -51,9 +53,9 @@ public class SparkWorkloads {
      * Lets into Spark Connect only a client with an OIDC token of the realm, as the token's subject, and refuses JVM code; it is in
      * the Spark image, from afon-spark-additional, not on this classpath.  The server does not start without it.
      */
-    static final String GUARD_INTERCEPTOR = "health.emrys.afon.spark.guard.SparkConnectGuardInterceptor";
+    final String GUARD_INTERCEPTOR;
     /** Refuses what would let one user's session reach another's, once Spark has analysed it; in the same jar as the interceptor. */
-    static final String GUARD_EXTENSIONS = "health.emrys.afon.spark.guard.SparkGuardExtensions";
+    final String GUARD_EXTENSIONS;
     /** Where KeyCloak serves a realm's signing keys, under the realm's URL. */
     static final String JWKS_PATH = "/protocol/openid-connect/certs";
     /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */
@@ -85,6 +87,8 @@ public class SparkWorkloads {
         this.names    = names;
         this.images   = images;
         this.realmUrl = realmUrl;
+        GUARD_INTERCEPTOR = SparkConnectGuardInterceptor.class.getName();
+        GUARD_EXTENSIONS = SparkGuardExtensions.class.getName();
     }
 
     /**
