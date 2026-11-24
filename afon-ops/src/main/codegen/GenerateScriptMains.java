@@ -155,6 +155,7 @@ public class GenerateScriptMains {
         new ScriptEntry("kube", "KubePolarisWhitelistMain", "kube/polaris-whitelist.sh"),
         new ScriptEntry("kube", "KubeKeycloakWhitelistMain", "kube/keycloak-whitelist.sh"),
 
+        new ScriptEntry("signing", "SigningEnforceCheckMain", "signing/enforce-check.sh"),
         new ScriptEntry("signing", "SigningPublicKeyMain", "signing/public-key.sh"),
         new ScriptEntry("signing", "SigningReportMain", "signing/report.sh"),
         new ScriptEntry("signing", "SigningRegistryMain", "signing/registry.sh"),

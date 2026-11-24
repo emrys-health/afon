@@ -592,6 +592,19 @@ mirrored or signed. A failing pod also lists its signed images, as the report is
 namespaces that are only audited this records the failure and does not stop the pod, so enforce a namespace only once
 the images of its pods are signed.
 
+##### Check that a namespace enforces
+
+`afon-cli.sh signing-enforce-check <aws|azure|gcp> <namespace> [<signed image>]` checks that an enforced namespace does
+what the table above says, on the cluster of the full stack of the cloud: it creates a pod of an image that no one
+signed, which must be rejected by `emrys-verify-images-enforce`, then a pod of an image that is mirrored and signed (one
+that passes in the policy reports, unless you give it), which must be admitted, and deletes the pods. It exits 0 only if
+both hold. A namespace that does not exist is created enforced and deleted at the end, so a throwaway one can be named;
+one that exists must be enforced already, as its label is never changed.
+```shell
+afon-cli.sh signing-enforce-check aws sigtest     # a throwaway namespace
+UNSIGNED_IMAGE=docker.io/library/busybox:1.36 afon-cli.sh signing-enforce-check aws sigtest
+```
+
 ### Setup AWS full stack
 
 The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
