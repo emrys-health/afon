@@ -16,6 +16,9 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Optional;
 
+import static health.emrys.afon.spark.Constants.ISSUER_CONF;
+import static health.emrys.afon.spark.Constants.KEYS_URL_CONF;
+
 /**
  * Lets into the Spark Connect server only a client with an OIDC token of the realm, and only what it may do there.  Register it
  * with {@code spark.connect.grpc.interceptor.classes}.
@@ -30,7 +33,7 @@ import java.util.Optional;
  * proven to have made them, and no client can reach another user's session, even knowing its id.  And a request with JVM code in
  * it is refused, as permission denied, see {@link RequestPolicy}.
  *
- * <p>The realm is configured by {@value #ISSUER_CONF} and {@value #KEYS_URL_CONF}: if either is missing, the server does not start.
+ * <p>The realm is configured by ISSUER_CONF and KEYS_URL_CONF: if either is missing, the server does not start.
  */
 public class SparkConnectGuardInterceptor implements ServerInterceptor {
 
@@ -38,12 +41,6 @@ public class SparkConnectGuardInterceptor implements ServerInterceptor {
 
     /** The header that holds the client's OIDC token. */
     public static final String TOKEN_HEADER = "x-afon-token";
-
-    /** The realm's URL, as its tokens name it in {@code iss}. */
-    public static final String ISSUER_CONF = "spark.afon.connect.issuer";
-
-    /** The realm's JWKS endpoint. */
-    public static final String KEYS_URL_CONF = "spark.afon.connect.keysUrl";
 
     static final Metadata.Key<String> TOKEN = Metadata.Key.of(TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
 

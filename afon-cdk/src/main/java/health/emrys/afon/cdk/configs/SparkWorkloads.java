@@ -16,6 +16,8 @@ import java.util.Map;
 
 import static health.emrys.afon.cdk.CdkHelper.SPARK_SERVICE_ACCOUNT_NAME;
 import static health.emrys.afon.cdk.CdkUtils.*;
+import static health.emrys.afon.spark.Constants.ISSUER_CONF;
+import static health.emrys.afon.spark.Constants.KEYS_URL_CONF;
 import static java.lang.String.format;
 
 /**
@@ -52,9 +54,6 @@ public class SparkWorkloads {
     static final String GUARD_INTERCEPTOR = "health.emrys.afon.spark.guard.SparkConnectGuardInterceptor";
     /** Refuses what would let one user's session reach another's, once Spark has analysed it; in the same jar as the interceptor. */
     static final String GUARD_EXTENSIONS = "health.emrys.afon.spark.guard.SparkGuardExtensions";
-    /** The configuration of the interceptor, see SparkConnectGuardInterceptor#ISSUER_CONF and #KEYS_URL_CONF. */
-    static final String ISSUER_CONF   = "spark.afon.connect.issuer";
-    static final String KEYS_URL_CONF = "spark.afon.connect.keysUrl";
     /** Where KeyCloak serves a realm's signing keys, under the realm's URL. */
     static final String JWKS_PATH = "/protocol/openid-connect/certs";
     /** How long the Spark Connect driver waits for the master to be Ready before the deploy fails. */
