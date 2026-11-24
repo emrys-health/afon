@@ -96,6 +96,33 @@ class AzureCloudProviderTest {
         return JSON.missingNode();
     }
 
+    @Test
+    void authRouteUsesJupyterZoneWithAuthRecordAndIdleTimeoutAnnotations(@TempDir Path dir) throws Exception {
+        assertThat(AzureCloudProvider.relativeRecordName("jupyter.example.com", "jupyter.example.com")).isEqualTo("@");
+        assertThat(AzureCloudProvider.relativeRecordName("auth.jupyter.example.com", "jupyter.example.com")).isEqualTo("auth");
+
+        JsonNode plan = JSON.readTree(SynthesisSupport.synthesise(StackId.parse("azure-full"), dir, Map.of()));
+        boolean sawAuthRecord = false;
+        for (var entry : plan.path("resource").path("azurerm_dns_a_record").properties()) {
+            if ("auth".equals(entry.getValue().path("name").asText())) {
+                sawAuthRecord = true;
+            }
+        }
+        assertThat(sawAuthRecord).isTrue();
+
+        int matchedIngresses = 0;
+        for (var entry : plan.path("resource").path("kubernetes_ingress_v1").properties()) {
+            String name = entry.getValue().path("metadata").path("name").asText();
+            if ("jupyter-ingress".equals(name) || "jupyter-auth-ingress".equals(name)) {
+                matchedIngresses++;
+                JsonNode annotations = entry.getValue().path("metadata").path("annotations");
+                assertThat(annotations.path("nginx.ingress.kubernetes.io/proxy-read-timeout").asText()).isEqualTo("3600");
+                assertThat(annotations.path("nginx.ingress.kubernetes.io/proxy-send-timeout").asText()).isEqualTo("3600");
+            }
+        }
+        assertThat(matchedIngresses).isEqualTo(2);
+    }
+
     private static JsonNode clusterAdmin(JsonNode plan) {
         for (var entry : plan.path("resource").path("azurerm_role_assignment").properties()) {
             if (entry.getKey().contains("tofu-cluster-admin")) {

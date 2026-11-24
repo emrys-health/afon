@@ -39,10 +39,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.*;
 
 import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
 import static health.emrys.afon.cdk.CdkHelper.clusterIpService;
+import static health.emrys.afon.cdk.CdkHelper.JUPYTER_AUTH_INGRESS_NAME;
 import static health.emrys.afon.cdk.CdkHelper.JUPYTER_INGRESS_NAME;
 import static health.emrys.afon.cdk.CdkHelper.PROXY_PORT;
 import static health.emrys.afon.cdk.CdkHelper.PROXY_SERVICE_NAME;
@@ -58,8 +60,8 @@ import static org.slf4j.LoggerFactory.getLogger;
  * but as plain Kubernetes resources rather than the Helm chart so it slots into the existing CDKTF
  * stacks):
  * <ul>
- *   <li>{@code hub} — the JupyterHub control plane. Authenticates users (delegated to the
- *       oauth2-proxy gate in front, see below) and asks {@code KubeSpawner} to create one notebook
+ *   <li>{@code hub} — the JupyterHub control plane. Authenticates users (behind the
+ *       Pomerium gate in front, see below) and asks {@code KubeSpawner} to create one notebook
  *       pod per user. Listens on 8081.</li>
  *   <li>{@code proxy} — {@code configurable-http-proxy}. The public entrypoint (8000); routes
  *       {@code /hub} traffic to the hub and {@code /user/<name>} traffic to that user's notebook
@@ -67,11 +69,11 @@ import static org.slf4j.LoggerFactory.getLogger;
  *   <li>per-user notebook pods — created at runtime by {@code KubeSpawner}, not declared here.</li>
  * </ul>
  *
- * <p>Authentication is fronted by oauth2-proxy, so that the cloud's KeyCloak enforces MFA before any
+ * <p>Authentication is fronted by Pomerium, so that the cloud's KeyCloak enforces MFA before any
  * request reaches the hub. The hub is also an OIDC client of that KeyCloak itself
  * ({@code GenericOAuthenticator}), so it can capture each user's token in {@code auth_state} and hand it
  * to their pod; as the user already has a KeyCloak session, this second login does not prompt them.
- * oauth2-proxy points at the {@code proxy-public} ClusterIP service rather than at a single Jupyter pod.
+ * Pomerium points at the {@code proxy-public} ClusterIP service rather than at a single Jupyter pod.
  */
 public class JupyterHubConfig {
 
@@ -122,12 +124,12 @@ public class JupyterHubConfig {
      * auto-spawns the user's pod and then hands off to Guacamole (served under {@link #GUACAMOLE_PATH})
      * to stream that pod's desktop.
      */
-    private static final String HUB_BASE_URL    = "/";
+    static final String HUB_BASE_URL    = "/";
     /**
      * Sub-path Guacamole is served under (its default servlet context) now that the hub owns root.
-     * The post-spawn redirect and the oauth2-proxy upstream both point here.
+     * The post-spawn redirect and the Pomerium upstream both point here.
      */
-    private static final String GUACAMOLE_PATH  = "/guacamole/";
+    static final String GUACAMOLE_PATH  = "/guacamole/";
     /**
      * KubeSpawner stamps this label (value = the user's slug) on each pod; the per-user VNC Service selects it.
      */
@@ -151,11 +153,11 @@ public class JupyterHubConfig {
 
 
     /**
-     * Upstreams the oauth2-proxy MFA gate fronts, on a single domain, both behind the same OIDC/MFA
-     * gate. oauth2-proxy routes by longest path prefix: {@code /guacamole/*} hits Guacamole and
-     * everything else falls through to the JupyterHub public proxy (the hub at {@code /hub/*} and the
-     * spawned single-user notebooks at {@code /user/*}). The hub owns the root so a bare visit to the
-     * domain lands on it and auto-spawns the user's pod before handing off to Guacamole.
+     * Upstreams the Pomerium MFA gate fronts, on a single domain, both behind the same OIDC/MFA
+     * gate and PPL policy. Pomerium routes {@code /guacamole/*} to Guacamole and everything else to
+     * the JupyterHub public proxy (the hub at {@code /hub/*} and the spawned single-user notebooks
+     * at {@code /user/*}, with {@code /hub/admin} refused). The hub owns the root so a bare visit
+     * to the domain lands on it and auto-spawns the user's pod before handing off to Guacamole.
      */
     public static final List<String> MFA_UPSTREAMS = List.of(
         "http://" + GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT + GUACAMOLE_PATH,
@@ -179,7 +181,10 @@ public class JupyterHubConfig {
      */
     static final String AUDIT_USER_LABEL = "audit/user-id";
 
-    private static final String TLS_SECRET_NAME = "jupyter-secret";
+    private static final String   TLS_SECRET_NAME      = "jupyter-secret";
+    private static final String   AUTH_TLS_SECRET_NAME = "jupyter-auth-secret";
+    private static final String   JUPYTER_ALB_GROUP    = "jupyter";
+    private static final Duration JUPYTER_IDLE_TIMEOUT = Duration.ofHours(1);
 
     private final   TerraformStack                stack;
     private final   CloudPlatform                 platform;
@@ -282,7 +287,7 @@ public class JupyterHubConfig {
         //    derived deterministically from an existing secret so restarts don't log everyone out.
         //  - hub.cryptKey: encrypts auth_state (the captured OIDC tokens) at rest in the hub DB.
         //  - oauth.clientId / oauth.clientSecret: the OIDC client credentials (same provider as
-        //    oauth2-proxy) JupyterHub uses to log users in and obtain their tokens.
+        //    Pomerium) JupyterHub uses to log users in and obtain their tokens.
         String cookieSecret = properties.getValue(AfonProperty.OAUTH2_COOKIE_SECRET);
         Secret hubSecret = Secret.Builder
             .create(stack, "jupyterhubSecret")
@@ -354,7 +359,7 @@ public class JupyterHubConfig {
         }
 
         // Guacamole streams each user's pod desktop. Transparent SSO: no Guacamole login page — the
-        // guacamole-auth-header extension trusts the X-Forwarded-Email header oauth2-proxy sets, and
+        // guacamole-auth-header extension trusts the X-Pomerium-Claim-Email header Pomerium sets, and
         // guacamole-auth-jdbc (backed by the shared RDS Postgres) serves each user their own
         // connection. A one-shot Job creates the DB/schema and provisions one VNC connection per user,
         // each targeting that user's own VNC Service (a different host per user).
@@ -366,12 +371,12 @@ public class JupyterHubConfig {
             session -> emailToVncHost.get(session.username()),
             sessions,
             guacamoleDb,
-            "X-Forwarded-Email",
+            PomeriumConfig.IDENTITY_HEADER,
             properties.getValue(AfonProperty.AFON_THEME, "emrys-hdrs"));
 
-        // A single oauth2-proxy MFA gate fronts both Guacamole (root) and JupyterHub
-        // (under /jupyter/), so users authenticate once, spawn their pod via the hub, then reach its
-        // desktop through Guacamole — all behind the same OIDC/MFA login.
+        // A single Pomerium MFA gate fronts both JupyterHub (root) and Guacamole (/guacamole/),
+        // so users authenticate once, spawn their pod via the hub, then reach its desktop through
+        // Guacamole — all behind the same OIDC/MFA login and per-request member policy.
         List<ITerraformDependable> mfaDeps = new ArrayList<>(eksDependOn);
         mfaDeps.add(proxyPublic);
         getMFAConfig(mfaDeps);
@@ -597,7 +602,7 @@ public class JupyterHubConfig {
 
     /**
      * The hub's runtime configuration. Points KubeSpawner at the same notebook image the single-pod
-     * deployment uses, tells the hub how to reach the externally-run proxy, and — since oauth2-proxy
+     * deployment uses, tells the hub how to reach the externally-run proxy, and — since Pomerium
      * is the real authentication gate — lets any username straight through.
      */
     private String jupyterhubConfigPy() {
@@ -686,7 +691,7 @@ public class JupyterHubConfig {
                # A valid Kubernetes label value.
                _LABEL_VALUE = re.compile('[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?')
                
-               # --- OIDC login against the same provider oauth2-proxy uses. JupyterHub is the OAuth
+               # --- OIDC login against the same provider Pomerium uses. JupyterHub is the OAuth
                #     client itself (not DummyAuthenticator) so it can capture each user's token via
                #     auth_state and hand it to their pod. Endpoints come from the issuer's discovery
                #     document, keeping this provider-agnostic. ---
@@ -696,6 +701,7 @@ public class JupyterHubConfig {
                c.GenericOAuthenticator.client_id = os.environ['OAUTH_CLIENT_ID']
                c.GenericOAuthenticator.client_secret = os.environ['OAUTH_CLIENT_SECRET']
                c.GenericOAuthenticator.oauth_callback_url = 'https://%10$s%7$shub/oauth_callback'
+               c.GenericOAuthenticator.logout_redirect_url = 'https://%10$s/.pomerium/sign_out'
                c.GenericOAuthenticator.authorize_url = _oidc['authorization_endpoint']
                c.GenericOAuthenticator.token_url = _oidc['token_endpoint']
                c.GenericOAuthenticator.userdata_url = _oidc['userinfo_endpoint']
@@ -851,13 +857,22 @@ public class JupyterHubConfig {
     }
 
     /**
-     * Exposes the oauth2-proxy MFA gate over HTTPS at the Jupyter domain, which forwards to JupyterHub's public proxy.
+     * Exposes the Pomerium MFA gate over HTTPS at both the Jupyter domain and its authenticate
+     * hostname ({@code auth.<jupyter>}), sharing one ALB on AWS and a one-hour idle timeout for
+     * WebSockets to Guacamole and Jupyter notebooks.
      */
     private void configureHttpsAndDNS() {
+        String jupyter = jupyterDomain();
         platform.exposeHttps(new HttpsRoute(
-            "jupyter", jupyterDomain(), PROXY_SERVICE_NAME, PROXY_PORT, JUPYTER_INGRESS_NAME,
-            HealthCheck.onTrafficPort(JupyterMfaConfig.PING_PATH),
-            TLS_SECRET_NAME, true, List.of(), Optional.empty()));
+            "jupyter", jupyter, PROXY_SERVICE_NAME, PROXY_PORT, JUPYTER_INGRESS_NAME,
+            HealthCheck.onTrafficPort(PomeriumConfig.PING_PATH),
+            TLS_SECRET_NAME, true, List.of(), Optional.empty(), List.of(),
+            Optional.empty(), Optional.of(JUPYTER_ALB_GROUP), Optional.of(JUPYTER_IDLE_TIMEOUT)));
+        platform.exposeHttps(new HttpsRoute(
+            "jupyter-auth", "auth." + jupyter, PROXY_SERVICE_NAME, PROXY_PORT, JUPYTER_AUTH_INGRESS_NAME,
+            HealthCheck.onTrafficPort(PomeriumConfig.PING_PATH),
+            AUTH_TLS_SECRET_NAME, true, List.of(), Optional.empty(), List.of(),
+            Optional.of(jupyter), Optional.of(JUPYTER_ALB_GROUP), Optional.of(JUPYTER_IDLE_TIMEOUT)));
     }
 
     /**
@@ -868,22 +883,23 @@ public class JupyterHubConfig {
     }
 
     /**
-     * The oauth2-proxy MFA gate, which waits for the issuer too, as it does OIDC discovery on startup.
+     * The Pomerium MFA gate, which waits for the issuer too, as it does OIDC discovery on startup.
      */
-    private JupyterMfaConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
+    private PomeriumConfig getMFAConfig(List<ITerraformDependable> proxyDeps) {
         List<ITerraformDependable> deps = new ArrayList<>(proxyDeps);
         deps.addAll(issuerDependencies);
-        return new JupyterMfaConfig(
+        return new PomeriumConfig(
             stack,
             deps,
-            properties,
             images,
             MFA_UPSTREAMS,
             properties.getOidcIssuerUrl(platform.cloud()),
             jupyterDomain(),
             properties.getValue(AfonProperty.OAUTH2_CLIENT_ID),
             properties.getValue(AfonProperty.OAUTH2_CLIENT_SECRET),
-            properties.getValue(AfonProperty.OAUTH2_COOKIE_SECRET));
+            properties.getValue(AfonProperty.POMERIUM_SHARED_SECRET),
+            properties.getValue(AfonProperty.POMERIUM_COOKIE_SECRET),
+            userProvider.getMembers().stream().map(AfonUser::email).toList());
     }
 
     /**
@@ -894,7 +910,7 @@ public class JupyterHubConfig {
     }
 
     /**
-     * OIDC client id for JupyterHub's OAuthenticator (same provider as oauth2-proxy).
+     * OIDC client id for JupyterHub's OAuthenticator (same provider as Pomerium).
      */
     protected String oauthClientId() {
         return properties.getValue(AfonProperty.OAUTH2_CLIENT_ID);

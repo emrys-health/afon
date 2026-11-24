@@ -7,7 +7,7 @@ usage(){
   echo "A stack restores the cert from there, rather than asking Let's Encrypt anew on each deploy, which allows only 5 certs a week of"
   echo "the same names."
   echo "Issue and stores in GCP Secret Manager the cert of each domain name that is configured, ie not blank, of"
-  echo "GCP_POLARIS_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME and OIDC_DOMAIN_NAME."
+  echo "GCP_POLARIS_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME (and auth.<jupyter> for Pomerium) and OIDC_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free - default)"
 }
@@ -26,15 +26,22 @@ ACME_VERSION="${ACME_VERSION:-3.1.6}"
 
 # The domain names to issue the certs of, those configured, without duplicates
 DOMAIN_NAMES=""
+add_domain() {
+  local domain="$1"
+  case " $DOMAIN_NAMES " in
+    *" $domain "*) ;;
+    *) DOMAIN_NAMES="$DOMAIN_NAMES $domain" ;;
+  esac
+}
 for DOMAIN_PROPERTY in GCP_POLARIS_DOMAIN_NAME GCP_JUPYTER_DOMAIN_NAME OIDC_DOMAIN_NAME; do
   DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
   if [ -z "$DOMAIN_NAME" ]; then
     echo "- $DOMAIN_PROPERTY is not set, skipping its cert"
   else
-    case " $DOMAIN_NAMES " in
-      *" $DOMAIN_NAME "*) ;;
-      *) DOMAIN_NAMES="$DOMAIN_NAMES $DOMAIN_NAME" ;;
-    esac
+    add_domain "$DOMAIN_NAME"
+    if [ "$DOMAIN_PROPERTY" = "GCP_JUPYTER_DOMAIN_NAME" ]; then
+      add_domain "auth.$DOMAIN_NAME"
+    fi
   fi
 done
 # Reports whether the cert of each domain name is cached in Secret Manager, under the secret names the restore step of the stack reads.

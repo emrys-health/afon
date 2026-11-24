@@ -132,6 +132,9 @@ class KeyCloakProviderProjectTest {
         String treClient = bodyOf("POST /admin/realms/polaris/clients", "xyz-yyyy-nnnn-tre");
         assertThat(treClient).contains("\"clientAuthenticatorType\":\"client-secret\"", "\"secret\":\"" + SECRET + "\"", "\"fullScopeAllowed\":false",
                                        "\"directAccessGrantsEnabled\":false", "\"serviceAccountsEnabled\":false",
+                                       "\"post.logout.redirect.uris\":\"+\"",
+                                       "https://auth.jupyter.example.org/oauth2/callback",
+                                       "https://auth.jupyter.example.org/.pomerium/signed_out",
                                        "https://jupyter.example.org/hub/oauth_callback");
         assertThat(treClient).doesNotContain("jwks");
         // the home pages of the clients, which the page that ends an invitation links back to
@@ -174,7 +177,9 @@ class KeyCloakProviderProjectTest {
     @EnumSource(AfonCloud.class)
     void makesTheTreRedirectUrisFromTheJupyterDomainOfTheProjectsCloud(AfonCloud cloud) {
         assertThat(KeyCloakProvider.treRedirectUris(projectStack(cloud), null)).containsExactly(
-            "https://jupyter.example.org/oauth2/callback", "https://jupyter.example.org/hub/oauth_callback");
+            "https://auth.jupyter.example.org/oauth2/callback",
+            "https://auth.jupyter.example.org/.pomerium/signed_out",
+            "https://jupyter.example.org/hub/oauth_callback");
     }
 
     @ParameterizedTest
@@ -206,7 +211,9 @@ class KeyCloakProviderProjectTest {
         var config = configWith(dir, cloud.name() + "_JUPYTER_DOMAIN_NAME=jupyter.derived.example.org\n");
 
         assertThat(KeyCloakProvider.treRedirectUris(noDomain, config)).containsExactly(
-            "https://jupyter.derived.example.org/oauth2/callback", "https://jupyter.derived.example.org/hub/oauth_callback");
+            "https://auth.jupyter.derived.example.org/oauth2/callback",
+            "https://auth.jupyter.derived.example.org/.pomerium/signed_out",
+            "https://jupyter.derived.example.org/hub/oauth_callback");
         // the file's own domain wins over the config's, and a blank one in the config is none
         assertThat(KeyCloakProvider.treRedirectUris(projectStack(cloud), config)).first().asString().contains("jupyter.example.org");
         assertThatThrownBy(() -> KeyCloakProvider.treRedirectUris(noDomain, configWith(dir, cloud.name() + "_JUPYTER_DOMAIN_NAME= \n")))
@@ -272,7 +279,7 @@ class KeyCloakProviderProjectTest {
                 users.add(body);
                 reply(exchange, 201, "");
             } else if (call.equals("GET /admin/realms/polaris/users/profile")) {
-                reply(exchange, 200, "{\"attributes\":[{\"name\":\"username\"}]}");
+                reply(exchange, 200, "{\"attributes\":[{\"name\":\"username\"},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}}]}");
             } else if (call.equals("GET /admin/realms/polaris/users/the-user-id")) {
                 reply(exchange, 200, "{\"username\":\"alice@tre.example\"}");
             } else {
@@ -284,8 +291,11 @@ class KeyCloakProviderProjectTest {
             "\"username\":\"alice@tre.example\"", "VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP").doesNotContain("password\""));
         assertThat(bodyOf("PUT /admin/realms/polaris/users/the-user-id", "afon:the-user-id")).contains("polaris_principal");
         assertThat(requests).contains("PUT /admin/realms/polaris/users/the-user-id/execute-actions-email");
-        // KeyCloak drops an attribute that the user profile does not declare, so it is declared, for admins only
-        assertThat(bodyOf("PUT /admin/realms/polaris/users/profile", "polaris_principal")).contains("\"edit\":[\"admin\"]");
+        // KeyCloak drops an attribute that the user profile does not declare, so it is declared, for admins only;
+        // email becomes editable by admin only while keeping its view permission and the other attributes
+        String profilePut = bodyOf("PUT /admin/realms/polaris/users/profile", "polaris_principal");
+        assertThat(profilePut).contains("\"name\":\"username\"");
+        assertThat(profilePut).contains("\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}");
     }
 
     @ParameterizedTest

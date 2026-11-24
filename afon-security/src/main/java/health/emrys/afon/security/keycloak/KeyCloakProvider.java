@@ -39,14 +39,18 @@ public class KeyCloakProvider implements IdentityProvider {
     private static final Logger logger = getLogger(KeyCloakProvider.class);
 
     /**
-     * oauth2-proxy's callback path (see JupyterMfaConfig's --redirect-url).
+     * Pomerium's callback path.
      */
-    public static final String OAUTH2_PROXY_CALLBACK = "/oauth2/callback";
+    public static final String POMERIUM_CALLBACK   = "/oauth2/callback";
+    /**
+     * Pomerium's post-logout redirect path, where Keycloak returns the browser after the gate's sign-out.
+     */
+    public static final String POMERIUM_SIGNED_OUT = "/.pomerium/signed_out";
     /**
      * JupyterHub's OAuthenticator callback path (HUB_BASE_URL + "hub/oauth_callback"). The hub now
      * owns the domain root (base_url "/"), so this is "/hub/oauth_callback" rather than under /jupyter/.
      */
-    public static final String JUPYTERHUB_CALLBACK   = "/hub/oauth_callback";
+    public static final String JUPYTERHUB_CALLBACK = "/hub/oauth_callback";
     /**
      * The default {@link AfonProperty#AFON_THEME}
      */
@@ -54,12 +58,14 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * The callback URIs, for the given domain, eg
-     * {@code https://jupyter.example/oauth2/callback} (oauth2-proxy) and
+     * {@code https://auth.jupyter.example/oauth2/callback} (Pomerium),
+     * {@code https://auth.jupyter.example/.pomerium/signed_out} (Pomerium post-logout redirect) and
      * {@code https://jupyter.example/hub/oauth_callback} (JupyterHub).
-    */
+     */
     public static @NonNull List<String> callbackURIs(String jupyterDomain) {
         return List.of(
-                "https://" + jupyterDomain + OAUTH2_PROXY_CALLBACK,
+                "https://auth." + jupyterDomain + POMERIUM_CALLBACK,
+                "https://auth." + jupyterDomain + POMERIUM_SIGNED_OUT,
                 "https://" + jupyterDomain + JUPYTERHUB_CALLBACK);
     }
 
@@ -247,8 +253,7 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * Registers a Polaris user, also setting the user's (verified) email.
-     * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
-     * whose email is unverified. Pass {@code null}/blank to leave the email unset.
+     * Pass {@code null}/blank to leave the email unset.
      *
      * Ensures the Polaris realm, client and user all exist.
      * Idempotent: anything that already exists is left untouched.
@@ -549,9 +554,9 @@ public class KeyCloakProvider implements IdentityProvider {
 
     /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
-     * oauth2-proxy and JupyterHub use to log users in. Unlike {@link #createConfidentialClient} (a
+     * Pomerium and JupyterHub use to log users in. Unlike {@link #createConfidentialClient} (a
      * direct-grant client for Polaris), this client has the authorization-code flow enabled and
-     * registered redirect URIs, so the browser redirect from oauth2-proxy resolves - otherwise
+     * registered redirect URIs, so the browser redirect from Pomerium resolves - otherwise
      * KeyCloak returns "Client not found".
      *
      * <p>Idempotent in the converging sense: an already-existing client is overwritten with the URIs
@@ -626,7 +631,9 @@ public class KeyCloakProvider implements IdentityProvider {
             Map.entry("serviceAccountsEnabled", false),
             Map.entry("redirectUris", redirectUris),
             // "+" tells KeyCloak to derive allowed CORS web origins from the redirect URIs.
-            Map.entry("webOrigins", List.of("+"))
+            Map.entry("webOrigins", List.of("+")),
+            // "+" tells KeyCloak to accept any of the client's redirect URIs (including signed_out) as post_logout_redirect_uri.
+            Map.entry("attributes", Map.of("post.logout.redirect.uris", "+"))
         ));
     }
 
@@ -1032,8 +1039,7 @@ public class KeyCloakProvider implements IdentityProvider {
         Map<String, Object> userObject = new HashMap<>();
         userObject.put("username", user.username());
         userObject.put("enabled", true);
-        // emailVerified is always true because oauth2-proxy rejects logins whose id_token email is
-        // unverified; there is no SMTP verification flow behind this Keycloak.
+        // Mark email verified on creation; there is no self-service SMTP verification flow behind this Keycloak.
         userObject.put("emailVerified", true);
         if (user.email() != null && !user.email().isBlank()) {
             userObject.put("email", user.email());
@@ -1147,7 +1153,7 @@ public class KeyCloakProvider implements IdentityProvider {
     private static final String AUDIENCE_MAPPER_PREFIX = "aud-";
 
     /**
-     * The exact redirect URIs of the project stack's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
+     * The exact redirect URIs of the project stack's TRE client: JupyterHub's and the Pomerium gate's, which VS Code and
      * the remote desktop are served under.  The domain is the one that the project stack's file gives, else the one that its config has, which is derived
      * from the env's (see {@code ProjectStackNames}), as a project stack's TRE has its domains derived unless the file names them.
      *
@@ -1191,7 +1197,7 @@ public class KeyCloakProvider implements IdentityProvider {
         String username = email.toLowerCase(Locale.ROOT);
         try {
             String token = adminToken();
-            ensurePrincipalInUserProfile(token);
+            ensureUserProfile(token);
             // the email is the identity: a user of the email may have another username, eg an admin of users.csv, and a second one with the
             // same email could not be made
             String id = userIdByEmail(token, KEYCLOAK_REALM, username);
@@ -1229,36 +1235,55 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Declares {@link #PRINCIPAL_ATTRIBUTE} in the realm's user profile, readable and writable by an admin only, so that a user cannot
-     * set their own principal.  KeyCloak 24 and later silently drops an attribute that the user profile does not declare, so without
-     * this the user would have no principal, and no token would carry the claim.  Idempotent.
+     * Converges the realm's user profile: declares {@link #PRINCIPAL_ATTRIBUTE}, readable and writable by an admin only, so that a user cannot
+     * set their own principal (KeyCloak 24 and later silently drops an attribute that the user profile does not declare), and makes {@code email}
+     * editable by an admin only (keeping its {@code view} permission), so that a user cannot change their own email in the Account Console.  Idempotent.
      */
-    private void ensurePrincipalInUserProfile(String token) throws IOException {
+    private void ensureUserProfile(String token) throws IOException {
         String uri = format("/admin/realms/%s/users/profile", KEYCLOAK_REALM);
         Map<String, Object> profile = getMap(token, uri, "the user profile");
         List<Map<String, Object>> attributes = new ArrayList<>();
+        boolean hasPrincipal = false;
+        boolean changed = false;
         Object existing = profile.get("attributes");
         if (existing instanceof List<?> list) {
             for (Object attribute : list) {
                 if (attribute instanceof Map<?, ?> map) {
-                    if (PRINCIPAL_ATTRIBUTE.equals(map.get("name"))) {
-                        return;
-                    }
                     Map<String, Object> copy = new LinkedHashMap<>();
                     map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+                    if (PRINCIPAL_ATTRIBUTE.equals(copy.get("name"))) {
+                        hasPrincipal = true;
+                    } else if ("email".equals(copy.get("name"))) {
+                        Map<String, Object> permissions = new LinkedHashMap<>();
+                        if (copy.get("permissions") instanceof Map<?, ?> existingPermissions) {
+                            existingPermissions.forEach((k, v) -> permissions.put(String.valueOf(k), v));
+                        }
+                        List<String> adminOnly = List.of("admin");
+                        if (!adminOnly.equals(permissions.get("edit"))) {
+                            permissions.put("edit", adminOnly);
+                            copy.put("permissions", permissions);
+                            changed = true;
+                        }
+                    }
                     attributes.add(copy);
                 }
             }
         }
-        attributes.add(new LinkedHashMap<>(Map.of(
-            "name", PRINCIPAL_ATTRIBUTE,
-            "multivalued", false,
-            "permissions", Map.of("view", List.of("admin"), "edit", List.of("admin")))));
+        if (!hasPrincipal) {
+            attributes.add(new LinkedHashMap<>(Map.of(
+                "name", PRINCIPAL_ATTRIBUTE,
+                "multivalued", false,
+                "permissions", Map.of("view", List.of("admin"), "edit", List.of("admin")))));
+            changed = true;
+        }
+        if (!changed) {
+            return;
+        }
         profile.put("attributes", attributes);
         if (isFailure(putJson(token, uri, mapper.writeValueAsString(profile), "the user profile"))) {
-            throw new IOException("Could not declare " + PRINCIPAL_ATTRIBUTE + " in the user profile of realm " + KEYCLOAK_REALM);
+            throw new IOException("Could not update the user profile of realm " + KEYCLOAK_REALM);
         }
-        logger.info("Declared {} in the user profile of realm {}", PRINCIPAL_ATTRIBUTE, KEYCLOAK_REALM);
+        logger.info("Updated the user profile of realm {} ({} declared, email editable by admin only)", KEYCLOAK_REALM, PRINCIPAL_ATTRIBUTE);
     }
 
     /**
@@ -1511,7 +1536,7 @@ public class KeyCloakProvider implements IdentityProvider {
         try {
             String token = adminToken();
             String realm = KEYCLOAK_REALM;
-            ensurePrincipalInUserProfile(token);
+            ensureUserProfile(token);
             ensureAcrLevel(token, realm, identity.acr());
             String treDomain = treDomain(projectStack, config);
             String tre = ensureProjectClient(token, realm, identity.treClient(), callbackURIs(treDomain), "https://" + treDomain + "/", secretOf(secrets, "tre"),
@@ -1584,9 +1609,11 @@ public class KeyCloakProvider implements IdentityProvider {
             // the login that admits only the members, after the second factor
             Map.entry("authenticationFlowBindingOverrides", Map.of("browser", browserFlowId)),
             Map.entry("attributes", Map.of(
-                // PKCE is asked for by the clients that can send it, not required: JupyterHub's authenticator, in the version that Afon runs, sends no
-                // code_challenge, and a client that requires one would refuse its login.  Empty, so that a client made before as requiring it is changed
+                // PKCE is asked for by the clients that can send it, not required: Pomerium and JupyterHub's authenticator send no
+                // code_challenge, and a client that requires one would refuse their login.  Empty, so that a client made before as requiring it is changed
                 "pkce.code.challenge.method", "",
+                // "+" accepts any of the client's redirect URIs (including Pomerium's signed_out) as post_logout_redirect_uri
+                "post.logout.redirect.uris", "+",
                 // asked for by default, and the least that a login may be: a request for less (acr_values=1) is a request for a token
                 // of a password alone, which carries the project claim and the audiences all the same
                 "default.acr.values", acr,

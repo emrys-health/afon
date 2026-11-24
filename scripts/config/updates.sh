@@ -58,10 +58,13 @@ REMOVALS=(
   "AWS_KEYCLOAK_CERT_ARN"
   "AWS_JUPYTER_CERT_ARN"
   "AWS_POLARIS_CERT_ARN"
+  # Only oauth2-proxy read this; replaced by Pomerium
+  "OIDC_EMAIL_DOMAIN"
 )
 REMOVED_COMMENTS=(
   "# DNS zones"
   "# Cert ARNs"
+  "# Email domains"
 )
 
 # Properties that are new and required, to add, with their default value, to the named $CONFIG_DIR file, just before another property of it,

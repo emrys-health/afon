@@ -43,11 +43,12 @@ import static java.lang.String.format;
  * Checks that a failed login at the TRE's Jupyter domain, {@code <CLOUD>_JUPYTER_DOMAIN_NAME}, leaves a trace in the
  * logs that Promtail ships to Loki.
  * <p>
- * As a browser would, it asks the oauth2-proxy MFA gate in front of JupyterHub to sign in, follows its redirect to
- * KeyCloak's login page, and submits that page's form with a username that no user has and a wrong password.  Both are
- * made unique to the run by a marker, so that the logs found are this run's and no other's.  It then checks, in Loki:
+ * As a browser would, it requests a unique path at the Pomerium MFA gate in front of JupyterHub, follows its redirect
+ * through {@code auth.<jupyter>} to KeyCloak's login page, and submits that page's form with a username that no user
+ * has and a wrong password.  Both are made unique to the run by a marker, so that the logs found are this run's and no
+ * other's.  It then checks, in Loki:
  * <ol>
- *     <li>that the gate's pods logged the request that started the login, which carries the marker in its {@code rd};</li>
+ *     <li>that the gate's pods logged the request that started the login, which carries the marker in its path;</li>
  *     <li>that KeyCloak's pods logged the refused login, the {@code LOGIN_ERROR} event of its {@code jboss-logging}
  *     listener, naming the unknown username.  Not checked when KeyCloak is another stack's, with
  *     {@code <CLOUD>_KEYCLOAK_EXTERNAL=true}, as its logs are not in this cluster's Loki.</li>
@@ -122,8 +123,8 @@ public class FailedLoginLokiSmokeMain {
 
         try (KubeClient client = new KubeClient(properties);
              LokiClient loki = new LokiClient(client, properties)) {
-            logger.info("Checking OAuth2-Proxy logs...");
-            errors.addAll(found(loki, "the oauth2-proxy gate's request that started the login", gateQuery(marker), start));
+            logger.info("Checking Pomerium logs...");
+            errors.addAll(found(loki, "the Pomerium gate's request that started the login", gateQuery(marker), start));
             if (Boolean.parseBoolean(properties.getCloudValue(cloud, KEYCLOAK_EXTERNAL, "false").trim())) {
                 logger.warn("Not checked that KeyCloak logged the failed login: it is another stack's, as {}_KEYCLOAK_EXTERNAL=true, so its logs are not in this cluster's Loki",
                             cloud.name());
@@ -146,7 +147,7 @@ public class FailedLoginLokiSmokeMain {
     }
 
     private LoginResult attemptLogin(String host, String marker, String username) throws IOException {
-        String start = format("https://%s/oauth2/start?rd=%s", host, URLEncoder.encode("/" + marker, StandardCharsets.UTF_8));
+        String start = format("https://%s/%s", host, marker);
         logger.info("Starting a login at {}", start);
         BasicCookieStore cookies = new BasicCookieStore();
         try (CloseableHttpClient http = HttpClients.custom().setDefaultCookieStore(cookies).build()) {

@@ -199,7 +199,15 @@ name|command|args
 network|network-smoke|
 spark-polaris|spark-polaris-smoke|
 spark-connect|spark-connect-smoke|
+failed-login-loki|failed-login-loki-smoke|
+gateway-redirect|gateway-redirect-smoke|
 ```
+
+The `gateway-redirect` test (`gateway-redirect-smoke`) verifies without signing in that an unauthenticated request to
+`https://<Jupyter domain>/` redirects (`302`) to `https://auth.<Jupyter domain>/...` and then to Keycloak with
+`redirect_uri=https://auth.<Jupyter domain>/oauth2/callback`. The `failed-login-loki` test (`failed-login-loki-smoke`)
+starts a sign-in at `https://<Jupyter domain>/<marker>`, follows the redirects through Pomerium to Keycloak, submits an
+invalid login, and verifies that Loki records the marker in Pomerium's (`pomerium-*`) and Keycloak's logs.
 
 `<cloud>` in a test's args is replaced by the `<cloud>` of the stack tested, so that the one file serves every cloud: the last test of the
 suite, `notebooks|smoke-notebook|<cloud>`, runs the notebooks of [Running the notebooks](#running-the-notebooks) against that cloud, after the other tests,

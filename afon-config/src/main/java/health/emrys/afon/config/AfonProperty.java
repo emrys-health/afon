@@ -265,7 +265,6 @@ public enum AfonProperty {
     OIDC_PROTOCOL("OIDC_PROTOCOL"),
     /** Issuer URL of the KeyCloak of any cloud without its own.  Optional: derived from the domain name when unset. */
     OIDC_ISSUER_URL("OIDC_ISSUER_URL"),
-    OIDC_EMAIL_DOMAIN("OIDC_EMAIL_DOMAIN"),
     /** The client of the project stack's TRE, eg {@code xyz-yyyy-nnnn-tre}, whose audience the TRE's consumers require.  Set for a project stack. */
     OIDC_AUDIENCE("OIDC_AUDIENCE"),
     /** The client of the project stack's Git, eg {@code xyz-yyyy-nnnn-git}, whose audience its Git requires.  Set for a project stack. */
@@ -376,6 +375,10 @@ public enum AfonProperty {
      */
     OIDC_REDIRECT_STRATEGY("OIDC_REDIRECT_STRATEGY"),
     OAUTH2_COOKIE_SECRET("OAUTH2_COOKIE_SECRET"),
+    /** Shared secret for Pomerium (32 random bytes, base64). */
+    POMERIUM_SHARED_SECRET("POMERIUM_SHARED_SECRET"),
+    /** Cookie encryption secret for Pomerium (32 random bytes, base64). */
+    POMERIUM_COOKIE_SECRET("POMERIUM_COOKIE_SECRET"),
 
     // JUPYTER
     JUPYTER_VNC_PASSWORD("JUPYTER_VNC_PASSWORD"),

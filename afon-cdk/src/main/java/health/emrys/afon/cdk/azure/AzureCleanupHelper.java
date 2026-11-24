@@ -33,13 +33,17 @@ public class AzureCleanupHelper extends CleanupHelper {
     }
 
     private @NonNull String deleteDnsRecordCommand(String domainName) {
+        return deleteDnsRecordCommand(domainName, "@");
+    }
+
+    private @NonNull String deleteDnsRecordCommand(String zoneName, String recordName) {
         return format(
             """
             az network dns record-set a delete \\
             --resource-group %s \\
             --zone-name %s \\
-            --name "@" \\
-            --yes""", resourceGroup, domainName);
+            --name "%s" \\
+            --yes""", resourceGroup, zoneName, recordName);
     }
 
     public String cleanupCommands() {
@@ -47,6 +51,7 @@ public class AzureCleanupHelper extends CleanupHelper {
                 """
                 #!/bin/bash
                 # clean common DNS issues
+                %s
                 %s
                 %s
                 # clean group that lingers after destroying the AKS cluster
@@ -57,6 +62,7 @@ public class AzureCleanupHelper extends CleanupHelper {
                 """,
                 deleteDnsRecordCommand(polarisDomainName),
                 deleteDnsRecordCommand(jupyterDomainName),
+                deleteDnsRecordCommand(jupyterDomainName, "auth"),
                 deleteGroupCommand());
     }
 

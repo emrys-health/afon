@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import com.hashicorp.cdktf.LocalExecProvisioner;
 import com.hashicorp.cdktf.TerraformResource;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +31,13 @@ import java.util.Optional;
  * @param openPaths        the path prefixes, eg {@code /realms/polaris}, that stay open to all when the component is
  *                         restricted to its allowed CIDRs, the rest of its paths being restricted.  Empty, the default,
  *                         restricts every path.
+ * @param zoneName         the DNS zone the record is written in, when it is not the zone named after {@code domainName},
+ *                         eg {@code jupyter.<env>} for {@code auth.jupyter.<env>}.  Empty, the default, uses {@code domainName}.
+ * @param albGroup         on AWS, the ALB ingress group name ({@code alb.ingress.kubernetes.io/group.name}) so routes
+ *                         that share a group share one ALB.  Empty, the default, gives the ingress its own ALB.
+ * @param idleTimeout      how long an idle connection (eg a WebSocket to Guacamole or a Jupyter notebook) may stay open
+ *                         before the load balancer or ingress controller closes it.  Empty, the default, leaves the
+ *                         platform's default unchanged.
  */
 public record HttpsRoute(String component,
                          String domainName,
@@ -41,10 +49,32 @@ public record HttpsRoute(String component,
                          boolean cacheCertificate,
                          List<? extends TerraformResource> dependsOn,
                          Optional<List<LocalExecProvisioner>> ingressProvisioners,
-                         List<String> openPaths) {
+                         List<String> openPaths,
+                         Optional<String> zoneName,
+                         Optional<String> albGroup,
+                         Optional<Duration> idleTimeout) {
     public HttpsRoute {
         Objects.requireNonNull(healthCheck, "health check of " + component);
-        openPaths = List.copyOf(openPaths);
+        openPaths   = List.copyOf(openPaths);
+        zoneName    = Objects.requireNonNull(zoneName, "zone name of " + component);
+        albGroup    = Objects.requireNonNull(albGroup, "ALB group of " + component);
+        idleTimeout = Objects.requireNonNull(idleTimeout, "idle timeout of " + component);
+    }
+
+    /** A route in its own DNS zone, with its own ALB and default idle timeout. */
+    public HttpsRoute(String component,
+                      String domainName,
+                      String service,
+                      int port,
+                      String ingressName,
+                      HealthCheck healthCheck,
+                      String tlsSecretName,
+                      boolean cacheCertificate,
+                      List<? extends TerraformResource> dependsOn,
+                      Optional<List<LocalExecProvisioner>> ingressProvisioners,
+                      List<String> openPaths) {
+        this(component, domainName, service, port, ingressName, healthCheck, tlsSecretName, cacheCertificate, dependsOn,
+             ingressProvisioners, openPaths, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** A route all of whose paths are restricted when the component is. */
@@ -59,6 +89,6 @@ public record HttpsRoute(String component,
                       List<? extends TerraformResource> dependsOn,
                       Optional<List<LocalExecProvisioner>> ingressProvisioners) {
         this(component, domainName, service, port, ingressName, healthCheck, tlsSecretName, cacheCertificate, dependsOn,
-             ingressProvisioners, List.of());
+             ingressProvisioners, List.of(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

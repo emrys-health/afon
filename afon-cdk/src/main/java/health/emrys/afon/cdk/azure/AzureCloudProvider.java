@@ -808,7 +808,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
      */
     @Override
     protected List<String> inboundCidrs(HttpsRoute route) {
-        return withClusterCidrs(allowedCidrs(route.component()), egressIp);
+        return withClusterCidrs(allowedCidrs(route.albGroup().orElse(route.component())), egressIp);
     }
 
     /**
@@ -872,10 +872,12 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     @Override
     protected ITerraformDependable configureDns(IngressV1 ingress, HttpsRoute route) {
         String domainName = route.domainName();
-        String suffix = domainName.replace(".", "-");
+        String zoneName   = route.zoneName().orElse(domainName);
+        String recordName = relativeRecordName(domainName, zoneName);
+        String suffix     = domainName.replace(".", "-");
         DataAzurermDnsZone dnsZone = DataAzurermDnsZone.Builder
             .create(stack(), "dns-zone-" + suffix)
-            .name(domainName)
+            .name(zoneName)
             .resourceGroupName(resourceGroup)
             .build();
 
@@ -885,11 +887,23 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             stack(), "dns-" + suffix,
             DnsARecordConfig
                 .builder()
-                .name("@")
+                .name(recordName)
                 .zoneName(dnsZone.getName())
                 .resourceGroupName(resourceGroup)
                 .ttl(300)
                 .records(ipAddresses)
                 .build());
+    }
+
+    static String relativeRecordName(String domainName, String zoneName) {
+        if (domainName.equals(zoneName)) {
+            return "@";
+        }
+        String suffix = "." + zoneName;
+        if (!domainName.endsWith(suffix)) {
+            throw new IllegalArgumentException(
+                "Domain '" + domainName + "' is not inside DNS zone '" + zoneName + "'");
+        }
+        return domainName.substring(0, domainName.length() - suffix.length());
     }
 }

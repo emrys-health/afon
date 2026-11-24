@@ -50,7 +50,7 @@ import static health.emrys.afon.cdk.CdkUtils.withAppKubernetesIoName;
  *
  * <p>Note: this only deploys Guacamole and a ClusterIP service. Exposing it to the public
  * internet (Ingress + ACM cert + DNS) is left as a follow-up so it can be put behind the
- * existing oauth2-proxy MFA gate.
+ * existing Pomerium MFA gate.
  */
 public class GuacamoleConfig {
 
@@ -155,7 +155,7 @@ public class GuacamoleConfig {
      *
      * <p>When {@code ssoUsernameHeader} is non-null, Guacamole runs in transparent SSO mode: the
      * {@code guacamole-auth-header} extension authenticates each request from that HTTP header
-     * (set by the upstream oauth2-proxy, e.g. {@code X-Forwarded-Email}), so there is no separate
+     * (set by Pomerium, e.g. {@code X-Pomerium-Claim-Email}), so there is no separate
      * Guacamole login and no shared password — the user lands straight on the connection whose
      * {@code <authorize>} username matches the header value. When null, the classic file login
      * (username + password from {@code user-mapping.xml}) is used.
@@ -236,7 +236,7 @@ public class GuacamoleConfig {
                 envVar("GUACD_HOSTNAME", "localhost"),
                 envVar("GUACD_PORT", String.valueOf(GUACD_PORT)),
                 // Deploy the webapp at the root context ("/") instead of the default
-                // "/guacamole/". Guacamole owns the domain root behind oauth2-proxy (which maps
+                // "/guacamole/". Guacamole sits behind Pomerium (which routes /guacamole/ here),
                 // "/" here); without this, "/" returns 404 and only "/guacamole/" works.
                 envVar("WEBAPP_CONTEXT", "ROOT"),
                 envVar("GUACAMOLE_HOME", "/etc/guacamole")))
@@ -295,14 +295,14 @@ public class GuacamoleConfig {
                                                              .protocol("TCP")
                                                              .build());
         clusterIpService(deps, LABELS, SVC_NAME, ports, scope);
-        onlyOauth2ProxyIngress(scope);
+        onlyGatewayIngress(scope);
     }
 
     /**
      * Database-backed, transparent-SSO deployment (no Guacamole login page).
      *
      * <p>The {@code guacamole-auth-header} extension authenticates each request from
-     * {@code httpAuthHeader} (set by the upstream oauth2-proxy, e.g. {@code X-Forwarded-Email}), and
+     * {@code httpAuthHeader} (set by Pomerium, e.g. {@code X-Pomerium-Claim-Email}), and
      * {@code guacamole-auth-jdbc} serves each user their own VNC connection from Postgres — the file
      * provider's "Session not associated with authentication provider default" limitation is why a DB
      * is required for SSO. A one-shot Job creates the database + schema and idempotently provisions one
@@ -441,25 +441,25 @@ public class GuacamoleConfig {
                                                              .protocol("TCP")
                                                              .build());
         clusterIpService(deployDeps, LABELS, SVC_NAME, ports, scope);
-        onlyOauth2ProxyIngress(scope);
+        onlyGatewayIngress(scope);
     }
 
-    /** The name of the {@link NetworkPolicy} that only lets oauth2-proxy reach Guacamole. */
-    static final String INGRESS_POLICY_NAME = "guacamole-only-from-oauth2-proxy";
+    /** The name of the {@link NetworkPolicy} that only lets Pomerium reach Guacamole. */
+    static final String INGRESS_POLICY_NAME = "guacamole-only-from-gateway";
 
     /**
-     * Lets only the oauth2-proxy pods reach Guacamole, and only on {@link #WEB_PORT}.  Guacamole logs in whoever the
-     * {@code X-Forwarded-Email} header names, which only oauth2-proxy, having authenticated the user, may set: any other pod that
+     * Lets only the Pomerium pods reach Guacamole, and only on {@link #WEB_PORT}.  Guacamole logs in whoever the
+     * {@code X-Pomerium-Claim-Email} header names, which only Pomerium, having authenticated the user, may set: any other pod that
      * reached it could name any user and take over their desktop.  guacd, in the same pod, is reached over localhost, which no
      * policy applies to, so its port is closed to every other pod too.
      */
-    private static void onlyOauth2ProxyIngress(Construct scope) {
-        NetworkPolicySpecIngress fromOauth2Proxy = NetworkPolicySpecIngress
+    private static void onlyGatewayIngress(Construct scope) {
+        NetworkPolicySpecIngress fromGateway = NetworkPolicySpecIngress
             .builder()
             .from(List.of(NetworkPolicySpecIngressFrom
                               .builder()
                               .podSelector(NetworkPolicySpecIngressFromPodSelector.builder()
-                                                                                  .matchLabels(JupyterMfaConfig.PROXY_LABELS)
+                                                                                  .matchLabels(PomeriumConfig.PROXY_LABELS)
                                                                                   .build())
                               .build()))
             .ports(List.of(NetworkPolicySpecIngressPorts.builder()
@@ -475,7 +475,7 @@ public class GuacamoleConfig {
                              .spec(NetworkPolicySpec.builder()
                                                     .podSelector(NetworkPolicySpecPodSelector.builder().matchLabels(LABELS).build())
                                                     .policyTypes(List.of("Ingress"))
-                                                    .ingress(List.of(fromOauth2Proxy))
+                                                    .ingress(List.of(fromGateway))
                                                     .build())
                              .build();
     }

@@ -17,7 +17,7 @@ stacks:
   aws-polaris:
     role: catalog
     components: [Polaris]
-  # Polaris with JupyterHub and Guacamole behind the oauth2-proxy MFA gate, the Spark operator the notebooks' Spark
+  # Polaris with JupyterHub and Guacamole behind the Pomerium gate, the Spark operator the notebooks' Spark
   # runs on (which only launches Spark in response to the resources of the Spark component), and monitoring (no Trino, unlike the bundled stacks)
   aws-full:
     role: tre

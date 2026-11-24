@@ -577,7 +577,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
      */
     @Override
     protected List<String> inboundCidrs(HttpsRoute route) {
-        return withClusterCidrs(allowedCidrs(route.component()), egressIp);
+        return withClusterCidrs(allowedCidrs(route.albGroup().orElse(route.component())), egressIp);
     }
 
     /**
@@ -665,7 +665,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             polaris ? "dns-zone" : "dns-zone-" + route.component(),
             DataGoogleDnsManagedZoneConfig
                 .builder()
-                .name(dnsZoneName(route.domainName()))
+                .name(dnsZoneName(route.zoneName().orElse(route.domainName())))
                 .build());
 
         String ingressIp = ingress.getStatus().get(0).getLoadBalancer().get(0).getIngress().get(0).getIp();

@@ -14,7 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +53,8 @@ public final class ProjectStackEnv {
      * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $}, {@code ;} or the like, but the {@code ,} of a node pool and the {@code ?} and {@code =} of the parameters of a database URL.
      */
     private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@,\\[\\]+?=-]+");
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private ProjectStackEnv() {
     }
@@ -364,6 +368,10 @@ public final class ProjectStackEnv {
             Map<String, String> secrets = derived.computeIfAbsent("secret.properties", file -> new LinkedHashMap<>());
             secrets.put(OAUTH2_CLIENT_ID.getName(), tre.identity().treClient());
             secrets.put(OAUTH2_CLIENT_SECRET.getName(), clientSecretOf(tre, afonHome));
+            // each project's TRE gets its own Pomerium secrets, reusing any already in the project's secret.properties so a rerun does not sign everyone out
+            Properties existingSecrets = readProperties(target.resolve("secret.properties"));
+            secrets.put(POMERIUM_SHARED_SECRET.getName(), existingOrRandomSecret(existingSecrets, POMERIUM_SHARED_SECRET));
+            secrets.put(POMERIUM_COOKIE_SECRET.getName(), existingOrRandomSecret(existingSecrets, POMERIUM_COOKIE_SECRET));
         }
         try {
             copyTree(envConfig, target);
@@ -380,6 +388,29 @@ public final class ProjectStackEnv {
             throw new UncheckedIOException("Cannot configure project stack " + projectStack.id() + ": the config env is " + target, e);
         }
         return target;
+    }
+
+    private static Properties readProperties(Path file) {
+        Properties properties = new Properties();
+        if (!Files.isRegularFile(file)) {
+            return properties;
+        }
+        try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read " + file, e);
+        }
+        return properties;
+    }
+
+    private static String existingOrRandomSecret(Properties existing, AfonProperty property) {
+        String value = existing.getProperty(property.getName(), "").trim();
+        if (!value.isEmpty()) {
+            return value;
+        }
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
     /**

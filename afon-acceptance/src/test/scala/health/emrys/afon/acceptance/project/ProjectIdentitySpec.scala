@@ -341,7 +341,9 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       }
       And("each client has the exact redirect URIs of the project's TRE and Git")
       assert(values(client("cfg-2026-0001-tre").get("redirectUris")).toSet ==
-        Set("https://jupyter.cfg-2026-0001.example.org/oauth2/callback", "https://jupyter.cfg-2026-0001.example.org/hub/oauth_callback"))
+        Set("https://auth.jupyter.cfg-2026-0001.example.org/oauth2/callback",
+            "https://auth.jupyter.cfg-2026-0001.example.org/.pomerium/signed_out",
+            "https://jupyter.cfg-2026-0001.example.org/hub/oauth_callback"))
       assert(values(client("cfg-2026-0001-git").get("redirectUris")) ==
         Seq("https://git.cfg-2026-0001.example.org/user/oauth2/keycloak/callback"))
     }
@@ -366,7 +368,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       provider.ensureProject(projectOf(id, Seq("data1"), ownGit = false), Map("tre" -> secret).asJava)
       // the token endpoint of a realm answers plain http from this machine only if the realm does not require https of it
       adminPut(s"/admin/realms/$KEYCLOAK_REALM", s"""{"realm":"$KEYCLOAK_REALM","sslRequired":"none"}""")
-      val redirectUri = s"https://jupyter.$id.example.org/oauth2/callback"
+      val redirectUri = s"https://auth.jupyter.$id.example.org/oauth2/callback"
 
       When("the TRE client presents the identity provider with its secret")
       val authenticated = tokenEndpointAnswer(s"$id-tre", secret, redirectUri)
@@ -557,7 +559,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       val bobSecret = acceptInvitation("bob@tre.example", "bob-password")
       provider.addMember(firstProject, alice)
       provider.addMember(secondProject, bob)
-      val redirectUri = s"https://jupyter.$first.example.org/oauth2/callback"
+      val redirectUri = s"https://auth.jupyter.$first.example.org/oauth2/callback"
       val (challenge, verifier) = pkce()
 
       When("alice logs in to the first project's TRE client, with their password and the code of their authenticator")
@@ -590,7 +592,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       assert(bobLogin.page.contains("You are not a member of this project"), bobLogin.page)
 
       When("alice, who has a session of the first project, logs in to the second project's TRE client, of which they are not a member")
-      val denied = login(browser, s"$second-tre", s"https://jupyter.$second.example.org/oauth2/callback", challenge, "alice@tre.example", "alice-password",
+      val denied = login(browser, s"$second-tre", s"https://auth.jupyter.$second.example.org/oauth2/callback", challenge, "alice@tre.example", "alice-password",
                          Some(aliceSecret))
       Then("the identity provider denies them too: a session of one project is no way into another")
       assert(denied.code.isEmpty)

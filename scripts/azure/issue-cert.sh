@@ -8,7 +8,7 @@ usage(){
   echo "A stack restores the cert from there, rather than asking Let's Encrypt anew on each deploy, which allows only 5 certs a week of"
   echo "the same names."
   echo "Issue and stores in Azure Key Vault the cert of each domain name that is configured, ie not blank, of"
-  echo "AZURE_POLARIS_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME and OIDC_DOMAIN_NAME."
+  echo "AZURE_POLARIS_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME (and auth.<jupyter> for Pomerium) and OIDC_DOMAIN_NAME."
   echo "The supported issuers are:"
   echo " - acme via Let's Encrypt (free - default)"
   echo " - digicert|globalsign via Key Vault CA (paying service)"
@@ -25,17 +25,28 @@ ACME_HOME="${ACME_HOME:-$AFON_HOME/acme}"
 # The release of acme.sh fetched, rather than its master branch, which can be broken at any commit
 ACME_VERSION="${ACME_VERSION:-3.1.6}"
 
-# The domain names to issue the certs of, those configured, without duplicates
+# The domain names to issue the certs of, those configured, without duplicates, plus each domain's DNS zone.
 DOMAIN_NAMES=""
+declare -A DOMAIN_ZONES=()
+add_domain() {
+  local domain="$1" zone="${2:-$1}"
+  case " $DOMAIN_NAMES " in
+    *" $domain "*) ;;
+    *)
+      DOMAIN_NAMES="$DOMAIN_NAMES $domain"
+      DOMAIN_ZONES["$domain"]="$zone"
+      ;;
+  esac
+}
 for DOMAIN_PROPERTY in AZURE_POLARIS_DOMAIN_NAME AZURE_JUPYTER_DOMAIN_NAME OIDC_DOMAIN_NAME; do
   DOMAIN_NAME="${!DOMAIN_PROPERTY:-}"
   if [ -z "$DOMAIN_NAME" ]; then
     echo "- $DOMAIN_PROPERTY is not set, skipping its cert"
   else
-    case " $DOMAIN_NAMES " in
-      *" $DOMAIN_NAME "*) ;;
-      *) DOMAIN_NAMES="$DOMAIN_NAMES $DOMAIN_NAME" ;;
-    esac
+    add_domain "$DOMAIN_NAME" "$DOMAIN_NAME"
+    if [ "$DOMAIN_PROPERTY" = "AZURE_JUPYTER_DOMAIN_NAME" ]; then
+      add_domain "auth.$DOMAIN_NAME" "$DOMAIN_NAME"
+    fi
   fi
 done
 if [ -z "$DOMAIN_NAMES" ]; then
@@ -247,9 +258,10 @@ wait_for_dns_zone_access() {
 
 # Issues (or renews, idempotently) the domain's cert directly against Let's Encrypt via DNS01.
 # Free, but subject to letsencrypt's 90-day validity and usage rate limits.
-# $1: domain name, whose DNS zone must be in the resource group, as the challenge is a record in it
+# $1: domain name   $2: DNS zone holding its _acme-challenge TXT record (defaults to $1)
 issue_via_acme() {
   DOMAIN_NAME="$1"
+  DNS_ZONE="${2:-$1}"
   install_acme
   DNS_ZONE_ROLE_GRANTED=false
   export AZUREDNS_SUBSCRIPTIONID=$AZURE_SUBSCRIPTION
@@ -262,7 +274,7 @@ issue_via_acme() {
     AZUREDNS_BEARERTOKEN="$(az account get-access-token --resource https://management.azure.com --query accessToken -o tsv)" || exit 1
     export AZUREDNS_BEARERTOKEN
   else
-    grant_dns_zone_role "$DOMAIN_NAME"
+    grant_dns_zone_role "$DNS_ZONE"
     # acme.sh's dns_azure hook reads these specific variable names to authenticate as the service
     # principal above when it creates/deletes the _acme-challenge TXT record.
     export AZUREDNS_APPID=$AZURE_APP_ID
@@ -272,7 +284,7 @@ issue_via_acme() {
     # attempt failing counts toward Let's Encrypt's limit of 5 failed authorizations per domain name per hour, so acme.sh
     # is never retried: Azure DNS is probed as the service principal instead, until it may write to the zone.
     if [ "$DNS_ZONE_ROLE_GRANTED" = "true" ]; then
-      wait_for_dns_zone_access "$DOMAIN_NAME"
+      wait_for_dns_zone_access "$DNS_ZONE"
     fi
   fi
 
@@ -373,7 +385,7 @@ require_key_vault
 for DOMAIN in $DOMAIN_NAMES; do
   echo "- Issuing the cert of $DOMAIN via $ISSUER"
   case "$ISSUER" in
-    acme)       issue_via_acme "$DOMAIN" ;;
+    acme)       issue_via_acme "$DOMAIN" "${DOMAIN_ZONES[$DOMAIN]}" ;;
     digicert)   issue_via_keyvault_ca "DigiCert" "$DOMAIN" ;;
     globalsign) issue_via_keyvault_ca "GlobalSign" "$DOMAIN" ;;
   esac

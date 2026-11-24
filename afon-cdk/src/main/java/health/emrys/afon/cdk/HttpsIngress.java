@@ -8,6 +8,7 @@ import com.hashicorp.cdktf.providers.helm.release.Release;
 import com.hashicorp.cdktf.providers.kubernetes.ingress_v1.IngressV1;
 import software.constructs.Construct;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -73,10 +74,28 @@ public class HttpsIngress {
                             Optional<List<LocalExecProvisioner>> provisioners,
                             List<String> inboundCidrs,
                             List<String> openPaths) {
+        return expose(domainName, tlsSecretName, service, port, ingressName, dependsOn, provisioners, inboundCidrs,
+                      openPaths, Optional.empty());
+    }
+
+    /**
+     * As above, additionally setting nginx's upstream read/send timeouts when {@code idleTimeout} is present (e.g. so
+     * long-lived WebSocket connections to Guacamole or Jupyter survive idle periods).
+     */
+    public IngressV1 expose(String domainName,
+                            String tlsSecretName,
+                            String service,
+                            int port,
+                            String ingressName,
+                            List<? extends TerraformResource> dependsOn,
+                            Optional<List<LocalExecProvisioner>> provisioners,
+                            List<String> inboundCidrs,
+                            List<String> openPaths,
+                            Optional<Duration> idleTimeout) {
         List<TerraformResource> dependencies = new ArrayList<>(List.of(nginxRelease, certManager));
         dependencies.addAll(dependsOn);
         CdkHelper helper  = new CdkHelper(scope, domainName, tlsSecretName, port, service, ingressName);
-        IngressV1 ingress = helper.createIngress(dependencies, provisioners, inboundCidrs);
+        IngressV1 ingress = helper.createIngress(dependencies, provisioners, inboundCidrs, idleTimeout);
         if (!inboundCidrs.isEmpty() && !openPaths.isEmpty()) {
             List<TerraformResource> openDependencies = new ArrayList<>(dependencies);
             openDependencies.add(ingress);

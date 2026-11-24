@@ -48,7 +48,7 @@ class KeyCloakProviderBrowserClientTest {
                 reply(exchange, 200, found ? "[{\"id\":\"the-id\"}]" : "[]");
             } else if (call.equals("GET /admin/realms/polaris/clients/the-id")) {
                 // the redirect URIs of another cloud's Jupyter, which the overwrite drops
-                reply(exchange, 200, "{\"redirectUris\":[\"https://aws-jupyter.example.org/oauth2/callback\"]}");
+                reply(exchange, 200, "{\"redirectUris\":[\"https://auth.aws-jupyter.example.org/oauth2/callback\",\"https://auth.aws-jupyter.example.org/.pomerium/signed_out\"]}");
             } else if (call.equals("PUT /admin/realms/polaris/clients/the-id")) {
                 putBody = body;
                 reply(exchange, updateCode, "{\"errorMessage\":\"refused\"}");
@@ -115,7 +115,7 @@ class KeyCloakProviderBrowserClientTest {
             // the mappers that follow are not what this is about
         }
 
-        assertThat(putBody).contains(URIS.get(0)).doesNotContain("aws-jupyter.example.org");
+        assertThat(putBody).contains(URIS.get(0), URIS.get(1), URIS.get(2), "\"post.logout.redirect.uris\":\"+\"").doesNotContain("aws-jupyter.example.org");
     }
 
     @Test
@@ -126,23 +126,28 @@ class KeyCloakProviderBrowserClientTest {
             // the mappers that follow are not what this is about
         }
 
-        // the callbacks of another cloud's Jupyter stay, with this one's
-        assertThat(putBody).contains("https://aws-jupyter.example.org/oauth2/callback", URIS.get(0), URIS.get(1));
+        // the callbacks of another cloud's Jupyter stay, with this one's (including signed_out) and post.logout.redirect.uris '+'
+        assertThat(putBody).contains("https://auth.aws-jupyter.example.org/oauth2/callback",
+                                     "https://auth.aws-jupyter.example.org/.pomerium/signed_out",
+                                     URIS.get(0), URIS.get(1), URIS.get(2),
+                                     "\"post.logout.redirect.uris\":\"+\"");
     }
 
     @Test
     void purgesTheRedirectUrisThatAreNotToStayAndChangesNothingElse() throws IOException {
         List<String> purged = provider.purgeBrowserClientRedirectUris("emrys", "secret", URIS, false);
 
-        // the existing one, of another cloud, is not among those to keep
-        assertThat(purged).containsExactly("https://aws-jupyter.example.org/oauth2/callback");
-        assertThat(putBody).contains("\"redirectUris\":[]").contains("\"clientId\":\"emrys\"");
+        // the existing ones, of another cloud, are not among those to keep
+        assertThat(purged).containsExactly("https://auth.aws-jupyter.example.org/oauth2/callback",
+                                           "https://auth.aws-jupyter.example.org/.pomerium/signed_out");
+        assertThat(putBody).contains("\"redirectUris\":[]").contains("\"clientId\":\"emrys\"", "\"post.logout.redirect.uris\":\"+\"");
     }
 
     @Test
     void keepsWhatIsToStayWhenPurging() throws IOException {
         List<String> keep = new ArrayList<>(URIS);
-        keep.add("https://aws-jupyter.example.org/oauth2/callback");
+        keep.add("https://auth.aws-jupyter.example.org/oauth2/callback");
+        keep.add("https://auth.aws-jupyter.example.org/.pomerium/signed_out");
 
         assertThat(provider.purgeBrowserClientRedirectUris("emrys", "secret", keep, false)).isEmpty();
         assertThat(putBody).isNull();
@@ -151,7 +156,8 @@ class KeyCloakProviderBrowserClientTest {
     @Test
     void aDryRunPurgeOnlySaysWhatItWouldTakeOff() throws IOException {
         assertThat(provider.purgeBrowserClientRedirectUris("emrys", "secret", URIS, true))
-            .containsExactly("https://aws-jupyter.example.org/oauth2/callback");
+            .containsExactly("https://auth.aws-jupyter.example.org/oauth2/callback",
+                             "https://auth.aws-jupyter.example.org/.pomerium/signed_out");
         assertThat(putBody).isNull();
     }
 

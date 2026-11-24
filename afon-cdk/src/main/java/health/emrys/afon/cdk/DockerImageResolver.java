@@ -105,7 +105,7 @@ public final class DockerImageResolver {
     public String jupyterhubProxy()  { return reference("jupyterhub-proxy"); }
     public String guacamole()        { return reference("guacamole"); }
     public String guacd()            { return reference("guacd"); }
-    public String oauth2Proxy()      { return reference("oauth2-proxy"); }
+    public String pomerium()         { return reference("pomerium"); }
     public String curl()             { return reference("curl"); }
     public String nginx()            { return reference("nginx"); }
     public String postgresAlpine()   { return reference("postgres-alpine"); }

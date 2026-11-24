@@ -647,7 +647,7 @@ UNSIGNED_IMAGE=docker.io/library/busybox:1.36 afon-cli.sh signing-enforce-check 
 
 ### Setup AWS full stack
 
-The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (behind Guacamole with OAuth2).
+The AWS full stack includes Polaris, Spark (via Spark Connect), and Jupyter (with Guacamole behind Pomerium, which also exposes `auth.<AWS_JUPYTER_DOMAIN_NAME>` in the Jupyter DNS zone on the same ALB).
 
 ```shell
 afon-cli.sh manage-stack setup aws-full
@@ -1065,7 +1065,7 @@ afon-cli.sh gcp-keycloak                       # is KeyCloak serving?
 afon-cli.sh gcp-create identity                # create the env (buckets, service accounts) for the stack
 ```
 `gcp-create` needs the stack, as what it creates depends on it; `dns-create-zones gcp <stack>` creates the DNS zones of the domain names the stack serves, and `gcp-issue-cert` issues
-the certs of every configured domain name (`GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME` and `OIDC_DOMAIN_NAME`).
+the certs of every configured domain name (`GCP_POLARIS_DOMAIN_NAME`, `GCP_JUPYTER_DOMAIN_NAME` and `auth.<GCP_JUPYTER_DOMAIN_NAME>`, and `OIDC_DOMAIN_NAME`).
 `gcp-update-kube-config` needs `gke-gcloud-auth-plugin` for kubectl to reach the cluster, and warns if it is missing: install it with
 `afon-cli.sh local-setup -c gcp`.
 
