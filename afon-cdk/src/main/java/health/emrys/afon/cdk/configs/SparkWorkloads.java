@@ -47,7 +47,7 @@ public class SparkWorkloads {
     static final String AUDIT_LISTENER = "health.emrys.afon.spark.audit.AuditQueryListener";
     /**
      * Lets into Spark Connect only a client with an OIDC token of the realm, as the token's subject, and refuses JVM code; it is in
-     * the Spark image, from afon-spark-guard, not on this classpath.  The server does not start without it.
+     * the Spark image, from afon-spark-additional, not on this classpath.  The server does not start without it.
      */
     static final String GUARD_INTERCEPTOR = "health.emrys.afon.spark.guard.SparkConnectGuardInterceptor";
     /** Refuses what would let one user's session reach another's, once Spark has analysed it; in the same jar as the interceptor. */

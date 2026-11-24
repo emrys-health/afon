@@ -74,7 +74,7 @@ The server lets in only a client that sends that token in the `x-afon-token` hea
 connection string (not Spark Connect's own `token`, which makes the client insist on TLS, which the server does not offer). Each request is made as
 the token's subject, whatever user the client says it is, so that no client reaches another user's session. As every user's code runs in the same
 driver and executors, the server runs no JVM code of its clients: no Scala or Java UDFs, jars or classes, `ADD JAR`, functions made from a class,
-`reflect`, nor global temporary views, which every session could read. Python UDFs are let through. See `afon-spark-guard`.
+`reflect`, nor global temporary views, which every session could read. Python UDFs are let through. See `afon-spark-additional`.
 
 ```python
 OIDC_TOKEN = os.environ["OIDC_TOKEN"]

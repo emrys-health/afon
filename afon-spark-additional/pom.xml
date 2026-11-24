@@ -8,13 +8,14 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <!-- Copied into the Spark image's /opt/spark/jars (see scripts/docker/spark-connect/Dockerfile), where the Spark Connect server
-         loads its gRPC interceptor and its session extension.  Spark ships everything it needs but the JWT library, which is shaded
-         into the jar, under a package of its own, so that it cannot clash with any copy of it that Spark's jars bring. -->
-    <artifactId>afon-spark-guard</artifactId>
+    <!-- What Afon adds to Spark: the audit listener, and the Spark Connect server's gRPC interceptor and session extension.
+         Copied into the Spark image's /opt/spark/jars (see scripts/docker/spark-connect/Dockerfile), so it depends on nothing that
+         Spark does not already ship but the JWT library, which is shaded into the jar, under a package of its own, so that it
+         cannot clash with any copy of it that Spark's jars bring. -->
+    <artifactId>afon-spark-additional</artifactId>
 
     <properties>
-        <!-- Spark logs through log4j2, not the logback used elsewhere. -->
+        <!-- Spark logs through log4j2 (see src/test/resources/log4j2.properties), not the logback used elsewhere. -->
         <afon.slf4j />
     </properties>
 
@@ -34,9 +35,20 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
             <version>10.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.compat.version}_${scala.compat.version}</artifactId>
+            <version>${iceberg.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
