@@ -24,6 +24,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -38,7 +39,9 @@ import java.util.TreeSet;
  * The stack is deployed as a whole, by {@link StepOperations#deployStack}, which applies the plan of all its components,
  * so the steps derived from the plans of each component are combined, based on the {@link StackAction}:
  * <ul>
- *   <li>every action starts by checking the login to the cloud, {@code check_<cloud>_login};</li>
+ *   <li>every action starts by checking the login to the cloud, {@code check_<cloud>_login}, then that the databases its components
+ *       use have their host set in the active config, {@code check_<stack>_databases_configured}, if they use any, before
+ *       anything is deleted or deployed;</li>
  *   <li>{@code delete}: just the stack, and the legacy stack of its cloud; or every stack of the cloud for {@code <cloud>-all};</li>
  *   <li>{@code deploy}: delete the stacks conflicting with it, check the KeyCloak it uses if it has none of its own, deploy it,
  *       wait for what its components need, then report it complete;</li>
@@ -101,11 +104,19 @@ public class StackPlanFactory {
             throw new IllegalArgumentException(String.format("Unsupported action '%s' on stack '%s'", action, stackId));
         }
         if (stackId.isAll()) {
-            return List.of(ops.checkLogin(stackId.cloud()), ops.deleteStackIn(stackId.cloud()), ops.deleteComplete(stackId));
+            List<Step> steps = new ArrayList<>();
+            steps.add(ops.checkLogin(stackId.cloud()));
+            // every stack of the cloud is deleted, so the databases of all that are defined are needed
+            List<StackComponent> all = StackDefinitions.all().stream().filter(d -> d.id().cloud() == stackId.cloud())
+                                                       .flatMap(d -> d.componentsFor(ops.properties()).stream()).toList();
+            checkDatabases(stackId, all, ops).ifPresent(steps::add);
+            steps.add(ops.deleteStackIn(stackId.cloud()));
+            steps.add(ops.deleteComplete(stackId));
+            return steps;
         }
         List<StackComponent> components = StackDefinitions.get(stackId).componentsFor(ops.properties());
         return switch (action) {
-            case DELETE -> deleteSteps(stackId, ops);
+            case DELETE -> deleteSteps(stackId, components, ops);
             case DEPLOY -> deploySteps(stackId, components, ops, replace, false);
             case SETUP -> deploySteps(stackId, components, ops, replace, true);
             case RUN -> throw new IllegalStateException("Unsupported action " + action);
@@ -168,14 +179,31 @@ public class StackPlanFactory {
         return StackDefinitions.get(stackId).componentsFor(properties).stream().anyMatch(PolarisComponent.class::isInstance);
     }
 
-    private List<Step> deleteSteps(StackId stackId, StepOperations ops) {
+    /**
+     * @return the step checking the databases that the components use have their host set in the active config, which
+     * is run before the stack is deleted or deployed, or empty if they use none
+     */
+    private Optional<Step> checkDatabases(StackId stackId, List<StackComponent> components, StepOperations ops) {
+        Map<String, ComponentPlan.Database> databases = new LinkedHashMap<>();
+        for (StackComponent component : components) {
+            for (ComponentPlan.Database database : registry.of(component).databases(stackId.cloud(), ops.properties())) {
+                databases.putIfAbsent(database.key(), database);
+            }
+        }
+        return databases.isEmpty() ? Optional.empty()
+                                   : Optional.of(ops.checkDatabasesConfigured(stackId, List.copyOf(databases.values())));
+    }
+
+    private List<Step> deleteSteps(StackId stackId, List<StackComponent> components, StepOperations ops) {
         StackFilter filter = new StackFilter(
             String.format("stack %s and the legacy stack", stackId),
             name -> name.equals(stackId.toString()) || name.equals(stackId.cloud().toString()));
-        return List.of(
-            ops.checkLogin(stackId.cloud()),
-            ops.deleteStacksIn(stackId, String.format("delete_%s_stack", stepName(stackId)), filter),
-            ops.deleteComplete(stackId));
+        List<Step> steps = new ArrayList<>();
+        steps.add(ops.checkLogin(stackId.cloud()));
+        checkDatabases(stackId, components, ops).ifPresent(steps::add);
+        steps.add(ops.deleteStacksIn(stackId, String.format("delete_%s_stack", stepName(stackId)), filter));
+        steps.add(ops.deleteComplete(stackId));
+        return steps;
     }
 
     // The steps are created in the order they run, as StepOperations logs as it creates them.
@@ -184,6 +212,8 @@ public class StackPlanFactory {
         AfonCloud cloud = stackId.cloud();
         List<Step> steps = new ArrayList<>();
         steps.add(ops.checkLogin(cloud));
+        // before deleting the stacks it conflicts with, as it needs them as much as deploying does
+        checkDatabases(stackId, components, ops).ifPresent(steps::add);
         steps.add(deleteConflicting(stackId, ops, replace));
         // the KeyCloak the stack uses is another stack's, if it has none of its own: it must answer
         if (components.stream().noneMatch(KeycloakComponent.class::isInstance)) {

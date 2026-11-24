@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.steps;
 
+import health.emrys.afon.ops.plan.ComponentPlan;
 import health.emrys.afon.ops.scripts.ProcessLogLevels;
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.StackDefinition;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static health.emrys.afon.config.ConfigUtils.tfStatePath;
 import static health.emrys.afon.config.AfonCloud.*;
@@ -103,6 +105,20 @@ public class StepOperations {
         return new Step(format("check_%s_login", cloud.toString().toLowerCase()),
                 format("check logged in to %s", cloud),
                 () -> actions.checkLogin(cloud));
+    }
+
+    /**
+     * Checks that the databases the components of the stack use are configured, ie their host is set in the config, before the stack is
+     * deleted or deployed, so that it fails in seconds, naming the property to set, rather than partway through.  It does not connect
+     * to them, as they only admit the addresses of the stack, so cannot be reached from here.
+     *
+     * @param stackId the stack whose components use them, or {@code <cloud>-all}
+     */
+    public Step checkDatabasesConfigured(StackId stackId, List<ComponentPlan.Database> databases) {
+        return new Step(format("check_%s_databases_configured", stackId.toString().replace('-', '_')),
+                format("check the databases of %s are configured: %s", stackId,
+                       databases.stream().map(d -> d.component() + " (" + d.property() + ")").collect(Collectors.joining(", "))),
+                () -> actions.checkDatabasesConfigured(databases));
     }
 
     /**

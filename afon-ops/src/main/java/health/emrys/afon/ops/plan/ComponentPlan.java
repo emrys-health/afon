@@ -42,6 +42,24 @@ public interface ComponentPlan {
     enum Endpoint {KEYCLOAK, POLARIS}
 
     /**
+     * A database the component keeps its data in, which the stack needs configured.
+     *
+     * @param property the property naming it, eg {@code POLARIS_DB_HOST}, which the failure says to set
+     * @param host     where it is, which is blank if the config does not set it, which is a failure to report, as the component cannot
+     *                 work without it
+     */
+    record Database(String component, String property, String host) {
+        public boolean isConfigured() {
+            return host != null && !host.isBlank();
+        }
+
+        /** @return what identifies it among the databases of a stack, so that one that two components share is checked once */
+        public String key() {
+            return isConfigured() ? host : property;
+        }
+    }
+
+    /**
      * @return what the component is called in messages, eg "Polaris" in "stack <stack-id> is running and already deploys Polaris at
      * polaris.example.com", which explains why a stack cannot be deployed beside another
      */
@@ -55,6 +73,16 @@ public interface ComponentPlan {
      * None by default, ie it does not stop other stacks from running beside it.
      */
     default List<AfonProperty> domains(AfonCloud cloud, AfonPropertyProvider properties) {
+        return List.of();
+    }
+
+    /**
+     * @return the databases the component uses, as the active config sets them, so that they can be checked to be configured before the
+     * stack is deleted or deployed, whose connectivity cannot, as it is not testable from here: they allow only the addresses of the
+     * stack.  One whose host the config does not set, or leaves blank, is returned too, with a blank host, as the
+     * check fails for it, for whoever forgot to configure it.  None by default, ie it keeps its data in the cluster.
+     */
+    default List<Database> databases(AfonCloud cloud, AfonPropertyProvider properties) {
         return List.of();
     }
 

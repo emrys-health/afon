@@ -573,6 +573,10 @@ if [ -n "$MVN_QUIET" ]; then
   MVN_CMD="$MVN_CMD -q"
 fi
 MVN_CMD="$MVN_CMD -s $AFON_ROOT/settings.xml"
+# Maven's repository prefix filter peeks at the prefixes file of each remote repository before using it, and a repository that answers
+# slowly, or not at all, stalls dependency resolution, so that the build appears to hang.  It only avoids lookups of artifacts that
+# a repository does not serve, so is switched off for every mvn this script runs, ahead of any MAVEN_ARGS already set.
+export MAVEN_ARGS="-Daether.remoteRepositoryFilter.prefixes=false ${MAVEN_ARGS:-}"
 resolve_ops_action
 case $ACTION in
   ansible)

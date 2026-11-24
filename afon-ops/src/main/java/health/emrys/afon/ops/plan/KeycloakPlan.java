@@ -7,6 +7,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.steps.Step;
 import health.emrys.afon.ops.steps.StepOperations;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 
@@ -28,6 +29,25 @@ public class KeycloakPlan implements ComponentPlan {
     @Override
     public List<AfonProperty> domains(AfonCloud cloud, AfonPropertyProvider properties) {
         return List.of(properties.getOidcDomainProperty(cloud));
+    }
+
+    /**
+     * The database of KeyCloak, if it is not its own embedded one, ie {@code KEYCLOAK_DB} is {@code postgres}, at the host of
+     * {@code KEYCLOAK_DB_URL}, a {@code jdbc:postgresql://host[:port]/database} URL, whose host is blank if the URL is not set, or
+     * names none, eg because it refers to a property that is not set.
+     */
+    @Override
+    public List<Database> databases(AfonCloud cloud, AfonPropertyProvider properties) {
+        if (!"postgres".equalsIgnoreCase(properties.getValue(AfonProperty.KEYCLOAK_DB, ""))) {
+            return List.of();
+        }
+        String property = AfonProperty.KEYCLOAK_DB_URL.getName();
+        try {
+            URI uri = URI.create(properties.getValue(AfonProperty.KEYCLOAK_DB_URL, "").replaceFirst("^jdbc:", ""));
+            return List.of(new Database(label(), property, uri.getHost() == null ? "" : uri.getHost()));
+        } catch (IllegalArgumentException e) {
+            return List.of(new Database(label(), property, "")); // malformed, so it names no host
+        }
     }
 
     @Override

@@ -6,6 +6,7 @@ import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.StackId;
+import health.emrys.afon.ops.plan.ComponentPlan;
 import health.emrys.afon.ops.steps.DurationUtils;
 import health.emrys.afon.ops.steps.StackFilter;
 import health.emrys.afon.ops.synth.PlanGuards;
@@ -321,6 +322,14 @@ public class DocumentingStepActions extends StepActions {
                    ```
                    If it doesn't: %s
                    """, url, expected, url, failure));
+        out.flush();
+    }
+
+    @Override
+    protected void checkDatabasesConfigured(List<ComponentPlan.Database> databases) {
+        out.println("Check that each database the stack uses is configured, ie these are set in the secret properties:\n");
+        databases.forEach(database -> out.println(format("- `%s`, for the %s database", database.property(), database.component())));
+        out.println(format("%nIf one is not set: set it, then rerun.%n"));
         out.flush();
     }
 

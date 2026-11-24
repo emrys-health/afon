@@ -86,12 +86,65 @@ class StackPlanFactoryTest {
                + (jupyter ? ", jupyter" + suffix + ".example" : "") + "])";
     }
 
+    /**
+     * The steps, without the check of the databases, which every stack with one has, whether or not the config sets it, and which
+     * the tests of it below show.
+     */
     private List<String> derived(StackAction action, String stackId) {
+        return derivedWithDatabaseCheck(action, stackId).stream().filter(step -> !step.startsWith("checkDatabasesConfigured(")).toList();
+    }
+
+    private List<String> derivedWithDatabaseCheck(StackAction action, String stackId) {
         return factory.steps(action, StackId.parse(stackId), ops, false).stream().map(Step::getName).toList();
     }
 
     private static String deleteStack(String stackId) {
         return String.format("deleteStacksIn(%s,delete_%s_stack,stack %s and the legacy stack)", stackId, stackId.replace('-', '_'), stackId);
+    }
+
+    @Test
+    void checksTheDatabasesTheComponentsUseBeforeDeletingOrDeploying() {
+        properties.setValue(POLARIS_DB_HOST, "polaris-db.example");
+        properties.setValue(KEYCLOAK_DB, "postgres");
+        properties.setValue(KEYCLOAK_DB_URL, "jdbc:postgresql://kc-db.example:6543/keycloak?sslmode=require");
+        properties.setValue(GUACAMOLE_DB_HOST, "");
+        properties.setValue(GITEA_DB_HOST, "");
+
+        // only the databases of the components of the stack: Polaris's, and not Keycloak's or Guacamole's
+        assertThat(derivedWithDatabaseCheck(DELETE, "aws-polaris")).containsExactly(
+            login("aws"),
+            "checkDatabasesConfigured(aws-polaris,[Database[component=Polaris, property=POLARIS_DB_HOST, host=polaris-db.example]])",
+            deleteStack("aws-polaris"), "deleteComplete(aws-polaris)");
+        assertThat(derivedWithDatabaseCheck(DEPLOY, "aws-keycloak").get(1))
+            .contains("Keycloak, property=KEYCLOAK_DB_URL, host=kc-db.example");
+        // before the stacks it conflicts with are deleted
+        assertThat(derivedWithDatabaseCheck(SETUP, "aws-polaris").subList(0, 3)).containsExactly(
+            login("aws"), derivedWithDatabaseCheck(DELETE, "aws-polaris").get(1), deleteConflicting("aws-polaris"));
+        // every stack of the cloud is deleted, so the databases of all of them, once each
+        assertThat(derivedWithDatabaseCheck(DELETE, "aws-all").get(1)).contains("polaris-db.example").contains("kc-db.example");
+    }
+
+    @Test
+    void checksTheDatabasesTheConfigDoesNotSetSoThatTheyFailForWhoeverForgotThem() {
+        properties.setValue(POLARIS_DB_HOST, " ");
+        properties.setValue(KEYCLOAK_DB, "postgres");
+        properties.setValue(KEYCLOAK_DB_URL, "jdbc:postgresql://:5432/keycloak"); // as it resolves from a POLARIS_DB_HOST that is not set
+        properties.setValue(GUACAMOLE_DB_HOST, "");
+        properties.setValue(GITEA_DB_HOST, "");
+
+        for (StackAction action : StackAction.derivingSteps()) {
+            assertThat(derivedWithDatabaseCheck(action, "aws-polaris")).anyMatch(
+                step -> step.startsWith("checkDatabasesConfigured(aws-polaris,[Database[component=Polaris, property=POLARIS_DB_HOST, host= ]"));
+        }
+        assertThat(derivedWithDatabaseCheck(DEPLOY, "aws-keycloak").get(1))
+            .contains("component=Keycloak, property=KEYCLOAK_DB_URL, host=]");
+    }
+
+    @Test
+    void checksNoDatabaseOfAComponentThatKeepsItsDataInTheCluster() {
+        properties.setValue(KEYCLOAK_DB, "");
+
+        assertThat(derivedWithDatabaseCheck(DEPLOY, "aws-keycloak")).noneMatch(step -> step.startsWith("checkDatabasesConfigured("));
     }
 
     @Test

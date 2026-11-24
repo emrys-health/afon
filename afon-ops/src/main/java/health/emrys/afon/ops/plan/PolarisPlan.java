@@ -32,6 +32,12 @@ public class PolarisPlan implements ComponentPlan {
         return List.of(AfonCloudProperty.POLARIS_DOMAIN_NAME.forCloud(cloud).orElseThrow());
     }
 
+    @Override
+    public List<Database> databases(AfonCloud cloud, AfonPropertyProvider properties) {
+        String host = properties.getValue(AfonProperty.POLARIS_DB_HOST, "");
+        return List.of(new Database(label(), AfonProperty.POLARIS_DB_HOST.getName(), host));
+    }
+
     /**
      * Polaris does OIDC discovery against KeyCloak, its own or another stack's, so waits for it too.
      */

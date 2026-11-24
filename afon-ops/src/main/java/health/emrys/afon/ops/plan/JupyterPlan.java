@@ -29,6 +29,15 @@ public class JupyterPlan implements ComponentPlan {
         return List.of(AfonCloudProperty.JUPYTER_DOMAIN_NAME.forCloud(cloud).orElseThrow());
     }
 
+    /**
+     * Guacamole, which Jupyter opens its desktop sessions with, keeps its sessions in a Postgres database.
+     */
+    @Override
+    public List<Database> databases(AfonCloud cloud, AfonPropertyProvider properties) {
+        String host = properties.getValue(AfonProperty.GUACAMOLE_DB_HOST, "");
+        return List.of(new Database("Guacamole", AfonProperty.GUACAMOLE_DB_HOST.getName(), host));
+    }
+
     @Override
     public List<Step> setupSteps(StepOperations ops, AfonCloud cloud) {
         return List.of(ops.configureJupyterClientFor(cloud));

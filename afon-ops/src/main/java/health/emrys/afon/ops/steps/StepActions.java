@@ -11,6 +11,7 @@ import health.emrys.afon.cdk.azure.AzureReader;
 import health.emrys.afon.config.*;
 import health.emrys.afon.ops.ConfigureUsersMain;
 import health.emrys.afon.ops.ManagePolarisCatalogsMain;
+import health.emrys.afon.ops.plan.ComponentPlan;
 import health.emrys.afon.ops.RegisterPolarisTableMain;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
@@ -1145,6 +1146,24 @@ public class StepActions {
             throw new IllegalStateException(format("Not logged in to %s (%s failed): log in with %s, then rerun.",
                 cloud.name(), String.join(" ", check), loginCommand(cloud)));
         }
+    }
+
+    /**
+     * Checks that each database the stack uses is configured, ie names a host, so that a delete or a deploy of a stack that cannot
+     * work does not start.  It does not connect to them, as they only admit the addresses of the stack, so cannot be reached from here.
+     *
+     * @param databases the databases to check, which are all checked, so that the failure names every one that is not configured
+     * @throws IllegalStateException if any is not configured, naming each and the property to set
+     */
+    protected void checkDatabasesConfigured(List<ComponentPlan.Database> databases) {
+        List<String> notConfigured = databases.stream().filter(database -> !database.isConfigured())
+            .map(database -> format("%s for the %s database", database.property(), database.component())).toList();
+        if (!notConfigured.isEmpty()) {
+            throw new IllegalStateException(format("The database is not configured: set %s, in the secret properties, then rerun.",
+                                                   String.join(" and ", notConfigured)));
+        }
+        logger.info("The databases are configured: {}",
+                    databases.stream().map(ComponentPlan.Database::property).collect(Collectors.joining(", ")));
     }
 
     /** @return the command that fails unless the CLI of the cloud is logged in */
