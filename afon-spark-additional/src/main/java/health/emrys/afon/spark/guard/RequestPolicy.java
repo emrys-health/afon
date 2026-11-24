@@ -3,8 +3,12 @@ package health.emrys.afon.spark.guard;
 import org.apache.spark.connect.proto.AddArtifactsRequest;
 import org.apache.spark.connect.proto.ExecuteExternalCommand;
 import org.apache.spark.connect.proto.JavaUDF;
+import org.apache.spark.connect.proto.Read;
 import org.apache.spark.connect.proto.ScalarScalaUDF;
 import org.apache.spark.connect.proto.StreamingQueryManagerCommand;
+import org.apache.spark.connect.proto.WriteOperation;
+import org.apache.spark.connect.proto.WriteOperationV2;
+import org.apache.spark.connect.proto.WriteStreamOperationStart;
 import org.sparkproject.connect.protobuf.Descriptors.FieldDescriptor;
 import org.sparkproject.connect.protobuf.Message;
 
@@ -29,6 +33,10 @@ import java.util.Optional;
  *   <li>no artifact but those that hold no JVM code: the cached local relations, that a client sends of a large DataFrame, and
  *       Python files, archives and files.  Jars and classes, and anything else, are refused.</li>
  * </ul>
+ * Nor does it read or write files anywhere but in the clouds' object stores, see {@link Locations}: not the disks of the server,
+ * which every user shares.  The paths of a read are checked here, before Spark lists and samples the files, as it does to find
+ * their schema, so that nothing of a local file is read at all; and those of a stream's sink and its checkpoint, which no plan
+ * that {@link PlanPolicy} sees holds.
  * What Spark makes of a plan, once it has read it, eg {@code ADD JAR} in SQL, is refused by {@link PlanPolicy}.
  */
 final class RequestPolicy {
@@ -85,6 +93,36 @@ final class RequestPolicy {
         }
         if (message instanceof ExecuteExternalCommand) {
             return Optional.of("external commands are refused, as " + NO_JVM_CODE);
+        }
+        if (message instanceof Read.DataSource source) {
+            return firstOf(locationRefusal(source.getPathsList()), optionsRefusal(source.getOptionsMap()));
+        }
+        if (message instanceof WriteOperation write) {
+            return firstOf(write.hasPath() ? Locations.refusal(write.getPath()) : Optional.empty(), optionsRefusal(write.getOptionsMap()));
+        }
+        if (message instanceof WriteOperationV2 write) {
+            return optionsRefusal(write.getOptionsMap());
+        }
+        if (message instanceof WriteStreamOperationStart stream) {
+            return firstOf(stream.hasPath() ? Locations.refusal(stream.getPath()) : Optional.empty(), optionsRefusal(stream.getOptionsMap()));
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<String> locationRefusal(List<String> locations) {
+        return locations.stream().map(Locations::refusal).flatMap(Optional::stream).findFirst();
+    }
+
+    private static Optional<String> optionsRefusal(Map<String, String> options) {
+        return options.entrySet().stream().map(o -> Locations.optionRefusal(o.getKey(), o.getValue())).flatMap(Optional::stream).findFirst();
+    }
+
+    @SafeVarargs
+    private static Optional<String> firstOf(Optional<String>... refusals) {
+        for (Optional<String> refusal : refusals) {
+            if (refusal.isPresent()) {
+                return refusal;
+            }
         }
         return Optional.empty();
     }

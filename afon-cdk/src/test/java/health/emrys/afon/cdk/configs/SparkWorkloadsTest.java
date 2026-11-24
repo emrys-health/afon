@@ -44,6 +44,14 @@ class SparkWorkloadsTest {
     }
 
     @Test
+    void theDriverHasNoTokenOfItsServiceAccountForUsersToRead() {
+        String command = new SparkWorkloads(new SparkNames("emrys"), DockerImageResolver.asDefined(), "https://oidc.example/realms/polaris")
+            .startConnectCommand();
+
+        assertThat(command).contains("\"automountServiceAccountToken\":false");
+    }
+
+    @Test
     void theRealmMustBeAnHttpsUrl() {
         org.assertj.core.api.Assertions.assertThatThrownBy(
             () -> new SparkWorkloads(new SparkNames("emrys"), DockerImageResolver.asDefined(), "http://oidc.example/realms/polaris"))

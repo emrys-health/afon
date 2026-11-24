@@ -1,6 +1,5 @@
 # Build this with:
-# mvn -pl afon-spark-additional -am package -DskipTests && \
-#   cp afon-spark-additional/target/afon-spark-additional-*.jar scripts/docker/spark-connect/
+# mvn -pl afon-spark-additional -am package -DskipTests && cp afon-spark-additional/target/afon-spark-additional-*.jar scripts/docker/spark-connect/
 # docker build -t emryshealth/spark_jars:4.0.1 .
 # docker push emryshealth/spark_jars:4.0.1
 

@@ -15,8 +15,8 @@ images:
   # first-party
   spark:
     image: emryshealth/spark_jars
-    tag: 4.0.1_afon414.3
-    digest: sha256:6f13cd1db635f542c5c75b74889e829291b5467a48c58e49f33163ccf0b0fed8
+    tag: 4.0.1_afon414.4
+    digest: sha256:c9e2f3d77a2df5c9f6b8af8cae569c72fbb7cecf49c402d3a739684484459f3a
     category: first-party
   afon-desktop:
     image: emryshealth/afon-desktop
