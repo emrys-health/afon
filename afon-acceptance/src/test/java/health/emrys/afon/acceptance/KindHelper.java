@@ -3,6 +3,9 @@ package health.emrys.afon.acceptance;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
+import health.emrys.afon.cdk.components.KyvernoComponent;
+import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.slf4j.Logger;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -176,9 +179,15 @@ public class KindHelper implements AutoCloseable {
             }
             Files.copy(in, chart, StandardCopyOption.REPLACE_EXISTING);
         }
-        List<String> values = List.of("--set", "features.registryClient.allowInsecure=true",
-                                      "--set", "backgroundController.enabled=false", "--set", "cleanupController.enabled=false",
-                                      "--set", "reportsController.enabled=false");
+        List<String> values = new ArrayList<>(List.of("--set", "features.registryClient.allowInsecure=true",
+                                                      "--set", "backgroundController.enabled=false", "--set", "cleanupController.enabled=false",
+                                                      "--set", "reportsController.enabled=false"));
+        // the registry that the stacks pull Kyverno from, KYVERNO_IMAGE_REGISTRY of the config, so that one setting moves both
+        String registry = new OpsPropertyProvider().getValue(AfonProperty.KYVERNO_IMAGE_REGISTRY, "").strip();
+        if (!registry.isEmpty()) {
+            logger.info("Pulling the Kyverno images from {}", registry);
+            values.addAll(List.of("--set", KyvernoComponent.IMAGE_REGISTRY_VALUE + "=" + registry));
+        }
         preloadImages(chart, values);
         List<String> command = new ArrayList<>(List.of("helm", "upgrade", "--install", "kyverno", chart.toString(), "--namespace", "kyverno",
                                                        "--create-namespace"));

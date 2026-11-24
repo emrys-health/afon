@@ -56,6 +56,18 @@ class KyvernoComponentTest {
     }
 
     @Test
+    void imagesComeFromTheRegistryOfTheChartUnlessOneIsSet() {
+        assertThat(KyvernoComponent.imageRegistryValues("")).isEmpty();
+        assertThat(KyvernoComponent.imageRegistryValues("  ")).isEmpty();
+        assertThat(KyvernoComponent.imageRegistryValues(null)).isEmpty();
+
+        var values = KyvernoComponent.imageRegistryValues(" ghcr.io ");
+        assertThat(values).hasSize(1);
+        assertThat(values.get(0).getName()).isEqualTo("global.image.registry");
+        assertThat(values.get(0).getValue()).isEqualTo("ghcr.io");
+    }
+
+    @Test
     void enforcedNamespacesAreTrimmedAndWithoutDuplicates() {
         assertThat(KyvernoComponent.namespaces(" default, trino ,,default")).containsExactly("default", "trino");
         assertThat(KyvernoComponent.namespaces("")).isEmpty();

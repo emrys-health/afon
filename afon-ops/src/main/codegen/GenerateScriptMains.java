@@ -156,6 +156,7 @@ public class GenerateScriptMains {
 
         new ScriptEntry("signing", "SigningPublicKeyMain", "signing/public-key.sh"),
         new ScriptEntry("signing", "SigningReportMain", "signing/report.sh"),
+        new ScriptEntry("signing", "SigningRegistryMain", "signing/registry.sh"),
 
         new ScriptEntry("smoke", "SmokeNotebookMain", "smoke/notebook.sh"),
         new ScriptEntry("smoke", "SmokeSigningMain", "smoke/signing.sh"),

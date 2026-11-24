@@ -2,6 +2,7 @@ package health.emrys.afon.cdk.components;
 
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.release.Release;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.null_provider.resource.Resource;
 import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.PublicKeys;
@@ -9,6 +10,7 @@ import health.emrys.afon.cdk.StackComponent;
 import health.emrys.afon.cdk.StackContext;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
+import health.emrys.afon.config.AfonProperty;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -81,6 +83,8 @@ public class KyvernoComponent implements StackComponent {
      */
     static final String WORKLOAD_NAMESPACE = "default";
     static final String ATTESTOR = "emrys";
+    /** The value of the chart that sets the registry of all its images */
+    public static final String IMAGE_REGISTRY_VALUE = "global.image.registry";
 
     @Override
     public void deploy(StackContext context) {
@@ -96,6 +100,7 @@ public class KyvernoComponent implements StackComponent {
             .createNamespace(true)
             .timeout(600)
             .atomic(true)
+            .set(imageRegistryValues(context.properties().getValue(AfonProperty.KYVERNO_IMAGE_REGISTRY, "")))
             .dependsOn(dependsOn)
             .build();
 
@@ -118,6 +123,15 @@ public class KyvernoComponent implements StackComponent {
                                          "auditedNamespaces", String.join(",", audited), "enforcedNamespaces", String.join(",", enforced)))
                         .provisioners(provisioners(auditPolicy, enforcePolicy, audited, enforced))
                         .build();
+    }
+
+    /**
+     * @param registry the registry of {@code KYVERNO_IMAGE_REGISTRY}, blank for that of the chart
+     * @return the chart values that make every image come from the registry: none if blank, so that the chart pulls from its own, {@code reg.kyverno.io}
+     */
+    static List<ReleaseSet> imageRegistryValues(String registry) {
+        String trimmed = registry == null ? "" : registry.strip();
+        return trimmed.isEmpty() ? List.of() : List.of(ReleaseSet.builder().name(IMAGE_REGISTRY_VALUE).value(trimmed).build());
     }
 
     /**

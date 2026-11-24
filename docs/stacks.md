@@ -501,6 +501,14 @@ If Kyverno itself is down, an enforced namespace rejects its pods too, but the n
 let the pods in meanwhile, remove the label, or delete the policy with `kubectl delete imagevalidatingpolicies.policies.kyverno.io
 emrys-verify-images-enforce`.
 
+**If the registry of Kyverno's images is down**, a deployment cannot pull them and rolls back (the Kyverno release is atomic), and a new Kyverno pod
+cannot start on a node that has not pulled them. The images come from `reg.kyverno.io` by default; set `KYVERNO_IMAGE_REGISTRY=ghcr.io` in
+`afon.properties` (the same images, and for every cloud) and deploy again.
+`afon-cli.sh signing-registry` shows the registry in use and checks that it responds and has the images; `afon-cli.sh signing-registry ghcr.io` checks another,
+to see that it is up before switching to it. The property sets the chart's `global.image.registry`, which moves
+**every** image of the chart, so the registry must have them all; leave it empty to go back to the chart's own. The signing acceptance test reads
+it too, so a run is moved the same way.
+
 ##### The public key
 
 `afon-cli.sh signing-public-key <aws|azure|gcp>` sets it for you: it generates a key pair (once, in `$AFON_HOME/cosign/<cloud>`) unless

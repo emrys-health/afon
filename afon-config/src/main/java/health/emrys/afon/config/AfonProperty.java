@@ -34,6 +34,14 @@ public enum AfonProperty {
     /** Selects which theme under afon-theme's {@code themes/<name>/} to deploy. Defaults to "emrys-hdrs". */
     AFON_THEME("AFON_THEME"),
 
+    /**
+     * Registry the images of the Kyverno chart are pulled from, for every cloud, set as the chart's {@code global.image.registry}, which overrides
+     * the registry of every image of the chart, so the registry must have them all, the {@code readiness-checker} included.  Optional: the
+     * registry of the chart, {@code reg.kyverno.io}, when blank or unset.  Set it to {@code ghcr.io}, which has the same images, if
+     * {@code reg.kyverno.io} is down.  The acceptance test of the signing uses it too.
+     */
+    KYVERNO_IMAGE_REGISTRY("KYVERNO_IMAGE_REGISTRY"),
+
     // AWS
     AWS_REGION("AWS_REGION"),
     AWS_ACCOUNT_ID("AWS_ACCOUNT_ID"),
