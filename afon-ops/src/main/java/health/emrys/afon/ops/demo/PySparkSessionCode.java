@@ -8,13 +8,14 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
+import static health.emrys.afon.spark.Constants.TOKEN_HEADER;
 import static java.lang.String.format;
 
 /**
  * Generates the PySpark code that creates a Spark Connect session whose catalogs authenticate with
  * the user's own OIDC token, read from the {@code OIDC_TOKEN} environment variable injected into
  * the Jupyter pod. The shared Spark Connect server registers no catalogs of its own, and lets in only a client that sends that
- * token in the header {@value SparkConnectClient#TOKEN_HEADER} too.
+ * token in the header TOKEN_HEADER too.
  */
 class PySparkSessionCode {
 
@@ -45,7 +46,7 @@ class PySparkSessionCode {
 
                                                  OIDC_TOKEN = os.environ["OIDC_TOKEN"]
                                                  spark = (SparkSession.builder.appName("test").remote(f"sc://%s-0-driver-svc:15002/;%s={OIDC_TOKEN}")
-                                                 """.formatted(SPARK_CONNECTOR_NAME, SparkConnectClient.TOKEN_HEADER));
+                                                 """.formatted(SPARK_CONNECTOR_NAME, TOKEN_HEADER));
         catalogs.forEach((sparkCatalog, catalogName) -> {
             python.append(format("# %s \n", catalogName));
             new TreeMap<>(config.sparkConfigsWithToken(sparkCatalog, catalogName, OIDC_TOKEN))

@@ -17,6 +17,7 @@ import java.util.Map;
 import static health.emrys.afon.config.AfonProperty.OIDC_DOMAIN_NAME;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
 import static health.emrys.afon.config.AfonProperty.SPARK_CONNECT_URL;
+import static health.emrys.afon.spark.Constants.TOKEN_HEADER;
 
 /**
  * A thin client for the <a href="https://spark.apache.org/spark-connect/">Spark Connect</a> server
@@ -42,12 +43,6 @@ public class SparkConnectClient {
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectClient.class);
 
     public static final String DEFAULT_SPARK_CONNECT_URL = "sc://localhost:15002";
-
-    /**
-     * The header that the Spark Connect server takes the client's OIDC token from, see SparkConnectGuardInterceptor of
-     * afon-spark-additional: not Spark Connect's own {@code token}, which makes the client insist on TLS, which the server does not offer.
-     */
-    public static final String TOKEN_HEADER = "x-afon-token";
 
     private final String connectionString;
     private final SparkWarehouseConfig sparkConfig;
