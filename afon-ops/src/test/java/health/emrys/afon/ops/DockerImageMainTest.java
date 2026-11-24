@@ -13,6 +13,23 @@ class DockerImageMainTest {
     }
 
     @Test
+    void listsTheRepositoriesOfTheMirroredImagesWithoutTheRegistryHost() {
+        var names = DockerImageMain.repositoryNames(health.emrys.afon.cdk.DockerImages.all(), "123.dkr.ecr.eu-west-2.amazonaws.com/emrys/");
+
+        assertThat(names).contains("emrys/keycloak/keycloak", "emrys/curlimages/curl").doesNotHaveDuplicates()
+                         .noneMatch(name -> name.contains("amazonaws.com") || name.startsWith("emryshealth/"));
+    }
+
+    @Test
+    void recognisesAnEcrByItsHostAndRegion() {
+        assertThat(DockerImageMain.ecr("123456789012.dkr.ecr.eu-west-2.amazonaws.com/emrys"))
+            .contains(java.util.List.of("123456789012.dkr.ecr.eu-west-2.amazonaws.com", "eu-west-2"));
+        assertThat(DockerImageMain.ecr("123456789012.dkr.ecr.eu-west-2.amazonaws.com")).isPresent();
+        assertThat(DockerImageMain.ecr("emrys2afonregistry.azurecr.io/afon")).isEmpty();
+        assertThat(DockerImageMain.ecr("")).isEmpty();
+    }
+
+    @Test
     void logsInToAnAcrOnly() {
         assertThat(DockerImageMain.loginCommand("emrys2afonregistry.azurecr.io/afon"))
             .contains(java.util.List.of("az", "acr", "login", "--name", "emrys2afonregistry"));

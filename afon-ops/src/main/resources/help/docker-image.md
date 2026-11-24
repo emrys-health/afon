@@ -63,3 +63,6 @@ Usage:
   afon-cli.sh docker-image --charts [--report <file>] [<stack-id>...]
 
 <name> is the name of an image of the file, eg postgres-alpine.
+
+--repositories prints the repositories that the images are copied to in <CLOUD>_IMAGE_REGISTRY, one per line without the host of the registry, eg
+emrys/keycloak/keycloak, for the scripts that make them, as ECR needs a repository for each image, see aws-signing.  --cloud <aws|azure|gcp> or else AFON_CLOUD.

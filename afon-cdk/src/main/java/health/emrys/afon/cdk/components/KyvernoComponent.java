@@ -100,7 +100,7 @@ public class KyvernoComponent implements StackComponent {
             .createNamespace(true)
             .timeout(600)
             .atomic(true)
-            .set(imageRegistryValues(context.properties().getValue(AfonProperty.KYVERNO_IMAGE_REGISTRY, "")))
+            .set(chartValues(context))
             .dependsOn(dependsOn)
             .build();
 
@@ -123,6 +123,17 @@ public class KyvernoComponent implements StackComponent {
                                          "auditedNamespaces", String.join(",", audited), "enforcedNamespaces", String.join(",", enforced)))
                         .provisioners(provisioners(auditPolicy, enforcePolicy, audited, enforced))
                         .build();
+    }
+
+    /**
+     * @return the values of the chart: those of the registry of its own images, and those that let the cloud's Kyverno read the signatures of the
+     * images that {@code <CLOUD>_IMAGE_REGISTRY} keeps
+     */
+    private static List<ReleaseSet> chartValues(StackContext context) {
+        List<ReleaseSet> values = new ArrayList<>(imageRegistryValues(context.properties().getValue(AfonProperty.KYVERNO_IMAGE_REGISTRY, "")));
+        values.addAll(context.platform().kyvernoRegistryValues(
+            context.properties().getCloudValue(context.stackId().cloud(), AfonCloudProperty.IMAGE_REGISTRY, "")));
+        return values;
     }
 
     /**

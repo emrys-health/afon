@@ -80,6 +80,8 @@ import software.constructs.Construct;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static health.emrys.afon.cdk.CdkHelper.*;
@@ -960,10 +962,19 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      * {@link #associateOIDCProvider} creates.
      */
     private String irsaTrustPolicy(String namespace, String serviceAccount) {
+        return irsaTrustPolicy(namespace, List.of(serviceAccount));
+    }
+
+    /**
+     * The trust policy of a role assumed via IRSA by any of the given service accounts of the namespace.
+     */
+    private String irsaTrustPolicy(String namespace, List<String> serviceAccounts) {
+        List<String> subjects = serviceAccounts.stream().map(name -> "\"system:serviceaccount:" + namespace + ":" + name + "\"").toList();
+        String subject = subjects.size() == 1 ? subjects.get(0) : "[" + String.join(", ", subjects) + "]";
         return format(
             """
-            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": \"system:serviceaccount:%s:%s\"}}}]})}
-            """, accountId, namespace, serviceAccount);
+            ${jsonencode({\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::%s:oidc-provider/${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"${replace(data.aws_eks_cluster.EksClusterData.identity[0].oidc[0].issuer, \"https://\", \"\")}:sub\": %s}}}]})}
+            """, accountId, subject);
     }
 
     /**
@@ -974,10 +985,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      * @param policy the role's inline policy
      */
     public IamRole createIrsaRole(String id, String roleName, String namespace, String serviceAccount, String policy) {
+        return createIrsaRole(id, roleName, namespace, List.of(serviceAccount), policy);
+    }
+
+    /**
+     * As {@link #createIrsaRole(String, String, String, String, String)}, for any of the service accounts of the namespace.
+     */
+    public IamRole createIrsaRole(String id, String roleName, String namespace, List<String> serviceAccounts, String policy) {
         return IamRole.Builder
             .create(this, id)
             .name(roleName)
-            .assumeRolePolicy(irsaTrustPolicy(namespace, serviceAccount))
+            .assumeRolePolicy(irsaTrustPolicy(namespace, serviceAccounts))
             .inlinePolicy(List.of(IamRoleInlinePolicy.builder().name(roleName + "-policy").policy(policy).build()))
             // The OIDC provider must exist for the role to be assumed, and outlive the pods assuming it.
             .dependsOn(lbcIrsaDependables)
@@ -1182,6 +1200,57 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             """, bucket, region), "", Map.of(
             "LOKI_S3_ACCESS_KEY_ID", properties.getValue(AfonProperty.AWS_ACCESS_KEY_ID),
             "LOKI_S3_SECRET_ACCESS_KEY", properties.getValue(AfonProperty.AWS_SECRET_ACCESS_KEY)));
+    }
+
+    private static final String       KYVERNO_NAMESPACE        = "kyverno";
+    /** The service accounts of Kyverno that read images, so verify them: the admission controller, and the controllers of the background scan and of the reports. */
+    private static final List<String> KYVERNO_SERVICE_ACCOUNTS = List.of("kyverno-admission-controller", "kyverno-background-controller",
+                                                                         "kyverno-reports-controller");
+    /** The values of its chart that annotate each of those service accounts. */
+    private static final List<String> KYVERNO_CHART_VALUES     = List.of("admissionController", "backgroundController", "reportsController");
+    private static final Pattern      ECR                      = Pattern.compile("^([0-9]{12})\\.dkr\\.ecr\\.([a-z0-9-]+)\\.amazonaws\\.com(?:/(.*))?$");
+
+    /**
+     * Gives the service accounts of Kyverno, through IRSA, a role that can read the images of the ECR of {@code AWS_IMAGE_REGISTRY}, and nothing else:
+     * in particular it cannot use the KMS key that signs them, as Kyverno verifies with the public key.  The pods cannot use the node role instead, see
+     * {@link #createIrsaRole}.  Nothing for a registry that is not an ECR.
+     */
+    @Override
+    public List<ReleaseSet> kyvernoRegistryValues(String imageRegistry) {
+        Matcher registry = ECR.matcher(imageRegistry == null ? "" : imageRegistry.strip());
+        if (!registry.matches()) {
+            return List.of();
+        }
+        IamRole role = createIrsaRole("kyvernoRegistryRole", componentNames.getKyvernoRegistryRoleName(), KYVERNO_NAMESPACE, KYVERNO_SERVICE_ACCOUNTS,
+                                      ecrReadPolicy(registry.group(2), registry.group(1), registry.group(3)));
+        return KYVERNO_CHART_VALUES.stream().map(controller -> ReleaseSet
+            .builder().name(controller + ".rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn").value(role.getArn()).build()).toList();
+    }
+
+    /**
+     * @param path the path in the registry, eg {@code emrys}, or blank for none, ie all the repositories of the account
+     * @return the policy that lets the holder pull the images of the repositories under the path, and get the token to do so, which is account-wide
+     */
+    static String ecrReadPolicy(String region, String account, String path) {
+        String prefix = path == null || path.isBlank() ? "" : path.strip().replaceAll("^/+|/+$", "") + "/";
+        return format("""
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ECRToken",
+                  "Effect": "Allow",
+                  "Action": "ecr:GetAuthorizationToken",
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "ECRPull",
+                  "Effect": "Allow",
+                  "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+                  "Resource": "arn:aws:ecr:%s:%s:repository/%s*"
+                }
+              ]
+            }""", region, account, prefix);
     }
 
     /**

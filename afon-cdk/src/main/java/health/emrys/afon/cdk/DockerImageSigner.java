@@ -308,6 +308,36 @@ public final class DockerImageSigner {
     }
 
     /**
+     * Logs Docker in to a registry, whose login cosign and oras share, with the password given to it on its input, not as an argument, which
+     * any process could read.
+     *
+     * @throws IOException if the login fails
+     */
+    public static void dockerLogin(String host, String username, String password) throws IOException {
+        List<String> command = List.of("docker", "login", "--username", username, "--password-stdin", host);
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        try (var out = process.getOutputStream()) {
+            out.write(password.getBytes(StandardCharsets.UTF_8));
+        }
+        try {
+            String output;
+            try (var in = process.getInputStream()) {
+                output = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+            }
+            if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("Timed out logging in to " + host);
+            }
+            if (process.exitValue() != 0) {
+                throw new IOException(String.format("docker login to %s failed: %s", host, output));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted logging in to " + host, e);
+        }
+    }
+
+    /**
      * @return a runner that runs each command as a process, failing with its output if it exits with other than 0
      */
     public static CommandRunner processes() {

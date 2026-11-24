@@ -31,7 +31,7 @@ public class AwsComponentNames {
         region = properties.getValue(AWS_REGION);
         checkRoleNameLength(getClusterRoleName(), getNodeGroupRoleName(), getLoadBalancerRoleName(),
                             getPolarisLogShipperRoleName(), getEbsCsiDriverRoleName(),
-                            getSnapshotRoleName());
+                            getSnapshotRoleName(), getKyvernoRegistryRoleName());
     }
 
     /**
@@ -132,6 +132,13 @@ public class AwsComponentNames {
 
     public String getPolarisLogShipperRoleName() {
         return "cdktf-eks-fluent-bit-role-" + cluster;
+    }
+
+    /**
+     * @return the role of the service accounts of Kyverno, which reads the signatures of the images from ECR
+     */
+    public String getKyvernoRegistryRoleName() {
+        return "cdktf-eks-kyverno-ecr-role-" + cluster;
     }
 
     public String getEbsCsiDriverRoleName() {

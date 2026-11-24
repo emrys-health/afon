@@ -58,6 +58,7 @@ public class DockerImageMain {
     static final String VERIFY_OPTION = "--verify";
     static final String SIGN_OPTION = "--sign";
     static final String PUBLIC_KEY_OPTION = "--public-key";
+    static final String REPOSITORIES_OPTION = "--repositories";
     static final String SIGNATURES_OPTION = "--signatures";
     private static final String CLOUD_OPTION = "--cloud";
     private static final String FILE_OPTION = "--file";
@@ -170,6 +171,29 @@ public class DockerImageMain {
         }
     }
 
+    /**
+     * Prints the repositories of the registry that the images are copied to, one per line, as the registry names them, ie the repository of
+     * each mirrored image without the host of the registry, eg {@code emrys/keycloak/keycloak}, for what has to make them first, as ECR does.
+     */
+    private static void repositories(SignArguments arguments) {
+        String registry = new OpsPropertyProvider().getCloudValue(arguments.cloud(), AfonCloudProperty.IMAGE_REGISTRY, "");
+        if (registry.isBlank()) {
+            throw new IllegalArgumentException(String.format("Set %s to list the repositories of its images",
+                AfonCloudProperty.IMAGE_REGISTRY.forCloud(arguments.cloud()).orElseThrow()));
+        }
+        // read by the scripts, so printed, not logged
+        repositoryNames(DockerImages.all(), registry).forEach(System.out::println);
+    }
+
+    /**
+     * @return the repositories that the mirrored images are copied to, without the host of the registry, in the order of the file, each once
+     */
+    static List<String> repositoryNames(java.util.Map<String, DockerImageDefinitions.Definition> images, String registry) {
+        String host = registry.strip().split("/", 2)[0];
+        return images.values().stream().filter(image -> image.isMirrored(registry))
+                     .map(image -> image.repository(registry).substring(host.length() + 1)).distinct().toList();
+    }
+
     private static void publicKey(SignArguments arguments) {
         var properties = new OpsPropertyProvider();
         String key = properties.getCloudValue(arguments.cloud(), AfonCloudProperty.COSIGN_KEY, "");
@@ -269,20 +293,39 @@ public class DockerImageMain {
         return acr.isEmpty() ? Optional.empty() : Optional.of(List.of("az", "acr", "login", "--name", acr));
     }
 
+    private static final java.util.regex.Pattern ECR = java.util.regex.Pattern.compile("^([0-9]{12}\\.dkr\\.ecr\\.([a-z0-9-]+)\\.amazonaws\\.com)(/.*)?$");
+
     /**
-     * Logs in to the registry if it is an ACR, so that the images can be copied to it and signed.  A failure is only reported, as the
-     * registry may already be logged in to, eg with a docker login of a service principal, and a login that is really missing fails
-     * the copy with its own error.
+     * @return the host and the region of the registry if it is an ECR, ie {@code <account>.dkr.ecr.<region>.amazonaws.com[/<path>]}, else empty
+     */
+    static Optional<List<String>> ecr(String registry) {
+        var matcher = ECR.matcher(registry == null ? "" : registry.strip());
+        return matcher.matches() ? Optional.of(List.of(matcher.group(1), matcher.group(2))) : Optional.empty();
+    }
+
+    /**
+     * Logs in to the registry if it is an ACR, with {@code az acr login}, or an ECR, with the token of {@code aws ecr get-login-password}, so that the
+     * images can be copied to it and signed.  A failure is only reported, as the registry may already be logged in to, eg with a docker login of a
+     * service principal, and a login that is really missing fails the copy with its own error.
      */
     private static void loginToRegistry(String registry) {
-        loginCommand(registry).ifPresent(command -> {
-            info("Logging in to the registry with: %s%n", String.join(" ", command));
-            try {
-                DockerImageSigner.processes().run(command);
-            } catch (IOException e) {
-                info("Could not log in, going on as the registry may be logged in to already: %s%n", e.getMessage());
+        try {
+            var acr = loginCommand(registry);
+            if (acr.isPresent()) {
+                info("Logging in to the registry with: %s%n", String.join(" ", acr.get()));
+                DockerImageSigner.processes().run(acr.get());
+                return;
             }
-        });
+            var ecr = ecr(registry);
+            if (ecr.isPresent()) {
+                String host = ecr.get().get(0);
+                info("Logging in to the registry %s with the token of aws ecr get-login-password%n", host);
+                String token = DockerImageSigner.outputs().output(List.of("aws", "ecr", "get-login-password", "--region", ecr.get().get(1)));
+                DockerImageSigner.dockerLogin(host, "AWS", token);
+            }
+        } catch (IOException e) {
+            info("Could not log in, going on as the registry may be logged in to already: %s%n", e.getMessage());
+        }
     }
 
     /**
@@ -307,7 +350,7 @@ public class DockerImageMain {
      */
     static List<String> lines(String[] args) {
         if (args.length != 1) {
-            throw new IllegalArgumentException("Usage: docker-image <name|" + EXPORT_OPTION + "|" + PIN_OPTION + "|" + VERIFY_OPTION + "|" + SIGN_OPTION + "|" + PUBLIC_KEY_OPTION + "|" + CHARTS_OPTION + " ...>, one of " + DockerImages.all().keySet());
+            throw new IllegalArgumentException("Usage: docker-image <name|" + EXPORT_OPTION + "|" + PIN_OPTION + "|" + VERIFY_OPTION + "|" + SIGN_OPTION + "|" + PUBLIC_KEY_OPTION + "|" + REPOSITORIES_OPTION + "|" + CHARTS_OPTION + " ...>, one of " + DockerImages.all().keySet());
         }
         var image = DockerImages.all().get(args[0]);
         if (image == null) {
@@ -442,6 +485,10 @@ public class DockerImageMain {
             }
             if (args.length >= 1 && SIGN_OPTION.equals(args[0])) {
                 sign(SignArguments.of(args, ConfigUtils.afonCloud()));
+                return;
+            }
+            if (args.length >= 1 && REPOSITORIES_OPTION.equals(args[0])) {
+                repositories(SignArguments.of(args, ConfigUtils.afonCloud(), false));
                 return;
             }
             if (args.length >= 1 && PUBLIC_KEY_OPTION.equals(args[0])) {

@@ -455,6 +455,40 @@ soft-deletes it and deletes the ACR, with its images. Kyverno has no role on the
 key alone. To check as another identity: `az login` as it, and `docker-image --sign` fails with a 403 on the key, or
 `azure-signing show` reports that the key cannot be read.
 
+###### AWS: the key and the registry
+
+On AWS the KMS key and the ECR repositories are made outside the stack, so that they outlive it, by `aws-signing`, which
+is idempotent. Set the properties of `afon-aws.properties` it reads, then run it as the deployer, ie the IAM user or role
+that is logged in:
+```shell
+# AWS_IMAGE_REGISTRY=<account>.dkr.ecr.<region>.amazonaws.com/afon
+# AWS_COSIGN_KEY=awskms:///arn:aws:kms:<region>:<account>:alias/afon-image-signing
+afon-cli.sh aws-signing create       # the KMS key and its alias, and a repository for each mirrored image
+afon-cli.sh signing-public-key aws   # AWS_COSIGN_PUBLIC_KEY, the public key of the KMS key
+afon-cli.sh docker-image --sign --cloud aws
+```
+`docker-image --sign` and `--verify --signatures` log in to the ECR first, with the token of
+`aws ecr get-login-password`, so that no separate login is needed; if that fails they go on, as the registry may already
+be logged in to.
+
+What `aws-signing create` makes:
+- The key is an asymmetric `ECC_NIST_P256` key for signing and verifying, with an alias. Its key policy lets only the
+  deployer, the principal that ran it (the role, for an assumed role, not its session), `kms:Sign`, `kms:Verify`,
+  `kms:GetPublicKey` and `kms:DescribeKey`. The account can manage the key, but its policy leaves out `kms:Sign` and
+  grants, so no other role can sign, whatever its own IAM policy says. Whoever can change the key policy can still give
+  itself the right to, as with any key. Run it again as another deployer to hand the key over.
+- A repository for each image that `docker-image --sign` copies, as `docker-image --repositories --cloud aws` lists them,
+  ie `<path>/<image>`: tags are immutable, except those of the signatures (`sha256-*.sig`), which cosign appends to, so
+  that what was copied and signed cannot be replaced, and untagged images are expired after 14 days.
+- The key and the repositories outlive the stack. `aws-signing delete` deletes the repositories, with their images, and
+  schedules the deletion of the key in 7 days, until when `aws kms cancel-key-deletion` restores it.
+
+The nodes pull from the ECR with the `AmazonEC2ContainerRegistryReadOnly` policy of their role. Kyverno cannot use the
+node role, as the nodes require IMDSv2 with a hop limit of 1, so the stack gives its admission, background and reports
+controllers an IRSA role that can only read the repositories under the path of the registry: it has no access to the KMS
+key, as Kyverno verifies with the public key alone. The IAM actions the deployer needs are in
+[scripts/aws/roles.md](../scripts/aws/roles.md#image-signing-signingsh).
+
 ##### Deploy the mirrored images
 
 With `<CLOUD>_IMAGE_REGISTRY` set, the stacks of the cloud pull the images that are not first-party from the registry, not from where

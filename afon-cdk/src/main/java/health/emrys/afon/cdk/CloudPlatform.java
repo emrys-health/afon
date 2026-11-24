@@ -3,6 +3,7 @@ package health.emrys.afon.cdk;
 import health.emrys.afon.cdk.configs.NetworkConfig;
 import com.hashicorp.cdktf.ITerraformDependable;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import health.emrys.afon.config.AfonCloud;
 
 import java.util.List;
@@ -55,6 +56,17 @@ public interface CloudPlatform extends CloudProvider {
      */
     default Map<String, String> ingressPodLabels() {
         return Map.of();
+    }
+
+    /**
+     * What lets Kyverno read the signatures of the images from the image registry of the cloud, as values of its chart.  Kyverno has no role on the
+     * key, as it verifies with the public key, only on the registry, which a cloud whose nodes alone can read it, as on Azure, needs nothing for.
+     *
+     * @param imageRegistry the value of {@code <CLOUD>_IMAGE_REGISTRY}, blank for none
+     * @return the values, by default none
+     */
+    default List<ReleaseSet> kyvernoRegistryValues(String imageRegistry) {
+        return List.of();
     }
 
     /**

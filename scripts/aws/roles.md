@@ -76,6 +76,7 @@ The deployer creates these, which is why it needs the IAM actions above, with th
 | EBS CSI driver role                     | `AmazonEBSCSIDriverPolicy`                                      | The volumes of the pods, eg Gitea's       |
 | `AmazonEKSLoadBalancerControllerRole<cluster>` | `AWSLoadBalancerControllerIAMPolicyCurl` (see above)     | The load balancer controller, which makes the ALB of the ingress |
 | snapshot role (stacks with Git)         | `AWSDataLifecycleManagerServiceRole`                            | Snapshots of Gitea's volume               |
+| Kyverno registry role (if `AWS_IMAGE_REGISTRY` is an ECR) | inline: `ecr:GetAuthorizationToken`, and `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:BatchCheckLayerAvailability` on the repositories under the path of the registry | Kyverno reading the signatures of the images, through IRSA; it has no KMS access |
 
 ### Symptoms of a missing permission
 
@@ -122,6 +123,26 @@ AWS has no service accounts, so Polaris and Gitea reach the buckets as an IAM us
 [user/README.md](user/README.md): it may only assume `S3ReadWriteRoleSA` (`trust-policy.json`) and, for the Glue catalog,
 `GlueIcebergRole` (`glue-iceberg-assume-role.json`).  Its access key is `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in
 `secret-aws.properties`.  The secret is shown only once, when the key is created.
+
+## Image signing (`signing.sh`)
+
+The user running `afon-cli.sh aws-signing create` (and `delete`, `show`), who becomes **the deployer**, the only principal that can sign
+with the key, and does so with `docker-image --sign`.  In the account and the region of `AWS_IMAGE_REGISTRY`:
+
+| Service | Actions                                                                                                                       | Needed for                                                                                        |
+|---------|-------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| KMS     | `kms:CreateKey`, `kms:CreateAlias`, `kms:PutKeyPolicy`, `kms:DescribeKey`, `kms:GetKeyPolicy`, `kms:TagResource`                | Making the key and its alias, and giving its policy: the principal that runs it is the one that signs |
+| KMS     | `kms:Sign`, `kms:Verify`, `kms:GetPublicKey`                                                                                   | Signing with the key, verifying, and `signing-public-key`: granted by the key policy, not by IAM    |
+| KMS     | `kms:ScheduleKeyDeletion`, `kms:DeleteAlias`                                                                                   | Only `aws-signing delete`                                                                         |
+| ECR     | `ecr:CreateRepository`, `DescribeRepositories`, `PutImageTagMutability`, `PutLifecyclePolicy`, `TagResource`                   | Making the repositories, with their immutability and lifecycle                                    |
+| ECR     | `ecr:GetAuthorizationToken`, `ecr:InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`, `PutImage`, `BatchCheckLayerAvailability`, `BatchGetImage`, `GetDownloadUrlForLayer` | Logging in, and copying the images to the repositories, and reading them for the checks |
+| ECR     | `ecr:DeleteRepository`                                                                                                         | Only `aws-signing delete`                                                                         |
+| STS/IAM | `sts:GetCallerIdentity`, and, for an assumed role, `iam:GetRole`                                                                | Naming the deployer in the key policy                                                             |
+
+The key policy is the only thing that decides who signs: it lets the deployer sign, verify and read the public key, and the account manage the key
+but not sign, nor create grants, so an IAM policy cannot give any other principal `kms:Sign`.  Anyone who can change the key policy can, though, which
+is the case of every KMS key: restrict `kms:PutKeyPolicy` to those who should be able to hand the key over.  Run `aws-signing create` as another
+deployer to make it the one that signs.  The roles that the stack creates for the nodes and Kyverno are in [Roles the stacks create](#roles-the-stacks-create).
 
 ## TLS cert management
 
