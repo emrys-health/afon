@@ -16,15 +16,14 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Optional;
 
-import static health.emrys.afon.spark.Constants.ISSUER_CONF;
-import static health.emrys.afon.spark.Constants.KEYS_URL_CONF;
+import static health.emrys.afon.spark.Constants.*;
 
 /**
  * Lets into the Spark Connect server only a client with an OIDC token of the realm, and only what it may do there.  Register it
  * with {@code spark.connect.grpc.interceptor.classes}.
  *
  * <p>Spark Connect checks nobody: any client that reaches it gets a session, as whatever user it says it is, and runs code beside
- * every other user's.  So every call must carry the client's own token, in the header {@value #TOKEN_HEADER}, which a client sets
+ * every other user's.  So every call must carry the client's own token, in the header TOKEN_HEADER, which a client sets
  * by adding {@code ;x-afon-token=<token>} to its {@code sc://} connection string, which is checked as Trino checks it
  * (see {@link TokenVerifier}).  Not the standard {@code token} parameter, which makes the client insist on TLS, which the server
  * does not offer.  A call without a token that is good is refused, as unauthenticated.
@@ -38,9 +37,6 @@ import static health.emrys.afon.spark.Constants.KEYS_URL_CONF;
 public class SparkConnectGuardInterceptor implements ServerInterceptor {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectGuardInterceptor.class);
-
-    /** The header that holds the client's OIDC token. */
-    public static final String TOKEN_HEADER = "x-afon-token";
 
     static final Metadata.Key<String> TOKEN = Metadata.Key.of(TOKEN_HEADER, Metadata.ASCII_STRING_MARSHALLER);
 
