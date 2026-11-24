@@ -11,10 +11,13 @@ import org.apache.spark.connect.proto.JavaUDF;
 import org.apache.spark.connect.proto.Plan;
 import org.apache.spark.connect.proto.Project;
 import org.apache.spark.connect.proto.PythonUDF;
+import org.apache.spark.connect.proto.Read;
 import org.apache.spark.connect.proto.Relation;
 import org.apache.spark.connect.proto.ScalarScalaUDF;
 import org.apache.spark.connect.proto.StreamingQueryManagerCommand;
 import org.apache.spark.connect.proto.UserContext;
+import org.apache.spark.connect.proto.WriteOperation;
+import org.apache.spark.connect.proto.WriteStreamOperationStart;
 import org.junit.jupiter.api.Test;
 import org.sparkproject.connect.protobuf.ByteString;
 
@@ -96,6 +99,45 @@ class RequestPolicyTest {
         assertThat(RequestPolicy.refusal(AddArtifactsRequest.newBuilder()
                                                             .setBeginChunk(AddArtifactsRequest.BeginChunkedArtifact.newBuilder().setName("jars/big.jar"))
                                                             .build())).isPresent();
+    }
+
+    static Plan reading(Read.DataSource.Builder source) {
+        return Plan.newBuilder().setRoot(Relation.newBuilder().setRead(Read.newBuilder().setDataSource(source.setFormat("text")))).build();
+    }
+
+    static Plan writing(WriteOperation.Builder write) {
+        return Plan.newBuilder().setCommand(Command.newBuilder().setWriteOperation(write.setInput(reading(Read.DataSource.newBuilder()
+            .addPaths("s3a://bucket/in")).getRoot()))).build();
+    }
+
+    @Test
+    void aReadOfTheLocalDiskIsRefusedBeforeSparkListsTheFiles() {
+        assertThat(RequestPolicy.refusal(executing(reading(Read.DataSource.newBuilder().addPaths("s3a://bucket/in"))))).isEmpty();
+        assertThat(RequestPolicy.refusal(executing(reading(Read.DataSource.newBuilder().addPaths("/etc/hostname"))))).isPresent();
+        assertThat(RequestPolicy.refusal(executing(reading(Read.DataSource.newBuilder().addPaths("s3a://bucket/in")
+                                                                                  .addPaths("file:///etc/hostname"))))).isPresent();
+        assertThat(RequestPolicy.refusal(executing(reading(Read.DataSource.newBuilder().putOptions("path", "/etc/hostname"))))).isPresent();
+    }
+
+    @Test
+    void aWriteToTheLocalDiskIsRefused() {
+        assertThat(RequestPolicy.refusal(executing(writing(WriteOperation.newBuilder().setPath("s3a://bucket/out"))))).isEmpty();
+        assertThat(RequestPolicy.refusal(executing(writing(WriteOperation.newBuilder().setPath("/tmp/out"))))).isPresent();
+        assertThat(RequestPolicy.refusal(executing(writing(WriteOperation.newBuilder().putOptions("path", "file:/tmp/out"))))).isPresent();
+    }
+
+    @Test
+    void aStreamThatWritesOrCheckpointsToTheLocalDiskIsRefused() {
+        Plan toLocalDisk = Plan.newBuilder().setCommand(Command.newBuilder().setWriteStreamOperationStart(
+            WriteStreamOperationStart.newBuilder().setPath("/tmp/sink").putOptions("checkpointLocation", "s3a://bucket/cp"))).build();
+        Plan checkpointedLocally = Plan.newBuilder().setCommand(Command.newBuilder().setWriteStreamOperationStart(
+            WriteStreamOperationStart.newBuilder().setPath("s3a://bucket/sink").putOptions("checkpointLocation", "/tmp/cp"))).build();
+        Plan toTheCloud = Plan.newBuilder().setCommand(Command.newBuilder().setWriteStreamOperationStart(
+            WriteStreamOperationStart.newBuilder().setPath("s3a://bucket/sink").putOptions("checkpointLocation", "s3a://bucket/cp"))).build();
+
+        assertThat(RequestPolicy.refusal(executing(toLocalDisk))).isPresent();
+        assertThat(RequestPolicy.refusal(executing(checkpointedLocally))).isPresent();
+        assertThat(RequestPolicy.refusal(executing(toTheCloud))).isEmpty();
     }
 
     @Test

@@ -197,8 +197,11 @@ public class SparkWorkloads {
                                 "app.kubernetes.io/name", SPARK_CONNECTOR_NAME + "-driver"
                             )
                         ),
+                        // The driver registers with the master, not with Kubernetes, so it needs no token of its service account,
+                        // which every user's code could read from the driver's disk
                         "spec", Map.of(
-                            "restartPolicy", "Always"
+                            "restartPolicy", "Always",
+                            "automountServiceAccountToken", false
                         )
                     )
                 ),
