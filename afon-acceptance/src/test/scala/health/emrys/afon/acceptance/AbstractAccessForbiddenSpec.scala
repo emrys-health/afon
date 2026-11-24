@@ -15,7 +15,7 @@ abstract class AbstractAccessForbiddenSpec extends SpecPretifier with GivenWhenT
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
   val NAMESPACE = "forbidden"
-  val FULL_NAMESPACE = s"$afonCatalog.$NAMESPACE"
+  val FULL_NAMESPACE = s"${afonCatalog()}.$NAMESPACE"
   val NUM_ROWS = 10
 
   "Polaris" should {

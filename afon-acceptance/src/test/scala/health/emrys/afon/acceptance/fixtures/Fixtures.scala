@@ -94,7 +94,7 @@ trait SimpleFixture extends Fixture[Datum] {
       }
     }
 
-  implicit val comparison = new Ordering[Datum] {
+  implicit val comparison: Ordering[Datum] = new Ordering[Datum] {
     override def compare(
                           x: Datum,
                           y: Datum,

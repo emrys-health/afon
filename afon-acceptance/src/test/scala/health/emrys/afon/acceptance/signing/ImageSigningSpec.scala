@@ -180,6 +180,7 @@ class ImageSigningSpec extends SpecPretifier with GivenWhenThen with Eventually 
     val signed = DockerImageSigner.sign(util.Map.of(name, definition), util.List.of(name), kind.hostRegistry,
                                         keyDir.resolve("cosign.key").toString, runner, _ => digest)
     assert(signed.size == 1)
+    ()
   }
 
   private def verify(kind: KindHelper, name: String, digest: String, keyDir: Path): KindHelper.Result =

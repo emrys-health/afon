@@ -34,7 +34,7 @@ object GcpRest {
     Using.resource(Files.newInputStream(Paths.get(ConfigUtils.configDir, "afon-gcp.properties")))(in => properties.load(in))
 
     val catalog_name = "CATALOG_NAME"
-    val spark = SparkSession.builder.config(new SparkConf().setMaster("local[2]").setAppName("Tests")
+    val spark = SparkSession.builder().config(new SparkConf().setMaster("local[2]").setAppName("Tests")
         .set(f"spark.sql.catalog.$catalog_name", "org.apache.iceberg.spark.SparkCatalog")
         .set(f"spark.sql.catalog.$catalog_name.header.x-goog-user-project", GCP_PROJECT_ID.getValueFrom(properties))
         .set(f"spark.sql.catalog.$catalog_name.header.X-Iceberg-Access-Delegation","vended-credentials")

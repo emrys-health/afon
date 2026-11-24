@@ -62,7 +62,7 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
   private def deleteTree(root: Path): Unit =
     if (Files.exists(root)) {
       val paths = Files.walk(root)
-      try paths.sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) finally paths.close()
+      try paths.sorted(java.util.Comparator.reverseOrder()).forEach(p => { Files.deleteIfExists(p); () }) finally paths.close()
     }
 
   "The state of a project" should {
@@ -161,7 +161,7 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
               val created = exec(Seq("aws", "s3api", "create-bucket", "--bucket", bucket, "--region", region,
                                      "--create-bucket-configuration", s"LocationConstraint=$region"))
               assert(created._1 == 0, s"$bucket: ${created._2}")
-              made += (() => exec(Seq("aws", "s3api", "delete-bucket", "--bucket", bucket, "--region", region)))
+              made += (() => { exec(Seq("aws", "s3api", "delete-bucket", "--bucket", bucket, "--region", region)); () })
             }
           case AfonCloud.GCP =>
             val project = env.getProperty("GCP_PROJECT_ID", "").trim
@@ -172,7 +172,7 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
             for (bucket <- buckets) {
               val created = exec(Seq("gcloud", "storage", "buckets", "create", s"gs://$bucket", s"--location=$region", s"--project=$project"))
               assert(created._1 == 0, s"$bucket: ${created._2}")
-              made += (() => exec(Seq("gcloud", "storage", "buckets", "delete", s"gs://$bucket")))
+              made += (() => { exec(Seq("gcloud", "storage", "buckets", "delete", s"gs://$bucket")); () })
             }
         }
       } finally {

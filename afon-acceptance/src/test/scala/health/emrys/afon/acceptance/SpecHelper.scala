@@ -17,7 +17,7 @@ trait SpecHelper {
 
   val tableName: String = simpleTableName + formatted
   def afonCatalog(): Any
-  val tableNameFQN = afonCatalog + "." + namespace + "." + tableName
+  val tableNameFQN = s"${afonCatalog()}.$namespace.$tableName"
 
   def syntheticData(numRows: Int, numPartitions: Int = 4): Seq[Datum] = {
     Seq.range(0, numRows).map((i: Int) => Datum(

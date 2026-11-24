@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance.fixtures
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
-trait SpecPretifier extends AnyWordSpec with BeforeAndAfterAll with BeforeAndAfterEach  with SpecFormats {
+trait SpecPretifier extends AnyWordSpec with BeforeAndAfterAll with BeforeAndAfterEach  with SpecFormats with SpecSummary {
 
 
   override def beforeAll(): Unit = delimit(delimiter(50))

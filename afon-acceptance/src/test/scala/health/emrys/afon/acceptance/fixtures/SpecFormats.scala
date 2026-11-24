@@ -23,7 +23,7 @@ trait SpecFormats {
   def toHumanReadable[T](rows: Seq[T]): String = alternativeColours(rows).mkString("\n")
 
   def alternativeColours[T](xs: Seq[T]): List[String] = {
-    xs.zipWithIndex.map { case (x: T, index: Int) =>
+    xs.zipWithIndex.map { case (x, index) =>
       val colour = if (index % 2 == 0) Console.YELLOW else Console.MAGENTA
       s"$colour$x"
     }.toList :+ s"${Console.RESET}"

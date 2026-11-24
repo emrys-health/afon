@@ -172,7 +172,7 @@ object AwsGlueExternalTableSpec {
             .version("2")
             .build())
           .build()
-        glue.createTable(CreateTableRequest.builder()
+        val _ = glue.createTable(CreateTableRequest.builder()
           .databaseName(dbName)
           .tableInput(tableInput)
           .openTableFormatInput(openTableFormatInput)

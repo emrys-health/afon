@@ -24,7 +24,7 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
   val grantCatalogAdmin = new GrantCatalogAdmin(this, catalog)
   val createCatalogRole = new CreateCatalogRole(this, catalog)
   val NUM_ROWS = 100
-  val FULL_NAMESPACE = s"${afonCatalog}.$namespace"
+  val FULL_NAMESPACE = s"${afonCatalog()}.$namespace"
 
   protected def createTableAndPopulate(): Unit = {
     spark.createDataFrame(syntheticData(NUM_ROWS)).writeTo(tableNameFQN).create()
@@ -68,9 +68,11 @@ abstract class AbstractAccessSpec extends SpecPretifier with GivenWhenThen with 
 
     "have a namespace" in {
       import scala.jdk.CollectionConverters._
-      var conf = SparkHelper.sparkWarehouse.sparkConfigs(afonCatalog.toString).asScala.map {
+      var conf = SparkHelper.sparkWarehouse.sparkConfigs(afonCatalog().toString).asScala.map {
         case (k, v) =>
-          val value = if (k.toLowerCase.contains("token") || k.toLowerCase.contains("oauth")) String.format("<%s>", k.toLowerCase) else v
+          val key = k.toLowerCase
+          val secret = Seq("token", "oauth", "credential", "secret", "password").exists(key.contains)
+          val value = if (secret) String.format("<%s>", key) else v
           String.format("%-50s%50s", k, value)
       }.mkString("\n")
       conf = AcceptanceTestConfig.instance.redactSecrets(conf, "sparkConfig")

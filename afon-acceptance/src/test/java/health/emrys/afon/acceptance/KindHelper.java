@@ -17,10 +17,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static health.emrys.afon.cdk.DockerImages.REGISTRY_IMAGE;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -172,10 +176,46 @@ public class KindHelper implements AutoCloseable {
             }
             Files.copy(in, chart, StandardCopyOption.REPLACE_EXISTING);
         }
-        runOrFail(null, kubeEnv(), "helm", "upgrade", "--install", "kyverno", chart.toString(), "--namespace", "kyverno",
-                  "--create-namespace", "--set", "features.registryClient.allowInsecure=true",
-                  "--set", "backgroundController.enabled=false", "--set", "cleanupController.enabled=false",
-                  "--set", "reportsController.enabled=false", "--wait", "--timeout", "10m");
+        List<String> values = List.of("--set", "features.registryClient.allowInsecure=true",
+                                      "--set", "backgroundController.enabled=false", "--set", "cleanupController.enabled=false",
+                                      "--set", "reportsController.enabled=false");
+        preloadImages(chart, values);
+        List<String> command = new ArrayList<>(List.of("helm", "upgrade", "--install", "kyverno", chart.toString(), "--namespace", "kyverno",
+                                                       "--create-namespace"));
+        command.addAll(values);
+        command.addAll(List.of("--wait", "--timeout", "3m"));
+        runOrFail(null, kubeEnv(), command.toArray(new String[0]));
+    }
+
+    /**
+     * Pulls the images of the chart with the docker of the host, whose cache lasts across runs, and loads them into the cluster, which starts empty,
+     * so that the pods do not pull them from the registry of Kyverno, which is slow and often answers 502 or 503.  Best effort: an image that
+     * cannot be pulled or loaded is left for the cluster to pull.
+     */
+    private void preloadImages(Path chart, List<String> values) {
+        List<String> template = new ArrayList<>(List.of("helm", "template", "kyverno", chart.toString(), "--namespace", "kyverno"));
+        template.addAll(values);
+        Result rendered = run(null, Map.of(), template);
+        if (!rendered.ok()) {
+            logger.warn("Cannot list the images of the Kyverno chart, the cluster will pull them: {}", rendered.output());
+            return;
+        }
+        Set<String> images = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("(?m)^[ \\t]*(?:-[ \\t]*)?image:[ \\t]*[\"']?([^\\s\"']+)").matcher(rendered.output());
+        while (matcher.find()) {
+            images.add(matcher.group(1));
+        }
+        for (String image : images) {
+            Result pulled = run(null, Map.of(), List.of("docker", "pull", image));
+            if (!pulled.ok()) {
+                logger.warn("Cannot pull {}, the cluster will: {}", image, pulled.output());
+                continue;
+            }
+            Result loaded = run(null, Map.of(), List.of("kind", "load", "docker-image", image, "--name", clusterName));
+            if (!loaded.ok()) {
+                logger.warn("Cannot load {} into the cluster, it will pull it: {}", image, loaded.output());
+            }
+        }
     }
 
     /**

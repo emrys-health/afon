@@ -50,7 +50,7 @@ class CreateCatalogRole(test: GivenWhenThen,
   val privileges = PolarisUserManager.DEFAULT_CATALOG_PRIVILEGES
   val userManager = new PolarisUserManager(properties, catalogRoleName, privileges)
 
-  def apply = {
+  def apply(): Unit = {
     val catalogName = catalogNameOpt.getOrElse(config.catalogName())
     if (noisy) Given(s"a principal that's already been created:\n${PolarisHelper.principal.getPrincipal}")
 

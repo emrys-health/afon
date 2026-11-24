@@ -109,6 +109,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(json)).build()
     val response = http.send(request, BodyHandlers.ofString())
     assert(response.statusCode() / 100 == 2, s"PUT $path: HTTP ${response.statusCode()} ${response.body()}")
+    ()
   }
 
   /** Runs a script of the repository, with the Afon home given, and says what it printed. */
@@ -153,7 +154,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
         val pair = cookie.takeWhile(_ != ';')
         val at = pair.indexOf('=')
         val (name, value) = (pair.take(at), pair.drop(at + 1))
-        if (value.isEmpty) cookies.remove(name) else cookies(name) = value
+        if (value.isEmpty) { cookies.remove(name); () } else cookies(name) = value
       }
       response
     }

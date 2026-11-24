@@ -126,6 +126,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
       .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(json)).build()
     val response = http.send(request, BodyHandlers.ofString())
     assert(response.statusCode() / 100 == 2, s"PUT $path: HTTP ${response.statusCode()} ${response.body()}")
+    ()
   }
 
   private def adminGet(path: String): JsonNode = {
@@ -200,6 +201,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
     }
     val response = http.send(request, BodyHandlers.ofString())
     assert(response.statusCode() / 100 == 2, s"stand-in acr mapper: HTTP ${response.statusCode()} ${response.body()}")
+    ()
   }
 
   private def tokenOf(project: TreProject, email: String): String = {
@@ -233,6 +235,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
          |"storageConfigInfo":{"storageType":"FILE","allowedLocations":["file:///var/tmp/$name"]}}}""".stripMargin.replace("\n", "")
     val created = adminClient.post(CatalogConfigurer.catalogsURI(), catalog, adminClient.getAccessToken)
     assert(created.getCode / 100 == 2, s"create the catalog $name: HTTP ${created.getCode}")
+    ()
   }
 
   /** What the tests share: the project, registered in the identity, and its members alice and bob, who are both in its group, with the tokens that the identity issues them. */

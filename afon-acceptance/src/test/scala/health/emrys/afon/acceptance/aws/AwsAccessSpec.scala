@@ -26,9 +26,9 @@ class AwsAccessSpec extends AbstractAccessSpec {
       And(s"a table called $tableName with $NUM_ROWS rows in cloud storage")
 
       And(
-        s"""a Trino instance with $afonCatalog.properties of:
+        s"""a Trino instance with ${afonCatalog()}.properties of:
            |
-           |${trinoLocalConfig(properties, afonCatalog.toString)}""".stripMargin)
+           |${trinoLocalConfig(properties, afonCatalog().toString)}""".stripMargin)
 
       var trinoHttp = trinoConfigProperties().get("discovery.uri").toString
       trinoHttp = trinoHttp.substring(trinoHttp.indexOf("//") + 2)
