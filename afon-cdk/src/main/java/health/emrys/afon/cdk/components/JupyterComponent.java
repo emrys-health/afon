@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * JupyterHub with Guacamole, behind the oauth2-proxy MFA gate, which is exposed over HTTPS at the cloud's
+ * JupyterHub with Guacamole, behind the Pomerium gate, which is exposed over HTTPS at the cloud's
  * {@code JUPYTER_DOMAIN_NAME}.  It waits for the KeyCloak of the stack, if it has one, as the hub and the proxy do
  * OIDC discovery on startup.
  */

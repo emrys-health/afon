@@ -273,8 +273,8 @@ public class TrinoWorkloads {
                                                      CdkHelper.KEYCLOAK_SERVICE_NAME, KEYCLOAK_PORT, KEYCLOAK_REALM, JWKS_PATH);
 
     /**
-     * Blocks the coordinator's start until the realm serves its signing keys, as {@code JupyterMfaConfig#waitForIssuer} does
-     * oauth2-proxy's.
+     * Blocks the coordinator's start until the realm serves its signing keys, as {@code PomeriumConfig#waitForIssuer} does
+     * Pomerium's.
      *
      * <p>The coordinator reads the keys once, at startup, and fails to start if it cannot: nothing else makes Trino wait for
      * KeyCloak, whose realm only exists once configure-users has run, after the apply, eg on a new stack.

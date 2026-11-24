@@ -2,9 +2,10 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|polaris|--stack <stack id>] [--force|--check]"
+  echo "Usage: ${BASH_SOURCE[0]} [all|keycloak|jupyter|jupyter-auth|polaris|--stack <stack id>] [--force|--check]"
   echo "Requests a new ACM certificate (DNS validation) for the given stack's domain,"
-  echo "creates the validation CNAME in the Route53 hosted zone named after the domain,"
+  echo "creates the validation CNAME in the Route53 hosted zone named after the domain"
+  echo "(or the Jupyter hosted zone for jupyter-auth / auth.<jupyter>),"
   echo "and waits for ACM to issue it. The domains come from afon.properties/afon-aws.properties,"
   echo "same as the CDK stacks themselves use. Defaults to 'all'."
   echo ""
@@ -41,19 +42,19 @@ done
 # block until ACM reports it issued. Exits (returning to the caller) rather than aborting the
 # whole script on failure, so 'all' can keep going and report the other domains' results too.
 issue_cert() {
-  local domain="$1" name="$2"
+  local domain="$1" name="$2" zone="${3:-$1}"
 
   if [ -z "$domain" ]; then
     echo "- Domain name for $name is blank - check afon.properties/afon-aws.properties"
     return 1
   fi
 
-  # The hosted zone is the one named after the domain, as the stacks look it up the same way
+  # The hosted zone is the one named after the domain (or the parent zone, e.g. jupyter for auth.<jupyter>)
   local dns_zone
-  dns_zone=$(aws route53 list-hosted-zones-by-name --dns-name "$domain" --max-items 1 \
-    --query "HostedZones[?Name=='$domain.'].Id | [0]" --output text) || return 1
+  dns_zone=$(aws route53 list-hosted-zones-by-name --dns-name "$zone" --max-items 1 \
+    --query "HostedZones[?Name=='$zone.'].Id | [0]" --output text) || return 1
   if [ -z "$dns_zone" ] || [ "$dns_zone" = "None" ]; then
-    echo "- No Route53 hosted zone named $domain for $name - create it first, see docs/dns_config.md"
+    echo "- No Route53 hosted zone named $zone for $name - create it first, see docs/dns_config.md"
     return 1
   fi
 
@@ -140,16 +141,18 @@ check_cert() {
 RESULTS=()
 FAILED=()
 
-# The domain names that the stack serves, once each, whose zones dns-create-zones makes: the certificates are those of the stack, not of the env
+# The certificates that the stack serves, once each (including auth.<Jupyter> in the Jupyter zone): the certificates are those of the stack, not of the env
 if [ -n "$STACK" ]; then
   source $AFON_ROOT/scripts/dns/zones-source.sh
-  dns_set_stack_domains aws "$STACK" || exit 1
+  dns_set_stack_cert_names aws "$STACK" || exit 1
   MISSING=()
-  for DOMAIN in $DNS_DOMAINS; do
+  for ENTRY in $DNS_CERT_NAMES; do
+    DOMAIN="${ENTRY%%|*}"
+    ZONE="${ENTRY##*|}"
     if [ "$CHECK" == "true" ]; then
       check_cert "$DOMAIN" "$DOMAIN" || MISSING+=("$DOMAIN")
     else
-      issue_cert "$DOMAIN" "$DOMAIN" || FAILED+=("$DOMAIN")
+      issue_cert "$DOMAIN" "$DOMAIN" "$ZONE" || FAILED+=("$DOMAIN")
     fi
   done
   if [ ${#MISSING[@]} -gt 0 ]; then exit 1; fi
@@ -176,6 +179,9 @@ if [ "$CHECK" == "true" ]; then
     all|jupyter) check_cert "$AWS_JUPYTER_DOMAIN_NAME" jupyter || MISSING+=(jupyter) ;;
   esac
   case "$NAME" in
+    all|jupyter-auth) check_cert "${AWS_JUPYTER_DOMAIN_NAME:+auth.$AWS_JUPYTER_DOMAIN_NAME}" jupyter-auth || MISSING+=(jupyter-auth) ;;
+  esac
+  case "$NAME" in
     all|polaris) check_cert "$AWS_POLARIS_DOMAIN_NAME" polaris || MISSING+=(polaris) ;;
   esac
   if [ ${#MISSING[@]} -gt 0 ]; then exit 1; else exit 0; fi
@@ -185,11 +191,13 @@ case "$NAME" in
   all)
     issue_cert "$OIDC_DOMAIN_NAME" "keycloak" || FAILED+=("keycloak")
     issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "jupyter" || FAILED+=("jupyter")
+    issue_cert "${AWS_JUPYTER_DOMAIN_NAME:+auth.$AWS_JUPYTER_DOMAIN_NAME}" "jupyter-auth" "$AWS_JUPYTER_DOMAIN_NAME" || FAILED+=("jupyter-auth")
     issue_cert "$AWS_POLARIS_DOMAIN_NAME" "polaris" || FAILED+=("polaris")
     ;;
-  keycloak) issue_cert "$OIDC_DOMAIN_NAME" "keycloak" || FAILED+=("keycloak") ;;
-  jupyter)  issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "jupyter" || FAILED+=("jupyter") ;;
-  polaris)  issue_cert "$AWS_POLARIS_DOMAIN_NAME" "polaris" || FAILED+=("polaris") ;;
+  keycloak)     issue_cert "$OIDC_DOMAIN_NAME" "keycloak" || FAILED+=("keycloak") ;;
+  jupyter)      issue_cert "$AWS_JUPYTER_DOMAIN_NAME" "jupyter" || FAILED+=("jupyter") ;;
+  jupyter-auth) issue_cert "${AWS_JUPYTER_DOMAIN_NAME:+auth.$AWS_JUPYTER_DOMAIN_NAME}" "jupyter-auth" "$AWS_JUPYTER_DOMAIN_NAME" || FAILED+=("jupyter-auth") ;;
+  polaris)      issue_cert "$AWS_POLARIS_DOMAIN_NAME" "polaris" || FAILED+=("polaris") ;;
   *) usage; exit 1 ;;
 esac
 

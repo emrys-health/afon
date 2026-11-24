@@ -97,6 +97,35 @@ dns_set_stack_domains() {
   DNS_DOMAINS="$(dns_unique_domains $DNS_DOMAINS | tr '\n' ' ')"
 }
 
+# dns_set_stack_cert_names <cloud> <stack id|role>: sets DNS_CERT_NAMES to "<domain>|<zone>" pairs for each certificate
+# the stack serves, adding auth.<Jupyter domain> in the Jupyter zone when the stack has Jupyter, and DNS_STACK_ID to its id.
+dns_set_stack_cert_names() {
+  local cloud="$1" stack="$2" property domain seen=" "
+  source $AFON_ROOT/scripts/stack/needs-source.sh
+  stack_needs "$cloud" "$stack" || return 1
+  DNS_STACK_ID="$AFON_STACK_ID"
+  DNS_CERT_NAMES=""
+  for property in $AFON_STACK_DOMAINS; do
+    domain="${!property:-}"
+    if [ -z "$domain" ]; then
+      echo "-- $property is not set, which stack '$DNS_STACK_ID' needs for its DNS zone"
+      return 1
+    fi
+    case "$seen" in
+      *" $domain "*) ;;
+      *) seen="$seen$domain "; DNS_CERT_NAMES="$DNS_CERT_NAMES $domain|$domain" ;;
+    esac
+    case "$property" in
+      *_JUPYTER_DOMAIN_NAME)
+        case "$seen" in
+          *" auth.$domain "*) ;;
+          *) seen="$seen auth.$domain "; DNS_CERT_NAMES="$DNS_CERT_NAMES auth.$domain|$domain" ;;
+        esac ;;
+    esac
+  done
+  DNS_CERT_NAMES="${DNS_CERT_NAMES# }"
+}
+
 # Creates the DNS zone named after the domain name in the cloud: a Route 53 hosted zone, an Azure DNS zone in AZURE_RESOURCE_GROUP,
 # which must exist, or a Cloud DNS managed zone in GCP_PROJECT_ID, named after the domain name with its dots replaced by dashes, as
 # GcpCloudProvider names it.  Fails, saying why, if it cannot.

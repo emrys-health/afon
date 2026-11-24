@@ -43,7 +43,7 @@ public final class DockerImages {
     public static final String GUACAMOLE_IMAGE           = reference("guacamole");
     public static final String GUACD_IMAGE               = reference("guacd");
 
-    public static final String OAUTH2_PROXY_IMAGE        = reference("oauth2-proxy");
+    public static final String POMERIUM_IMAGE            = reference("pomerium");
     public static final String CURL_IMAGE                = reference("curl");
 
     public static final String POSTGRES_ALPINE_IMAGE     = reference("postgres-alpine");

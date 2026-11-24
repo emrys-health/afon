@@ -16,8 +16,7 @@ public interface IdentityProvider {
 
     /**
      * Registers a Polaris user, also setting the user's (verified) email.
-     * A verified email is required for logins that go through oauth2-proxy, which rejects id_tokens
-     * whose email is unverified. Pass {@code null}/blank to leave the email unset.
+     * Pass {@code null}/blank to leave the email unset.
      *
      * Ensures the Polaris realm, client and user all exist.
      * Idempotent: anything that already exists is left untouched.
@@ -95,7 +94,7 @@ public interface IdentityProvider {
 
     /**
      * Ensures the realm exists and (idempotently) provisions the confidential, browser-flow client that
-     * oauth2-proxy and JupyterHub use to log users in.
+     * the gate (Pomerium) and JupyterHub use to log users in.
      *
      * @param clientId the OAUTH2 client ID
      * @param clientSecret the OAUTH2 client secret

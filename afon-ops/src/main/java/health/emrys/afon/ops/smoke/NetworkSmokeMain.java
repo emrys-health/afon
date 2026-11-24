@@ -39,6 +39,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -68,15 +69,28 @@ public class NetworkSmokeMain {
     private NetworkSmokeMain(AfonPropertyProvider properties, KubeClient client) {
         this.properties          = properties;
         this.client              = client;
-        this.allowedIngressHosts = Set.of(
-                                          AWS_JUPYTER_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME,
-                                          AWS_OIDC_DOMAIN_NAME, AZURE_OIDC_DOMAIN_NAME, GCP_OIDC_DOMAIN_NAME,
-                                          AWS_POLARIS_DOMAIN_NAME, AZURE_POLARIS_DOMAIN_NAME, GCP_POLARIS_DOMAIN_NAME,
-                                          OIDC_DOMAIN_NAME)
-                                      .stream()
-                                      .map(x -> properties.getValue(x, ""))
-                                      .filter(x -> !x.isEmpty())
-                                      .collect(Collectors.toUnmodifiableSet());
+        this.allowedIngressHosts = allowedIngressHosts(properties);
+    }
+
+    static Set<String> allowedIngressHosts(AfonPropertyProvider properties) {
+        Set<String> hosts = new LinkedHashSet<>();
+        for (var property : List.of(AWS_JUPYTER_DOMAIN_NAME, AZURE_JUPYTER_DOMAIN_NAME, GCP_JUPYTER_DOMAIN_NAME)) {
+            String host = properties.getValue(property, "");
+            if (!host.isEmpty()) {
+                hosts.add(host);
+                hosts.add("auth." + host);
+            }
+        }
+        for (var property : List.of(
+            AWS_OIDC_DOMAIN_NAME, AZURE_OIDC_DOMAIN_NAME, GCP_OIDC_DOMAIN_NAME,
+            AWS_POLARIS_DOMAIN_NAME, AZURE_POLARIS_DOMAIN_NAME, GCP_POLARIS_DOMAIN_NAME,
+            OIDC_DOMAIN_NAME)) {
+            String host = properties.getValue(property, "");
+            if (!host.isEmpty()) {
+                hosts.add(host);
+            }
+        }
+        return Set.copyOf(hosts);
     }
 
     interface Check {
@@ -89,7 +103,7 @@ public class NetworkSmokeMain {
         results.addAll(checkPolarisCanTalkToDB());
         results.addAll(checkPublicFacingInterfaces());
         results.addAll(checkPolarisOnlyAccessibleFromCluster());
-        results.addAll(checkGuacamoleOnlyReachableFromOauth2Proxy());
+        results.addAll(checkGuacamoleOnlyReachableFromGateway());
         results.addAll(checkSparkUisReachableFromNoPod());
         // Only the driver and the workers call what the ingress exposes, so only they may reach the ingress controller, when it is in
         // the cluster: the master is allowed the other domains, but not those, so it is not checked for the domains
@@ -117,10 +131,11 @@ public class NetworkSmokeMain {
     }
 
     /**
-     * Checks that a pod other than oauth2-proxy cannot reach Guacamole, which logs in whoever the {@code X-Forwarded-Email}
-     * header names.  From Polaris, which no egress policy limits, so that only Guacamole's own ingress policy can stop it.
+     * Checks that a pod other than Pomerium cannot reach Guacamole, which logs in whoever the
+     * {@code X-Pomerium-Claim-Email} header names.  From Polaris, which no egress policy limits, so that only
+     * Guacamole's own ingress policy can stop it.
      */
-    private List<ExecResult> checkGuacamoleOnlyReachableFromOauth2Proxy() throws Exception {
+    private List<ExecResult> checkGuacamoleOnlyReachableFromGateway() throws Exception {
         String polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
         logger.info("Checking Guacamole cannot be reached from {}", polarisPodName);
         return new CurlCommand(client, polarisPodName, GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT, false).run();

@@ -79,6 +79,7 @@ import org.slf4j.LoggerFactory;
 import software.constructs.Construct;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -903,6 +904,12 @@ public class AwsCloudProvider extends AbstractCloudProvider {
      */
     public Route53Record configureDNS(String constructId, String r53ZoneId, String domainName,
                                       Release release, IngressV1 ingress, String ingressK8sName) {
+        return configureDNS(constructId, r53ZoneId, domainName, release, ingress, ingressK8sName, Optional.empty());
+    }
+
+    public Route53Record configureDNS(String constructId, String r53ZoneId, String domainName,
+                                      Release release, IngressV1 ingress, String ingressK8sName,
+                                      Optional<String> albGroup) {
         // We deliberately do NOT read the ALB hostname from the Ingress' status. The
         // hashicorp/kubernetes provider routinely returns a null status[0] for an
         // ALB-backed Ingress even when wait_for_load_balancer is set and the ALB is
@@ -912,14 +919,17 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         //
         // The AWS Load Balancer Controller does provision the ALB; only the status
         // read-back is unreliable. So we query AWS directly for the ALB the controller
-        // created, identified by the tags it stamps on it. depends_on(ingress) defers
-        // this data read to apply time, after the Ingress (and thus the ALB) exists.
+        // created, identified by the tags it stamps on it. For a grouped ingress, the
+        // controller tags the shared ALB with ingress.k8s.aws/stack=<group> rather than
+        // default/<ingress>. depends_on(ingress) defers this data read to apply time,
+        // after the Ingress (and thus the ALB) exists.
+        String stackTag = albGroup.orElse("default/" + ingressK8sName);
         DataAwsLb alb = new DataAwsLb(
             this, constructId + "Alb", DataAwsLbConfig
             .builder()
             .tags(Map.of(
                 "elbv2.k8s.aws/cluster", clusterName,
-                "ingress.k8s.aws/stack", "default/" + ingressK8sName,
+                "ingress.k8s.aws/stack", stackTag,
                 "ingress.k8s.aws/resource", "LoadBalancer"))
             .dependsOn(List.of(ingress))
             .build());
@@ -927,7 +937,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         // "provisioning" state for a few minutes, during which its DNS name does not resolve.
         // An alias record created in that window resolves to nothing, and resolvers (the
         // VPC's, CoreDNS) cache that negative answer for the zone's SOA minimum TTL, so in-cluster
-        // clients such as oauth2-proxy keep failing to reach the domain for ~10 minutes after the
+        // clients such as Pomerium keep failing to reach the domain for ~10 minutes after the
         // ALB is actually up. Creating the record only once the ALB is active avoids that.
         // The wait polls every 15s for up to 10 minutes, and fails the apply if the ALB never
         // becomes active, which applyWithRetry retries.
@@ -1159,7 +1169,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                 "source", "hashicorp/kubernetes",
                 // 3.2.1 fixes "Unexpected Identity Change" errors when a resource takes
                 // extended time to become ready (as happened when an EKS token expired
-                // mid-rollout of oauth2-proxy). Do not downgrade below 3.2.1.
+                // mid-rollout of the gate). Do not downgrade below 3.2.1.
                 "version", "3.2.1"   // 👈 Pin exact version
                                                              ));
     }
@@ -1287,7 +1297,7 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             .build();
         DataAwsRoute53Zone zone = DataAwsRoute53Zone.Builder
             .create(this, constructIds[1] + "Zone")
-            .name(route.domainName())
+            .name(route.zoneName().orElse(route.domainName()))
             .build();
         IngressV1 ingress = createHttpsIngress(
             constructIds[0],
@@ -1298,15 +1308,18 @@ public class AwsCloudProvider extends AbstractCloudProvider {
             route.port(),
             route.healthCheck(),
             getSubnetIds(),
-            inboundCidrs(AllowedCidrs.of(properties, AWS, route.component())),
-            route.openPaths());
+            inboundCidrs(AllowedCidrs.of(properties, AWS, route.albGroup().orElse(route.component()))),
+            route.openPaths(),
+            route.albGroup(),
+            route.idleTimeout());
         Route53Record dnsRecord = configureDNS(
             constructIds[1],
             zone.getZoneId(),
             route.domainName(),
             getLbRelease(),
             ingress,
-            route.ingressName());
+            route.ingressName(),
+            route.albGroup());
         return new HttpsExposure(ingress, dnsRecord);
     }
 
@@ -1314,7 +1327,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
     private static final String LOAD_BALANCER_CLASS = "service.k8s.aws/nlb";
 
     /** Restricts an ALB to the given comma-separated source CIDRs; absent means open to all. */
-    public static final String INBOUND_CIDRS_ANNOTATION = "alb.ingress.kubernetes.io/inbound-cidrs";
+    public static final String INBOUND_CIDRS_ANNOTATION    = "alb.ingress.kubernetes.io/inbound-cidrs";
+    public static final String ALB_GROUP_NAME_ANNOTATION   = "alb.ingress.kubernetes.io/group.name";
+    public static final String ALB_LB_ATTRIBUTES_ANNOTATION = "alb.ingress.kubernetes.io/load-balancer-attributes";
 
     public IngressV1 createHttpsIngress(
         final String constructId,
@@ -1363,6 +1378,23 @@ public class AwsCloudProvider extends AbstractCloudProvider {
         final List<String> subnetIds,
         final List<String> inboundCidrs,
         final List<String> openPaths) {
+        return createHttpsIngress(constructId, ingressName, certArn, hostName, serviceName, servicePort,
+                                  healthCheck, subnetIds, inboundCidrs, openPaths, Optional.empty(), Optional.empty());
+    }
+
+    public IngressV1 createHttpsIngress(
+        final String constructId,
+        final String ingressName,
+        final String certArn,
+        final String hostName,
+        final String serviceName,
+        final int servicePort,
+        final HealthCheck healthCheck,
+        final List<String> subnetIds,
+        final List<String> inboundCidrs,
+        final List<String> openPaths,
+        final Optional<String> albGroup,
+        final Optional<Duration> idleTimeout) {
         KubernetesProvider kubernetesProvider = configureK8s();
         // The key annotations for the AWS Load Balancer Controller (LBC)
         String subnetIdsCSV = subnetIds.stream().collect(Collectors.joining(","));
@@ -1391,6 +1423,9 @@ public class AwsCloudProvider extends AbstractCloudProvider {
                                                    ));
         albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-path", healthCheck.path());
         albAnnotations.put("alb.ingress.kubernetes.io/healthcheck-port", healthCheck.port());
+        albGroup.ifPresent(group -> albAnnotations.put(ALB_GROUP_NAME_ANNOTATION, group));
+        idleTimeout.ifPresent(timeout -> albAnnotations.put(
+            ALB_LB_ATTRIBUTES_ANNOTATION, "idle_timeout.timeout_seconds=" + timeout.toSeconds()));
         List<IngressV1SpecRuleHttpPath> paths;
         if (inboundCidrs.isEmpty()) {
             paths = List.of(servicePath("/", serviceName, servicePort));

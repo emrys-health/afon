@@ -33,7 +33,7 @@ default       kube-prometheus-stack-prometheus-node-exporter-27n94       1/1    
 default       kube-prometheus-stack-prometheus-node-exporter-6srn2       1/1     Running     0               2d22h
 default       kube-prometheus-stack-prometheus-node-exporter-ljv8h       1/1     Running     0               2d22h
 default       loki-0                                                     2/2     Running     0               2d22h
-default       oauth2-proxy-deployment-7cc6555dcc-4nmzh                   1/1     Running     0               2d22h
+default       pomerium-deployment-7cc6555dcc-4nmzh                       1/1     Running     0               2d22h
 default       polaris-deployment-7775b67b59-z9pgg                        1/1     Running     0               2d22h
 default       prometheus-kube-prometheus-stack-prometheus-0              2/2     Running     0               2d22h
 default       promtail-8fj5c                                             1/1     Running     0               2d22h

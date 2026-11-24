@@ -508,7 +508,7 @@ the `create` stage, but have to be delegated from the parent domain before the T
 `up` issues too, once the zones are delegated. Either `up` does the delegation, or you stop after `create`, delegate,
 issue the certificates, and run the rest.
 
-**3. Make the secret of its TRE client.** The TRE's JupyterHub and the oauth2-proxy gate in front of it sign members in
+**3. Make the secret of its TRE client.** The TRE's JupyterHub and the Pomerium gate in front of it sign members in
 with a client of the project's own, `cvd-2026-tre`, which has a secret. This writes a random one, readable by its owner
 only, to `~/.afon/projects/cvd-2026/secrets/tre.secret`:
 
@@ -517,12 +517,14 @@ afon-cli.sh project-secret cvd-2026 tre
 afon-cli.sh manage-project-stack configure cvd-2026
 ```
 
-`configure` puts the client in the TRE's config, in `secret.properties`: `OAUTH2_CLIENT_ID=cvd-2026-tre` and
-`OAUTH2_CLIENT_SECRET`, in place of the env's client, which the env keeps in the same file, and which an id in
+`configure` puts the client in the TRE's config, in `secret.properties`: `OAUTH2_CLIENT_ID=cvd-2026-tre`,
+`OAUTH2_CLIENT_SECRET`, and project-specific `POMERIUM_SHARED_SECRET` and `POMERIUM_COOKIE_SECRET` (reused on rerun),
+in place of the env's client, which the env keeps in the same file, and which an id in
 `afon.properties` would not override, as `secret.properties` is read after it. `up` gives the identity the same secret
 when it makes the client. `configure` stops if the `secrets/tre.secret` file is missing. The file is not replaced if it
 exists, as the identity and the config were given that secret: `--force` makes another, and `configure` and
-`manage-identity create` are run again. See [Client secrets](#client-secrets) for what it is for.
+`manage-identity create` are run again (also rerun `manage-identity create` when migrating an existing project's TRE to
+the Pomerium gate so its client gets the `auth.<Jupyter domain>` callbacks). See [Client secrets](#client-secrets) for what it is for.
 
 ### Automatic delegation
 
@@ -1393,13 +1395,11 @@ say what the receiver found (`spf=pass`, `dkim=pass`, `dmarc=pass`).
   not a member proving who they are. A project has its own, so that its tokens are for its own client, with its own
   audience, project claim and `acr`.
 - **Why not a key.** The client was first made to authenticate by a signed assertion with a private key
-  (`private_key_jwt`), which Keycloak supports. The tools that sign members in do not: oauth2-proxy, in the version that
-  Afon runs (`v7.6.0`), takes a client secret only, and support for a signed client assertion is an open pull request,
-  and JupyterHub's `GenericOAuthenticator` takes a `client_id` and a `client_secret` only. A key is to be used again when
+  (`private_key_jwt`), which Keycloak supports. The tools that sign members in do not: Pomerium and JupyterHub's
+  `GenericOAuthenticator` take a `client_id` and a `client_secret` only. A key is to be used again when
   they can present it.
-- **PKCE.** The gate in front of JupyterHub asks for PKCE (the S256 method) in a project's TRE. The project's client
-  allows it and does not require it: JupyterHub's own sign-in, behind the oauth2-proxy gate and with the same client,
-  sends none in the version that Afon runs, so a client that required it would let only the gate sign in.
+- **PKCE.** The project's client allows PKCE and does not require it: neither Pomerium nor JupyterHub's own sign-in
+  sends PKCE in the versions that Afon runs, while the client's secret still authenticates the code exchange.
 - **How members authenticate.** Each member signs in as themselves, in the browser flow, with their own password and a
   second factor. Their email is only their identifier: it is their username in the identity provider, and `sync-members`
   uses it to find or create their account. The first time, they get an invitation email to verify the email, set a
@@ -1535,8 +1535,8 @@ Provider that its file names:
 
 - **Not built: the TRE's tools do not check the audience, the project claim or the `acr` of a token
   ([#410](https://github.com/emrys-health/afon/issues/410)).** The tokens carry them, and the Data Providers check them,
-  so the data is protected, but Trino, the oauth2-proxy gate and JupyterHub, and Gitea and VS Code when they exist, do
-  not each require them. A key in place of the secret waits for oauth2-proxy and JupyterHub's authenticator to be able to
+  so the data is protected, but Trino, the Pomerium gate and JupyterHub, and Gitea and VS Code when they exist, do
+  not each require them. A key in place of the secret waits for Pomerium and JupyterHub's authenticator to be able to
   present one, see [Client secrets](#client-secrets).
 
 ### Members, invitations and the setup of a TRE

@@ -92,7 +92,7 @@ class KeyCloakSmtpTest {
     @Test
     void hasNoServerWhenTheHostIsNotSet() throws IOException {
         assertThat(KeyCloakProvider.Smtp.of(properties("KEYCLOAK_SMTP_HOST=\nKEYCLOAK_SMTP_FROM=\n", ""))).isNull();
-        assertThat(KeyCloakProvider.Smtp.of(properties("OIDC_EMAIL_DOMAIN=*\n", ""))).isNull();
+        assertThat(KeyCloakProvider.Smtp.of(properties("ENV_NAME=dev\n", ""))).isNull();
     }
 
     @Test

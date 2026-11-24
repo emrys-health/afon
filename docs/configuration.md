@@ -121,13 +121,15 @@ provide information to the user of the config content.  It will also list the fi
 
 #### Browser login of Jupyter and Guacamole
 
-For the browser login of Jupyter and Guacamole, `OAUTH2_CLIENT_ID` and `OAUTH2_CLIENT_SECRET` are not looked up in KeyCloak: they are chosen by the deployer, and the setup (`ConfigureUsersMain.configureJupyterClient`) creates the KeyCloak browser client with them, while JupyterHub and oauth2-proxy sign in with the same pair.  Nothing has to exist beforehand.  If they are blank, KeyCloak is asked for a client with an empty id and secret and answers `400`, and the setup stops with `Failed to provision KeyCloak browser client`, caused by `Could not create KeyCloak browser client : HTTP 400`.
+For the browser login of Jupyter and Guacamole, `OAUTH2_CLIENT_ID` and `OAUTH2_CLIENT_SECRET` are not looked up in KeyCloak: they are chosen by the deployer, and the setup (`ConfigureUsersMain.configureJupyterClient`) creates the KeyCloak browser client with them, while JupyterHub and Pomerium sign in with the same pair.  Nothing has to exist beforehand.  If they are blank, KeyCloak is asked for a client with an empty id and secret and answers `400`, and the setup stops with `Failed to provision KeyCloak browser client`, caused by `Could not create KeyCloak browser client : HTTP 400`.
 
-| Property               | Set to                                                                                   |
-|------------------------|------------------------------------------------------------------------------------------|
-| `OAUTH2_CLIENT_ID`     | any stable name, eg `afon-jupyter` or `<env>-browser`                                    |
-| `OAUTH2_CLIENT_SECRET` | a long random string, eg `openssl rand -hex 32`                                          |
-| `OAUTH2_COOKIE_SECRET` | a random string of 16, 24 or 32 bytes, as oauth2-proxy requires, eg `openssl rand -hex 16` |
+| Property                 | Set to                                                                            |
+|--------------------------|-----------------------------------------------------------------------------------|
+| `OAUTH2_CLIENT_ID`       | any stable name, eg `afon-jupyter` or `<env>-browser`                             |
+| `OAUTH2_CLIENT_SECRET`   | a long random string, eg `openssl rand -hex 32`                                   |
+| `OAUTH2_COOKIE_SECRET`   | a random string used to derive JupyterHub's proxy/hub secrets, eg `openssl rand -hex 16` |
+| `POMERIUM_SHARED_SECRET` | 32 random bytes, base64-encoded, eg `head -c32 /dev/urandom \| base64`            |
+| `POMERIUM_COOKIE_SECRET` | 32 random bytes, base64-encoded, eg `head -c32 /dev/urandom \| base64`            |
 
 Keep the pair as it is once the client exists: KeyCloak's database outlives the cluster, and the next setup overwrites the client with whatever the config says, so changing one side only breaks the login.  A project's TRE (`OIDC_PROJECT_CLAIM` set) does not use these as a deployer's choice: its client is made by the central identity, see [projects](projects.md).
 
@@ -160,7 +162,7 @@ the env's name, eg a domain registered under another name, is set by hand.  Chec
 | `AZURE_TENANT_ID`, `AZURE_APP_ID`, `AZURE_APP_SECRET`, `AZURE_WORKLOAD_IDENTITY`, `AZURE_SP_ID`, `AZURE_CA_*`, `AZURE_DATABRICKS_TOKEN` | the app registration is per tenant                          |
 | `GOOGLE_APPLICATION_CREDENTIALS`, `GCP_SERVICE_ACCOUNT`, `GCP_HMAC_ACCESS_ID`, `GCP_HMAC_SECRET` | the service account is per project, and the HMAC key belongs to it       |
 | `POLARIS_DB_HOST`, `POLARIS_DB_*`, `GUACAMOLE_DB_*`, `GITEA_DB_*`                              | the Postgres instance may be shared: each env gets databases of its own, named after its Polaris domain (`polaris_db_<domain>`), its cluster (`guacamole-<cluster>`) and its cloud and cluster (`gitea_<cloud>_<cluster>`) |
-| `POLARIS_ID`, `POLARIS_SECRET`, `USER_ID`, `KEYCLOAK_BOOTSTRAP_ADMIN_*`, `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, `OAUTH2_COOKIE_SECRET`, `JUPYTER_VNC_PASSWORD`, `SNOWFLAKE_*` | a client or a login is created with these values by the env's own setup, or only used |
+| `POLARIS_ID`, `POLARIS_SECRET`, `USER_ID`, `KEYCLOAK_BOOTSTRAP_ADMIN_*`, `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET`, `OAUTH2_COOKIE_SECRET`, `POMERIUM_SHARED_SECRET`, `POMERIUM_COOKIE_SECRET`, `JUPYTER_VNC_PASSWORD`, `SNOWFLAKE_*` | a client or a login is created with these values by the env's own setup, or only used |
 | `<CLOUD>_COSIGN_PUBLIC_KEY`, `<CLOUD>_COSIGN_KEY`, `<CLOUD>_IMAGE_REGISTRY`                      | the images are signed once, with the key of the cloud, into its registry, whichever env deploys them: Kyverno verifies the same signatures with the same public key.  A separate key, and so a separate registry or a re-signing of the images, is only for an env that is to admit images that the others do not |
 | `users.csv`, `users-acl.csv`, `whitelist.yaml` (as it names the domains by property)          | the users of the env, and the domains it may resolve                      |
 

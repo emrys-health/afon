@@ -133,6 +133,28 @@ public class CdkUtils {
         String                                        createTimeout,
         String                                        serviceAccountName,
         Map<String, String>                           extraPodLabels) {
+        return deploy(scope, eksDependOn, labels, containers, initContainers, volumes, name, createTimeout,
+                      serviceAccountName, extraPodLabels, null);
+    }
+
+    /**
+     * As {@link #deploy(Construct, List, Map, List, List, List, String, String, String, Map)}, additionally setting the
+     * deployment's rollout strategy (e.g. {@code Recreate} for a single-replica gateway).
+     *
+     * @param strategy the deployment rollout strategy, or {@code null} for Kubernetes' default ({@code RollingUpdate})
+     */
+    public static Deployment deploy(
+        Construct                                     scope,
+        List<@NonNull ITerraformDependable>           eksDependOn,
+        Map<String, String>                           labels,
+        List<DeploymentSpecTemplateSpecContainer>     containers,
+        List<DeploymentSpecTemplateSpecInitContainer> initContainers,
+        List<DeploymentSpecTemplateSpecVolume>        volumes,
+        String                                        name,
+        String                                        createTimeout,
+        String                                        serviceAccountName,
+        Map<String, String>                           extraPodLabels,
+        DeploymentSpecStrategy                        strategy) {
         // Mirror `app` onto the canonical Kubernetes label so Hubble UI shows
         // a real workload name rather than "Unknown App". Only the pod template
         // gets the extra label — the selector and Deployment metadata keep the
@@ -164,6 +186,9 @@ public class CdkUtils {
                           .build())
             .replicas("1")
             .template(specTemplate);
+        if (strategy != null) {
+            deploymentSpec.strategy(strategy);
+        }
         // Kubernetes fails a rollout once its own progressDeadlineSeconds (default 600s / 10m)
         // elapses, surfacing a "Deployment exceeded its progress deadline" condition that the
         // provider reports as an error long before the Terraform create timeout below is reached.
@@ -178,7 +203,7 @@ public class CdkUtils {
                                  // app workloads reached at runtime via ALB/ingress — nothing downstream
                                  // in Terraform depends on their readiness, so waiting only burns wall-clock
                                  // under the 15-minute EKS auth token and risks the token expiring
-                                 // mid-rollout (which is how oauth2-proxy failed). Trade-off: a genuinely
+                                 // mid-rollout (which is how the gate failed). Trade-off: a genuinely
                                  // broken rollout won't fail the apply — surface it via monitoring/kubectl.
                                  .waitForRollout(false)
                                  .metadata(DeploymentMetadata

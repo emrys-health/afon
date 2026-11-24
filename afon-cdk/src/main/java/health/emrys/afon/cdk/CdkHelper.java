@@ -23,6 +23,7 @@ import com.hashicorp.cdktf.providers.kubernetes.service.ServiceSpecPort;
 import org.jspecify.annotations.NonNull;
 import software.constructs.Construct;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +36,8 @@ public class CdkHelper {
 
     public static final String KEYCLOAK_INGRESS_NAME = "keycloak-ingress";
     public static final String KEYCLOAK_SERVICE_NAME = "keycloak-service";
-    public static final int    PROXY_PORT            = 4180;
-    public static final String PROXY_SERVICE_NAME    = "oauth2-proxy";
+    public static final int    PROXY_PORT            = 8080;
+    public static final String PROXY_SERVICE_NAME    = "pomerium";
     public static final String POLARIS_INGRESS_NAME  = "polaris-ingress";
     /**
      * Name of the cert-manager ClusterIssuer, which the ingress refers to and a restored TLS secret must be annotated with.
@@ -52,6 +53,7 @@ public class CdkHelper {
         "k8s:io.kubernetes.pod.namespace", NGINX_INGRESS_NAMESPACE,
         "k8s:app.kubernetes.io/name", "ingress-nginx");
     public static final String              JUPYTER_INGRESS_NAME       = "jupyter-ingress";
+    public static final String              JUPYTER_AUTH_INGRESS_NAME  = "jupyter-auth-ingress";
     public static final String              JUPYTER_SERVICE_NAME       = "jupyter-web";
     public static final String              SPARK_SERVICE_ACCOUNT_NAME = "spark-application-sa";
     public static final String              TRINO_SERVICE_NAME         = "trino";
@@ -177,7 +179,7 @@ public class CdkHelper {
     }
 
     /**
-     * The size of nginx's buffer for the headers of an upstream's response, which must hold all of them. oauth2-proxy's
+     * The size of nginx's buffer for the headers of an upstream's response, which must hold all of them. The gate's
      * callback sets its session cookie, which holds the user's KeyCloak tokens, split into several {@code Set-Cookie}
      * headers that together exceed nginx's default of 4k: nginx then answers {@code 502 Bad Gateway}, logging "upstream sent
      * too big header", once the user has logged in. The AWS ALB has no such limit.
@@ -271,6 +273,8 @@ public class CdkHelper {
      * Restricts an nginx ingress to the given comma-separated source CIDRs; absent means open to all.
      */
     public static final String WHITELIST_SOURCE_RANGE_ANNOTATION = "nginx.ingress.kubernetes.io/whitelist-source-range";
+    public static final String PROXY_READ_TIMEOUT_ANNOTATION     = "nginx.ingress.kubernetes.io/proxy-read-timeout";
+    public static final String PROXY_SEND_TIMEOUT_ANNOTATION     = "nginx.ingress.kubernetes.io/proxy-send-timeout";
 
     /**
      * @param inboundCidrs the source CIDRs the ingress admits, or empty to admit all.  The controller can only tell
@@ -282,10 +286,28 @@ public class CdkHelper {
         Optional<List<LocalExecProvisioner>> ingressProvisioners,
         List<String> inboundCidrs
     ) {
+        return createIngress(dependencies, ingressProvisioners, inboundCidrs, Optional.empty());
+    }
+
+    /**
+     * As {@link #createIngress(List, Optional, List)}, additionally setting nginx's upstream read/send timeouts when
+     * {@code idleTimeout} is present.
+     */
+    public IngressV1 createIngress(
+        List<TerraformResource> dependencies,
+        Optional<List<LocalExecProvisioner>> ingressProvisioners,
+        List<String> inboundCidrs,
+        Optional<Duration> idleTimeout
+    ) {
         Map<String, String> annotations = new HashMap<>(Map.of("cert-manager.io/cluster-issuer", CLUSTER_ISSUER_NAME));
         if (!inboundCidrs.isEmpty()) {
             annotations.put(WHITELIST_SOURCE_RANGE_ANNOTATION, String.join(",", inboundCidrs));
         }
+        idleTimeout.ifPresent(timeout -> {
+            String seconds = String.valueOf(timeout.toSeconds());
+            annotations.put(PROXY_READ_TIMEOUT_ANNOTATION, seconds);
+            annotations.put(PROXY_SEND_TIMEOUT_ANNOTATION, seconds);
+        });
         return createIngress(ingressName, annotations, List.of("/"), dependencies, ingressProvisioners);
     }
 

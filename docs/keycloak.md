@@ -3,7 +3,7 @@
 ## The browser client of Jupyter
 
 Logins to the Jupyter of a cloud go through one browser client of the `polaris` realm, `OAUTH2_CLIENT_ID`, whose redirect URIs are the callbacks of that
-cloud's Jupyter, `<CLOUD>_JUPYTER_DOMAIN_NAME`.  The setup of a stack that deploys Jupyter, eg `aws-full`, registers it (step
+cloud's Jupyter (`<CLOUD>_JUPYTER_DOMAIN_NAME`): `https://auth.<jupyter>/oauth2/callback` (Pomerium), `https://auth.<jupyter>/.pomerium/signed_out` (Pomerium post-logout), and `https://<jupyter>/hub/oauth_callback` (JupyterHub), with `post.logout.redirect.uris` set to `+`.  The setup of a stack that deploys Jupyter, eg `aws-full`, registers it (step
 `configure_jupyter_client_for_cloud_<cloud>`), overwriting the redirect URIs of a client that is already there.  The stacks that do not deploy Jupyter,
 eg the Polaris-only and KeyCloak-only ones, do not register it, so cannot overwrite it, and a setup that cannot create or update it fails.
 

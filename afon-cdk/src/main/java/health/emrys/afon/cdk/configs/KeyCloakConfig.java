@@ -136,7 +136,7 @@ public class KeyCloakConfig extends Construct {
         // KeyCloak 26 takes the scheme of its frontend/issuer URLs from KC_HOSTNAME when that is a full
         // URL. In production KeyCloak sits behind a TLS-terminating load balancer, so the pod itself only
         // speaks http (KC_HTTP_ENABLED=true) but must still advertise https issuers - otherwise
-        // oauth2-proxy, which requires https, rejects the OIDC discovery document. We therefore pin the
+        // Pomerium, which requires https, rejects the OIDC discovery document. We therefore pin the
         // public scheme here. Configurable (defaulting to https) so the acceptance tests can run KeyCloak
         // over plain http.
         String protocol = properties.getValue(OIDC_PROTOCOL, "https");

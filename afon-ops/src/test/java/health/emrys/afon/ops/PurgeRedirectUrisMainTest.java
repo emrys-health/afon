@@ -47,8 +47,8 @@ class PurgeRedirectUrisMainTest {
         when(properties.getValue(AZURE_JUPYTER_DOMAIN_NAME, "")).thenReturn(" azure-jupyter.example.org ");
 
         assertThat(purge.callbacksToKeep()).containsExactly(
-            "https://aws-jupyter.example.org/oauth2/callback", "https://aws-jupyter.example.org/hub/oauth_callback",
-            "https://azure-jupyter.example.org/oauth2/callback", "https://azure-jupyter.example.org/hub/oauth_callback");
+            "https://auth.aws-jupyter.example.org/oauth2/callback", "https://auth.aws-jupyter.example.org/.pomerium/signed_out", "https://aws-jupyter.example.org/hub/oauth_callback",
+            "https://auth.azure-jupyter.example.org/oauth2/callback", "https://auth.azure-jupyter.example.org/.pomerium/signed_out", "https://azure-jupyter.example.org/hub/oauth_callback");
     }
 
     @Test
