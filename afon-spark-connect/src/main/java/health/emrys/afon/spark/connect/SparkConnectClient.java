@@ -41,7 +41,13 @@ public class SparkConnectClient {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectClient.class);
 
-    public static final String DEFAULT_SPARK_CONNECT_URL = "sc://localhost:15002/;token=deadbeef";
+    public static final String DEFAULT_SPARK_CONNECT_URL = "sc://localhost:15002";
+
+    /**
+     * The header that the Spark Connect server takes the client's OIDC token from, see SparkConnectGuardInterceptor of
+     * afon-spark-guard: not Spark Connect's own {@code token}, which makes the client insist on TLS, which the server does not offer.
+     */
+    public static final String TOKEN_HEADER = "x-afon-token";
 
     private final String connectionString;
     private final SparkWarehouseConfig sparkConfig;
@@ -66,7 +72,22 @@ public class SparkConnectClient {
         this.token = token;
     }
 
-    private static String userToken(AfonPropertyProvider properties, AfonUser user) throws IOException {
+    /**
+     * @return the connection string, with the token in the header that the server takes it from: a parameter of the connection
+     * string that is not one of Spark Connect's own is sent as a header with every call
+     */
+    public static String withToken(String connectionString, String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Spark Connect needs an OIDC token");
+        }
+        String base = connectionString.contains("/;") ? connectionString : connectionString.replaceAll("/+$", "") + "/";
+        return base + ";" + TOKEN_HEADER + "=" + token;
+    }
+
+    /**
+     * @return the OIDC token of the user's confidential client
+     */
+    public static String userToken(AfonPropertyProvider properties, AfonUser user) throws IOException {
         // The user's confidential client, of the same name and secret, as it takes no username/password
         return new KeyCloakProvider(properties.getValue(OIDC_DOMAIN_NAME)).clientToken(user.username(), user.password());
     }
@@ -86,7 +107,7 @@ public class SparkConnectClient {
                 .builder()
                 .classic()
                 .appName(this.getClass().getSimpleName())
-                .remote(connectionString);
+                .remote(withToken(connectionString, token));
 
         final StringBuffer sb = new StringBuffer();
         config.entrySet()

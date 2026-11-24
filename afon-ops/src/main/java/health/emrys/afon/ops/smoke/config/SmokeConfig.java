@@ -5,6 +5,10 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.cdk.configs.WhitelistConfig;
+import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.spark.connect.SparkConnectClient;
+
+import java.io.IOException;
 
 import java.util.List;
 import java.util.Locale;
@@ -154,4 +158,14 @@ public class SmokeConfig {
         return CALL_TIMEOUT_SECONDS;
     }
 
+
+    /**
+     * @return the OIDC token of the configured user, from the KeyCloak of the cloud under test, without which the Spark Connect server
+     * refuses a session
+     */
+    public static String sparkConnectToken() throws IOException {
+        AfonPropertyProvider properties = smokeTestProperties();
+        AfonPropertyProvider ofCloud    = properties.forCloud(new SmokeConfig(properties).cloud());
+        return SparkConnectClient.userToken(ofCloud, ProjectUserProvider.forActiveConfig().getConfiguredUser(ofCloud));
+    }
 }

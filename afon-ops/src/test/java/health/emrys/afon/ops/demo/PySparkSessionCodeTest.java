@@ -79,4 +79,9 @@ class PySparkSessionCodeTest {
         String python = code(OWN);
         assertThat(python).contains("spark.sql.catalog.test_azure.uri").doesNotContain("Data Provider").doesNotContain("lon_cvd");
     }
+
+    @Test
+    void theSessionSendsTheUsersTokenToSparkConnectAsWellAsToTheCatalogs() throws IOException {
+        assertThat(code(OWN)).contains(".remote(f\"sc://spark-connector-0-driver-svc:15002/;x-afon-token={OIDC_TOKEN}\")");
+    }
 }

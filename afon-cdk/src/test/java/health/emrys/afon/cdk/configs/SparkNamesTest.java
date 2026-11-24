@@ -46,7 +46,7 @@ class SparkNamesTest {
     @Test
     void destroyCommandsUseTheNameTheClusterWasCreatedWith() {
         // exercised through the waiting command, which names the pod
-        assertThat(new SparkWorkloads(new SparkNames("afon-spark"), DockerImageResolver.asDefined()).waitForMasterCommand())
+        assertThat(new SparkWorkloads(new SparkNames("afon-spark"), DockerImageResolver.asDefined(), "https://oidc.example/realms/polaris").waitForMasterCommand())
             .contains("pod/afon-spark-master-0");
     }
 }

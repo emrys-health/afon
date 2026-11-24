@@ -21,9 +21,11 @@ This prints ready-to-run PySpark code that:
 The generated code looks like:
 
 ```python
+import os
 from pyspark.sql import SparkSession
 
-spark = SparkSession.builder.appName("test").remote("sc://spark-connector-0-driver-svc:15002").getOrCreate()
+OIDC_TOKEN = os.environ["OIDC_TOKEN"]
+spark = SparkSession.builder.appName("test").remote(f"sc://spark-connector-0-driver-svc:15002/;x-afon-token={OIDC_TOKEN}").getOrCreate()
 
 df_test = spark.createDataFrame([["test", 1]], ['name', 'num'])
 

@@ -11,6 +11,8 @@ import health.emrys.afon.cdk.configs.SparkWorkloads;
 import java.util.ArrayList;
 import java.util.List;
 
+import static health.emrys.afon.security.keycloak.KeyCloakConfigurer.internalRealmUrl;
+
 /**
  * The Spark cluster and the Spark Connect application, which the {@link SparkOperatorComponent} launches.
  */
@@ -27,6 +29,8 @@ public class SparkComponent implements StackComponent {
         CloudPlatform platform = context.platform();
         List<ITerraformDependable> dependsOn = new ArrayList<>(platform.getDependables());
         dependsOn.add(context.require(SparkOperatorComponent.class).operatorReady());
-        new SparkWorkloads(SparkNames.from(context.properties()), context.images()).deploy(context.stack(), platform.cloud(), dependsOn);
+        // the realm whose tokens Trino takes too, see TrinoComponent
+        String realmUrl = internalRealmUrl(context.properties().getOidcDomainName(platform.cloud()), "https");
+        new SparkWorkloads(SparkNames.from(context.properties()), context.images(), realmUrl).deploy(context.stack(), platform.cloud(), dependsOn);
     }
 }

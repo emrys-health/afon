@@ -102,7 +102,8 @@ the smoke test needs: the admin is not one of the users whose access `users-acl.
 
 Open the notebook in a user's Jupyter pod and run all cells. `OIDC_TOKEN` is already injected into the pod by
 JupyterHub, and the defaults apply: Spark Connect at `sc://spark-connector-0-driver-svc:15002`. This tests the logged
-in user, so their ACL must meet the requirements above.
+in user, so their ACL must meet the requirements above. The notebook sends `OIDC_TOKEN` to Spark Connect too, in the `x-afon-token` header, and checks that
+the server refuses a session without it, or with an invalid one, and refuses `ADD JAR`, `reflect` and global temporary views.
 
 ## Settings
 

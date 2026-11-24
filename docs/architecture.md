@@ -68,11 +68,17 @@ Spark connects to Polaris via the Iceberg REST catalog protocol. `SparkWarehouse
 
 In the deployed environment, Spark runs as a Spark Connect server in Kubernetes. Jupyter notebooks connect to it via the Spark Connect protocol (`sc://spark-connector-0-driver-svc:15002`).
 The Spark Connect server is shared by all users, so it registers no catalogs and holds no credentials.
-Each session declares its own catalogs, authenticating with the user's OIDC token, which JupyterHub injects into the user's pod as the `OIDC_TOKEN` environment variable:
+Each session declares its own catalogs, authenticating with the user's OIDC token, which JupyterHub injects into the user's pod as the `OIDC_TOKEN` environment variable.
+
+The server lets in only a client that sends that token in the `x-afon-token` header too, which a client does by adding `;x-afon-token=<token>` to its
+connection string (not Spark Connect's own `token`, which makes the client insist on TLS, which the server does not offer). Each request is made as
+the token's subject, whatever user the client says it is, so that no client reaches another user's session. As every user's code runs in the same
+driver and executors, the server runs no JVM code of its clients: no Scala or Java UDFs, jars or classes, `ADD JAR`, functions made from a class,
+`reflect`, nor global temporary views, which every session could read. Python UDFs are let through. See `afon-spark-guard`.
 
 ```python
 OIDC_TOKEN = os.environ["OIDC_TOKEN"]
-spark = (SparkSession.builder.remote("sc://spark-connector-0-driver-svc:15002")
+spark = (SparkSession.builder.remote(f"sc://spark-connector-0-driver-svc:15002/;x-afon-token={OIDC_TOKEN}")
     .config("spark.sql.catalog.aws", "org.apache.iceberg.spark.SparkCatalog")
     .config("spark.sql.catalog.aws.type", "rest")
     .config("spark.sql.catalog.aws.uri", "https://<polaris-host>/api/catalog")

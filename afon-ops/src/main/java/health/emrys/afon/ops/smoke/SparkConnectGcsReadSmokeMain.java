@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.spark.connect.SparkConnectClient;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import org.apache.spark.sql.Dataset;
@@ -54,14 +55,19 @@ public class SparkConnectGcsReadSmokeMain {
     private final        KubeClient client;
     private final        String     namespace;
 
-    private SparkConnectGcsReadSmokeMain(KubeClient client, String namespace) {
+    /** The OIDC token of the configured user, without which Spark Connect refuses the session before the read is tried. */
+    private final String token;
+
+    private SparkConnectGcsReadSmokeMain(KubeClient client, String namespace, String token) {
         this.client    = client;
         this.namespace = namespace;
+        this.token     = token;
     }
+
 
     public Dataset<Row> readTextThroughPortForwarder() throws IOException {
         try (PortForwarder forward = new PortForwarder(client, namespace, SPARK_CONNECTOR_POD, 0, 15002)) {
-            String remote = "sc://localhost:" + forward.localPort();
+            String remote = SparkConnectClient.withToken("sc://localhost:" + forward.localPort(), token);
             return readText(remote);
         }
     }
@@ -129,7 +135,7 @@ public class SparkConnectGcsReadSmokeMain {
     public static void main(final String[] args) {
         int exitCode = 0;
         try (KubeClient client = new KubeClient(smokeTestProperties())) {
-            SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE);
+            SparkConnectGcsReadSmokeMain app = new SparkConnectGcsReadSmokeMain(client, KUBERNETES_NAMESPACE, sparkConnectToken());
             Dataset<Row>                 df  = app.readTextThroughPortForwarder();
             if (df != null) {
                 String msg = format("Test failed. We should not have been allowed to read public bucket %s", PATH);

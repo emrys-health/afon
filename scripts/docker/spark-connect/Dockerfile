@@ -1,5 +1,6 @@
 # Build this with:
-# mvn -pl afon-spark-audit -am package -DskipTests && cp afon-spark-audit/target/afon-spark-audit-*.jar scripts/docker/spark-connect/
+# mvn -pl afon-spark-audit,afon-spark-guard -am package -DskipTests && \
+#   cp afon-spark-audit/target/afon-spark-audit-*.jar afon-spark-guard/target/afon-spark-guard-*.jar scripts/docker/spark-connect/
 # docker build -t emryshealth/spark_jars:4.0.1 .
 # docker push emryshealth/spark_jars:4.0.1
 
@@ -28,6 +29,10 @@ RUN /opt/spark/bin/spark-submit \
 
 # The audit listener SparkWorkloads registers with spark.sql.queryExecutionListeners: without it no session can start
 COPY afon-spark-audit-*.jar /opt/spark/jars/
+
+# The gRPC interceptor and the session extension SparkWorkloads registers, which let into Spark Connect only a client with an OIDC
+# token of the realm, and refuse JVM code: without the interceptor the Spark Connect server does not start
+COPY afon-spark-guard-*.jar /opt/spark/jars/
 
 # Switch back to the default non-root user (spark) for security
 USER 185

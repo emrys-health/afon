@@ -1,5 +1,6 @@
 package health.emrys.afon.ops.smoke;
 
+import health.emrys.afon.spark.connect.SparkConnectClient;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import org.apache.spark.sql.Dataset;
@@ -59,14 +60,19 @@ public class SparkConnectS3ReadSmokeMain {
     private final KubeClient client;
     private final String namespace;
 
-    private SparkConnectS3ReadSmokeMain(KubeClient client, String namespace) {
+    /** The OIDC token of the configured user, without which Spark Connect refuses the session before the read is tried. */
+    private final String token;
+
+    private SparkConnectS3ReadSmokeMain(KubeClient client, String namespace, String token) {
         this.client    = client;
         this.namespace = namespace;
+        this.token     = token;
     }
+
 
     private Dataset<Row> readTextViaPortForward() throws IOException {
         try (PortForwarder forward = new PortForwarder(client, namespace, SPARK_CONNECTOR_POD, 0, 15002)) {
-            String remote = "sc://localhost:" + forward.localPort();
+            String remote = SparkConnectClient.withToken("sc://localhost:" + forward.localPort(), token);
             return readText(remote);
         }
     }
@@ -121,7 +127,7 @@ public class SparkConnectS3ReadSmokeMain {
     public static void main(final String[] args) throws Exception {
         int exitCode = 0;
         try (KubeClient client = new KubeClient(smokeTestProperties())) {
-            new SparkConnectS3ReadSmokeMain(client, KUBERNETES_NAMESPACE).readTextViaPortForward();
+            new SparkConnectS3ReadSmokeMain(client, KUBERNETES_NAMESPACE, sparkConnectToken()).readTextViaPortForward();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             exitCode = 1;
