@@ -574,7 +574,12 @@ afon-cli.sh signing-report azure                  # the pods checked and their i
 afon-cli.sh signing-report azure default --images # only the images of the pods in default that failed
 afon-cli.sh signing-report azure --json | jq .summary
 ```
-A pod that failed may have images that are signed: the report is of the pod, not of each image. 
+The report splits the pods in two: those whose images all come from the registry of the cloud (`<CLOUD>_IMAGE_REGISTRY`),
+which `docker-image` mirrors and signs, so that a failure there is to be fixed; and those with an image not mirrored to it,
+such as the charts' own, which are expected to fail until they are mirrored. `--images` lists the images of
+the pods that failed in the same two groups.
+
+A pod that failed may have images that are signed: the report is of the pod, not of each image.
 The reports of the controllers (Deployments, ReplicaSets...) repeat those of their pods, so they are left out.
 
 The `ephemeralContainers` are not checked yet, and images that no one has signed are reported, such as those of the Helm charts, until
