@@ -26,6 +26,11 @@ FROM ubuntu:22.04
 
 ARG TARGETARCH
 ARG PYTHON_VERSION
+ARG ORAS_VERSION
+
+# A pipe fails if any of its commands does, not only the last: a download piped to tar or gpg that fails (a 404...) is reported as curl's
+# error, rather than as the one of the command that got no input
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # The options of every download: fail on an HTTP error, rather than save its body as the file, and retry the transient failures
 ARG CURL_OPTS="-fsSL --retry 5 --retry-delay 10 --retry-all-errors"
