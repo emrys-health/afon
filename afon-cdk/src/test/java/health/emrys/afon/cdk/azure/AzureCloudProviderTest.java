@@ -66,6 +66,36 @@ class AzureCloudProviderTest {
         assertThat(admin.has("principal_type")).isFalse();
     }
 
+    @Test
+    void registryNameIsThatOfTheAcrOrEmpty() {
+        assertThat(AzureCloudProvider.registryName("myacr.azurecr.io/emrys")).isEqualTo("myacr");
+        assertThat(AzureCloudProvider.registryName(" myacr.azurecr.io ")).isEqualTo("myacr");
+        assertThat(AzureCloudProvider.registryName("123.dkr.ecr.eu-west-1.amazonaws.com/emrys")).isEmpty();
+        assertThat(AzureCloudProvider.registryName("")).isEmpty();
+    }
+
+    @Test
+    void theKubeletPullsFromTheAcrOfTheImageRegistryOnly(@TempDir Path dir, @TempDir Path other) throws Exception {
+        JsonNode without = JSON.readTree(SynthesisSupport.synthesise(StackId.parse("azure-full"), dir, Map.of()));
+        assertThat(kubeletPull(without).isMissingNode()).isTrue();
+
+        JsonNode with = JSON.readTree(SynthesisSupport.synthesise(StackId.parse("azure-full"), other,
+                                                                   Map.of("AZURE_IMAGE_REGISTRY", "myacr.azurecr.io/emrys")));
+        JsonNode pull = kubeletPull(with);
+        assertThat(pull.isMissingNode()).isFalse();
+        assertThat(pull.path("role_definition_name").asText()).isEqualTo("AcrPull");
+        assertThat(pull.path("scope").asText()).endsWith("/providers/Microsoft.ContainerRegistry/registries/myacr");
+    }
+
+    private static JsonNode kubeletPull(JsonNode plan) {
+        for (var entry : plan.path("resource").path("azurerm_role_assignment").properties()) {
+            if (entry.getKey().contains("kubelet-acr-pull")) {
+                return entry.getValue();
+            }
+        }
+        return JSON.missingNode();
+    }
+
     private static JsonNode clusterAdmin(JsonNode plan) {
         for (var entry : plan.path("resource").path("azurerm_role_assignment").properties()) {
             if (entry.getKey().contains("tofu-cluster-admin")) {

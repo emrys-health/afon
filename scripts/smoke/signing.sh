@@ -17,7 +17,7 @@
 #   4. checks with 'docker-image --verify --signatures' that the image is signed, and then all the images, of which only that one should be
 #   5. removes the registry and the key, also when a step fails
 #
-# Needs docker, cosign and curl, and network access to pull the image.  COSIGN_PASSWORD is set to empty for the run.
+# Needs docker, cosign, oras and curl, and network access to pull the image.  COSIGN_PASSWORD is set to empty for the run.
 # The commands are run as 'smoke-signing [options]'.
 
 set -euo pipefail
@@ -52,7 +52,7 @@ esac
 IMAGE="${ARGS[0]:-postgres-alpine}"
 CLOUD_UPPER="$(echo "$CLOUD" | tr '[:lower:]' '[:upper:]')"
 
-for TOOL in docker cosign curl; do
+for TOOL in docker cosign oras curl; do
   if ! command -v "$TOOL" >/dev/null 2>&1; then
     echo "$TOOL not found on PATH: run afon-cli.sh local-setup" >&2
     exit 1

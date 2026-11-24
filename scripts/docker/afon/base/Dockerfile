@@ -9,6 +9,7 @@ ARG EKSCTL_VERSION=v0.215.0
 ARG YQ_VERSION=4.54.1
 ARG KUBELOGIN_VERSION=v0.2.22
 ARG COSIGN_VERSION=v3.1.4
+ARG ORAS_VERSION=1.4.0
 ARG UV_VERSION=0.12.15
 ARG PYTHON_VERSION=3.12
 ARG EKSCTL_PLATFORM=linux/amd64
@@ -117,10 +118,13 @@ RUN curl $CURL_OPTS https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TAR
 COPY --from=kubelogin /usr/local/bin/kubelogin /usr/local/bin/kubelogin
 
 # kind, which runs a Kubernetes cluster in Docker, from its release server as in the local setup, and cosign, which signs images,
-# from its image
+# from its image, and oras, which copies the images it signs by digest, from its release server
 RUN curl $CURL_OPTS https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${TARGETARCH} -o /usr/local/bin/kind \
  && chmod 0755 /usr/local/bin/kind
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
+RUN curl $CURL_OPTS https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz \
+  | tar -xz -C /usr/local/bin oras \
+ && chmod 0755 /usr/local/bin/oras
 
 # uv, from its image, and the python it sets up the common python env with (scripts/python, requires 3.11 or 3.12, while the python of
 # ubuntu 22.04 is 3.10), installed here so that the notebooks of the smoke tests need no download of it.  Both are readable by any user.

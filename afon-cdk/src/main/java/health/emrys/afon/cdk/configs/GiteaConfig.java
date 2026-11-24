@@ -355,6 +355,9 @@ public class GiteaConfig {
         Map<String, Object> values = Map.of(
             // The repositories' volume: the claimed one, else one of the cluster's default StorageClass.
             "persistence", persistence,
+            // The image of the whole pod, not only of create-users: the chart's own main and init containers would otherwise keep
+            // the chart's registry, repository and appVersion, and so not be pulled from the registry where the image is signed.
+            "image", Map.of("fullOverride", images.gitea()),
             // A single replica on a ReadWriteOnce volume: the old pod must let go of it before the new one starts.
             "strategy", Map.of("type", "Recreate"),
             "preExtraInitContainers", List.of(createDatabase),

@@ -22,6 +22,7 @@ PINNED_helm=4.1.1
 PINNED_hubble=1.19.4
 PINNED_kind=0.33.0
 PINNED_cosign=3.1.4
+PINNED_oras=1.4.0
 PINNED_aws=2.38.3
 PINNED_eksctl=0.231.0
 PINNED_az=2.90.0
@@ -91,6 +92,7 @@ installed_version(){
     helm) helm version --short 2>/dev/null | sed -E 's/^v//; s/\+.*//' ;;
     kind) kind version 2>/dev/null | awk '{print $2}' | sed -E 's/^v//' ;;
     cosign) cosign version 2>/dev/null | grep -i GitVersion | awk '{print $2}' | sed -E 's/^v//' ;;
+    oras) oras version 2>/dev/null | awk '/^Version:/ {print $2}' ;;
     hubble) hubble version 2>/dev/null | head -1 | awk '{print $2}' | sed -E 's/^v//; s/@.*//' ;;
     aws) aws --version 2>/dev/null | sed -E 's#aws-cli/([^ ]+).*#\1#' ;;
     eksctl) eksctl version 2>/dev/null | head -1 | sed -E 's/^v//; s/-.*//' ;;
@@ -129,7 +131,7 @@ check_tool_versions(){
 
 # The tools relevant to the cloud targeted: all the clouds' if CLOUD is empty.
 pinned_tools(){
-  echo bash git java mvn node gh docker tofu kubectl jq yq helm hubble kind cosign
+  echo bash git java mvn node gh docker tofu kubectl jq yq helm hubble kind cosign oras
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then echo aws eksctl; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "azure" ]; then echo az kubelogin; fi
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "gcp" ]; then echo gcloud; fi

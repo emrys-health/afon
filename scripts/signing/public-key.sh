@@ -42,7 +42,29 @@ fi
 property() {
   sed -n "s/^$1=//p" "$PROPS" | tail -1
 }
-COSIGN_KEY="$(property "$KEY_PROPERTY")"
+# The value of a property of the cloud's file, or else of afon.properties, as the config resolves a ${NAME} reference to another property
+lookup() {
+  local VALUE
+  VALUE="$(property "$1")"
+  if [ -z "$VALUE" ] && [ -f "$AFON_HOME/config/afon.properties" ]; then
+    VALUE="$(sed -n "s/^$1=//p" "$AFON_HOME/config/afon.properties" | tail -1)"
+  fi
+  printf '%s' "$VALUE"
+}
+# The value with its ${NAME} references resolved, which may refer to others, eg azurekms://${AZURE_KEY_VAULT_NAME}.vault.azure.net/<key>: the file is read as
+# text, not sourced, so the shell does not expand them.  A reference to a property that is not there is left as it is, for cosign to report.
+resolve() {
+  local VALUE="$1" NAME REPLACEMENT PASS
+  for PASS in 1 2 3 4 5; do
+    [[ "$VALUE" =~ \$\{([A-Za-z0-9_.]+)\} ]] || break
+    NAME="${BASH_REMATCH[1]}"
+    REPLACEMENT="$(lookup "$NAME")"
+    [ -n "$REPLACEMENT" ] || break
+    VALUE="${VALUE//\$\{$NAME\}/$REPLACEMENT}"
+  done
+  printf '%s' "$VALUE"
+}
+COSIGN_KEY="$(resolve "$(property "$KEY_PROPERTY")")"
 
 if ! command -v cosign >/dev/null; then
   echo "- cosign is not installed: run afon-cli.sh local-setup"

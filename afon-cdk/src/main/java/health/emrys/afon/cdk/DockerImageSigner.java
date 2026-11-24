@@ -1,5 +1,7 @@
 package health.emrys.afon.cdk;
 
+import org.slf4j.Logger;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +12,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 /**
  * Signs the images of a {@code docker-images.yaml} with cosign, at the digest they are pinned to.  The images that are not first-party are first
  * mirrored to the registry of the stack at that digest, so that the signature, and what the cluster pulls, are in our registry.  The
@@ -18,6 +22,8 @@ import java.util.function.Consumer;
  * and signs in the legacy layout, a {@code sha256-<digest>.sig} tag, rather than its new bundle format, which the admission controller may not read.
  */
 public final class DockerImageSigner {
+
+    private static final Logger logger = getLogger(DockerImageSigner.class);
 
     private static final int COMMAND_TIMEOUT_SECONDS = 300;
     private static final File NULL_DEVICE = new File(System.getProperty("os.name", "").startsWith("Windows") ? "NUL" : "/dev/null");
@@ -68,12 +74,21 @@ public final class DockerImageSigner {
         String output(List<String> command) throws IOException;
     }
 
+    /**
+     * Whether an image, at its digest, has a signature that verifies with the key that signs.
+     */
+    @FunctionalInterface
+    public interface SignatureCheck {
+        boolean verifies(String reference);
+    }
+
     private DockerImageSigner() {
     }
 
     /**
      * Mirrors the images that are not first-party to the registry, if they are not there already, and signs every image at its digest.  An
-     * image is signed again if it was signed, which cosign allows, adding a signature.
+     * image is signed again, which cosign allows, adding a signature, unless it has a signature that verifies, see
+     * {@link #sign(Map, List, String, String, CommandRunner, DockerImagePinner.DigestResolver, Consumer, SignatureCheck)}, which this does not use.
      *
      * @param images   the images, as defined in the file
      * @param names    the images to sign, or none for those that have a digest
@@ -92,12 +107,44 @@ public final class DockerImageSigner {
     }
 
     /**
+     * @return a check of the signatures with the public key of {@code key}, derived from it, not read from the config, so that an image that
+     * was signed with a key that this has replaced is signed again.  It needs no private key, only the registry.  A check that fails for any reason,
+     * eg the registry cannot be reached, says that the image is not signed, so that the image is signed.
+     * @throws IOException if the public key cannot be had from the key
+     */
+    public static SignatureCheck verifiesWith(String key, CommandOutput commands) throws IOException {
+        String pem = PublicKeys.fromProperty(publicKey(key, commands));
+        java.nio.file.Path file = java.nio.file.Files.createTempFile("afon-cosign-", ".pub");
+        file.toFile().deleteOnExit();
+        java.nio.file.Files.writeString(file, pem + "\n", StandardCharsets.UTF_8);
+        return reference -> {
+            try {
+                commands.output(List.of("cosign", "verify", "--key", file.toString(), "--insecure-ignore-tlog=true", reference));
+                return true;
+            } catch (IOException e) {
+                return false;
+            }
+        };
+    }
+
+    /**
      * As {@link #sign(Map, List, String, String, CommandRunner, DockerImagePinner.DigestResolver)}, telling the listener of each image as
      * soon as it is signed, so that what was done is known if a later image fails.
      */
     public static List<Signed> sign(Map<String, DockerImageDefinitions.Definition> images, List<String> names, String registry, String key,
                                     CommandRunner commands, DockerImagePinner.DigestResolver resolver, Consumer<Signed> listener)
         throws IOException {
+        return sign(images, names, registry, key, commands, resolver, listener, reference -> false);
+    }
+
+    /**
+     * As {@link #sign(Map, List, String, String, CommandRunner, DockerImagePinner.DigestResolver)}, telling the listener of each image as
+     * soon as it is signed, so that what was done is known if a later image fails, and not signing an image again that already has a signature
+     * that verifies, see {@link #verifiesWith}, as it would only add another.  Such an image is still reported as signed, and told to the listener.
+     */
+    public static List<Signed> sign(Map<String, DockerImageDefinitions.Definition> images, List<String> names, String registry, String key,
+                                    CommandRunner commands, DockerImagePinner.DigestResolver resolver, Consumer<Signed> listener,
+                                    SignatureCheck check) throws IOException {
         if (registry == null || registry.isBlank() || key == null || key.isBlank()) {
             throw new IllegalArgumentException("Both a registry and a cosign key are required to sign");
         }
@@ -115,20 +162,37 @@ public final class DockerImageSigner {
                     "%s has no digest to sign: %s", image.name(), image.unpinned() != null ? image.unpinned() : "pin it with --pin"));
             }
         }
+        logger.info("Signing {} images with {}, to the registry {}", chosen.size(), key, registry);
         List<Signed> signed = new ArrayList<>();
         for (DockerImageDefinitions.Definition image : chosen) {
             String source = image.image() + "@" + image.digest();
             boolean mirror = image.isMirrored(registry);
             String target = image.repository(registry);
             if (mirror) {
-                commands.run(List.of("docker", "buildx", "imagetools", "create", "--tag", target + ":" + image.tag(), source));
+                // Nothing is copied if the tag already has the digest that is signed, ie from an earlier run: copying is the slow part.  A tag that
+                // cannot be looked up, eg because it is not there yet, is copied.
+                String existing = digestOrNull(resolver, target + ":" + image.tag());
+                if (image.digest().equals(existing)) {
+                    logger.info("{} is already in the registry as {}:{} at {}, not copying it", image.name(), target, image.tag(), image.digest());
+                } else {
+                    logger.info("Copying {} to {}:{}{}", source, target, image.tag(),
+                                existing == null ? "" : ", which has the digest " + existing + " now");
+                    // oras copies by digest, so the copy has the digest that is signed, whatever its media type: docker buildx imagetools create
+                    // wraps an image that is a single manifest, rather than an index, in a manifest list, which has another digest
+                    commands.run(List.of("oras", "cp", qualified(source), target + ":" + image.tag()));
+                }
                 String copy = resolver.digest(target + ":" + image.tag());
+                logger.debug("The copy of {} has the digest {}", image.name(), copy);
                 if (!copy.equals(image.digest())) {
                     throw new IllegalStateException(String.format(
                         "The copy of %s in %s has the digest %s, not %s", image.name(), registry, copy, image.digest()));
                 }
             }
-            commands.run(List.of("cosign", "sign", "--yes", "--use-signing-config=false", "--tlog-upload=false", "--new-bundle-format=false", "--key", key, target + "@" + image.digest()));
+            if (check.verifies(target + "@" + image.digest())) {
+                logger.info("{} is already signed with the key, at {}, not signing it again", image.name(), target + "@" + image.digest());
+            } else {
+                commands.run(List.of("cosign", "sign", "--yes", "--use-signing-config=false", "--tlog-upload=false", "--new-bundle-format=false", "--key", key, target + "@" + image.digest()));
+            }
             Signed done = new Signed(image.name(), source, target + "@" + image.digest(), mirror);
             signed.add(done);
             listener.accept(done);
@@ -162,6 +226,7 @@ public final class DockerImageSigner {
         }
         List<DockerImageDefinitions.Definition> chosen = images.values().stream()
             .filter(image -> names.isEmpty() ? image.digest() != null : names.contains(image.name())).toList();
+        logger.info("Verifying the signatures of {} images in the registry {}", chosen.size(), registry);
         List<Verified> verified = new ArrayList<>();
         java.nio.file.Path keyFile = java.nio.file.Files.createTempFile("afon-cosign-", ".pub");
         try {
@@ -177,6 +242,7 @@ public final class DockerImageSigner {
                     commands.run(List.of("cosign", "verify", "--key", keyFile.toString(), "--insecure-ignore-tlog=true", target));
                     verified.add(new Verified(image.name(), target, null));
                 } catch (IOException e) {
+                    logger.debug("Verifying {} failed: {}", target, e.getMessage());
                     verified.add(new Verified(image.name(), target, reason(e)));
                 }
             }
@@ -211,6 +277,27 @@ public final class DockerImageSigner {
             throw new IllegalArgumentException("A cosign key is required to export its public key");
         }
         return PublicKeys.toProperty(commands.output(List.of("cosign", "public-key", "--key", key)));
+    }
+
+    private static String digestOrNull(DockerImagePinner.DigestResolver resolver, String reference) {
+        try {
+            return resolver.digest(reference);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * @return the reference with its registry, as oras needs it, whereas docker takes {@code curlimages/curl} for Docker Hub's and
+     * {@code postgres} for its {@code library/postgres}: a first component is a registry if it has a dot or a colon, or is localhost
+     */
+    static String qualified(String reference) {
+        int slash = reference.indexOf('/');
+        String first = slash < 0 ? "" : reference.substring(0, slash);
+        if (slash >= 0 && (first.contains(".") || first.contains(":") || first.equals("localhost"))) {
+            return reference;
+        }
+        return "docker.io/" + (slash < 0 ? "library/" : "") + reference;
     }
 
     /**

@@ -82,6 +82,19 @@ Roles required for the **deployer**:
   - **Azure Kubernetes Service RBAC Cluster Admin** → the deployer itself (cluster scope), whether a user, a service
     principal or a managed identity ([#324](https://github.com/emrys-health/afon/issues/324))
 
+## Image signing (`signing.sh`)
+
+`azure-signing create` makes, outside the stack, the ACR of `AZURE_IMAGE_REGISTRY` and the EC P-256 key of `AZURE_COSIGN_KEY` in its Key Vault, which
+must exist.  Roles required for the **deployer**:
+
+- **Contributor** at resource group scope: create the ACR.
+- **A role-assignment-granting role**, as above, to create:
+  - **Key Vault Crypto Officer** → the deployer (vault scope), to create, rotate and delete the key; it cannot sign, so the deployer holds it together with the role below
+  - **Key Vault Crypto User** → the deployer (key scope): the only role that signs, no other identity is given it.  Signs, verifies and reads the public key
+  - **AcrPush** → the deployer (ACR scope), to push the images that `docker-image --sign` mirrors
+- The deploy of the stack (`tofu apply`) creates **AcrPull** → the kubelet identity of the cluster (ACR scope), if `AZURE_IMAGE_REGISTRY` is an ACR, so
+  that the nodes pull the images and Kyverno reads their signatures.  Kyverno has no role on the Key Vault.
+
 ## TLS certs issuance (`issue-cert.sh`)
 
 TLS certs can be issued and stored in Key Vault by `issue-cert.sh`.

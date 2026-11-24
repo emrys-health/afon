@@ -1,6 +1,7 @@
 package health.emrys.afon.cdk.configs;
 
 import health.emrys.afon.cdk.DockerImageResolver;
+import health.emrys.afon.cdk.DockerImages;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +28,10 @@ class GiteaConfigValidationTest {
     private final AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
 
     private GiteaConfig configOf(AfonCloud cloud, AfonUser... users) {
+        return configOf(cloud, DockerImageResolver.asDefined(), users);
+    }
+
+    private GiteaConfig configOf(AfonCloud cloud, DockerImageResolver images, AfonUser... users) {
         properties.setValue(AfonProperty.GITEA_ADMIN_PASSWORD, "adm1n-passw0rd");
         properties.setValue(AfonProperty.AWS_GITEA_BUCKET, "bucket");
         properties.setValue(AfonProperty.AZURE_GITEA_BUCKET, "container");
@@ -37,7 +43,7 @@ class GiteaConfigValidationTest {
             @Override public AfonUser getUser(String username) { return null; }
             @Override public boolean isAuthorised(String username, String catalogName) { return false; }
         };
-        return new GiteaConfig(properties, provider, cloud, "full-x-cluster", DockerImageResolver.asDefined());
+        return new GiteaConfig(properties, provider, cloud, "full-x-cluster", images);
     }
 
     private static AfonUser user(String name, String password) {
@@ -49,6 +55,25 @@ class GiteaConfigValidationTest {
         assertThat(configOf(AfonCloud.GCP).databaseName()).isEqualTo("gitea_gcp_full_x_cluster");
         assertThat(configOf(AfonCloud.AWS).databaseName()).isEqualTo("gitea_aws_full_x_cluster");
         assertThat(configOf(AfonCloud.AZURE).databaseName()).isEqualTo("gitea_azure_full_x_cluster");
+    }
+
+    @Test
+    void theWholePodRunsTheImageOfTheRegistry() throws Exception {
+        String registry = "myacr.azurecr.io/afon";
+        var resolver = new DockerImageResolver(DockerImages.all(), registry);
+        var values = new com.fasterxml.jackson.databind.ObjectMapper().readTree(configOf(AfonCloud.AZURE, resolver).values(Optional.empty()));
+
+        // the chart's own containers use it too, not only create-users, so the pod has no image the policy cannot verify
+        assertThat(values.path("image").path("fullOverride").asText()).isEqualTo(resolver.gitea()).startsWith(registry + "/gitea:1.27.0-rootless@sha256:");
+        assertThat(values.path("postExtraInitContainers").get(0).path("image").asText()).isEqualTo(resolver.gitea());
+    }
+
+    @Test
+    void theWholePodRunsTheImageAsDefinedWithoutARegistry() throws Exception {
+        var values = new com.fasterxml.jackson.databind.ObjectMapper().readTree(configOf(AfonCloud.AZURE).values(Optional.empty()));
+
+        assertThat(values.path("image").path("fullOverride").asText()).isEqualTo(DockerImageResolver.asDefined().gitea())
+            .startsWith("docker.gitea.com/gitea:1.27.0-rootless@sha256:");
     }
 
     @Test

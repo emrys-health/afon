@@ -82,6 +82,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
     private static final String                  AKS_AAD_SERVER_ID  = "6dae42f8-4368-4678-94ff-3960e28e3630";
     private static final String                  VNET_CIDR          = "10.1.0.0/16";
     private static final String                  SUBNET_CIDR        = "10.1.1.0/24";
+    private static final String                  ACR_SUFFIX         = ".azurecr.io";
     private static final String                  SERVICE_CIDR       = "10.2.0.0/16";
     private static final String                  DNS_SERVICE_IP     = "10.2.0.10";
     private final        String                  resourceGroup;
@@ -132,6 +133,7 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
         clientConfig = new DataAzurermClientConfig(this, "current");
         aksCluster   = createCluster(lookupResourceGroup());
         grantClusterAdmin();
+        grantRegistryPull();
         Aspects.of(scope).add(new ClusterAdminAspect(clusterAdminAssignment));
         // not left to whichever component first needs it, as a stack of the KeyCloak alone creates kubernetes resources
         // without any other asking for the provider
@@ -223,6 +225,37 @@ public class AzureCloudProvider extends AbstractHttpsCloudProvider {
             .scope(aksCluster.getId())
             .provisioners(List.of(waitForRbac))
             .build());
+    }
+
+    /**
+     * Lets the kubelet of the cluster pull from the ACR of {@code AZURE_IMAGE_REGISTRY}, where {@code docker-image --sign} mirrors
+     * the images, and Kyverno reads their signatures: its admission controller needs nothing else, in particular no role on the
+     * Key Vault, as it verifies with the public key.  As for the node role of AWS.  The ACR is made outside the stack, by
+     * {@code azure-signing}, so it is only named, not looked up.  Nothing is granted for a registry that is not an ACR.
+     */
+    private void grantRegistryPull() {
+        String registry = registryName(properties.getCloudValue(AZURE, AfonCloudProperty.IMAGE_REGISTRY, ""));
+        if (registry.isEmpty()) {
+            return;
+        }
+        new RoleAssignment(
+            this, "kubelet-acr-pull", RoleAssignmentConfig
+            .builder()
+            .principalId(aksCluster.getKubeletIdentity().getObjectId())
+            .roleDefinitionName("AcrPull")
+            .scope(format("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries/%s",
+                          subscriptionId, resourceGroup, registry))
+            .skipServicePrincipalAadCheck(true)
+            .build());
+    }
+
+    /**
+     * @param imageRegistry the value of {@code AZURE_IMAGE_REGISTRY}, eg {@code myacr.azurecr.io/emrys}
+     * @return the name of the ACR it is in, eg {@code myacr}, or empty if it is blank or not an ACR
+     */
+    public static String registryName(String imageRegistry) {
+        String host = imageRegistry.trim().split("/", 2)[0];
+        return host.endsWith(ACR_SUFFIX) ? host.substring(0, host.length() - ACR_SUFFIX.length()) : "";
     }
 
     /**

@@ -20,6 +20,7 @@ verify_commands:
   - helm version --short
   - kind version
   - cosign version
+  - oras version
 
 verify_cloud_commands:
   - tofu --version

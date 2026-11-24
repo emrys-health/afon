@@ -13,6 +13,14 @@ class DockerImageMainTest {
     }
 
     @Test
+    void logsInToAnAcrOnly() {
+        assertThat(DockerImageMain.loginCommand("emrys2afonregistry.azurecr.io/afon"))
+            .contains(java.util.List.of("az", "acr", "login", "--name", "emrys2afonregistry"));
+        assertThat(DockerImageMain.loginCommand("123.dkr.ecr.eu-west-2.amazonaws.com/emrys")).isEmpty();
+        assertThat(DockerImageMain.loginCommand("")).isEmpty();
+    }
+
+    @Test
     void rejectsWrongArgsAndUnknownImages() {
         assertThatThrownBy(() -> DockerImageMain.lines(new String[]{}))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Usage: docker-image <name|--export|--pin");

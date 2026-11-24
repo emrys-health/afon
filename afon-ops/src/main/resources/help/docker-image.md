@@ -29,8 +29,8 @@ AFON_CLOUD, and so the images need a digest.  It needs <CLOUD>_IMAGE_REGISTRY, t
 awskms:///alias/afon-image-signing, which only the deployer role should be able to use.  The first-party images are signed where they
 are; the others (upstream and third-party) are first copied, at their digest, to the registry under the path of the image without its
 own registry, eg quay.io/keycloak/keycloak to <registry>/keycloak/keycloak, and the copy is signed, after checking that it has the digest
-of the source.  Without names it signs each image that has a digest.  It needs Docker, cosign 3, network access and the credentials of the
-registry and the key, with COSIGN_PASSWORD set to the password of a key file (empty if it has none).  Signing an image again adds a signature.  --report <file> writes the record of the signing, JSON if the file is named *.json, Markdown if *.md, even when
+of the source.  Without names it signs each image that has a digest.  It needs Docker (to read the digest of a copy), cosign 3, oras (to copy the images by digest), network access and the credentials of the
+registry and the key, with COSIGN_PASSWORD set to the password of a key file (empty if it has none).  For an Azure registry, an ACR, it first runs az acr login for it (and so does --verify --signatures); if that fails it goes on, as the registry may be logged in to already.  An image that is in the registry already at its digest is not copied again, and one that already has a signature that verifies with the public key of the key is not signed again (the public key is derived from the key, not read from the config): it is still listed as signed.  --report <file> writes the record of the signing, JSON if the file is named *.json, Markdown if *.md, even when
 signing stops on an error: the cloud, registry and key reference, when, and each image signed, with its source, the image at its digest that
 was signed, and whether it was copied, for a CI job to keep.  The signatures are not uploaded to a transparency log.
 

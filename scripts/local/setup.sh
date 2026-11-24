@@ -136,6 +136,12 @@ install_cosign(){
   install_release_binary cosign 'https://github.com/sigstore/cosign/releases/download/v${version}/cosign-${os}-${arch}' raw
 }
 
+# oras, which copies the images that docker-image --sign mirrors, by digest, so that a copy keeps the digest that is signed: docker buildx
+# imagetools create wraps an image that is a single manifest in a manifest list, which has another digest.
+install_oras(){
+  install_release_binary oras 'https://github.com/oras-project/oras/releases/download/v${version}/oras_${version}_${os}_${arch}.tar.gz' tgz oras
+}
+
 # jq, from its release binary.
 install_jq(){
   local jqos=$(bin_os)
@@ -338,6 +344,7 @@ setup_tools(){
   install_helm
   install_kind
   install_cosign
+  install_oras
   if [ -z "$CLOUD" ] || [ "$CLOUD" == "aws" ]; then
     install_aws
     install_eksctl

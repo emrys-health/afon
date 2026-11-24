@@ -30,7 +30,13 @@ class DockerImageSignerTest {
 
     @Test
     void signsOurImagesInPlaceAndMirrorsTheOthersFirst() throws IOException {
-        var signed = DockerImageSigner.sign(images(), List.of(), REGISTRY, KEY, commands::add, reference -> THEIRS);
+        // the copy is not in the registry until oras has made it
+        var signed = DockerImageSigner.sign(images(), List.of(), REGISTRY, KEY, commands::add, reference -> {
+            if (commands.stream().noneMatch(command -> command.contains("oras"))) {
+                throw new IOException("not found");
+            }
+            return THEIRS;
+        });
 
         assertThat(signed).extracting(DockerImageSigner.Signed::name).containsExactly("spark", "keycloak");
         assertThat(signed.get(0).mirrored()).isFalse();
@@ -39,8 +45,61 @@ class DockerImageSignerTest {
         assertThat(signed.get(1).signed()).isEqualTo(REGISTRY + "/keycloak/keycloak@" + THEIRS);
         assertThat(commands).containsExactly(
             List.of("cosign", "sign", "--yes", "--use-signing-config=false", "--tlog-upload=false", "--new-bundle-format=false", "--key", KEY, "emryshealth/spark@" + OURS),
-            List.of("docker", "buildx", "imagetools", "create", "--tag", REGISTRY + "/keycloak/keycloak:26", "quay.io/keycloak/keycloak@" + THEIRS),
+            List.of("oras", "cp", "quay.io/keycloak/keycloak@" + THEIRS, REGISTRY + "/keycloak/keycloak:26"),
             List.of("cosign", "sign", "--yes", "--use-signing-config=false", "--tlog-upload=false", "--new-bundle-format=false", "--key", KEY, REGISTRY + "/keycloak/keycloak@" + THEIRS));
+    }
+
+    @Test
+    void doesNotCopyACopyThatIsThereWithTheDigest() throws IOException {
+        var signed = DockerImageSigner.sign(images(), List.of("keycloak"), REGISTRY, KEY, commands::add, reference -> THEIRS);
+
+        assertThat(signed).singleElement().satisfies(image -> assertThat(image.mirrored()).isTrue());
+        assertThat(commands).noneMatch(command -> command.contains("oras"));
+        assertThat(commands).singleElement().satisfies(command -> assertThat(command).contains("cosign", REGISTRY + "/keycloak/keycloak@" + THEIRS));
+    }
+
+    @Test
+    void doesNotSignAgainAnImageThatHasASignatureThatVerifies() throws IOException {
+        var checked = new java.util.ArrayList<String>();
+        var signed = DockerImageSigner.sign(images(), List.of(), REGISTRY, KEY, commands::add, reference -> THEIRS, image -> {
+        }, reference -> {
+            checked.add(reference);
+            return reference.startsWith(REGISTRY);
+        });
+
+        assertThat(signed).extracting(DockerImageSigner.Signed::name).containsExactly("spark", "keycloak");
+        assertThat(checked).containsExactly("emryshealth/spark@" + OURS, REGISTRY + "/keycloak/keycloak@" + THEIRS);
+        // spark does not verify, so it is signed; keycloak does, so it is not, and is not copied, as its tag has the digest
+        assertThat(commands).singleElement().satisfies(command -> assertThat(command).contains("cosign", "sign", "emryshealth/spark@" + OURS));
+    }
+
+    @Test
+    void verifiesWithThePublicKeyDerivedFromTheSigningKey() throws IOException {
+        var run = new java.util.ArrayList<List<String>>();
+        var check = DockerImageSigner.verifiesWith(KEY, command -> {
+            run.add(command);
+            if (command.contains("public-key")) {
+                return "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEabc\n-----END PUBLIC KEY-----";
+            }
+            if (command.stream().anyMatch(part -> part.contains("/bad@"))) {
+                throw new IOException("no signatures found");
+            }
+            return "ok";
+        });
+
+        assertThat(check.verifies("r/good@sha256:a")).isTrue();
+        assertThat(check.verifies("r/bad@sha256:a")).isFalse();
+        assertThat(run.get(0)).containsExactly("cosign", "public-key", "--key", KEY);
+        assertThat(run.get(1)).contains("cosign", "verify", "--insecure-ignore-tlog=true", "r/good@sha256:a").doesNotContain(KEY);
+    }
+
+    @Test
+    void qualifiesTheSourceWithItsRegistryAsOrasNeedsIt() {
+        assertThat(DockerImageSigner.qualified("curlimages/curl@sha256:a")).isEqualTo("docker.io/curlimages/curl@sha256:a");
+        assertThat(DockerImageSigner.qualified("postgres@sha256:a")).isEqualTo("docker.io/library/postgres@sha256:a");
+        assertThat(DockerImageSigner.qualified("quay.io/keycloak/keycloak@sha256:a")).isEqualTo("quay.io/keycloak/keycloak@sha256:a");
+        assertThat(DockerImageSigner.qualified("localhost:5000/x@sha256:a")).isEqualTo("localhost:5000/x@sha256:a");
+        assertThat(DockerImageSigner.qualified("localhost/x@sha256:a")).isEqualTo("localhost/x@sha256:a");
     }
 
     @Test

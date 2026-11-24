@@ -394,8 +394,10 @@ content that their pinned digest identifies, whatever their tag points to by now
 own registry (`quay.io/keycloak/keycloak` becomes `<registry>/keycloak/keycloak`) and is signed, after checking that it has the digest of
 the source.  So what the cluster pulls is in our registry, signed with our key.
 
-It needs Docker, cosign 3 (the flags are its own), network access and the credentials of the registry and the key.  For a key file, its
-password goes in `COSIGN_PASSWORD`, empty if it has none, as the command asks for no input.
+It needs Docker (to read the digest of a copy), cosign 3 (the flags are its own), oras (to copy the images by digest, so
+that a copy keeps the digest that is signed, which `docker buildx imagetools create` does not for an image that is a
+single manifest), network access and the credentials of the registry and the key. For a key file, its password goes in
+`COSIGN_PASSWORD`, empty if it has none, as the command asks for no input.
 
 The signatures are not uploaded to a transparency log, and are stored in the legacy layout, a `sha256-<digest>.sig` tag of the repository,
 which Kyverno reads, rather than cosign 3's new bundle format.
@@ -418,6 +420,40 @@ afon-cli.sh docker-image --verify --signatures --cloud aws             # every i
 afon-cli.sh docker-image --verify --signatures --cloud aws keycloak    # one image
 afon-cli.sh docker-image --verify --signatures --cloud aws --report signatures.md   # also writes a report, as Markdown, or JSON if named *.json
 ```
+
+###### Azure: the key and the registry
+
+On Azure the Key Vault key and the ACR are made outside the stack, so that they outlive it, by `azure-signing`, which is
+idempotent. Set the properties of `afon-azure.properties` (defaults are provided in the template):
+```properties
+AZURE_IMAGE_REGISTRY=<acr>.azurecr.io/emrys  # (the ACR name is global: 5 to 50 lowercase letters and digits)
+AZURE_COSIGN_KEY=azurekms://<vault>.vault.azure.net/<key>
+```
+Run as the deployer, ie the principal logged in with `azure-login`:
+```shell
+afon-cli.sh azure-keyvault create     # the vault, if it does not exist (AZURE_KEY_VAULT_NAME)
+afon-cli.sh azure-signing create      # the ACR, the EC P-256 key, and the roles below
+afon-cli.sh signing-public-key azure  # AZURE_COSIGN_PUBLIC_KEY, the public key of the Key Vault key
+afon-cli.sh docker-image --sign --cloud azure
+```
+`docker-image --sign` and `--verify --signatures` log in to the ACR first, with `az acr login --name <acr>`, so that no
+separate login is needed; if that fails they go on, as the registry may already be logged in to.
+
+The roles, none of which the identities of the cluster or the service principal of the app hold, so that **only the
+deployer can sign** (and manage the key):
+- `Key Vault Crypto Officer`, on the vault, to the deployer: to create, rotate and delete the key. It cannot sign, which
+  `Key Vault Crypto User` does, so the deployer holds both.
+- `Key Vault Crypto User`, on the key, to the deployer: to sign, and to read the public key. Reader roles of the vault,
+  eg `Key Vault Reader`, do not let anyone sign.
+- `AcrPush`, on the ACR, to the deployer: to push the mirrored images.
+- `AcrPull`, on the ACR, to the kubelet identity of the cluster: the stack grants it when `AZURE_IMAGE_REGISTRY` is an
+  ACR, so that the nodes pull from it and Kyverno reads the signatures.
+
+Granting them takes a role-assignment-granting role, as `azure-create` does, see `scripts/azure/roles.md`; a new role may
+take a few minutes to apply, and the script retries. The key can only sign and verify, and `azure-signing delete`
+soft-deletes it and deletes the ACR, with its images. Kyverno has no role on the Key Vault: it verifies with the public
+key alone. To check as another identity: `az login` as it, and `docker-image --sign` fails with a 403 on the key, or
+`azure-signing show` reports that the key cannot be read.
 
 ##### Deploy the mirrored images
 
@@ -485,20 +521,29 @@ images are still verified (and, without the registry, that they are not).
 
 ##### The signing report
 
-`afon-cli.sh signing-report` reads the policy reports that Kyverno writes on the current kubectl context (it needs `kubectl` and `jq`), and
-tells which pods the policies checked, whether each passed, and with `--images`, the images of the pods that failed, with the number of pods:
-that is what is left to sign. The pods are those of the namespaces labelled `afon.emrys.health/verify-images`, and Kyverno finds them by
-scanning the namespace in the background, so it also reports the pods that were running before the policy, within moments.
+`afon-cli.sh signing-report <aws|azure|gcp>` reads the policy reports that Kyverno writes on the cluster of the full
+stack of the cloud, ie that of the kubeconfig written by `<cloud>-update-kube-config tre`, or the one in `KUBECONFIG` if
+that is set (it needs `kubectl` and `jq`), and tells which pods the policies checked, whether each passed, and with
+`--images`, the images of the pods that failed, with the number of pods: that is what is left to sign. The pods are those
+of the namespaces labelled `afon.emrys.health/verify-images`, and Kyverno finds them by scanning the namespace in the
+background, so it also reports the pods that were running before the policy, within moments.
 ```shell
-afon-cli.sh signing-report                  # the pods checked and their images, in all the namespaces
-afon-cli.sh signing-report default --images # only the images of the pods in default that failed
-afon-cli.sh signing-report --json | jq .summary
+afon-cli.sh signing-report azure                  # the pods checked and their images, in all the namespaces
+afon-cli.sh signing-report azure default --images # only the images of the pods in default that failed
+afon-cli.sh signing-report azure --json | jq .summary
 ```
-A pod that failed may have images that are signed: the report is of the pod, not of each image. The reports of the controllers (Deployments,
-ReplicaSets...) repeat those of their pods, so they are left out.
+A pod that failed may have images that are signed: the report is of the pod, not of each image. 
+The reports of the controllers (Deployments, ReplicaSets...) repeat those of their pods, so they are left out.
 
 The `ephemeralContainers` are not checked yet, and images that no one has signed are reported, such as those of the Helm charts, until
 they are mirrored and signed.
+
+Some failures are therefore expected, even when every image of `docker-images.yaml` is signed. A pod fails if any one of
+its images is not signed, and the images that the Helm charts pull (kube-prometheus-stack, Loki, Promtail, Tetragon, the
+Spark operator, Trino) are not in `docker-images.yaml`, so they are still pulled from their own registries and are not
+mirrored or signed. A failing pod also lists its signed images, as the report is of the pod, not of each image. In the
+namespaces that are only audited this records the failure and does not stop the pod, so enforce a namespace only once
+the images of its pods are signed.
 
 ### Setup AWS full stack
 

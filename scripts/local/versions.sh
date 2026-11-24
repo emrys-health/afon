@@ -37,6 +37,8 @@ echo "### kind" >> $VERSIONS_OUTPUT
 kind version >> $VERSIONS_OUTPUT
 echo "### cosign" >> $VERSIONS_OUTPUT
 cosign version >> $VERSIONS_OUTPUT
+echo "### oras" >> $VERSIONS_OUTPUT
+oras version >> $VERSIONS_OUTPUT
 if [ -z "$CLOUD" ]; then
   echo "### aws" >> $VERSIONS_OUTPUT
   aws --version >> $VERSIONS_OUTPUT

@@ -4,6 +4,7 @@ import health.emrys.afon.cdk.DockerImageDefinitions;
 import health.emrys.afon.cdk.DockerImagePinner;
 import health.emrys.afon.cdk.DockerImageSigner;
 import health.emrys.afon.cdk.DockerImages;
+import health.emrys.afon.cdk.azure.AzureCloudProvider;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.ConfigUtils;
@@ -14,10 +15,15 @@ import health.emrys.afon.ops.reports.SignatureReport;
 import health.emrys.afon.ops.reports.SignReport;
 import health.emrys.afon.ops.synth.ChartImages;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.IntSupplier;
 
 /**
  * Prints the reference of a Docker image of {@code docker-images.yaml}, for a shell script that needs one, as
@@ -30,6 +36,16 @@ import java.util.List;
  * to its registry, and {@code docker-image --public-key [--cloud <cloud>]} prints the public key of that key, as the property that Kyverno verifies the images with.
  */
 public class DockerImageMain {
+
+    private static final Logger logger = LoggerFactory.getLogger(DockerImageMain.class);
+
+    /**
+     * Logs a line, so that it goes to afon.log as well as the console.  Only what a script reads from the output, ie the reference of an
+     * image and the public key, is printed.
+     */
+    private static void info(String format, Object... args) {
+        logger.info(String.format(format, args).stripTrailing());
+    }
 
     /**
      * The name of the line printed.
@@ -162,6 +178,7 @@ public class DockerImageMain {
                 AfonCloudProperty.COSIGN_KEY.forCloud(arguments.cloud()).orElseThrow()));
         }
         try {
+            // not logged: it is the line to put in the config, which the scripts read from the output
             System.out.printf("%s=%s%n", AfonCloudProperty.COSIGN_PUBLIC_KEY.forCloud(arguments.cloud()).orElseThrow(),
                               DockerImageSigner.publicKey(key, DockerImageSigner.outputs()));
         } catch (IOException e) {
@@ -181,22 +198,23 @@ public class DockerImageMain {
                 AfonCloudProperty.IMAGE_REGISTRY.forCloud(arguments.cloud()).orElseThrow(),
                 AfonCloudProperty.COSIGN_PUBLIC_KEY.forCloud(arguments.cloud()).orElseThrow(), arguments.cloud()));
         }
+        loginToRegistry(registry);
         List<DockerImageSigner.Verified> checks;
         try {
             checks = DockerImageSigner.verify(DockerImages.all(), arguments.names(), registry, publicKey, DockerImageSigner.processes());
         } catch (IOException e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
-        checks.forEach(check -> System.out.printf("%-18s %s: %s%n", check.name(), check.image(),
+        checks.forEach(check -> info("%-18s %s: %s%n", check.name(), check.image(),
                                                   check.isOk() ? "OK" : "FAILED, " + check.error()));
         long failed = checks.stream().filter(check -> !check.isOk()).count();
-        System.out.printf("Verified the signatures of %d images, %d failed%n", checks.size(), failed);
+        info("Verified the signatures of %d images, %d failed%n", checks.size(), failed);
         if (failed > 0) {
-            System.out.printf("Sign them with docker-image %s --cloud %s%n", SIGN_OPTION, arguments.cloud().toString().toLowerCase(java.util.Locale.ROOT));
+            info("Sign them with docker-image %s --cloud %s%n", SIGN_OPTION, arguments.cloud().toString().toLowerCase(java.util.Locale.ROOT));
         }
         if (arguments.report() != null) {
             new SignatureReport(arguments.cloud().toString(), registry, java.time.Instant.now(), checks).write(arguments.report());
-            System.out.printf("Report written to %s%n", arguments.report());
+            info("Report written to %s%n", arguments.report());
         }
         return failed == 0;
     }
@@ -210,25 +228,77 @@ public class DockerImageMain {
                 AfonCloudProperty.IMAGE_REGISTRY.forCloud(arguments.cloud()).orElseThrow(),
                 AfonCloudProperty.COSIGN_KEY.forCloud(arguments.cloud()).orElseThrow(), arguments.cloud()));
         }
+        loginToRegistry(registry);
         List<DockerImageSigner.Signed> signed = new ArrayList<>();
         String error = null;
         try {
-            DockerImageSigner.sign(DockerImages.all(), arguments.names(), registry, key, DockerImageSigner.processes(),
-                                   DockerImagePinner.docker(), signed::add);
+            int total = arguments.names().isEmpty()
+                ? (int) DockerImages.all().values().stream().filter(image -> image.digest() != null).count()
+                : arguments.names().size();
+            DockerImageSigner.SignatureCheck check;
+            try {
+                check = DockerImageSigner.verifiesWith(key, DockerImageSigner.outputs());
+            } catch (IOException | IllegalArgumentException e) {
+                logger.warn("Cannot get the public key of {} to skip the images that are signed already, signing them all: {}", key, e.getMessage());
+                check = reference -> false;
+            }
+            DockerImageSigner.sign(DockerImages.all(), arguments.names(), registry, key, progress(DockerImageSigner.processes(), total, signed::size),
+                                   DockerImagePinner.docker(), signed::add, check);
         } catch (IOException | IllegalStateException e) {
             error = e.getMessage();
         }
-        signed.forEach(image -> System.out.printf("%-18s %s%s%n", image.name(), image.signed(),
+        signed.forEach(image -> info("%-18s %s%s%n", image.name(), image.signed(),
                                                   image.mirrored() ? "  [mirrored from " + image.source() + "]" : ""));
-        System.out.printf("Signed %d images with %s%n", signed.size(), key);
+        info("Signed %d images with %s%n", signed.size(), key);
         if (arguments.report() != null) {
             // written even when signing failed, to record what was signed before
             new SignReport(arguments.cloud().toString(), registry, key, java.time.Instant.now(), signed, error).write(arguments.report());
-            System.out.printf("Record written to %s%n", arguments.report());
+            info("Record written to %s%n", arguments.report());
         }
         if (error != null) {
             throw new IllegalStateException(error);
         }
+    }
+
+    /**
+     * @return the command that logs Docker, and so cosign and oras, in to the registry with the login of the cloud, if it is an ACR, ie
+     * {@code az acr login}, else empty: the login of any other registry is the user's, as it is with the credentials of the registry
+     */
+    static Optional<List<String>> loginCommand(String registry) {
+        String acr = AzureCloudProvider.registryName(registry);
+        return acr.isEmpty() ? Optional.empty() : Optional.of(List.of("az", "acr", "login", "--name", acr));
+    }
+
+    /**
+     * Logs in to the registry if it is an ACR, so that the images can be copied to it and signed.  A failure is only reported, as the
+     * registry may already be logged in to, eg with a docker login of a service principal, and a login that is really missing fails
+     * the copy with its own error.
+     */
+    private static void loginToRegistry(String registry) {
+        loginCommand(registry).ifPresent(command -> {
+            info("Logging in to the registry with: %s%n", String.join(" ", command));
+            try {
+                DockerImageSigner.processes().run(command);
+            } catch (IOException e) {
+                info("Could not log in, going on as the registry may be logged in to already: %s%n", e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * @param done how many images are signed so far, so that the image being worked on is the next
+     * @return the runner, which says what it is doing before each command, and how long it took after, as copying an image can take minutes
+     */
+    static DockerImageSigner.CommandRunner progress(DockerImageSigner.CommandRunner runner, int total, IntSupplier done) {
+        return command -> {
+            boolean sign = "cosign".equals(command.get(0));
+            String image = command.get(command.size() - 1);
+            int number = done.getAsInt() + 1;
+            info("[%d/%d] %s %s%n", number, total, sign ? "Signing" : "Copying", image);
+            long start = System.nanoTime();
+            runner.run(command);
+            info("[%d/%d] %s in %ds%n", number, total, sign ? "Signed" : "Copied", (System.nanoTime() - start) / 1_000_000_000L);
+        };
     }
 
     /**
@@ -287,25 +357,25 @@ public class DockerImageMain {
         for (ChartImages.Release release : releases) {
             if (!release.stack().equals(current)) {
                 current = release.stack();
-                System.out.printf("== %s%n", current);
+                info("== %s%n", current);
             }
-            System.out.printf("%s (%s)%n", release.release(), release.chart());
+            info("%s (%s)%n", release.release(), release.chart());
             if (release.error() != null) {
-                System.out.printf("    ERROR %s%n", release.error());
+                info("    ERROR %s%n", release.error());
             }
-            release.images().stream().filter(found -> !found.test()).forEach(found -> System.out.printf("    %s  %s%s%n", found.image(),
+            release.images().stream().filter(found -> !found.test()).forEach(found -> info("    %s  %s%s%n", found.image(),
                 found.isPinned() ? "pinned" : found.tag() == null ? "NO TAG" : "latest".equals(found.tag()) ? "LATEST" : "tag only",
                 report.entries(false).stream().filter(entry -> entry.image().equals(found.image()) && entry.listedAs() != null).findFirst()
                     .map(entry -> "  [in docker-images.yaml: " + entry.listedAs() + "]").orElse("")));
         }
         var entries = report.entries(false);
         long tests = report.entries(true).size() - entries.size();
-        System.out.printf("%d images in %d releases of %d stacks, %d pinned by digest, %d only in helm test pods, %d releases not rendered%n",
+        info("%d images in %d releases of %d stacks, %d pinned by digest, %d only in helm test pods, %d releases not rendered%n",
                           entries.size(), releases.size(), stacks.size(), entries.stream().filter(ChartImageReport.Entry::pinned).count(), tests,
                           report.failed());
         if (arguments.report() != null) {
             report.write(arguments.report());
-            System.out.printf("Report written to %s%n", arguments.report());
+            info("Report written to %s%n", arguments.report());
         }
         return report.failed() == 0;
     }
@@ -315,12 +385,12 @@ public class DockerImageMain {
             throw new IllegalArgumentException(REPORT_OPTION + " is for " + VERIFY_OPTION + ", not " + PIN_OPTION);
         }
         var changes = DockerImagePinner.pin(arguments.file(), arguments.names(), DockerImagePinner.docker(), DockerImages::version);
-        changes.forEach(change -> System.out.printf("%-18s %s: %s%n", change.name(), change.reference(),
+        changes.forEach(change -> info("%-18s %s: %s%n", change.name(), change.reference(),
                                                     !change.isChanged() ? "digest unchanged" : change.before() == null
                                                         ? "pinned to " + change.after()
                                                         : change.before() + " -> " + change.after()));
         long changed = changes.stream().filter(DockerImagePinner.Change::isChanged).count();
-        System.out.printf("Pinned %d images in %s, %d changed%n", changes.size(), arguments.file(), changed);
+        info("Pinned %d images in %s, %d changed%n", changes.size(), arguments.file(), changed);
     }
 
     /**
@@ -330,7 +400,7 @@ public class DockerImageMain {
         var images = arguments.file() == null ? DockerImages.all()
             : DockerImageDefinitions.load(arguments.file(), DockerImages::version);
         var checks = DockerImagePinner.verify(images, arguments.names(), DockerImagePinner.docker());
-        checks.forEach(check -> System.out.printf("%-18s %s: %s%n", check.name(), check.reference(),
+        checks.forEach(check -> info("%-18s %s: %s%n", check.name(), check.reference(),
                                                   check.isOk() ? "OK"
                                                       : check.error() != null ? "ERROR " + check.error()
                                                       : check.pinned() == null ? "UNPINNED, the tag points to " + check.registry()
@@ -338,18 +408,18 @@ public class DockerImageMain {
         long failed = checks.stream().filter(check -> !check.isOk()).count();
         var unpinned = arguments.names().isEmpty() ? images.values().stream().filter(image -> image.digest() == null).toList()
             : List.<DockerImageDefinitions.Definition>of();
-        System.out.printf("Verified %d images, %d failed%s%n", checks.size(), failed,
+        info("Verified %d images, %d failed%s%n", checks.size(), failed,
                           unpinned.isEmpty() ? "" : ", " + unpinned.size() + " unpinned and not checked:");
-        unpinned.forEach(image -> System.out.printf("  %-18s %s%n", image.name(),
+        unpinned.forEach(image -> info("  %-18s %s%n", image.name(),
                                                     image.unpinned() != null ? image.unpinned() : "no digest in the file"));
         if (failed > 0) {
-            System.out.printf("Update the digests with docker-image %s%n", PIN_OPTION);
+            info("Update the digests with docker-image %s%n", PIN_OPTION);
         }
         if (arguments.report() != null) {
             new DockerImageReport(arguments.file() == null ? "the images in effect" : arguments.file().toString(), java.time.Instant.now(),
                                   checks.stream().map(DockerImageReport.Entry::of).toList(),
                                   unpinned.stream().map(DockerImageReport.Unpinned::of).toList()).write(arguments.report());
-            System.out.printf("Report written to %s%n", arguments.report());
+            info("Report written to %s%n", arguments.report());
         }
         return failed == 0;
     }
@@ -358,7 +428,7 @@ public class DockerImageMain {
         try {
             if (args.length == 1 && EXPORT_OPTION.equals(args[0])) {
                 Path file = DockerImageDefinitions.exportBundled(Path.of(ConfigUtils.configDir()));
-                System.out.printf("Exported the bundled Docker images to %s, which now replaces them: edit it to define the images differently%n", file);
+                info("Exported the bundled Docker images to %s, which now replaces them: edit it to define the images differently%n", file);
                 return;
             }
             if (args.length >= 1 && VERIFY_OPTION.equals(args[0]) && List.of(args).contains(SIGNATURES_OPTION)) {
@@ -388,7 +458,7 @@ public class DockerImageMain {
             }
             lines(args).forEach(System.out::println);
         } catch (IllegalArgumentException | IllegalStateException | ExceptionInInitializerError e) {
-            System.err.println(e.getMessage() != null ? e.getMessage() : String.valueOf(e.getCause()));
+            logger.error(e.getMessage() != null ? e.getMessage() : String.valueOf(e.getCause()));
             System.exit(1);
         }
     }

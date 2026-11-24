@@ -42,7 +42,7 @@ public class KindHelper implements AutoCloseable {
 
     private static final Logger logger = getLogger(KindHelper.class);
 
-    public static final List<String> TOOLS = List.of("docker", "kind", "kubectl", "helm", "cosign");
+    public static final List<String> TOOLS = List.of("docker", "kind", "kubectl", "helm", "cosign", "oras");
     public static final int REGISTRY_PORT = 5000;
     private static final String KIND_NETWORK = "kind";
     private static final String KYVERNO_CHART = "kyverno-3.9.2.tgz";
