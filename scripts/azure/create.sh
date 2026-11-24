@@ -77,16 +77,23 @@ fi
 
 # Storage
 
+# The minimum TLS version of the storage account: the only place to change it, to upgrade it.
+AZURE_TLS_VERSION="TLS1_2"
+
 echo "- Creating storage"
 
 ## Storage Account
 
 if az storage account show --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP -o none 2>/dev/null; then
-  echo "- Storage account '$AZURE_STORAGE_ACCOUNT' already exists, skipping"
+  echo "- Storage account '$AZURE_STORAGE_ACCOUNT' already exists, skipping creation"
 else
   echo "- Creating storage account '$AZURE_STORAGE_ACCOUNT'"
-  az storage account create --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP --location $AZURE_REGION --sku Standard_LRS --kind StorageV2 --enable-hierarchical-namespace false || exit 1
+  az storage account create --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP --location $AZURE_REGION --sku Standard_LRS --kind StorageV2 --enable-hierarchical-namespace false --min-tls-version $AZURE_TLS_VERSION || exit 1
 fi
+
+# The minimum TLS version is AZURE_TLS_VERSION, also for an account made before it was set, which was left at TLS 1.0: idempotent, so every run enforces it.
+echo "- Setting the minimum TLS version of storage account '$AZURE_STORAGE_ACCOUNT' to $AZURE_TLS_VERSION"
+az storage account update --name $AZURE_STORAGE_ACCOUNT --resource-group $AZURE_RESOURCE_GROUP --min-tls-version $AZURE_TLS_VERSION -o none || exit 1
 
 ## Storage access of the signed-in principal
 
