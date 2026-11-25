@@ -14,7 +14,7 @@ public class StepRunner {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(StepRunner.class);
     /**
-     * The env var that names a file to write the name of the step that failed to, which the command that runs this one reads, eg {@code manage-project}, to say
+     * The env var that names a file to write the name of the step that failed to, which the command that runs this one reads, eg {@code manage-project-stack}, to say
      * which step to resume from.
      */
     public static final String FAILED_STEP_FILE = "AFON_FAILED_STEP_FILE";

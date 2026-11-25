@@ -22,51 +22,51 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The users of a project's TRE: the admins, currently defined in {@code users.csv}, who bootstrap and operate it, and the
- * members of the project, who use it.
+ * The users of a project stack's TRE: the admins, currently defined in {@code users.csv}, who bootstrap and operate it, and the
+ * members of the project stack, who use it.
  * <p>
- * An admin is not a member, so is not served by JupyterHub and its remote desktop, unless the project names them as a member, by the
+ * An admin is not a member, so is not served by JupyterHub and its remote desktop, unless the project stack names them as a member, by the
  * same email.
  * <p>
  * A member is not an admin, so it has no password here, as the central identity invites it when {@code manage-identity sync-members}
- * adds it to the project's group, and its username is its email, as it is in the central identity.
+ * adds it to the project stack's group, and its username is its email, as it is in the central identity.
  * A member has no login, Polaris principal or Git account made from this list.
  * <p>
  * Outside a project, the users are those of {@code users.csv} alone, who are admins and members, see {@link #forActiveConfig()}.
  */
-public final class ProjectUserProvider implements AfonUserProvider {
+public final class ProjectStackUserProvider implements AfonUserProvider {
 
     private static final int SLUG_NAME_LENGTH = 40;
     private static final int SLUG_HASH_LENGTH = 6;
 
     private final AfonUserProvider admins;
-    private final AfonProject project;
+    private final ProjectStack projectStack;
     private List<AfonUser> users;
 
-    public ProjectUserProvider(AfonUserProvider admins, AfonProject project) {
+    public ProjectStackUserProvider(AfonUserProvider admins, ProjectStack projectStack) {
         this.admins = admins;
-        this.project = project;
+        this.projectStack = projectStack;
     }
 
     /**
-     * @return the users of the TRE that the config dir is of: those of its project if it has a {@value FileProjectProvider#FILE}, as the
-     * config env of a project has, and else the users of {@code users.csv}, as for any other env
+     * @return the users of the TRE that the config dir is of: those of its project stack if it has a {@value FileProjectStackProvider#FILE}, as the
+     * config env of a project stack has, and else the users of {@code users.csv}, as for any other env
      */
     public static AfonUserProvider forActiveConfig() {
-        Path file = Path.of(ConfigUtils.configDir(), FileProjectProvider.FILE);
+        Path file = Path.of(ConfigUtils.configDir(), FileProjectStackProvider.FILE);
         AfonUserProvider admins = new FileUserProvider();
-        return Files.isRegularFile(file) ? new ProjectUserProvider(admins, new FileProjectProvider(file).getProject()) : admins;
+        return Files.isRegularFile(file) ? new ProjectStackUserProvider(admins, new FileProjectStackProvider(file).getProjectStack()) : admins;
     }
 
     @Override
     public synchronized List<AfonUser> getUsers() {
         if (users == null) {
-            users = merge(admins.getUsers(), project.members());
+            users = merge(admins.getUsers(), projectStack.members());
         }
         return users;
     }
 
-    private static List<AfonUser> merge(List<AfonUser> admins, List<TreProject.Member> members) {
+    private static List<AfonUser> merge(List<AfonUser> admins, List<TreProjectStack.Member> members) {
         Set<String> memberEmails = new HashSet<>();
         members.forEach(member -> memberEmails.add(member.email()));
         List<AfonUser> merged = new ArrayList<>();
@@ -80,7 +80,7 @@ public final class ProjectUserProvider implements AfonUserProvider {
                 merged.add(admin.withRoles(Role.ADMIN));
             }
         }
-        for (TreProject.Member member : members) {
+        for (TreProjectStack.Member member : members) {
             if (!adminEmails.contains(member.email())) {
                 merged.add(member(member));
             }
@@ -90,19 +90,19 @@ public final class ProjectUserProvider implements AfonUserProvider {
 
     /**
      * A member is known in the central identity by their email, which is their username there, so an admin who is a member must be too: the
-     * login that the setup makes for the admin is then the one that the project's group has.
+     * login that the setup makes for the admin is then the one that the project stack's group has.
      *
      * @throws IllegalStateException if the admin's username is not their email
      */
     private static void requireEmailAsUsername(AfonUser admin) {
         if (!admin.username().equalsIgnoreCase(admin.email())) {
             throw new IllegalStateException(String.format(
-                "The user %s of users.csv is also a member of the project, by the email %s: a member is known by their email, so give the user "
+                "The user %s of users.csv is also a member of the project stack, by the email %s: a member is known by their email, so give the user "
                 + "that email as their username in users.csv, or list them as a member by another email", admin.username(), admin.email()));
         }
     }
 
-    private static AfonUser member(TreProject.Member member) {
+    private static AfonUser member(TreProjectStack.Member member) {
         String first = member.firstName() == null ? AfonUser.UNDEFINED : member.firstName();
         String last = member.lastName() == null ? AfonUser.UNDEFINED : member.lastName();
         return new AfonUser(member.email(), null, member.email(), slug(member.email()), first, last, EnumSet.of(Role.MEMBER));
@@ -145,7 +145,7 @@ public final class ProjectUserProvider implements AfonUserProvider {
     }
 
     /**
-     * Members are authorised on no catalog by this list: a Data Provider grants them, per project.
+     * Members are authorised on no catalog by this list: a Data Provider grants them, per project stack.
      */
     @Override
     public boolean isAuthorised(String username, String catalogName) {

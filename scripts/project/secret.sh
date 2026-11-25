@@ -6,8 +6,8 @@ set -euo pipefail
 usage(){
   echo "Usage: ${BASH_SOURCE[0]} <project> <client> [--force]"
   echo "Generates a random secret (256 bits, as hex) for the client of the project, <project>-<client>, and writes it, readable by its owner only, to"
-  echo "  \$AFON_HOME/projects/<project>/keys/<client>.secret"
-  echo "manage-project configure puts the TRE client's in the project's config, and manage-identity create gives the identity the same."
+  echo "  \$AFON_HOME/projects/<project>/secrets/<client>.secret"
+  echo "manage-project-stack configure puts the TRE client's in the project's config, and manage-identity create gives the identity the same."
   echo "<project> is the id of the project, a lower-case DNS label of at most 30 characters, eg xyz-yyyy-nnnn."
   echo "<client> is tre, the client of the project's TRE, or git, the client of its own Git, which a project has only if its file has stacks.git."
   echo "It stops if the file exists already, as the identity and the config were given that secret, unless --force replaces it."
@@ -41,7 +41,7 @@ case "$CLIENT" in
   tre|git) ;;
   *) echo "- '$CLIENT' is not a client of a project: tre or git"; usage; exit 1 ;;
 esac
-# the id names a dir, so it is checked as ProjectId does, which also keeps it from naming a path
+# the id names a dir, so it is checked as ProjectStackId does, which also keeps it from naming a path
 if [ "${#PROJECT}" -gt 30 ] || ! [[ "$PROJECT" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
   echo "- '$PROJECT' is not a project id: a lower-case DNS label of at most 30 characters, eg xyz-yyyy-nnnn"
   exit 1
@@ -52,11 +52,11 @@ if ! command -v openssl > /dev/null 2>&1; then
 fi
 
 PROJECT_DIR="$AFON_HOME/projects/$PROJECT"
-SECRET_FILE="$PROJECT_DIR/keys/$CLIENT.secret"
+SECRET_FILE="$PROJECT_DIR/secrets/$CLIENT.secret"
 
 if [ "$FORCE" != "true" ] && [ -e "$SECRET_FILE" ]; then
   echo "- $SECRET_FILE exists already: the identity and the project's config were given that secret, so it is not replaced"
-  echo "  Use --force to replace it, then configure the project and make it in the identity again: manage-project configure $PROJECT, manage-identity create $PROJECT"
+  echo "  Use --force to replace it, then configure the project and make it in the identity again: manage-project-stack configure $PROJECT, manage-identity create $PROJECT"
   exit 1
 fi
 
@@ -72,4 +72,4 @@ echo "- Secret of the $CLIENT client of $PROJECT, $PROJECT-$CLIENT: $SECRET_FILE
 if [ ! -f "$PROJECT_DIR/project.yaml" ]; then
   echo "- There is no $PROJECT_DIR/project.yaml yet: write it, see docs/projects.md"
 fi
-echo "- Then: afon-cli.sh manage-project configure $PROJECT, and manage-identity create $PROJECT"
+echo "- Then: afon-cli.sh manage-project-stack configure $PROJECT, and manage-identity create $PROJECT"

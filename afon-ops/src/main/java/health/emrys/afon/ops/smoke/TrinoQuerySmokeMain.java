@@ -8,7 +8,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.ops.kube.tools.LokiClient;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
@@ -55,7 +55,7 @@ public class TrinoQuerySmokeMain {
     public TrinoQuerySmokeMain(AfonCloud cloud, AfonPropertyProvider properties) {
         this.cloud        = cloud;
         this.properties   = properties;
-        this.userProvider = ProjectUserProvider.forActiveConfig();
+        this.userProvider = ProjectStackUserProvider.forActiveConfig();
     }
 
     public TrinoQuerySmokeMain() {

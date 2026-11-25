@@ -24,12 +24,11 @@ import java.util.Set;
 
 
 /**
- * An {@link AfonProjectProvider} backed by a {@value #FILE}, which the deployer writes, in a dir of its own named by the project,
- * {@code <afon-home>/projects/<project>/project.yaml}, see {@link #forProject}.  The file is read, strictly, and validated when the
- * project is first asked for, and read once.  Its format, see {@link AfonProject}:
+ * An {@link ProjectStackProvider} backed by a {@value #FILE}, which the deployer writes, in a dir of its own named by the project stack,
+ * {@code <afon-home>/projects/<project-stack>/project.yaml}, see {@link #forProjectStack}.  The file is read, strictly, and validated when the
+ * project stack is first asked for, and read once.  Its format, see {@link ProjectStack}:
  * <pre>
-
- * project:   {id, cloud, role, env, egressIp}      role is identity or tre (the default), see {@link ProjectRole}, and decides the rest;
+ * project-stack:   {id, cloud, role, env, egressIp}   role is identity or tre (the default), see {@link ProjectStackRole}, and decides the rest;
  *                                   env is the env whose config it is made from, eg dev for config-dev: the active one if not given;
  *                                   egressIp is the address its cluster leaves from, which the Data Providers allowlist: the env's if not given;
  *                                   where it deploys (region, account, node pools, names) comes from that config
@@ -37,111 +36,112 @@ import java.util.Set;
  *                                   hosted zone of the parent domain, in the current AWS account, rather than by hand
  * cluster:   {nodePool: {vmSize, nodeCount}}      optional: the nodes of its cluster, with the keys of the cloud's node pool property
  *                                   (Azure vmSize and nodeCount, GCP machineType and nodeCount, none on AWS): the env's if not given
- * identity:  {issuerUrl, acr, clients: {tre, git}, projectClaim, userClaim, project}     project is the id of the identity project;
+ * identity:  {issuerUrl, acr, clients: {tre, git}, projectClaim, userClaim, project-stack}     project-stack is the id of the identity project stack;
  *                                   acr is the authentication context class reference that
- *                                   proves MFA, eg mfa; clients default to &lt;project&gt;-tre and &lt;project&gt;-git,
+ *                                   proves MFA, eg mfa; clients default to &lt;project-stack&gt;-tre and &lt;project-stack&gt;-git,
  *                                                                              the claims to project and polaris_principal
- * dataProviders: {named: [{project, catalogs}], defined: [{id, catalogUri, catalogName, audience, bucket, cloud}]}     cloud defaults to the project's; project is the id of a data
- *                                   project of the Afon home, whose catalogs the entry then takes the endpoint, the audience and the storage of from it, with the ids <project>-<catalog>
- * members:   [email | {email, firstName, lastName}]     the project's members, at least one, which up makes its group have, and no others
+ * dataProviders: {named: [{project-stack, catalogs}], defined: [{id, catalogUri, catalogName, audience, bucket, cloud}]}     cloud defaults to the project stack's;
+ *                                   project-stack is the id of a data project stack of the Afon home, whose catalogs the entry then takes the endpoint, the audience
+ *                                   and the storage of from it, with the ids &lt;project-stack&gt;-&lt;catalog&gt;
+ * members:   [email | {email, firstName, lastName}]     the project stack's members, at least one, which up makes its group have, and no others
  * stacks:
- *   create:  {auditBucket, gitBucket}     gitBucket is optional: the config the project is made from says if it is not given
+ *   create:  {auditBucket, gitBucket}     gitBucket is optional: the config the project stack is made from says if it is not given
  *   git:     {domain}                     optional: without it Git is deployed with the TRE, and has no client
  *   tre:     {stack, domains: {&lt;PROPERTY&gt;: &lt;domain&gt;}, lifetime: {teardown, timeZone}}     stack defaults to &lt;cloud&gt;-full
  * </pre>
- * A project with the role {@code identity} deploys the central identity, and has only {@code project} and
+ * A project stack with the role {@code identity} deploys the central identity, and has only {@code project-stack} and
  * <pre>
  * stacks:
- *   identity: {stack, domain}                  stack defaults to &lt;cloud&gt;-keycloak; domain is {@code <CLOUD>_OIDC_DOMAIN_NAME}, the env's with the project id as a label after the first if not given
+ *   identity: {stack, domain}                  stack defaults to &lt;cloud&gt;-keycloak; domain is {@code <CLOUD>_OIDC_DOMAIN_NAME}, the env's with the project stack id as a label after the first if not given
  * </pre>
- * no {@code identity}, {@code dataProviders}, {@code create}, {@code git} or {@code tre}.  A project with the role {@code data} deploys a Data Provider's
- * Polaris, and has only {@code project}, {@code dns}, {@code cluster} and
+ * no {@code identity}, {@code dataProviders}, {@code create}, {@code git} or {@code tre}.  A project stack with the role {@code data} deploys a Data Provider's
+ * Polaris, and has only {@code project-stack}, {@code dns}, {@code cluster} and
  * <pre>
- * identity:  {issuerUrl, acr, audience, project}  the central identity that its Polaris trusts: audience defaults to provider-&lt;project id&gt;
+ * identity:  {issuerUrl, acr, audience, project-stack}  the central identity that its Polaris trusts: audience defaults to provider-&lt;id&gt;
  * catalogs:  [id]                                 its catalogs, at least one, eg [cvd, dbt]: lower-case letters, digits and underscores, the first a letter
  * stacks:
- *   data:    {stack, domain}                     stack defaults to &lt;cloud&gt;-polaris; domain is {@code <CLOUD>_POLARIS_DOMAIN_NAME}, the env's with the project id as a label after the first if not given
+ *   data:    {stack, domain}                     stack defaults to &lt;cloud&gt;-polaris; domain is {@code <CLOUD>_POLARIS_DOMAIN_NAME}, the env's with the project stack id as a label after the first if not given
  * </pre>
  * <p>
  * Reading is strict: an unknown key is a problem, as a misspelt one would otherwise be ignored silently, and every problem
- * found is reported together, see {@link ProjectException}.
+ * found is reported together, see {@link ProjectStackException}.
  */
-public class FileProjectProvider implements AfonProjectProvider {
+public class FileProjectStackProvider implements ProjectStackProvider {
 
     /**
-     * The name of a project's file, in its dir.
+     * The name of a project stack's file, in its dir.
      */
     public static final String FILE = "project.yaml";
 
     /**
-     * The dir of the Afon home holding a dir for each project.
+     * The dir of the Afon home holding a dir for each project stack.
      */
     public static final String PROJECTS_DIR = "projects";
 
     /**
-     * The dir of a project's dir holding the secrets of its clients, {@code tre.secret} and {@code git.secret}, which
-     * {@code project-secret} makes: the project's config is given the TRE's, and the central identity the same.
+     * The dir of a project stack's dir holding the secrets of its clients, {@code tre.secret} and {@code git.secret}, which
+     * {@code project-secret} makes: the project stack's config is given the TRE's, and the central identity the same.
      */
-    public static final String KEYS_DIR = "keys";
+    public static final String SECRETS_DIR = "secrets";
 
     private final Path file;
     private final String expectedId;
-    /** The Afon home that the project is of, which the Data Providers it names are looked up in, or {@code null} if it is not known. */
+    /** The Afon home that the project stack is of, which the Data Providers it names are looked up in, or {@code null} if it is not known. */
     private final Path afonHome;
-    private AfonProject project;
+    private ProjectStack projectStack;
 
     /**
-     * Provides the project of the file, whatever its id.
+     * Provides the project stack of the file, whatever its id.
      */
-    public FileProjectProvider(Path file) {
+    public FileProjectStackProvider(Path file) {
         this(file, null, null);
     }
 
-    private FileProjectProvider(Path file, String expectedId, Path afonHome) {
+    private FileProjectStackProvider(Path file, String expectedId, Path afonHome) {
         this.file = file;
         this.expectedId = expectedId;
         this.afonHome = afonHome;
     }
 
     /**
-     * Provides the project that the deployer defines in its own dir, {@code <afon-home>/projects/<project>/project.yaml}, so that a
-     * project is found by its id alone.  The id of the file must be that of its dir.
+     * Provides the project stack that the deployer defines in its own dir, {@code <afon-home>/projects/<project-stack>/project.yaml}, so that a
+     * project stack is found by its id alone.  The id of the file must be that of its dir.
      *
-     * @throws IllegalArgumentException if {@code project} is not a valid project id, which also keeps it from naming a path
+     * @throws IllegalArgumentException if {@code projectStack} is not a valid project stack id, which also keeps it from naming a path
      */
-    public static FileProjectProvider forProject(Path afonHome, String project) {
-        return new FileProjectProvider(projectFile(afonHome, project), project, afonHome);
+    public static FileProjectStackProvider forProjectStack(Path afonHome, String projectStack) {
+        return new FileProjectStackProvider(projectFile(afonHome, projectStack), projectStack, afonHome);
     }
 
     /**
-     * @return the dir of the project, {@code <afon-home>/projects/<project>}
-     * @throws IllegalArgumentException if {@code project} is not a valid project id
+     * @return the dir of the project stack, {@code <afon-home>/projects/<project-stack>}
+     * @throws IllegalArgumentException if {@code projectStack} is not a valid project stack id
      */
-    public static Path projectDir(Path afonHome, String project) {
-        return afonHome.resolve(PROJECTS_DIR).resolve(new AfonProject.ProjectId(project).value());
+    public static Path projectDir(Path afonHome, String projectStack) {
+        return afonHome.resolve(PROJECTS_DIR).resolve(new ProjectStack.ProjectStackId(projectStack).value());
     }
 
     /**
-     * @return the dir of the public keys of the project's clients, {@code <afon-home>/projects/<project>/keys}
-     * @throws IllegalArgumentException if {@code project} is not a valid project id
+     * @return the dir of the secrets of the project stack's clients, {@code <afon-home>/projects/<project-stack>/secrets}
+     * @throws IllegalArgumentException if {@code projectStack} is not a valid project stack id
      */
-    public static Path keysDir(Path afonHome, String project) {
-        return projectDir(afonHome, project).resolve(KEYS_DIR);
+    public static Path secretsDir(Path afonHome, String projectStack) {
+        return projectDir(afonHome, projectStack).resolve(SECRETS_DIR);
     }
 
     /**
-     * @return the file of the project, {@code <afon-home>/projects/<project>/project.yaml}
-     * @throws IllegalArgumentException if {@code project} is not a valid project id
+     * @return the file of the project stack, {@code <afon-home>/projects/<project-stack>/project.yaml}
+     * @throws IllegalArgumentException if {@code projectStack} is not a valid project stack id
      */
-    public static Path projectFile(Path afonHome, String project) {
-        return projectDir(afonHome, project).resolve(FILE);
+    public static Path projectFile(Path afonHome, String projectStack) {
+        return projectDir(afonHome, projectStack).resolve(FILE);
     }
 
     /**
-     * @return the project defined by the text, as it would be by a file, eg for tests
-     * @throws ProjectException if it is not a valid project
+     * @return the project stack defined by the text, as it would be by a file, eg for tests
+     * @throws ProjectStackException if it is not a valid project stack
      */
-    public static AfonProject parse(String yaml) {
+    public static ProjectStack parse(String yaml) {
         return Parser.parse(yaml);
     }
 
@@ -160,20 +160,20 @@ public class FileProjectProvider implements AfonProjectProvider {
     }
 
     @Override
-    public synchronized AfonProject getProject() {
-        if (project == null) {
-            AfonProject loaded = Parser.load(file, afonHome);
+    public synchronized ProjectStack getProjectStack() {
+        if (projectStack == null) {
+            ProjectStack loaded = Parser.load(file, afonHome);
             if (expectedId != null && !expectedId.equals(loaded.id().value())) {
-                throw new ProjectException(file.toString(), List.of(String.format(
-                    "project.id '%s' is not '%s', the name of the dir that holds it", loaded.id(), expectedId)));
+                throw new ProjectStackException(file.toString(), List.of(String.format(
+                    "project-stack.id '%s' is not '%s', the name of the dir that holds it", loaded.id(), expectedId)));
             }
-            project = loaded;
+            projectStack = loaded;
         }
-        return project;
+        return projectStack;
     }
 
     /**
-     * Parses and validates the text of one project file.  It holds the problems found so far, which every check adds to, so
+     * Parses and validates the text of one project stack file.  It holds the problems found so far, which every check adds to, so
      * that all are reported together: one is made for each parse.
      */
     private static final class Parser {
@@ -190,10 +190,10 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @throws ProjectException     if the file is not a valid project
+         * @throws ProjectStackException     if the file is not a valid project stack
          * @throws IllegalStateException if it cannot be read
          */
-        static AfonProject load(Path file, Path afonHome) {
+        static ProjectStack load(Path file, Path afonHome) {
             try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 return new Parser(file.toString(), afonHome).parse(reader);
             } catch (IOException e) {
@@ -202,139 +202,139 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @throws ProjectException if the text is not a valid project
+         * @throws ProjectStackException if the text is not a valid project stack
          */
-        static AfonProject parse(String yaml) {
+        static ProjectStack parse(String yaml) {
             return new Parser(FILE, null).parse(new StringReader(yaml));
         }
 
-        private AfonProject parse(Reader reader) {
+        private ProjectStack parse(Reader reader) {
             Object root;
             try {
                 LoaderOptions options = new LoaderOptions();
                 options.setAllowDuplicateKeys(false);
                 root = new Yaml(new SafeConstructor(options)).load(reader);
             } catch (RuntimeException e) {
-                throw new ProjectException(source, List.of("not valid YAML: " + e.getMessage()));
+                throw new ProjectStackException(source, List.of("not valid YAML: " + e.getMessage()));
             }
-            ProjectRole role = role(root);
-            boolean identityRole = role == ProjectRole.IDENTITY;
-            boolean dataRole = role == ProjectRole.DATA;
-            Map<String, Object> top = map(root, "", identityRole ? Set.of("project", "cluster", "dns", "stacks")
-                                                   : dataRole ? Set.of("project", "cluster", "dns", "identity", "catalogs", "stacks")
-                                                   : Set.of("project", "cluster", "dns", "identity", "dataProviders", "members", "stacks"));
-            Map<String, Object> project = map(top.get("project"), "project", Set.of("id", "cloud", "role", "env", "egressIp"));
-            AfonProject.ProjectId id = id(project);
-            AfonCloud cloud = cloud(string(project, "project.cloud"), "project.cloud");
-            String env = env(project);
-            String egressIp = egressIp(project);
+            ProjectStackRole role = role(root);
+            boolean identityRole = role == ProjectStackRole.IDENTITY;
+            boolean dataRole = role == ProjectStackRole.DATA;
+            Map<String, Object> top = map(root, "", identityRole ? Set.of("project-stack", "cluster", "dns", "stacks")
+                                                   : dataRole ? Set.of("project-stack", "cluster", "dns", "identity", "catalogs", "stacks")
+                                                   : Set.of("project-stack", "cluster", "dns", "identity", "dataProviders", "members", "stacks"));
+            Map<String, Object> projectStack = map(top.get("project-stack"), "project-stack", Set.of("id", "cloud", "role", "env", "egressIp"));
+            ProjectStack.ProjectStackId id = id(projectStack);
+            AfonCloud cloud = cloud(string(projectStack, "project-stack.cloud"), "project-stack.cloud");
+            String env = env(projectStack);
+            String egressIp = egressIp(projectStack);
             Map<String, String> nodePool = nodePool(map(top.get("cluster"), "cluster", Set.of("nodePool")), cloud);
             DnsDelegation dnsDelegation = dnsDelegation(map(top.get("dns"), "dns", Set.of("delegation")));
 
             Map<String, Object> stacks = map(top.get("stacks"), "stacks", identityRole ? Set.of("identity") : dataRole ? Set.of("data") : Set.of("create", "git", "tre"));
             if (dataRole) {
                 List<String> catalogs = catalogs(top.get("catalogs"));
-                DataProject.Identity dataIdentity = dataIdentity(map(top.get("identity"), "identity", Set.of("issuerUrl", "acr", "audience", "project")), id);
+                DataProjectStack.Identity dataIdentity = dataIdentity(map(top.get("identity"), "identity", Set.of("issuerUrl", "acr", "audience", "project-stack")), id);
                 if (!problems.isEmpty()) {
-                    throw new ProjectException(source, problems);
+                    throw new ProjectStackException(source, problems);
                 }
-                DataProject dataProject = dataProject(id, cloud, env, egressIp, nodePool, dnsDelegation, dataIdentity, catalogs,
+                DataProjectStack dataProjectStack = dataProjectStack(id, cloud, env, egressIp, nodePool, dnsDelegation, dataIdentity, catalogs,
                                                       map(stacks.get("data"), "stacks.data", Set.of("stack", "domain")));
                 if (!problems.isEmpty()) {
-                    throw new ProjectException(source, problems);
+                    throw new ProjectStackException(source, problems);
                 }
-                checkClusterNames(dataProject);
-                return dataProject;
+                checkClusterNames(dataProjectStack);
+                return dataProjectStack;
             }
             if (identityRole) {
                 if (!problems.isEmpty()) {
-                    throw new ProjectException(source, problems);
+                    throw new ProjectStackException(source, problems);
                 }
-                IdentityProject identityProject = identityProject(id, cloud, env, egressIp, nodePool, dnsDelegation,
+                IdentityProjectStack identityProjectStack = identityProjectStack(id, cloud, env, egressIp, nodePool, dnsDelegation,
                                                                   map(stacks.get("identity"), "stacks.identity", Set.of("stack", "domain")));
                 if (!problems.isEmpty()) {
-                    throw new ProjectException(source, problems);
+                    throw new ProjectStackException(source, problems);
                 }
-                checkClusterNames(identityProject);
-                return identityProject;
+                checkClusterNames(identityProjectStack);
+                return identityProjectStack;
             }
             boolean ownGit = stacks.get("git") != null;
-            TreProject.Identity identity = identity(map(top.get("identity"), "identity",
-                                                          Set.of("issuerUrl", "acr", "clients", "projectClaim", "userClaim", "project")), id, ownGit);
-            List<TreProject.DataProvider> dataProviders = dataProviders(top.get("dataProviders"), cloud, identity.issuerUrl());
-            List<TreProject.Member> members = members(top.get("members"));
+            TreProjectStack.Identity identity = identity(map(top.get("identity"), "identity",
+                                                          Set.of("issuerUrl", "acr", "clients", "projectClaim", "userClaim", "project-stack")), id, ownGit);
+            List<TreProjectStack.DataProvider> dataProviders = dataProviders(top.get("dataProviders"), cloud, identity.issuerUrl());
+            List<TreProjectStack.Member> members = members(top.get("members"));
 
             Map<String, Object> create = map(stacks.get("create"), "stacks.create", Set.of("auditBucket", "gitBucket"));
             Map<String, Object> git = map(stacks.get("git"), "stacks.git", Set.of("domain"));
-            TreProject.Create createStack = new TreProject.Create(string(create, "stacks.create.auditBucket"),
+            TreProjectStack.Create createStack = new TreProjectStack.Create(string(create, "stacks.create.auditBucket"),
                                                                     optional(create, "stacks.create.gitBucket", null));
-            TreProject.Git gitStack = ownGit ? new TreProject.Git(string(git, "stacks.git.domain")) : null;
-            TreProject.Tre treStack = tre(map(stacks.get("tre"), "stacks.tre", Set.of("stack", "domains", "lifetime")), cloud);
+            TreProjectStack.Git gitStack = ownGit ? new TreProjectStack.Git(string(git, "stacks.git.domain")) : null;
+            TreProjectStack.Tre treStack = tre(map(stacks.get("tre"), "stacks.tre", Set.of("stack", "domains", "lifetime")), cloud);
 
             if (!problems.isEmpty()) {
-                throw new ProjectException(source, problems);
+                throw new ProjectStackException(source, problems);
             }
-            TreProject treProject = new TreProject(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, dataProviders, members, createStack, gitStack, treStack);
-            checkClusterNames(treProject);
-            return treProject;
+            TreProjectStack treProjectStack = new TreProjectStack(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, dataProviders, members, createStack, gitStack, treStack);
+            checkClusterNames(treProjectStack);
+            return treProjectStack;
         }
 
-        /** The project's id is in the name of its clusters, which each cloud limits. */
-        private void checkClusterNames(AfonProject project) {
-            List<String> tooLong = ProjectNames.clusterNameProblems(project);
+        /** The project stack's id is in the name of its clusters, which each cloud limits. */
+        private void checkClusterNames(ProjectStack projectStack) {
+            List<String> tooLong = ProjectStackNames.clusterNameProblems(projectStack);
             if (!tooLong.isEmpty()) {
-                throw new ProjectException(source, tooLong);
+                throw new ProjectStackException(source, tooLong);
             }
         }
 
         /**
-         * @return the role the file gives the project, {@link ProjectRole#TRE} if it gives none, or, noting a problem, if it gives one that
-         * is not a role, so that the rest is read as for a TRE project, which is what a project mostly is
+         * @return the role the file gives the project stack, {@link ProjectStackRole#TRE} if it gives none, or, noting a problem, if it gives one that
+         * is not a role, so that the rest is read as for a TRE project stack, which is what a project stack mostly is
          */
-        private ProjectRole role(Object root) {
-            Object project = root instanceof Map<?, ?> top ? top.get("project") : null;
-            Object value = project instanceof Map<?, ?> map ? map.get("role") : null;
+        private ProjectStackRole role(Object root) {
+            Object projectStack = root instanceof Map<?, ?> top ? top.get("project-stack") : null;
+            Object value = projectStack instanceof Map<?, ?> map ? map.get("role") : null;
             if (value == null || String.valueOf(value).isBlank()) {
-                return ProjectRole.TRE;
+                return ProjectStackRole.TRE;
             }
-            return ProjectRole.of(String.valueOf(value).trim()).orElseGet(() -> {
-                problems.add(String.format("project.role '%s' is not a role of a project: one of %s", value,
-                                           Arrays.stream(ProjectRole.values()).map(ProjectRole::value).toList()));
-                return ProjectRole.TRE;
+            return ProjectStackRole.of(String.valueOf(value).trim()).orElseGet(() -> {
+                problems.add(String.format("project-stack.role '%s' is not a role of a project stack: one of %s", value,
+                                           Arrays.stream(ProjectStackRole.values()).map(ProjectStackRole::value).toList()));
+                return ProjectStackRole.TRE;
             });
         }
 
         /**
-         * @return the identity project, whose stack is {@code <cloud>-keycloak} if it names none, which the stacks file may define otherwise: it is
-         * looked up when the project runs, as for a TRE's
+         * @return the identity project stack, whose stack is {@code <cloud>-keycloak} if it names none, which the stacks file may define otherwise: it is
+         * looked up when the project stack runs, as for a TRE's
          */
-        private IdentityProject identityProject(AfonProject.ProjectId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
+        private IdentityProjectStack identityProjectStack(ProjectStack.ProjectStackId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
                                                 DnsDelegation dnsDelegation,
                                                 Map<String, Object> identity) {
             StackId stack = stackOf(identity, "stacks.identity", cloud, "keycloak");
-            return new IdentityProject(id, cloud, env, egressIp, nodePool, dnsDelegation, stack, optional(identity, "stacks.identity.domain", null));
+            return new IdentityProjectStack(id, cloud, env, egressIp, nodePool, dnsDelegation, stack, optional(identity, "stacks.identity.domain", null));
         }
 
         /**
-         * @return the data project, whose stack is {@code <cloud>-polaris} if it names none, which the stacks file may define otherwise
+         * @return the data project stack, whose stack is {@code <cloud>-polaris} if it names none, which the stacks file may define otherwise
          */
-        private DataProject dataProject(AfonProject.ProjectId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
-                                        DnsDelegation dnsDelegation, DataProject.Identity identity, List<String> catalogs, Map<String, Object> data) {
+        private DataProjectStack dataProjectStack(ProjectStack.ProjectStackId id, AfonCloud cloud, String env, String egressIp, Map<String, String> nodePool,
+                                        DnsDelegation dnsDelegation, DataProjectStack.Identity identity, List<String> catalogs, Map<String, Object> data) {
             StackId stack = stackOf(data, "stacks.data", cloud, "polaris");
-            return new DataProject(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, catalogs, stack, optional(data, "stacks.data.domain", null));
+            return new DataProjectStack(id, cloud, env, egressIp, nodePool, dnsDelegation, identity, catalogs, stack, optional(data, "stacks.data.domain", null));
         }
 
         /**
          * @return how the Data Provider uses the central identity: its issuer, which has to be https as every consumer pins it, the {@code acr} that proves a
-         * second factor, and its audience, {@code provider-<project>} if the file gives none
+         * second factor, and its audience, {@code provider-<id>} if the file gives none
          */
-        private DataProject.Identity dataIdentity(Map<String, Object> identity, AfonProject.ProjectId id) {
+        private DataProjectStack.Identity dataIdentity(Map<String, Object> identity, ProjectStack.ProjectStackId id) {
             String issuer = string(identity, "identity.issuerUrl");
             if (issuer != null && !issuer.startsWith("https://")) {
                 problems.add("identity.issuerUrl must be an https URL, as every consumer pins it");
             }
-            return new DataProject.Identity(issuer, string(identity, "identity.acr"),
-                                            optional(identity, "identity.audience", id == null ? null : "provider-" + id), identityProjectId(identity));
+            return new DataProjectStack.Identity(issuer, string(identity, "identity.acr"),
+                                            optional(identity, "identity.audience", id == null ? null : "provider-" + id), identityProjectStackId(identity));
         }
 
         /**
@@ -349,7 +349,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             try {
                 StackId stack = StackId.parse(name);
                 if (cloud != null && stack.cloud() != cloud) {
-                    problems.add(String.format("%s.stack '%s' is not on the project's cloud, %s", path, name, cloud));
+                    problems.add(String.format("%s.stack '%s' is not on the project stack's cloud, %s", path, name, cloud));
                 }
                 return stack;
             } catch (IllegalArgumentException e) {
@@ -389,17 +389,17 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return the id of the identity project that the TRE project names, or {@code null} if it names none or, noting a problem, not an id
+         * @return the id of the identity project stack that the TRE project stack names, or {@code null} if it names none or, noting a problem, not an id
          */
-        private String identityProjectId(Map<String, Object> identity) {
-            String id = optional(identity, "identity.project", null);
+        private String identityProjectStackId(Map<String, Object> identity) {
+            String id = optional(identity, "identity.project-stack", null);
             if (id == null) {
                 return null;
             }
             try {
-                return new AfonProject.ProjectId(id).value();
+                return new ProjectStack.ProjectStackId(id).value();
             } catch (IllegalArgumentException e) {
-                problems.add("identity.project: " + e.getMessage());
+                problems.add("identity.project-stack: " + e.getMessage());
                 return null;
             }
         }
@@ -408,7 +408,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             java.util.regex.Pattern.compile("(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}");
 
         /**
-         * @return the address the project's cluster leaves from, or {@code null} if it is not given or, noting a problem, not an IPv4 address,
+         * @return the address the project stack's cluster leaves from, or {@code null} if it is not given or, noting a problem, not an IPv4 address,
          * which is what the static IPs of the clouds that pin one are
          */
         /**
@@ -421,9 +421,9 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (pool.isEmpty() || cloud == null) {
                 return result;
             }
-            Set<String> keys = AfonProject.NODE_POOL_KEYS.get(cloud);
+            Set<String> keys = ProjectStack.NODE_POOL_KEYS.get(cloud);
             if (keys.isEmpty()) {
-                problems.add(String.format("cluster.nodePool is not available on %s, which has no node pool property: the config the project is made from has the nodes",
+                problems.add(String.format("cluster.nodePool is not available on %s, which has no node pool property: the config the project stack is made from has the nodes",
                                            cloud.toString().toLowerCase(Locale.ROOT)));
                 return result;
             }
@@ -444,7 +444,7 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return how the zones of the project's domains are delegated: manual unless the file says route53; {@code none}, or no value, is
+         * @return how the zones of the project stack's domains are delegated: manual unless the file says route53; {@code none}, or no value, is
          * manual: no automatic delegation
          */
         private DnsDelegation dnsDelegation(Map<String, Object> dns) {
@@ -456,40 +456,40 @@ public class FileProjectProvider implements AfonProjectProvider {
             });
         }
 
-        private String egressIp(Map<String, Object> project) {
-            String egressIp = optional(project, "project.egressIp", null);
+        private String egressIp(Map<String, Object> projectStack) {
+            String egressIp = optional(projectStack, "project-stack.egressIp", null);
             if (egressIp != null && !IPV4.matcher(egressIp).matches()) {
-                problems.add(String.format("project.egressIp '%s' is not an IPv4 address, eg the one that azure-egress-ip create prints", egressIp));
+                problems.add(String.format("project-stack.egressIp '%s' is not an IPv4 address, eg the one that azure-egress-ip create prints", egressIp));
                 return null;
             }
             return egressIp;
         }
 
         /**
-         * @return the env whose config the project is made from, or {@code null} if it is not given or, noting a problem, not the name of an env:
+         * @return the env whose config the project stack is made from, or {@code null} if it is not given or, noting a problem, not the name of an env:
          * it names a dir, {@code config-<env>}, so it is no path
          */
-        private String env(Map<String, Object> project) {
-            String env = optional(project, "project.env", null);
+        private String env(Map<String, Object> projectStack) {
+            String env = optional(projectStack, "project-stack.env", null);
             if (env != null && !env.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
-                problems.add(String.format("project.env '%s' is not the name of an env, eg dev for config-dev", env));
+                problems.add(String.format("project-stack.env '%s' is not the name of an env, eg dev for config-dev", env));
                 return null;
             }
             return env;
         }
 
         /**
-         * @return the project's id, or {@code null}, noting a problem, if it is missing or not valid
+         * @return the project stack's id, or {@code null}, noting a problem, if it is missing or not valid
          */
-        private AfonProject.ProjectId id(Map<String, Object> project) {
-            String value = string(project, "project.id");
+        private ProjectStack.ProjectStackId id(Map<String, Object> projectStack) {
+            String value = string(projectStack, "project-stack.id");
             if (value == null) {
                 return null;
             }
             try {
-                return new AfonProject.ProjectId(value);
+                return new ProjectStack.ProjectStackId(value);
             } catch (IllegalArgumentException e) {
-                problems.add("project.id: " + e.getMessage());
+                problems.add("project-stack.id: " + e.getMessage());
                 return null;
             }
         }
@@ -507,9 +507,9 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @param ownGit whether the project has a Git of its own, which has a client: without, Git is deployed with the TRE
+         * @param ownGit whether the project stack has a Git of its own, which has a client: without, Git is deployed with the TRE
          */
-        private TreProject.Identity identity(Map<String, Object> identity, AfonProject.ProjectId id, boolean ownGit) {
+        private TreProjectStack.Identity identity(Map<String, Object> identity, ProjectStack.ProjectStackId id, boolean ownGit) {
             Map<String, Object> clients = map(identity.get("clients"), "identity.clients", Set.of("tre", "git"));
             String tre = optional(clients, "identity.clients.tre", id == null ? null : id + "-tre");
             String git = ownGit ? optional(clients, "identity.clients.git", id == null ? null : id + "-git") : null;
@@ -520,16 +520,16 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (issuer != null && !issuer.startsWith("https://")) {
                 problems.add("identity.issuerUrl must be an https URL, as every consumer pins it");
             }
-            return new TreProject.Identity(issuer, string(identity, "identity.acr"), tre, git,
-                                            optional(identity, "identity.projectClaim", TreProject.Identity.DEFAULT_PROJECT_CLAIM),
-                                            optional(identity, "identity.userClaim", TreProject.Identity.DEFAULT_USER_CLAIM),
-                                            identityProjectId(identity));
+            return new TreProjectStack.Identity(issuer, string(identity, "identity.acr"), tre, git,
+                                            optional(identity, "identity.projectClaim", TreProjectStack.Identity.DEFAULT_PROJECT_CLAIM),
+                                            optional(identity, "identity.userClaim", TreProjectStack.Identity.DEFAULT_USER_CLAIM),
+                                            identityProjectStackId(identity));
         }
 
-        private List<TreProject.DataProvider> dataProviders(Object node, AfonCloud projectCloud, String issuerUrl) {
-            List<TreProject.DataProvider> dataProviders = new ArrayList<>();
+        private List<TreProjectStack.DataProvider> dataProviders(Object node, AfonCloud projectCloud, String issuerUrl) {
+            List<TreProjectStack.DataProvider> dataProviders = new ArrayList<>();
             if (node == null) {
-                problems.add("dataProviders is missing: a project reads the data of at least one Data Provider");
+                problems.add("dataProviders is missing: a project stack reads the data of at least one Data Provider");
                 return dataProviders;
             }
             if (!(node instanceof Map<?, ?>)) {
@@ -540,7 +540,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             Set<String> ids = new LinkedHashSet<>();
             for (Object entry : list(top.get("named"), "dataProviders.named")) {
                 String path = "dataProviders.named[" + indexOf(top.get("named"), entry) + "]";
-                for (TreProject.DataProvider named : namedProviders(map(entry, path, Set.of("project", "catalogs")), path, issuerUrl)) {
+                for (TreProjectStack.DataProvider named : namedProviders(map(entry, path, Set.of("project-stack", "catalogs")), path, issuerUrl)) {
                     if (!ids.add(named.id())) {
                         problems.add(String.format("%s: the id '%s' is used by another Data Provider", path, named.id()));
                     } else {
@@ -556,12 +556,12 @@ public class FileProjectProvider implements AfonProjectProvider {
                     problems.add(String.format("%s.id '%s' is used by another Data Provider", path, id));
                 }
                 String cloudName = optional(provider, path + ".cloud", projectCloud == null ? null : projectCloud.toString());
-                dataProviders.add(new TreProject.DataProvider(id, string(provider, path + ".catalogUri"),
+                dataProviders.add(new TreProjectStack.DataProvider(id, string(provider, path + ".catalogUri"),
                                                        string(provider, path + ".catalogName"), string(provider, path + ".audience"),
                                                        string(provider, path + ".bucket"), cloud(cloudName, path + ".cloud")));
             }
             if (dataProviders.isEmpty() && problems.isEmpty()) {
-                problems.add("dataProviders names no catalog: a project reads the data of at least one Data Provider, in named or defined");
+                problems.add("dataProviders names no catalog: a project stack reads the data of at least one Data Provider, in named or defined");
             }
             return dataProviders;
         }
@@ -583,30 +583,30 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return the catalogs of the Data Provider's project that the entry names, {@code catalogs}, whose ids are the project's and the catalog's,
-         * {@code lon-cvd}; each as that project's file and config say it.  Those that cannot be read are left out, noting a problem: this has no Afon home
-         * to look the project up in, the project is not a Data Provider, or it has not the catalog
+         * @return the catalogs of the Data Provider's project stack that the entry names, {@code catalogs}, whose ids are the project stack's and the catalog's,
+         * {@code lon-cvd}; each as that project stack's file and config say it.  Those that cannot be read are left out, noting a problem: this has no Afon home
+         * to look the project stack up in, the project stack is not a Data Provider, or it has not the catalog
          */
-        private List<TreProject.DataProvider> namedProviders(Map<String, Object> entry, String path, String issuerUrl) {
-            String project = string(entry, path + ".project");
-            if (project == null) {
+        private List<TreProjectStack.DataProvider> namedProviders(Map<String, Object> entry, String path, String issuerUrl) {
+            String projectStack = string(entry, path + ".project-stack");
+            if (projectStack == null) {
                 return List.of();
             }
             try {
-                new AfonProject.ProjectId(project);
+                new ProjectStack.ProjectStackId(projectStack);
             } catch (IllegalArgumentException e) {
-                problems.add(path + ".project: " + e.getMessage());
+                problems.add(path + ".project-stack: " + e.getMessage());
                 return List.of();
             }
             if (!(entry.get("catalogs") instanceof List<?> catalogs) || catalogs.isEmpty()) {
-                problems.add(path + ".catalogs must be a non-empty list of the catalog ids of " + project);
+                problems.add(path + ".catalogs must be a non-empty list of the catalog ids of " + projectStack);
                 return List.of();
             }
             if (afonHome == null) {
-                problems.add(path + ".project names " + project + ", which is looked up in the projects of the Afon home, so by manage-project, not here");
+                problems.add(path + ".project-stack names " + projectStack + ", which is looked up in the project stacks of the Afon home, so by manage-project-stack, not here");
                 return List.of();
             }
-            List<TreProject.DataProvider> dataProviders = new ArrayList<>();
+            List<TreProjectStack.DataProvider> dataProviders = new ArrayList<>();
             Set<String> seen = new LinkedHashSet<>();
             for (int j = 0; j < catalogs.size(); j++) {
                 String catalog = catalogs.get(j) == null ? "" : String.valueOf(catalogs.get(j)).trim();
@@ -615,7 +615,7 @@ public class FileProjectProvider implements AfonProjectProvider {
                 } else if (!seen.add(catalog)) {
                     problems.add(String.format("%s.catalogs[%d] '%s' is listed twice", path, j, catalog));
                 } else {
-                    TreProject.DataProvider provider = DataProviderResolution.resolve(afonHome, project, catalog, project + "-" + catalog, issuerUrl, path, problems);
+                    TreProjectStack.DataProvider provider = DataProviderResolution.resolve(afonHome, projectStack, catalog, projectStack + "-" + catalog, issuerUrl, path, problems);
                     if (provider != null) {
                         dataProviders.add(provider);
                     }
@@ -625,19 +625,19 @@ public class FileProjectProvider implements AfonProjectProvider {
         }
 
         /**
-         * @return the members, each an email or a mapping with an {@code email} and optionally a {@code firstName} and a {@code lastName}; a project
+         * @return the members, each an email or a mapping with an {@code email} and optionally a {@code firstName} and a {@code lastName}; a project stack
          * has at least one, so none, or an empty list, is a problem
          */
-        private List<TreProject.Member> members(Object node) {
+        private List<TreProjectStack.Member> members(Object node) {
             if (node == null || node instanceof List<?> none && none.isEmpty()) {
-                problems.add("members is required: a project has at least one member, by email");
+                problems.add("members is required: a project stack has at least one member, by email");
                 return List.of();
             }
             if (!(node instanceof List<?> list)) {
                 problems.add("members must be a list of at least one member");
                 return List.of();
             }
-            List<TreProject.Member> members = new ArrayList<>();
+            List<TreProjectStack.Member> members = new ArrayList<>();
             Set<String> emails = new LinkedHashSet<>();
             for (int i = 0; i < list.size(); i++) {
                 String path = "members[" + i + "]";
@@ -654,20 +654,20 @@ public class FileProjectProvider implements AfonProjectProvider {
                 } else if (!emails.add(email)) {
                     problems.add(String.format("%s '%s' is listed twice", path + ".email", email));
                 } else {
-                    members.add(new TreProject.Member(email, optional(entry, path + ".firstName", null), optional(entry, path + ".lastName", null)));
+                    members.add(new TreProjectStack.Member(email, optional(entry, path + ".firstName", null), optional(entry, path + ".lastName", null)));
                 }
             }
             return members;
         }
 
-        private TreProject.Tre tre(Map<String, Object> tre, AfonCloud cloud) {
+        private TreProjectStack.Tre tre(Map<String, Object> tre, AfonCloud cloud) {
             String stackName = optional(tre, "stacks.tre.stack", cloud == null ? null : cloud + "-full");
             StackId stack = null;
             if (stackName != null) {
                 try {
                     stack = StackId.parse(stackName);
                     if (cloud != null && stack.cloud() != cloud) {
-                        problems.add(String.format("stacks.tre.stack '%s' is not on the project's cloud, %s", stackName, cloud));
+                        problems.add(String.format("stacks.tre.stack '%s' is not on the project stack's cloud, %s", stackName, cloud));
                     }
                 } catch (IllegalArgumentException e) {
                     problems.add("stacks.tre.stack: " + e.getMessage());
@@ -686,7 +686,7 @@ public class FileProjectProvider implements AfonProjectProvider {
             if (teardown != null && !teardown.matches("([01]\\d|2[0-3]):[0-5]\\d")) {
                 problems.add(String.format("stacks.tre.lifetime.teardown '%s' is not a time as HH:mm, eg 22:00", teardown));
             }
-            return new TreProject.Tre(stack, domainsByProperty, teardown,
+            return new TreProjectStack.Tre(stack, domainsByProperty, teardown,
                                        optional(lifetime, "stacks.tre.lifetime.timeZone", DEFAULT_TIME_ZONE));
         }
 

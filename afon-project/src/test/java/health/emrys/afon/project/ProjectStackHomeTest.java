@@ -12,14 +12,14 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ProjectHomeTest {
+class ProjectStackHomeTest {
 
     @TempDir
     Path afonHome;
 
-    /** The home of the Afon, with an env and the project of the example on the cloud. */
-    private AfonProject makeHome(AfonCloud cloud) throws IOException {
-        AfonProject project = FileProjectProvider.parse(ProjectFixtures.example(cloud));
+    /** The home of the Afon, with an env and the project stack of the example on the cloud. */
+    private ProjectStack makeHome(AfonCloud cloud) throws IOException {
+        ProjectStack projectStack = FileProjectStackProvider.parse(ProjectStackFixtures.example(cloud));
         Files.createDirectories(afonHome.resolve("config-dev"));
         Files.createDirectories(afonHome.resolve("config-xyz-yyyy-nnnn"));
         Files.createDirectories(afonHome.resolve("cdktf-xyz-yyyy-nnnn"));
@@ -29,21 +29,21 @@ class ProjectHomeTest {
         Files.createDirectories(afonHome.resolve("cosign"));
         Files.createDirectories(afonHome.resolve("logs"));
         Files.createDirectories(afonHome.resolve("projects/xyz-yyyy-nnnn"));
-        return project;
+        return projectStack;
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void pointsConfigAndCdktfAtTheProjectsAndSharesTheRest(AfonCloud cloud) throws IOException {
-        AfonProject project = makeHome(cloud);
-        Path home = ProjectHome.prepare(afonHome, project);
+        ProjectStack projectStack = makeHome(cloud);
+        Path home = ProjectStackHome.prepare(afonHome, projectStack);
 
         assertThat(home).isEqualTo(afonHome.resolve("projects/xyz-yyyy-nnnn/home"));
         assertThat(home.resolve("config").toRealPath()).isEqualTo(afonHome.resolve("config-xyz-yyyy-nnnn").toRealPath());
         assertThat(home.resolve("cdktf").toRealPath()).isEqualTo(afonHome.resolve("cdktf-xyz-yyyy-nnnn").toRealPath());
         assertThat(home.resolve("cosign").toRealPath()).isEqualTo(afonHome.resolve("cosign").toRealPath());
         assertThat(home.resolve("logs")).exists();
-        // not the other envs; the projects are shared, so that a command of the home finds its project file
+        // not the other envs; the project stacks are shared, so that a command of the home finds its project stack file
         assertThat(home.resolve("config-dev")).doesNotExist();
         assertThat(home.resolve("cdktf-dev")).doesNotExist();
         assertThat(home.resolve("projects/xyz-yyyy-nnnn").toRealPath()).isEqualTo(afonHome.resolve("projects/xyz-yyyy-nnnn").toRealPath());
@@ -54,19 +54,19 @@ class ProjectHomeTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void makesItAgainWithoutTouchingWhatTheLinksPointTo(AfonCloud cloud) throws IOException {
-        AfonProject project = makeHome(cloud);
+        ProjectStack projectStack = makeHome(cloud);
         Files.writeString(afonHome.resolve("config-xyz-yyyy-nnnn/afon.properties"), "A=1\n");
-        ProjectHome.prepare(afonHome, project);
-        Path home = ProjectHome.prepare(afonHome, project);
+        ProjectStackHome.prepare(afonHome, projectStack);
+        Path home = ProjectStackHome.prepare(afonHome, projectStack);
         assertThat(home.resolve("config/afon.properties")).hasContent("A=1\n");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAProjectThatIsNotConfigured(AfonCloud cloud) throws IOException {
-        AfonProject project = makeHome(cloud);
+        ProjectStack projectStack = makeHome(cloud);
         Files.delete(afonHome.resolve("cdktf-xyz-yyyy-nnnn"));
-        assertThatThrownBy(() -> ProjectHome.prepare(afonHome, project)).isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("run manage-project configure xyz-yyyy-nnnn");
+        assertThatThrownBy(() -> ProjectStackHome.prepare(afonHome, projectStack)).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("run manage-project-stack configure xyz-yyyy-nnnn");
     }
 }

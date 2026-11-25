@@ -295,16 +295,16 @@ running the test, through a port-forward to its pod, or through its public domai
 It is skipped, and passes, for a project's TRE (the config has `OIDC_PROJECT_CLAIM`): its Polaris admits only the tokens of the project, with its
 audience, its `acr` and its project claim, which that user cannot present. Making the smoke tests work against it is separate work.
 
-In a Data Provider's project (a project id, no `OIDC_PROJECT_CLAIM`, and the admin client of its Polaris) it is the same test, with the same code, writing where
+In a Data Provider's project stack (a project stack id, no `OIDC_PROJECT_CLAIM`, and the admin client of its Polaris) it is the same test, with the same code, writing where
 a Data Provider writes: the `staging` namespace of the first of its own catalogs, which no project may read. It writes two tables, `smoke_test` and
 `smoke_test_unreleased`, signed in as the admin client of its Polaris, which is what its Polaris admits besides the members of the projects it lets in,
-and reaches Polaris through a port-forward as `POLARIS_ACCESS` says, as `manage-project-grants` does. Run it in the project's home:
+and reaches Polaris through a port-forward as `POLARIS_ACCESS` says, as `manage-data` does. Run it in the project stack's home:
 
 ```shell
-afon-cli.sh manage-project run lon spark-polaris-smoke
+afon-cli.sh manage-project-stack run lon spark-polaris-smoke
 ```
 
-Releasing `smoke_test` (`afon-cli.sh manage-project run lon manage-project-grants release cvd smoke_test`) gives the projects that `lon` has let in a table with
+Releasing `smoke_test` (`afon-cli.sh manage-project-stack run lon manage-data release cvd smoke_test`) gives the projects that `lon` has let in a table with
 rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb` with Spark, `project-trino-reads-data-providers.ipynb` with Trino), and
 leaves `smoke_test_unreleased` in `staging`, which they must be refused. Until [#411](https://github.com/emrys-health/afon/issues/411) (smoke tests that sign in as a user) is built, those two notebooks can only be run interactively, by a member who is signed in to the TRE's
 JupyterHub, in a notebook of their own pod, which has `OIDC_TOKEN` only after that sign-in: they are not run by `smoke-test` or `smoke-notebook`, nor from the CLI.

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops;
 
 import health.emrys.afon.config.*;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.catalogs.IncorrectConfigException;
 import health.emrys.afon.polaris.config.PolarisEndpoint;
@@ -80,9 +80,9 @@ public class ConfigureUsersMain {
                 propertyProvider.getValue(POLARIS_ID), propertyProvider.getValue(POLARIS_SECRET)));
         trustTheAdminClientAtTheDataProvider();
         if (isSet(OIDC_PROJECT_CLAIM)) {
-            // the identity of a project's TRE is shared: its users are the members, made by manage-identity with their own passwords, and the admins of the env's
-            // users.csv are not the project's to make there, nor to give the password of that file again
-            logger.info("Leaving the users of the central identity to it: the admins of users.csv are not made, nor their passwords set, for a project's TRE");
+            // the identity of a project stack's TRE is shared: its users are the members, made by manage-identity with their own passwords, and the admins of the env's
+            // users.csv are not the project stack's to make there, nor to give the password of that file again
+            logger.info("Leaving the users of the central identity to it: the admins of users.csv are not made, nor their passwords set, for a project stack's TRE");
             return responses;
         }
         for (AfonUser user : userProvider.getAdmins()) {
@@ -108,7 +108,7 @@ public class ConfigureUsersMain {
         identityProvider.ensureClientAcr(client, propertyProvider.getValue(OIDC_ACR));
     }
 
-    /** The config template has the keys of a project's, empty, so that a key alone is not a Data Provider. */
+    /** The config template has the keys of a project stack's, empty, so that a key alone is not a Data Provider. */
     private boolean isSet(AfonProperty property) {
         return propertyProvider.hasProperty(property) && !propertyProvider.getValue(property).isBlank();
     }
@@ -149,9 +149,9 @@ public class ConfigureUsersMain {
         logger.info("Configuring browser client for jupyter domain {}", jupyterDomain);
         List<HttpResponse> responses = new ArrayList<>();
         if (isSet(OIDC_PROJECT_CLAIM)) {
-            // a project's TRE signs in with the client of the project, which the central identity makes when the project is made in it (manage-identity create), with
-            // the project's flow, audiences and claims: registering a browser client of that id would overwrite it with a plain one
-            logger.info("Leaving the client {} to the identity of the project, which makes it", propertyProvider.getValue(OAUTH2_CLIENT_ID, ""));
+            // a project stack's TRE signs in with the client of the project stack, which the central identity makes when the project stack is made in it (manage-identity create), with
+            // the project stack's flow, audiences and claims: registering a browser client of that id would overwrite it with a plain one
+            logger.info("Leaving the client {} to the identity of the project stack, which makes it", propertyProvider.getValue(OAUTH2_CLIENT_ID, ""));
         } else {
             responses.addAll(identityProvider.registerBrowserClient(
                     propertyProvider.getValue(OAUTH2_CLIENT_ID),
@@ -218,7 +218,7 @@ public class ConfigureUsersMain {
         String catalogName = args.length == 2 ? args[1] : null;
 
         AfonCloud cloud = AfonCloud.valueOf(cloudName.toUpperCase());
-        var    userProvider     = ProjectUserProvider.forActiveConfig();
+        var    userProvider     = ProjectStackUserProvider.forActiveConfig();
         // as seen by the cloud, whose KeyCloak it configures and whose Polaris it calls
         AfonPropertyProvider propertyProvider = new OpsPropertyProvider().forCloud(cloud);
         var app = new ConfigureUsersMain(userProvider, propertyProvider, keycloakEndpoint);

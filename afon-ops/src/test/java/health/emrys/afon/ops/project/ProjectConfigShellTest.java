@@ -2,10 +2,10 @@ package health.emrys.afon.ops.project;
 
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.project.AfonProject;
-import health.emrys.afon.project.FileProjectProvider;
-import health.emrys.afon.project.ProjectEnv;
-import health.emrys.afon.project.ProjectNames;
+import health.emrys.afon.project.ProjectStack;
+import health.emrys.afon.project.FileProjectStackProvider;
+import health.emrys.afon.project.ProjectStackEnv;
+import health.emrys.afon.project.ProjectStackNames;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,12 +25,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static health.emrys.afon.ops.project.ProjectTemplates.lower;
+import static health.emrys.afon.ops.project.ProjectStackTemplates.lower;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The config of a project is read by two readers that must agree: the scripts, which a shell sources, evaluating {@code ${NAME}} where it reads a
- * line, and the Java side, which resolves the references once every file is read.  A property set in terms of one that the project overrides further down
+ * The config of a project stack is read by two readers that must agree: the scripts, which a shell sources, evaluating {@code ${NAME}} where it reads a
+ * line, and the Java side, which resolves the references once every file is read.  A property set in terms of one that the project stack overrides further down
  * is where they would differ, so every property of the config that {@code configure} makes is read both ways here, on every cloud, as the launcher
  * does: with {@code scripts/config/afon-source.sh}.
  */
@@ -47,13 +47,13 @@ class ProjectConfigShellTest {
         Path dir = Files.createDirectories(home.resolve("config-dev"));
         String c = cloud.name();
         Files.writeString(dir.resolve("afon.properties"),
-                          "ENV_NAME=dev\nCLUSTER_NAME=${ENV_NAME}-cluster\n" + ProjectEnvAccounts.ACCOUNTS);
+                          "ENV_NAME=dev\nCLUSTER_NAME=${ENV_NAME}-cluster\n" + ProjectStackEnvAccounts.ACCOUNTS);
         String own = switch (cloud) {
             case AZURE -> "AZURE_STORAGE_ACCOUNT=${ENV_NAME}afonstorage\nAZURE_GITEA_BUCKET=${AZURE_STORAGE_ACCOUNT}-gitea\n"
                           + "AZURE_POLARIS_LOG_BUCKET=${AZURE_STORAGE_ACCOUNT}-polaris-logs\nAZURE_KEY_VAULT_NAME=${ENV_NAME}-afon-key-vault\n";
             default -> c + "_GITEA_BUCKET=${ENV_NAME}-gitea\n" + c + "_POLARIS_LOG_BUCKET=${" + c + "_GITEA_BUCKET}-logs\n";
         };
-        // in terms of a property of another file, which the project overrides
+        // in terms of a property of another file, which the project stack overrides
         Files.writeString(dir.resolve("afon-" + lower(cloud) + ".properties"),
                           own + c + "_RESOURCE_PREFIX=${CLUSTER_NAME}-res\n" + c + "_JUPYTER_DOMAIN_NAME=" + lower(cloud) + "-jupyter.${ENV_NAME}.click\n");
         Files.writeString(dir.resolve("catalogs.properties"), "");
@@ -105,36 +105,36 @@ class ProjectConfigShellTest {
 
     private Path configured(AfonCloud cloud, String yaml) throws IOException {
         Path file = Files.writeString(home.resolve("project.yaml"), yaml);
-        AfonProject project = FileProjectProvider.parse(yaml);
-        Path keys = Files.createDirectories(home.resolve("projects").resolve(project.id().value()).resolve("keys"));
+        ProjectStack projectStack = FileProjectStackProvider.parse(yaml);
+        Path keys = Files.createDirectories(home.resolve("projects").resolve(projectStack.id().value()).resolve("secrets"));
         Files.writeString(keys.resolve("tre.secret"), "secret-of-the-client\n");
-        return ProjectEnv.configure(project, envConfig(cloud), home, file);
+        return ProjectStackEnv.configure(projectStack, envConfig(cloud), home, file);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void theScriptsAndTheJavaSideSeeTheSameConfigOfAProject(AfonCloud cloud) throws Exception {
         Assumptions.assumeTrue(new ProcessBuilder("bash", "-c", "true").start().waitFor() == 0);
-        // no Git bucket of its own, so that the env's, set in terms of other properties, is the one the project's is derived from
-        Path config = configured(cloud, ProjectTemplates.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
+        // no Git bucket of its own, so that the env's, set in terms of other properties, is the one the project stack's is derived from
+        Path config = configured(cloud, ProjectStackTemplates.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
         Set<String> names = namesIn(config);
         assertThat(names).contains("CLUSTER_NAME", cloud.name() + "_RESOURCE_PREFIX", cloud.name() + "_JUPYTER_DOMAIN_NAME", "PROJECT_ID");
 
         Map<String, String> shell = asTheScriptsSeeIt(cloud, config, names);
         Properties java = new FilePropertyProvider(config.toString(), List.of("afon", "catalogs")).getProperties();
 
-        // every property, which is the point: the ones that a project overrides, and the ones set in terms of them
+        // every property, which is the point: the ones that a project stack overrides, and the ones set in terms of them
         for (String name : names) {
             assertThat(shell.get(name)).as("%s, as the scripts see it, and as Java does", name).isEqualTo(java.getProperty(name, ""));
         }
-        // and the values are the project's, not the env's
+        // and the values are the project stack's, not the env's
         String id = "xyz-yyyy-nnnn";
         assertThat(shell).containsEntry("PROJECT_ID", id).containsEntry("CLUSTER_NAME", id + "-cluster")
                          .containsEntry(cloud.name() + "_RESOURCE_PREFIX", id + "-cluster-res");
         if (cloud == AfonCloud.AZURE) {
-            String account = "afonstorage" + ProjectNames.token(cloud, "sub-1", id);
+            String account = "afonstorage" + ProjectStackNames.token(cloud, "sub-1", id);
             assertThat(shell).containsEntry("AZURE_STORAGE_ACCOUNT", account)
-                             // set in terms of the account, which is the project's by the time it is read
+                             // set in terms of the account, which is the project stack's by the time it is read
                              .containsEntry("AZURE_GITEA_BUCKET", account + "-gitea")
                              .containsEntry("AZURE_POLARIS_LOG_BUCKET", account + "-polaris-logs");
         }

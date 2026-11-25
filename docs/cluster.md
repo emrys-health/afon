@@ -435,7 +435,7 @@ The other callers of the restricted paths must be listed, or KeyCloak refuses th
 On Azure and GCP, `kube-keycloak-whitelist` shows, sets or removes the restriction of the cluster that kubectl points at, live, as
 `kube-polaris-whitelist` does for Polaris: by the annotation of `keycloak-ingress`, which the next deploy sets again as the config says. It is
 how to let this machine call the admin API, eg to run `manage-identity` outside a project, without listing it in the config. A project needs none
-of it: `manage-project up`, and `manage-project run <project> manage-identity`, reach Keycloak through a port-forward to its pod, see
+of it: `manage-project-stack up`, and `manage-project-stack run <project-stack> manage-identity`, reach Keycloak through a port-forward to its pod, see
 [Projects](projects.md):
 
 ```shell

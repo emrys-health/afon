@@ -52,7 +52,7 @@ import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_ALLOWED_CIDRS;
 import static health.emrys.afon.config.AfonCloudProperty.KEYCLOAK_EXTERNAL;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
 import static health.emrys.afon.config.AfonProperty.*;
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.isProject;
+import static health.emrys.afon.ops.smoke.config.SmokeConfig.isProjectStack;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.polaris.config.PolarisEndpoint.getPolarisEndpointFor;
 import static java.lang.String.format;
@@ -503,7 +503,7 @@ public class NetworkSmokeMain {
     static final String NOTEBOOK_POD_LABEL = "afon-role=jupyter-singleuser";
 
     protected List<String> jupyterPods() throws Exception {
-        if (isProject(properties)) {
+        if (isProjectStack(properties)) {
             // JupyterHub serves the members of a project's TRE, and not the admin that this signs in as, which it has no user of: the notebook of a member who is
             // signed in is checked, if one runs, which no one is made to start
             List<String> running = client.runningPodWithLabel(NOTEBOOK_POD_LABEL).map(List::of).orElse(List.of());

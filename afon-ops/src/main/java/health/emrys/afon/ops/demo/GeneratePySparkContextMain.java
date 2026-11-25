@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.SparkWarehouseConfig;
@@ -138,7 +138,7 @@ public class GeneratePySparkContextMain {
     }
 
     /**
-     * The catalogs of the Data Providers that a TRE project reads, each under its id, which is not the name of a catalog of the stack's own.
+     * The catalogs of the Data Providers that a TRE project stack reads, each under its id, which is not the name of a catalog of the stack's own.
      */
     private Map<String, AfonCatalog> dataProviderCatalogs() {
         Map<String, AfonCatalog> catalogs = new LinkedHashMap<>();
@@ -266,7 +266,7 @@ public class GeneratePySparkContextMain {
         }
         AfonCloud cloud = AfonCloud.valueOf(args[0].toUpperCase());
         var properties = new OpsPropertyProvider();
-        new GeneratePySparkContextMain(cloud, properties, ProjectUserProvider.forActiveConfig()).generatePySparkCode();
+        new GeneratePySparkContextMain(cloud, properties, ProjectStackUserProvider.forActiveConfig()).generatePySparkCode();
     }
 
 

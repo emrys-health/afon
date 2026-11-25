@@ -13,14 +13,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static health.emrys.afon.project.ProjectFixtures.tre;
+import static health.emrys.afon.project.ProjectStackFixtures.tre;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Every test is run on every cloud, see {@link ProjectFixtures}.
+ * Every test is run on every cloud, see {@link ProjectStackFixtures}.
  */
-class ProjectUserProviderTest {
+class ProjectStackUserProviderTest {
 
     private static final String USERS = """
         # username,password,email,slug,firstName,lastName
@@ -37,9 +37,9 @@ class ProjectUserProviderTest {
         return new FileUserProvider(dir.toString());
     }
 
-    private static TreProject project(AfonCloud cloud, String members) {
-        return tre(ProjectFixtures.render("""
-            project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
+    private static TreProjectStack projectStack(AfonCloud cloud, String members) {
+        return tre(ProjectStackFixtures.render("""
+            project-stack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
             identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
             dataProviders:
               defined:
@@ -55,7 +55,7 @@ class ProjectUserProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void theAdminsOfTheUsersFileAreNotMembers(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[bob@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[bob@example.org]"));
         assertThat(users.getAdmins()).extracting(AfonUser::username).containsExactly("root", "ada", "grace@example.org");
         assertThat(users.getAdmins()).allMatch(user -> user.has(Role.ADMIN) && !user.has(Role.MEMBER));
         assertThat(users.getAdmins()).extracting(AfonUser::password).containsOnly("p5ssw0rd");
@@ -64,7 +64,7 @@ class ProjectUserProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void theMembersOfTheProjectAreNotAdmins(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[{email: Bob@Example.org, firstName: Bob, lastName: Brown}, cy@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[{email: Bob@Example.org, firstName: Bob, lastName: Brown}, cy@example.org]"));
         assertThat(users.getMembers()).extracting(AfonUser::username).containsExactly("bob@example.org", "cy@example.org");
         assertThat(users.getMembers()).allMatch(user -> user.has(Role.MEMBER) && !user.has(Role.ADMIN) && user.password() == null);
         AfonUser bob = users.getUser("bob@example.org");
@@ -77,7 +77,7 @@ class ProjectUserProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void aMemberWhoIsAnAdminByTheSameEmailIsBoth(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[grace@example.org, bob@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[grace@example.org, bob@example.org]"));
         assertThat(users.getUsers()).extracting(AfonUser::username).containsExactly("root", "ada", "grace@example.org", "bob@example.org");
         AfonUser grace = users.getUser("grace@example.org");
         assertThat(grace.roles()).containsExactlyInAnyOrder(Role.ADMIN, Role.MEMBER);
@@ -89,7 +89,7 @@ class ProjectUserProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAMemberWhoIsAnAdminWhoseUsernameIsNotTheirEmail(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[ada@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[ada@example.org]"));
         assertThatThrownBy(users::getUsers).isInstanceOf(IllegalStateException.class)
                                            .hasMessageContaining("user ada of users.csv").hasMessageContaining("ada@example.org")
                                            .hasMessageContaining("as their username");
@@ -98,26 +98,26 @@ class ProjectUserProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void aMembersSlugIsALabelThatItsEmailAloneGives(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(),
-            project(cloud, "[a.b@example.org, a-b@example.org, \"first+last.with-a-very-long-name-that-goes-on-and-on@example.org\"]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(),
+            projectStack(cloud, "[a.b@example.org, a-b@example.org, \"first+last.with-a-very-long-name-that-goes-on-and-on@example.org\"]"));
         // the users are made, so each slug passes the label check of the user
         assertThat(users.getMembers()).extracting(AfonUser::slug).doesNotHaveDuplicates().allMatch(slug -> slug.length() <= 63);
         assertThat(users.getUser("a.b@example.org").slug()).startsWith("a-b-");
-        assertThat(ProjectUserProvider.slug("a.b@example.org")).isEqualTo(ProjectUserProvider.slug("a.b@example.org"));
-        assertThat(ProjectUserProvider.slug("a.b@example.org")).isNotEqualTo(ProjectUserProvider.slug("a-b@example.org"));
+        assertThat(ProjectStackUserProvider.slug("a.b@example.org")).isEqualTo(ProjectStackUserProvider.slug("a.b@example.org"));
+        assertThat(ProjectStackUserProvider.slug("a.b@example.org")).isNotEqualTo(ProjectStackUserProvider.slug("a-b@example.org"));
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void membersAreAuthorisedOnNoCatalog(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[bob@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[bob@example.org]"));
         assertThat(users.isAuthorised("bob@example.org", "any")).isFalse();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void anUnknownUserIsNotFound(AfonCloud cloud) throws IOException {
-        AfonUserProvider users = new ProjectUserProvider(admins(), project(cloud, "[bob@example.org]"));
+        AfonUserProvider users = new ProjectStackUserProvider(admins(), projectStack(cloud, "[bob@example.org]"));
         assertThatThrownBy(() -> users.getUser("nobody")).hasMessageContaining("nobody");
     }
 

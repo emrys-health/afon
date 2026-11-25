@@ -1,7 +1,7 @@
 package health.emrys.afon.security;
 
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.project.TreProject;
+import health.emrys.afon.project.TreProjectStack;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.apache.hc.core5.http.HttpResponse;
 
@@ -224,34 +224,34 @@ public interface IdentityProvider {
     int removeSecondFactor(String email);
 
     /**
-     * Makes the project's clients, group and token claims in the central identity, converging them if they exist: a client
-     * for the TRE, whose tokens carry the audiences of the project's Data Provider catalogs, and one for Git, whose tokens carry
+     * Makes the project stack's clients, group and token claims in the central identity, converging them if they exist: a client
+     * for the TRE, whose tokens carry the audiences of the project stack's Data Provider catalogs, and one for Git, whose tokens carry
      * no Data Provider audience.  Each authenticates with the secret it is given, which is the one the TRE is configured with, and each token
-     * names the one project it is for, only when the user is a member of the project's group.
+     * names the one project stack it is for, only when the user is a member of the project stack's group.
      *
-     * @param secrets the secret of each client, by {@code tre} and {@code git}: the client's own, made for the project, not the env's
+     * @param secrets the secret of each client, by {@code tre} and {@code git}: the client's own, made for the project stack, not the env's
      */
-    void ensureProject(TreProject project, Map<String, String> secrets);
+    void ensureProject(TreProjectStack projectStack, Map<String, String> secrets);
 
     /**
-     * Adds the user to the project's group, so that they can get a token for the project.
+     * Adds the user to the project stack's group, so that they can get a token for the project stack.
      */
-    void addMember(TreProject project, String userId);
+    void addMember(TreProjectStack projectStack, String userId);
 
     /**
-     * @return the members of the project's group, by their immutable id, with their email
+     * @return the members of the project stack's group, by their immutable id, with their email
      */
-    Map<String, String> members(TreProject project);
+    Map<String, String> members(TreProjectStack projectStack);
 
     /**
-     * Removes the user from the project's group and ends their sessions.  A token already issued lasts until it expires.
+     * Removes the user from the project stack's group and ends their sessions.  A token already issued lasts until it expires.
      */
-    void removeMember(TreProject project, String userId);
+    void removeMember(TreProjectStack projectStack, String userId);
 
     /**
-     * Closes the project's TRE client, so that no token is issued for it.  A token already issued lasts until it expires.
+     * Closes the project stack's TRE client, so that no token is issued for it.  A token already issued lasts until it expires.
      */
-    void closeProject(TreProject project);
+    void closeProject(TreProjectStack projectStack);
 
     /**
      * Convenience check used by callers to wait until the provider is serving requests.

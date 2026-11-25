@@ -92,13 +92,13 @@ public enum AfonProperty {
      * outlive the cluster.  Optional: no logs are shipped when unset.
      */
     AWS_POLARIS_LOG_BUCKET("AWS_POLARIS_LOG_BUCKET"),
-    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    /** The bucket of the project stack's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project stack. */
     AWS_AUDIT_BUCKET("AWS_AUDIT_BUCKET"),
     /** S3 bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
     AWS_GITEA_BUCKET("AWS_GITEA_BUCKET"),
 
     // GCP
-    /** Project the GCP stacks are deployed into, eg {@code afon-core}.  Required for the GCP stacks. */
+    /** Project stack the GCP stacks are deployed into, eg {@code afon-core}.  Required for the GCP stacks. */
     GCP_PROJECT_ID("GCP_PROJECT_ID"),
     GCP_REGION("GCP_REGION"),
     GCP_SERVICE_ACCOUNT("GCP_SERVICE_ACCOUNT"),
@@ -126,12 +126,12 @@ public enum AfonProperty {
     /**
      * Whether the Polaris TLS cert cached in Secret Manager is restored on deploy.  Defaults to false.
      * A plain switch, unlike {@link #AZURE_KEY_VAULT_NAME}: Secret Manager has no named vault, its secrets live
-     * directly in the project {@link #GCP_PROJECT_ID}.
+     * directly in the project stack {@link #GCP_PROJECT_ID}.
      */
     GCP_SECRETS_ENABLED("GCP_SECRETS_ENABLED"),
     /**
      * Container registry for the images that are not first-party, for the
-     * stacks of the cloud: {@code docker-image --sign} copies them to it and signs the copies, eg {@code <region>-docker.pkg.dev/<project>/emrys}.  Optional: the images cannot be signed without it.
+     * stacks of the cloud: {@code docker-image --sign} copies them to it and signs the copies, eg {@code <region>-docker.pkg.dev/<project-stack>/emrys}.  Optional: the images cannot be signed without it.
      */
     GCP_IMAGE_REGISTRY("GCP_IMAGE_REGISTRY"),
     /**
@@ -170,7 +170,7 @@ public enum AfonProperty {
      * not shipped without it.
      */
     GCP_POLARIS_LOG_BUCKET("GCP_POLARIS_LOG_BUCKET"),
-    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    /** The bucket of the project stack's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project stack. */
     GCP_AUDIT_BUCKET("GCP_AUDIT_BUCKET"),
     /**
      * GKE node pool, as comma-separated {@code key:value} pairs, eg {@code machineType:e2-standard-4,nodeCount:1}, see
@@ -250,7 +250,7 @@ public enum AfonProperty {
      */
     AZURE_KEYCLOAK_EXTERNAL("AZURE_KEYCLOAK_EXTERNAL"),
     AZURE_POLARIS_LOG_BUCKET("AZURE_POLARIS_LOG_BUCKET"),
-    /** The bucket of the project's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project. */
+    /** The bucket of the project stack's audit trail, made outside the stacks so that deleting them keeps it.  Set for a project stack. */
     AZURE_AUDIT_BUCKET("AZURE_AUDIT_BUCKET"),
 
     // OIDC provider (client-facing; any IdentityProvider implementation)
@@ -259,26 +259,26 @@ public enum AfonProperty {
     /** Issuer URL of the KeyCloak of any cloud without its own.  Optional: derived from the domain name when unset. */
     OIDC_ISSUER_URL("OIDC_ISSUER_URL"),
     OIDC_EMAIL_DOMAIN("OIDC_EMAIL_DOMAIN"),
-    /** The client of the project's TRE, eg {@code xyz-yyyy-nnnn-tre}, whose audience the TRE's consumers require.  Set for a project. */
+    /** The client of the project stack's TRE, eg {@code xyz-yyyy-nnnn-tre}, whose audience the TRE's consumers require.  Set for a project stack. */
     OIDC_AUDIENCE("OIDC_AUDIENCE"),
-    /** The client of the project's Git, eg {@code xyz-yyyy-nnnn-git}, whose audience its Git requires.  Set for a project. */
+    /** The client of the project stack's Git, eg {@code xyz-yyyy-nnnn-git}, whose audience its Git requires.  Set for a project stack. */
     OIDC_GIT_AUDIENCE("OIDC_GIT_AUDIENCE"),
     /**
      * The value of the {@code acr} (authentication context class reference) claim of a token, which says how strongly the user authenticated,
-     * that proves a second factor (MFA), eg {@code mfa}, and which every consumer of a project's tokens requires.  Set for a project.
+     * that proves a second factor (MFA), eg {@code mfa}, and which every consumer of a project stack's tokens requires.  Set for a project stack.
      */
     OIDC_ACR("OIDC_ACR"),
-    /** The claim of a token naming its project, a list of exactly one.  Optional: {@code project} when unset. */
+    /** The claim of a token naming its project stack, a list of exactly one.  Optional: {@code project} when unset. */
     OIDC_PROJECT_CLAIM("OIDC_PROJECT_CLAIM"),
     /** The claim of a token naming its user, by their immutable id.  Optional: {@code polaris_principal} when unset. */
     OIDC_USER_CLAIM("OIDC_USER_CLAIM"),
 
-    // Project (set by manage-project from project.yaml, see FileProjectProvider)
-    /** The project's immutable id, eg {@code xyz-yyyy-nnnn}, which names its clients, group and principal role.  Set for a project. */
+    // Project stack (set by manage-project-stack from project.yaml, see FileProjectStackProvider)
+    /** The project stack's immutable id, eg {@code xyz-yyyy-nnnn}, which names its clients, group and principal role.  Set for a project stack. */
     PROJECT_ID("PROJECT_ID"),
-    /** The domain of the project's Git.  Set for a project. */
+    /** The domain of the project stack's Git.  Set for a project stack. */
     GIT_DOMAIN_NAME("GIT_DOMAIN_NAME"),
-    /** The time of the nightly teardown of the project's TRE, as {@code HH:mm}.  Optional: the TRE is not torn down nightly when unset. */
+    /** The time of the nightly teardown of the project stack's TRE, as {@code HH:mm}.  Optional: the TRE is not torn down nightly when unset. */
     TRE_TEARDOWN_TIME("TRE_TEARDOWN_TIME"),
     /** The time zone of {@link #TRE_TEARDOWN_TIME}.  Optional: {@code Europe/London} when unset. */
     TRE_TEARDOWN_TIME_ZONE("TRE_TEARDOWN_TIME_ZONE"),
@@ -286,7 +286,7 @@ public enum AfonProperty {
     // Keycloak (self-hosted OIDC provider deployment, via KeyCloakConfig)
     /**
      * The kubeconfig of the cluster whose Keycloak the stacks configure through a port-forward, when it is not the cluster that they
-     * deploy, ie when they use the Keycloak of another project, which a project's config names for the TRE.  Optional: the cluster of the
+     * deploy, ie when they use the Keycloak of another project stack, which a project stack's config names for the TRE.  Optional: the cluster of the
      * stack when unset.
      */
     KEYCLOAK_KUBECONFIG("KEYCLOAK_KUBECONFIG"),
@@ -303,7 +303,7 @@ public enum AfonProperty {
     KEYCLOAK_DB_USERNAME("KEYCLOAK_DB_USERNAME"),
     KEYCLOAK_DB_PASSWORD("KEYCLOAK_DB_PASSWORD"),
     /**
-     * The SMTP server that the realm of the Keycloak sends its emails through, eg the invitations to the members of a project, which they set
+     * The SMTP server that the realm of the Keycloak sends its emails through, eg the invitations to the members of a project stack, which they set
      * their password and second factor by.  Optional: with no host, the realm sends none, and an invitation fails (it is a warning, as the
      * member is made all the same, but gets no email, and is not invited again by a later sync, only by {@code manage-identity invite}).  Set in the env of
      * the Keycloak, before the members are made.

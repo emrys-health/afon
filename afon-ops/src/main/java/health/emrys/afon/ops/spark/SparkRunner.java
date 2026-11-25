@@ -27,10 +27,10 @@ abstract public class SparkRunner {
     }
 
     /**
-     * @return whether the config is of a project that runs a Data Provider's Polaris: it has a project id, names no claim for the project in its tokens, as a
+     * @return whether the config is of a data project stack, that runs a Data Provider's Polaris: it has a project stack id, names no claim for the project in its tokens, as a
      * TRE's does, and has the admin client of its Polaris
      */
-    public static boolean isDataProject(AfonPropertyProvider properties) {
+    public static boolean isDataProjectStack(AfonPropertyProvider properties) {
         return isSet(properties, PROJECT_ID) && !isSet(properties, OIDC_PROJECT_CLAIM) && isSet(properties, POLARIS_ID);
     }
 
@@ -44,7 +44,7 @@ abstract public class SparkRunner {
      * users of {@code users.csv} are not made in the identity by a project.  Elsewhere it is the configured user, as ever.
      */
     static AfonUser userFor(AfonPropertyProvider properties, AfonUserProvider users) {
-        if (isDataProject(properties)) {
+        if (isDataProjectStack(properties)) {
             return AfonUserProvider.createUser(properties.getValue(POLARIS_ID), properties.getValue(POLARIS_SECRET));
         }
         return users.getConfiguredUser(properties);
@@ -62,7 +62,7 @@ abstract public class SparkRunner {
      * when the endpoint is given already ({@code POLARIS_ENDPOINT}, by a caller that has made its own), it runs it as it is: at Polaris' public domain name.
      */
     static void withPolarisAccess(AfonPropertyProvider properties, AfonCloud cloud, Action action) throws Exception {
-        if (!isDataProject(properties)) {
+        if (!isDataProjectStack(properties)) {
             action.run();
             return;
         }

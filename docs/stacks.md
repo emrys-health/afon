@@ -142,7 +142,7 @@ To deploy aws-polaris, delete it first:
 or rerun with --replace to delete it as part of this run.
 ```
 Only a deployed stack, ie with a `tofu` state, can make them fail: a conflicting stack dir without one, eg left from `validate-stack`, has nothing deployed, so they just delete it.
-The pinned egress IP, `AWS_EGRESS_IP`, `AZURE_EGRESS_IP` or `GCP_EGRESS_IP`, is only held, and so only conflicts, when it is set. A stack deployed by a project, ie with a `PROJECT_ID` in its config, pins it whatever its definition says, as a project is an env of its own with its own address (`egressIp` of its `project.yaml`), so even `azure-keycloak` holds the address of the project that deploys it.
+The pinned egress IP, `AWS_EGRESS_IP`, `AZURE_EGRESS_IP` or `GCP_EGRESS_IP`, is only held, and so only conflicts, when it is set. A stack deployed by a project stack, ie with a `PROJECT_ID` in its config, pins it whatever its definition says, as a project is an env of its own with its own address (`egressIp` of its `project.yaml`), so even `azure-keycloak` holds the address of the project that deploys it.
 The [AWS stack workflow](github_workflows.md#stack-aws-workflow) always runs with `--replace`.
 
 `delete` deletes just the stack, while `delete <cloud>-all`, eg `delete aws-all`, deletes every stack deployed in the cloud.  The legacy stack of a cloud, deployed before each stack had its own `tofu` state (see

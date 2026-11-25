@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.demo;
 
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonCatalogs;
@@ -97,7 +97,7 @@ public class GeneratePySparkKeycloakMain {
         String polarisHost = args.length == 2 ? args[1] : new PolarisEndpoint(cloud, properties).getEndpoint();
         logger.info("Using {} as the Polaris host", polarisHost);
         properties.setValue(POLARIS_ENDPOINT, polarisHost);
-        new GeneratePySparkKeycloakMain(properties, ProjectUserProvider.forActiveConfig()).generateAndSavePySparkCode();
+        new GeneratePySparkKeycloakMain(properties, ProjectStackUserProvider.forActiveConfig()).generateAndSavePySparkCode();
     }
 
 

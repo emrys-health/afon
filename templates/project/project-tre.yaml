@@ -1,35 +1,35 @@
 # A trusted research environment, which signs its users in with the central identity.  Made by
-#   afon-cli.sh manage-project init ${id} --role tre ${cloud}
+#   afon-cli.sh manage-project-stack init ${id} --role tre ${cloud}
 # Complete what is in <angle brackets>, then check it, configure it and bring it up:
-#   afon-cli.sh manage-project validate ${id}
-#   afon-cli.sh manage-project plan ${id}
-#   afon-cli.sh manage-project configure ${id}
-#   afon-cli.sh manage-project up ${id}
+#   afon-cli.sh manage-project-stack validate ${id}
+#   afon-cli.sh manage-project-stack plan ${id}
+#   afon-cli.sh manage-project-stack configure ${id}
+#   afon-cli.sh manage-project-stack up ${id}
 # The secret of its TRE client, which configure needs, is made by: afon-cli.sh project-secret ${id} tre
 # See docs/projects.md.
-project:
+project-stack:
   id: ${id}
   cloud: ${cloud}
-  # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
+  # the env whose config the project stack is made from: where it deploys (account, region, domain names, secrets) is that env's
   env: ${env}
   # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>.  One
-  # address serves one cluster, so each project that runs next to another needs its own, which also leaves the env's for a deployment of the env itself
+  # address serves one cluster, so each project stack that runs next to another needs its own, which also leaves the env's for a deployment of the env itself
   egressIp: <egress-ip>
 
 identity:
-  # the identity project that deploys the central identity, so that up can reach its admin API for the registration
-  project: <identity-project>
+  # the identity project stack that deploys the central identity, so that up can reach its admin API for the registration
+  project-stack: <identity-project-stack>
   issuerUrl: https://<identity-domain>/realms/polaris
   # the authentication context class reference that proves a second factor
   acr: mfa
 
-# the catalogs of the Data Providers that the project reads, in one or both of two lists.  named has the catalogs of a Data Provider that is one of Afon's
-# projects (with the role data): the endpoint, the audience and the storage are taken from that project, which must be made, with its env's config there,
-# and the entry for each catalog has the id <data-project>-<catalog>.  defined has a Data Provider that is not one of Afon's, in full
+# the catalogs of the Data Providers that the project stack reads, in one or both of two lists.  named has the catalogs of a Data Provider that is one of Afon's
+# project stacks (with the role data): the endpoint, the audience and the storage are taken from that project stack, which must be made, with its env's config there,
+# and the entry for each catalog has the id <data-project-stack>-<catalog>.  defined has a Data Provider that is not one of Afon's, in full
 dataProviders:
-  # uncomment to name the catalogs of a Data Provider's project, and remove the entry of defined if the project has no other:
+  # uncomment to name the catalogs of a Data Provider's project stack, and remove the entry of defined if the project stack has no other:
   # named:
-  #   - project: <data-project>
+  #   - project-stack: <data-project-stack>
   #     catalogs: [<catalog>, <catalog>]
   defined:
     - id: <provider>
@@ -37,11 +37,11 @@ dataProviders:
       catalogName: <catalog>
       audience: <provider-audience>
       bucket: <provider-bucket>
-      # cloud: <cloud>                   # that of the bucket, the project's unless it says another
+      # cloud: <cloud>                   # that of the bucket, the project stack's unless it says another
 
-# the project's members, at least one, made members of its group in the central identity, and no others (one not listed is
+# the project stack's members, at least one, made members of its group in the central identity, and no others (one not listed is
 # removed): an email, or {email, firstName, lastName}, the names being set only when the member is first made in the identity
-# a project is not valid until it has one, eg
+# a project stack is not valid until it has one, eg
 #   - alice@tre.example
 #   - {email: bob@tre.example, firstName: Bob, lastName: Hope}
 members: []
@@ -49,7 +49,7 @@ members: []
 stacks:
   create:
     auditBucket: ${id}-audit
-  # the domains of the TRE are those of the env with the project id as a label after the first, eg azure-jupyter.<project>.<domain>: to name
+  # the domains of the TRE are those of the env with the project stack id as a label after the first, eg azure-jupyter.<project-stack>.<domain>: to name
   # one, ${CLOUD}_JUPYTER_DOMAIN_NAME for example, here, uncomment
   # tre:
   #   domains:

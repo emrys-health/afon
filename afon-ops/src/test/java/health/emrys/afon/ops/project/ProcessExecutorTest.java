@@ -62,7 +62,7 @@ class ProcessExecutorTest {
 
         ProcessExecutor.withKubeconfigOfTheProject(inherits, command);
 
-        // the only kubeconfig of the project, not the link to it, and not the deployer's
+        // the only kubeconfig of the project stack, not the link to it, and not the deployer's
         assertThat(inherits.environment()).containsEntry("KUBECONFIG", config.toString());
     }
 

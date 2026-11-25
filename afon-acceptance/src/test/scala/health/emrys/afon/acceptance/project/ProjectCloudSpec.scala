@@ -3,7 +3,7 @@ package health.emrys.afon.acceptance.project
 import com.fasterxml.jackson.databind.ObjectMapper
 import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.config.{AfonCloud, ConfigUtils}
-import health.emrys.afon.project.{AfonProject, FileProjectProvider, ProjectEnv, ProjectHome, ProjectNames}
+import health.emrys.afon.project.{ProjectStack, FileProjectStackProvider, ProjectStackEnv, ProjectStackHome, ProjectStackNames}
 import org.scalatest.GivenWhenThen
 
 import java.nio.charset.StandardCharsets
@@ -47,9 +47,9 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
   }
 
   /** A project of the cloud, made as the example is, with the id given. */
-  private def projectOf(id: String): AfonProject =
-    FileProjectProvider.parse(
-      s"""project: {id: $id, cloud: $lower}
+  private def projectOf(id: String): ProjectStack =
+    FileProjectStackProvider.parse(
+      s"""project-stack: {id: $id, cloud: $lower}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:
@@ -89,7 +89,7 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
         val original = """{"version":4,"serial":1,"lineage":"acceptance","outputs":{},"resources":[]}"""
         Files.writeString(state, original)
         Files.writeString(Files.createDirectories(cdktf.resolve(s"stacks/$stack")).resolve("cdk.tf.json"), "{}")
-        home = ProjectHome.prepare(root, projectOf(id))
+        home = ProjectStackHome.prepare(root, projectOf(id))
 
         When("it is stored")
         val pushed = store("push", tag, stack, "--force")
@@ -130,8 +130,8 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
     "be accepted by the cloud" in {
       val id = newProjectId()
       val project = projectOf(id)
-      val env = ProjectEnv.envProperties(realConfig)
-      val names = ProjectNames.names(project, env).asScala.toMap
+      val env = ProjectStackEnv.envProperties(realConfig)
+      val names = ProjectStackNames.names(project, env).asScala.toMap
       Given(s"the names that configure gives project $id from the config this runs in")
       info(names.map { case (k, v) => s"$k=$v" }.mkString(", "))
       val made = ListBuffer.empty[() => Unit]

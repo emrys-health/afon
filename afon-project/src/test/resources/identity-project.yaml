@@ -1,5 +1,5 @@
-# A template: ${cloud} and ${CLOUD} are the project's cloud, in lower and upper case, as the tests give it, so that no cloud is special.
-project:
+# A template: ${cloud} and ${CLOUD} are the project stack's cloud, in lower and upper case, as the tests give it, so that no cloud is special.
+project-stack:
   id: idp
   cloud: ${cloud}
   role: identity

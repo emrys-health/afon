@@ -9,18 +9,18 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static health.emrys.afon.project.ProjectFixtures.lower;
-import static health.emrys.afon.project.ProjectFixtures.render;
+import static health.emrys.afon.project.ProjectStackFixtures.lower;
+import static health.emrys.afon.project.ProjectStackFixtures.render;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Every test is run on every cloud, see {@link ProjectFixtures}.
+ * Every test is run on every cloud, see {@link ProjectStackFixtures}.
  */
-class FileProjectProviderTest {
+class FileProjectStackProviderTest {
 
     private static final String VALID = """
-        project: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
+        project-stack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         dataProviders:
           defined:
@@ -36,13 +36,13 @@ class FileProjectProviderTest {
         return render(VALID, cloud);
     }
 
-    private static ProjectException invalid(String yaml) {
+    private static ProjectStackException invalid(String yaml) {
         try {
-            FileProjectProvider.parse(yaml);
-        } catch (ProjectException e) {
+            FileProjectStackProvider.parse(yaml);
+        } catch (ProjectStackException e) {
             return e;
         }
-        throw new AssertionError("expected the project to be invalid");
+        throw new AssertionError("expected the project stack to be invalid");
     }
 
     private static AfonCloud anotherThan(AfonCloud cloud) {
@@ -52,43 +52,43 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void loadsTheExampleFile(AfonCloud cloud) {
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud));
-        assertThat(project.id().value()).isEqualTo("xyz-yyyy-nnnn");
-        assertThat(project.cloud()).isEqualTo(cloud);
-        assertThat(project.identity().treClient()).isEqualTo("xyz-yyyy-nnnn-tre");
-        assertThat(project.identity().gitClient()).isEqualTo("xyz-yyyy-nnnn-git");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::cloud).containsExactly(cloud, cloud);
-        assertThat(project.tre().stack().toString()).isEqualTo(lower(cloud) + "-full");
-        assertThat(project.tre().domains()).containsEntry(cloud.name() + "_JUPYTER_DOMAIN_NAME", "jupyter.xyz-yyyy-nnnn.example.org");
-        assertThat(project.tre().teardown()).isEqualTo("22:00");
-        assertThat(project.tre().timeZone()).isEqualTo("Europe/London");
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud));
+        assertThat(projectStack.id().value()).isEqualTo("xyz-yyyy-nnnn");
+        assertThat(projectStack.cloud()).isEqualTo(cloud);
+        assertThat(projectStack.identity().treClient()).isEqualTo("xyz-yyyy-nnnn-tre");
+        assertThat(projectStack.identity().gitClient()).isEqualTo("xyz-yyyy-nnnn-git");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::cloud).containsExactly(cloud, cloud);
+        assertThat(projectStack.tre().stack().toString()).isEqualTo(lower(cloud) + "-full");
+        assertThat(projectStack.tre().domains()).containsEntry(cloud.name() + "_JUPYTER_DOMAIN_NAME", "jupyter.xyz-yyyy-nnnn.example.org");
+        assertThat(projectStack.tre().teardown()).isEqualTo("22:00");
+        assertThat(projectStack.tre().timeZone()).isEqualTo("Europe/London");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheCloudOfAProvidersStorageFromItselfNotFromTheProject(AfonCloud cloud) {
         AfonCloud other = anotherThan(cloud);
-        TreProject project = ProjectFixtures.tre(valid(cloud).replace("bucket: b}", "bucket: b, cloud: " + lower(other) + "}"));
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::cloud).containsExactly(other);
+        TreProjectStack projectStack = ProjectStackFixtures.tre(valid(cloud).replace("bucket: b}", "bucket: b, cloud: " + lower(other) + "}"));
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::cloud).containsExactly(other);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void defaultsTheTreStackToTheFullOneOfTheProjectsCloud(AfonCloud cloud) {
-        TreProject project = ProjectFixtures.tre(valid(cloud));
-        assertThat(project.cloud()).isEqualTo(cloud);
-        assertThat(project.tre().stack().toString()).isEqualTo(lower(cloud) + "-full");
-        assertThat(project.tre().teardown()).isNull();
-        assertThat(project.identity().treClient()).isEqualTo("xyz-yyyy-nnnn-tre");
+        TreProjectStack projectStack = ProjectStackFixtures.tre(valid(cloud));
+        assertThat(projectStack.cloud()).isEqualTo(cloud);
+        assertThat(projectStack.tre().stack().toString()).isEqualTo(lower(cloud) + "-full");
+        assertThat(projectStack.tre().teardown()).isNull();
+        assertThat(projectStack.identity().treClient()).isEqualTo("xyz-yyyy-nnnn-tre");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesADomainOfTheProjectsCloudAndRejectsOneThatIsNotAKnownProperty(AfonCloud cloud) {
         String prefix = cloud.name() + "_";
-        TreProject project = ProjectFixtures.tre(valid(cloud).replace("tre: {domains: {}}",
+        TreProjectStack projectStack = ProjectStackFixtures.tre(valid(cloud).replace("tre: {domains: {}}",
                                                                                "tre: {domains: {" + prefix + "JUPYTER_DOMAIN_NAME: j.example.org}}"));
-        assertThat(project.tre().domains()).containsEntry(prefix + "JUPYTER_DOMAIN_NAME", "j.example.org");
+        assertThat(projectStack.tre().domains()).containsEntry(prefix + "JUPYTER_DOMAIN_NAME", "j.example.org");
         assertThat(invalid(valid(cloud).replace("tre: {domains: {}}", "tre: {domains: {" + prefix + "JUPYTR_DOMAIN_NAME: j}}")).problems())
             .contains("stacks.tre.domains." + prefix + "JUPYTR_DOMAIN_NAME is not a known property");
     }
@@ -96,8 +96,8 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void reportsEveryProblemAtOnce(AfonCloud cloud) {
-        ProjectException e = invalid(valid(cloud).replace("xyz-yyyy-nnnn", "CVD_1").replace("audience: provider-data1, ", ""));
-        assertThat(e.problems()).anyMatch(p -> p.startsWith("project.id")).anyMatch(p -> p.equals("dataProviders.defined[0].audience is required"));
+        ProjectStackException e = invalid(valid(cloud).replace("xyz-yyyy-nnnn", "CVD_1").replace("audience: provider-data1, ", ""));
+        assertThat(e.problems()).anyMatch(p -> p.startsWith("project-stack.id")).anyMatch(p -> p.equals("dataProviders.defined[0].audience is required"));
     }
 
     @ParameterizedTest
@@ -123,15 +123,15 @@ class FileProjectProviderTest {
     @EnumSource(AfonCloud.class)
     void readsMembersAsEmailsOrMappings(AfonCloud cloud) {
         String yaml = withMembers(cloud, "members:\n  - Ada@Example.org\n  - {email: grace@example.org, firstName: Grace, lastName: Hopper}\n");
-        assertThat(((TreProject) FileProjectProvider.parse(yaml)).members()).containsExactly(
-            new TreProject.Member("ada@example.org", null, null), new TreProject.Member("grace@example.org", "Grace", "Hopper"));
+        assertThat(((TreProjectStack) FileProjectStackProvider.parse(yaml)).members()).containsExactly(
+            new TreProjectStack.Member("ada@example.org", null, null), new TreProjectStack.Member("grace@example.org", "Grace", "Hopper"));
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void requiresAtLeastOneMember(AfonCloud cloud) {
         for (String none : new String[]{"", "members:\n", "members: []\n", "members: ~\n"}) {
-            assertThat(invalid(withMembers(cloud, none)).problems()).contains("members is required: a project has at least one member, by email");
+            assertThat(invalid(withMembers(cloud, none)).problems()).contains("members is required: a project stack has at least one member, by email");
         }
     }
 
@@ -153,7 +153,7 @@ class FileProjectProviderTest {
     void rejectsATreStackOfAnotherCloud(AfonCloud cloud) {
         String stack = lower(anotherThan(cloud)) + "-full";
         assertThat(invalid(valid(cloud).replace("tre: {domains: {}}", "tre: {stack: " + stack + "}")).problems())
-            .anyMatch(p -> p.contains("is not on the project's cloud"));
+            .anyMatch(p -> p.contains("is not on the project stack's cloud"));
     }
 
     @ParameterizedTest
@@ -165,40 +165,40 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void findsAProjectByItsIdInItsOwnDir(AfonCloud cloud, @TempDir Path home) throws Exception {
-        ProjectFixtures.writeExample(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"), cloud);
-        FileProjectProvider provider = FileProjectProvider.forProject(home, "xyz-yyyy-nnnn");
+        ProjectStackFixtures.writeExample(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"), cloud);
+        FileProjectStackProvider provider = FileProjectStackProvider.forProjectStack(home, "xyz-yyyy-nnnn");
         assertThat(provider.file()).isEqualTo(home.resolve("projects/xyz-yyyy-nnnn/project.yaml"));
         assertThat(provider.exists()).isTrue();
-        assertThat(provider.getProject().id().value()).isEqualTo("xyz-yyyy-nnnn");
-        assertThat(FileProjectProvider.keysDir(home, "xyz-yyyy-nnnn")).isEqualTo(home.resolve("projects/xyz-yyyy-nnnn/keys"));
-        assertThat(FileProjectProvider.forProject(home, "other-project").exists()).isFalse();
+        assertThat(provider.getProjectStack().id().value()).isEqualTo("xyz-yyyy-nnnn");
+        assertThat(FileProjectStackProvider.secretsDir(home, "xyz-yyyy-nnnn")).isEqualTo(home.resolve("projects/xyz-yyyy-nnnn/secrets"));
+        assertThat(FileProjectStackProvider.forProjectStack(home, "other-project").exists()).isFalse();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAnIdThatWouldNamePathsOutsideTheProjectsDir(AfonCloud cloud, @TempDir Path home) {
-        assertThatThrownBy(() -> FileProjectProvider.forProject(home, "../config")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> FileProjectProvider.projectFile(home, "a/b")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FileProjectStackProvider.forProjectStack(home, "../config")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FileProjectStackProvider.projectFile(home, "a/b")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAFileWhoseIdIsNotThatOfItsDir(AfonCloud cloud, @TempDir Path home) throws Exception {
-        ProjectFixtures.writeExample(home.resolve("projects/other-project/project.yaml"), cloud);
-        assertThatThrownBy(() -> FileProjectProvider.forProject(home, "other-project").getProject())
-            .isInstanceOf(ProjectException.class).hasMessageContaining("is not 'other-project'");
+        ProjectStackFixtures.writeExample(home.resolve("projects/other-project/project.yaml"), cloud);
+        assertThatThrownBy(() -> FileProjectStackProvider.forProjectStack(home, "other-project").getProjectStack())
+            .isInstanceOf(ProjectStackException.class).hasMessageContaining("is not 'other-project'");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void hasNoGitOfItsOwnWithoutStacksGit(AfonCloud cloud) {
-        TreProject project = ProjectFixtures.tre(valid(cloud).replace("create: {auditBucket: audit, gitBucket: gitea}", "create: {auditBucket: audit}")
+        TreProjectStack projectStack = ProjectStackFixtures.tre(valid(cloud).replace("create: {auditBucket: audit, gitBucket: gitea}", "create: {auditBucket: audit}")
                                                                     .replace("  git: {domain: git.example.org}\n", ""));
-        assertThat(project.git()).isNull();
-        assertThat(project.identity().gitClient()).isNull();
-        assertThat(project.create().gitBucket()).isNull();
-        assertThat(ProjectPlan.of(project).stages()).extracting(ProjectPlan.Stage::id)
-            .containsExactly(ProjectPlan.StageId.CREATE, ProjectPlan.StageId.REGISTER, ProjectPlan.StageId.TRE);
+        assertThat(projectStack.git()).isNull();
+        assertThat(projectStack.identity().gitClient()).isNull();
+        assertThat(projectStack.create().gitBucket()).isNull();
+        assertThat(ProjectStackPlan.of(projectStack).stages()).extracting(ProjectStackPlan.Stage::id)
+            .containsExactly(ProjectStackPlan.StageId.CREATE, ProjectStackPlan.StageId.REGISTER, ProjectStackPlan.StageId.TRE);
     }
 
     @ParameterizedTest
@@ -212,8 +212,8 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheEnvWhoseConfigItIsMadeFrom(AfonCloud cloud) {
-        assertThat(FileProjectProvider.parse(valid(cloud)).env()).isNull();
-        assertThat(FileProjectProvider.parse(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", env: emrys2}")).env())
+        assertThat(FileProjectStackProvider.parse(valid(cloud)).env()).isNull();
+        assertThat(FileProjectStackProvider.parse(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", env: emrys2}")).env())
             .isEqualTo("emrys2");
     }
 
@@ -221,7 +221,7 @@ class FileProjectProviderTest {
     @EnumSource(AfonCloud.class)
     void rejectsAnEnvThatIsNotANameAsItWouldNameAPath(AfonCloud cloud) {
         assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", env: ../secret}")).problems())
-            .contains("project.env '../secret' is not the name of an env, eg dev for config-dev");
+            .contains("project-stack.env '../secret' is not the name of an env, eg dev for config-dev");
     }
 
     @ParameterizedTest
@@ -229,17 +229,17 @@ class FileProjectProviderTest {
     void takesWhereItDeploysFromItsEnvNotFromItsOwnFile(AfonCloud cloud) {
         // the region and the account are those of the config it is made from, so naming them in the file is a mistake, not a second source
         assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", region: a-region, account: acct}")).problems())
-            .anyMatch(p -> p.startsWith("project.region is not a known key"))
-            .anyMatch(p -> p.startsWith("project.account is not a known key"));
+            .anyMatch(p -> p.startsWith("project-stack.region is not a known key"))
+            .anyMatch(p -> p.startsWith("project-stack.account is not a known key"));
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheAddressItsClusterLeavesFrom(AfonCloud cloud) {
-        assertThat(ProjectFixtures.tre(valid(cloud)).egressIp()).isNull();
-        assertThat(ProjectFixtures.tre(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", egressIp: 20.50.115.68}")).egressIp())
+        assertThat(ProjectStackFixtures.tre(valid(cloud)).egressIp()).isNull();
+        assertThat(ProjectStackFixtures.tre(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", egressIp: 20.50.115.68}")).egressIp())
             .isEqualTo("20.50.115.68");
-        assertThat(ProjectFixtures.tre(ProjectFixtures.example(cloud)).egressIp()).isEqualTo("203.0.113.10");
+        assertThat(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)).egressIp()).isEqualTo("203.0.113.10");
     }
 
     /** The nodes of a cluster, as the cloud's node pool property takes them, or null if it has none, as AWS has not. */
@@ -254,15 +254,15 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheNodesOfItsClusterWithTheKeysOfItsCloud(AfonCloud cloud) {
-        assertThat(ProjectFixtures.tre(valid(cloud)).nodePool()).isEmpty();
+        assertThat(ProjectStackFixtures.tre(valid(cloud)).nodePool()).isEmpty();
         String withPool = valid(cloud) + "cluster: {nodePool: {" + pool(cloud) + "}}\n";
         if (pool(cloud) == null) {
             assertThat(invalid(withPool).problems()).anyMatch(p -> p.startsWith("cluster.nodePool is not available on aws"));
             return;
         }
-        assertThat(ProjectFixtures.tre(withPool).nodePool()).hasSize(2).containsEntry("nodeCount", "2");
-        // an identity project has its own, as it is a cluster of its own
-        assertThat(ProjectFixtures.identity(IDENTITY_PROJECT.replace("${cloud}", lower(cloud)) + "cluster: {nodePool: {" + pool(cloud) + "}}\n").nodePool())
+        assertThat(ProjectStackFixtures.tre(withPool).nodePool()).hasSize(2).containsEntry("nodeCount", "2");
+        // an identity project stack has its own, as it is a cluster of its own
+        assertThat(ProjectStackFixtures.identity(IDENTITY_PROJECT.replace("${cloud}", lower(cloud)) + "cluster: {nodePool: {" + pool(cloud) + "}}\n").nodePool())
             .hasSize(2).containsEntry("nodeCount", "2");
     }
 
@@ -286,9 +286,9 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void delegatesTheDnsZonesByHandUnlessTheProjectSaysRoute53(AfonCloud cloud) {
-        assertThat(ProjectFixtures.tre(valid(cloud)).dnsDelegation()).isEqualTo(DnsDelegation.MANUAL);
-        assertThat(ProjectFixtures.tre(valid(cloud) + "dns: {delegation: route53}\n").dnsDelegation()).isEqualTo(DnsDelegation.ROUTE53);
-        assertThat(ProjectFixtures.identity(IDENTITY_PROJECT.replace("${cloud}", lower(cloud)) + "dns: {delegation: route53}\n").dnsDelegation())
+        assertThat(ProjectStackFixtures.tre(valid(cloud)).dnsDelegation()).isEqualTo(DnsDelegation.MANUAL);
+        assertThat(ProjectStackFixtures.tre(valid(cloud) + "dns: {delegation: route53}\n").dnsDelegation()).isEqualTo(DnsDelegation.ROUTE53);
+        assertThat(ProjectStackFixtures.identity(IDENTITY_PROJECT.replace("${cloud}", lower(cloud)) + "dns: {delegation: route53}\n").dnsDelegation())
             .isEqualTo(DnsDelegation.ROUTE53);
         assertThat(invalid(valid(cloud) + "dns: {delegation: carrier-pigeon}\n").problems())
             .anyMatch(p -> p.startsWith("dns.delegation 'carrier-pigeon' is not a way to delegate the DNS zones: one of [manual, route53]"));
@@ -300,72 +300,72 @@ class FileProjectProviderTest {
     void rejectsAnEgressIpThatIsNotAnIpv4Address(AfonCloud cloud) {
         for (String bad : new String[]{"afon-egress-ip", "20.50.115", "20.50.115.256", "20.50.115.68/32", "$(id)"}) {
             assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", egressIp: \"" + bad + "\"}")).problems())
-                .as(bad).anyMatch(p -> p.startsWith("project.egressIp '" + bad + "' is not an IPv4 address"));
+                .as(bad).anyMatch(p -> p.startsWith("project-stack.egressIp '" + bad + "' is not an IPv4 address"));
         }
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void namesTheIdentityProjectItUses(AfonCloud cloud) {
-        assertThat(ProjectFixtures.tre(valid(cloud)).identity().project()).isNull();
-        assertThat(ProjectFixtures.tre(valid(cloud).replace("identity: {", "identity: {project: idp, ")).identity().project())
+        assertThat(ProjectStackFixtures.tre(valid(cloud)).identity().projectStack()).isNull();
+        assertThat(ProjectStackFixtures.tre(valid(cloud).replace("identity: {", "identity: {project-stack: idp, ")).identity().projectStack())
             .isEqualTo("idp");
-        assertThat(invalid(valid(cloud).replace("identity: {", "identity: {project: Bad_Id, ")).problems())
-            .anyMatch(p -> p.startsWith("identity.project: Project id 'Bad_Id' is not a lower-case DNS label"));
+        assertThat(invalid(valid(cloud).replace("identity: {", "identity: {project-stack: Bad_Id, ")).problems())
+            .anyMatch(p -> p.startsWith("identity.project-stack: Project stack id 'Bad_Id' is not a lower-case DNS label"));
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void rejectsInvalidYaml(AfonCloud cloud) {
-        assertThatThrownBy(() -> FileProjectProvider.parse("project: [")).isInstanceOf(ProjectException.class);
+        assertThatThrownBy(() -> FileProjectStackProvider.parse("project-stack: [")).isInstanceOf(ProjectStackException.class);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void plansTheStacksInOrderWithStatePerProject(AfonCloud cloud) {
         String c = lower(cloud);
-        ProjectPlan plan = ProjectPlan.of(FileProjectProvider.parse(ProjectFixtures.example(cloud)));
-        assertThat(plan.stages()).extracting(ProjectPlan.Stage::id).containsExactly(
-            ProjectPlan.StageId.CREATE, ProjectPlan.StageId.REGISTER, ProjectPlan.StageId.GIT, ProjectPlan.StageId.TRE);
-        assertThat(plan.stages()).extracting(ProjectPlan.Stage::stateKey).containsExactly(
+        ProjectStackPlan plan = ProjectStackPlan.of(FileProjectStackProvider.parse(ProjectStackFixtures.example(cloud)));
+        assertThat(plan.stages()).extracting(ProjectStackPlan.Stage::id).containsExactly(
+            ProjectStackPlan.StageId.CREATE, ProjectStackPlan.StageId.REGISTER, ProjectStackPlan.StageId.GIT, ProjectStackPlan.StageId.TRE);
+        assertThat(plan.stages()).extracting(ProjectStackPlan.Stage::stateKey).containsExactly(
             "xyz-yyyy-nnnn/" + c + "-create", null, "xyz-yyyy-nnnn/" + c + "-git", "xyz-yyyy-nnnn/" + c + "-full");
-        assertThat(plan.nightlyStages()).extracting(ProjectPlan.Stage::id).containsExactly(ProjectPlan.StageId.TRE);
+        assertThat(plan.nightlyStages()).extracting(ProjectStackPlan.Stage::id).containsExactly(ProjectStackPlan.StageId.TRE);
     }
 
-    // the identity project
+    // the identity project stack
 
     private static final String IDENTITY_PROJECT = """
-        project: {id: idp, cloud: ${cloud}, role: identity}
+        project-stack: {id: idp, cloud: ${cloud}, role: identity}
         """;
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void loadsTheIdentityProject(AfonCloud cloud) {
-        IdentityProject project = ProjectFixtures.identity(ProjectFixtures.identityExample(cloud));
-        assertThat(project.role()).isEqualTo(ProjectRole.IDENTITY);
-        assertThat(project.cloud()).isEqualTo(cloud);
-        assertThat(project.egressIp()).isEqualTo("203.0.113.20");
-        assertThat(project.stack().toString()).isEqualTo(lower(cloud) + "-keycloak");
-        assertThat(project.domain()).isEqualTo("oidc.example.org");
-        assertThat(project.role()).isEqualTo(ProjectRole.IDENTITY);
+        IdentityProjectStack projectStack = ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud));
+        assertThat(projectStack.role()).isEqualTo(ProjectStackRole.IDENTITY);
+        assertThat(projectStack.cloud()).isEqualTo(cloud);
+        assertThat(projectStack.egressIp()).isEqualTo("203.0.113.20");
+        assertThat(projectStack.stack().toString()).isEqualTo(lower(cloud) + "-keycloak");
+        assertThat(projectStack.domain()).isEqualTo("oidc.example.org");
+        assertThat(projectStack.role()).isEqualTo(ProjectStackRole.IDENTITY);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void needsNothingMoreThanItsRoleToBeAnIdentityProject(AfonCloud cloud) {
-        IdentityProject project = ProjectFixtures.identity(render(IDENTITY_PROJECT, cloud));
-        assertThat(project.domain()).isNull();
-        assertThat(project.stack().toString()).isEqualTo(lower(cloud) + "-keycloak");
-        assertThat(project.egressIp()).isNull();
+        IdentityProjectStack projectStack = ProjectStackFixtures.identity(render(IDENTITY_PROJECT, cloud));
+        assertThat(projectStack.domain()).isNull();
+        assertThat(projectStack.stack().toString()).isEqualTo(lower(cloud) + "-keycloak");
+        assertThat(projectStack.egressIp()).isNull();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheStackOfTheIdentityFromTheFileIfItNamesOneOfItsCloud(AfonCloud cloud) {
-        IdentityProject project = ProjectFixtures.identity(render(IDENTITY_PROJECT, cloud) + "stacks: {identity: {stack: " + lower(cloud) + "-sso}}\n");
-        assertThat(project.stack().toString()).isEqualTo(lower(cloud) + "-sso");
+        IdentityProjectStack projectStack = ProjectStackFixtures.identity(render(IDENTITY_PROJECT, cloud) + "stacks: {identity: {stack: " + lower(cloud) + "-sso}}\n");
+        assertThat(projectStack.stack().toString()).isEqualTo(lower(cloud) + "-sso");
         assertThat(invalid(render(IDENTITY_PROJECT, cloud) + "stacks: {identity: {stack: " + lower(anotherThan(cloud)) + "-keycloak}}\n").problems())
-            .anyMatch(p -> p.contains("is not on the project's cloud"));
+            .anyMatch(p -> p.contains("is not on the project stack's cloud"));
     }
 
     @ParameterizedTest
@@ -390,48 +390,48 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void isATreProjectUnlessItSaysItIsAnIdentityProject(AfonCloud cloud) {
-        assertThat(FileProjectProvider.parse(valid(cloud)).role()).isEqualTo(ProjectRole.TRE);
-        assertThat(FileProjectProvider.parse(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: tre}")).role())
-            .isEqualTo(ProjectRole.TRE);
+        assertThat(FileProjectStackProvider.parse(valid(cloud)).role()).isEqualTo(ProjectStackRole.TRE);
+        assertThat(FileProjectStackProvider.parse(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: tre}")).role())
+            .isEqualTo(ProjectStackRole.TRE);
         assertThat(invalid(valid(cloud).replace("cloud: " + lower(cloud) + "}", "cloud: " + lower(cloud) + ", role: catalog}")).problems())
-            .contains("project.role 'catalog' is not a role of a project: one of [identity, tre, data]");
+            .contains("project-stack.role 'catalog' is not a role of a project stack: one of [identity, tre, data]");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void plansTheIdentityProjectAsItsStackAloneNeverRebuiltAtNight(AfonCloud cloud) {
         String c = lower(cloud);
-        ProjectPlan plan = ProjectPlan.of(FileProjectProvider.parse(ProjectFixtures.identityExample(cloud)));
-        assertThat(plan.stages()).extracting(ProjectPlan.Stage::id).containsExactly(ProjectPlan.StageId.CREATE, ProjectPlan.StageId.IDENTITY);
-        assertThat(plan.stages()).extracting(ProjectPlan.Stage::stateKey).containsExactly("idp/" + c + "-create", "idp/" + c + "-keycloak");
+        ProjectStackPlan plan = ProjectStackPlan.of(FileProjectStackProvider.parse(ProjectStackFixtures.identityExample(cloud)));
+        assertThat(plan.stages()).extracting(ProjectStackPlan.Stage::id).containsExactly(ProjectStackPlan.StageId.CREATE, ProjectStackPlan.StageId.IDENTITY);
+        assertThat(plan.stages()).extracting(ProjectStackPlan.Stage::stateKey).containsExactly("idp/" + c + "-create", "idp/" + c + "-keycloak");
         assertThat(plan.nightlyStages()).isEmpty();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void readsADataProjectWithItsCatalogsAndThePolarisStackOfItsCloud(AfonCloud cloud) {
-        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
-        assertThat(project.id().value()).isEqualTo("lon");
-        assertThat(project.role()).isEqualTo(ProjectRole.DATA);
-        assertThat(project.cloud()).isEqualTo(cloud);
-        assertThat(project.catalogs()).containsExactly("cvd", "dbt");
-        assertThat(project.stack().toString()).isEqualTo(lower(cloud) + "-polaris");
-        assertThat(project.domain()).isNull();
-        assertThat(project.egressIp()).isEqualTo("203.0.113.40");
+        DataProjectStack projectStack = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud));
+        assertThat(projectStack.id().value()).isEqualTo("lon");
+        assertThat(projectStack.role()).isEqualTo(ProjectStackRole.DATA);
+        assertThat(projectStack.cloud()).isEqualTo(cloud);
+        assertThat(projectStack.catalogs()).containsExactly("cvd", "dbt");
+        assertThat(projectStack.stack().toString()).isEqualTo(lower(cloud) + "-polaris");
+        assertThat(projectStack.domain()).isNull();
+        assertThat(projectStack.egressIp()).isEqualTo("203.0.113.40");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheStackAndTheDomainOfADataProjectFromItsFile(AfonCloud cloud) {
-        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud)
+        DataProjectStack projectStack = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud)
             + "stacks:\n  data: {stack: " + lower(cloud) + "-polaris, domain: polaris.lon.example.org}\n");
-        assertThat(project.domain()).isEqualTo("polaris.lon.example.org");
+        assertThat(projectStack.domain()).isEqualTo("polaris.lon.example.org");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesADataProjectWithNoCatalogOrAnInvalidOne(AfonCloud cloud) {
-        String base = ProjectFixtures.dataExample(cloud);
+        String base = ProjectStackFixtures.dataExample(cloud);
         assertThat(invalid(base.replace("catalogs: [cvd, dbt]\n", "")).getMessage()).contains("catalogs is missing");
         assertThat(invalid(base.replace("catalogs: [cvd, dbt]", "catalogs: []")).getMessage()).contains("catalogs must be a non-empty list");
         assertThat(invalid(base.replace("[cvd, dbt]", "[Cvd]")).getMessage()).contains("catalogs[0] 'Cvd' is not a catalog id");
@@ -442,40 +442,40 @@ class FileProjectProviderTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesWhatADataProjectDoesNotHave(AfonCloud cloud) {
-        String base = ProjectFixtures.dataExample(cloud);
+        String base = ProjectStackFixtures.dataExample(cloud);
         // it has no members, Data Providers or identity of its own, and no TRE stacks
         assertThat(invalid(base + "members: [ada@example.org]\n").getMessage()).contains("members");
         assertThat(invalid(base + "dataProviders: []\n").getMessage()).contains("dataProviders");
         assertThat(invalid(base + "stacks:\n  tre: {domains: {}}\n").getMessage()).contains("stacks.tre");
         assertThat(invalid(base + "stacks:\n  data: {stack: " + lower(anotherThan(cloud)) + "-polaris}\n").getMessage())
-            .contains("is not on the project's cloud");
+            .contains("is not on the project stack's cloud");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesCatalogsInAProjectThatIsNotAData(AfonCloud cloud) {
         assertThat(invalid(valid(cloud) + "catalogs: [cvd]\n").getMessage()).contains("catalogs");
-        assertThat(invalid(ProjectFixtures.identityExample(cloud) + "catalogs: [cvd]\n").getMessage()).contains("catalogs");
+        assertThat(invalid(ProjectStackFixtures.identityExample(cloud) + "catalogs: [cvd]\n").getMessage()).contains("catalogs");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void readsTheIdentityThatADataProjectTrustsWithTheAudienceOfItsOwnByDefault(AfonCloud cloud) {
-        DataProject project = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
-        assertThat(project.identity().issuerUrl()).isEqualTo("https://id.example.org/realms/polaris");
-        assertThat(project.identity().acr()).isEqualTo("mfa");
-        assertThat(project.identity().audience()).isEqualTo("provider-lon");
-        assertThat(project.identity().project()).isNull();
-        assertThat(project.identityProject()).isNull();
-        DataProject named = ProjectFixtures.data(ProjectFixtures.dataExample(cloud).replace("acr: mfa}", "acr: mfa, audience: lon-data, project: idp}"));
+        DataProjectStack projectStack = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud));
+        assertThat(projectStack.identity().issuerUrl()).isEqualTo("https://id.example.org/realms/polaris");
+        assertThat(projectStack.identity().acr()).isEqualTo("mfa");
+        assertThat(projectStack.identity().audience()).isEqualTo("provider-lon");
+        assertThat(projectStack.identity().projectStack()).isNull();
+        assertThat(projectStack.identityProjectStack()).isNull();
+        DataProjectStack named = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud).replace("acr: mfa}", "acr: mfa, audience: lon-data, project-stack: idp}"));
         assertThat(named.identity().audience()).isEqualTo("lon-data");
-        assertThat(named.identityProject()).isEqualTo("idp");
+        assertThat(named.identityProjectStack()).isEqualTo("idp");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesADataProjectWithNoIdentityOrAnInsecureOne(AfonCloud cloud) {
-        String base = ProjectFixtures.dataExample(cloud);
+        String base = ProjectStackFixtures.dataExample(cloud);
         assertThat(invalid(base.replace("identity: {issuerUrl: \"https://id.example.org/realms/polaris\", acr: mfa}\n", "")).problems())
             .contains("identity.issuerUrl is required", "identity.acr is required");
         assertThat(invalid(base.replace("https://id", "http://id")).problems()).contains("identity.issuerUrl must be an https URL, as every consumer pins it");

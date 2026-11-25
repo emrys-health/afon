@@ -20,7 +20,7 @@
 #
 # A local path is relative to the dir that the command is run from.
 #
-# Run in a project, so that it is that project's cluster, with afon-cli.sh manage-project run <project> kube-user-cp ...
+# Run in a project, so that it is that project's cluster, with afon-cli.sh manage-project-stack run <project> kube-user-cp ...
 
 set -euo pipefail
 

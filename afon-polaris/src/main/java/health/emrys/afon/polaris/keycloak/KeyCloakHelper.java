@@ -60,7 +60,7 @@ public class KeyCloakHelper {
      *                     token meant for another Data Provider, or for the TRE itself, cannot be replayed here
      * @param acr          the {@code acr} that proves a second factor, eg {@code mfa}: a token of a password alone is refused
      * @param projectClaim the claim that names the project, a list: it selects which of the principal's roles are active, only the one of the project the
-     *                     token is for, {@code <project>Project}, so that a member of two projects reads in each only what that project may
+     *                     token is for, {@code <id>Project}, so that a member of two projects reads in each only what that project may
      */
     public record Trust(String issuer, String audience, String acr, String projectClaim) {
     }

@@ -1,7 +1,7 @@
 package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.*;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import org.slf4j.Logger;
@@ -40,7 +40,7 @@ public class KeyCloakSmokeMain {
         AfonCloud   cloud  = config.cloud();
         this.properties = config.getProperties();
         this.keyCloak   = new KeyCloakProvider(properties.getOidcDomainName(cloud));
-        this.users      = ProjectUserProvider.forActiveConfig();
+        this.users      = ProjectStackUserProvider.forActiveConfig();
     }
 
     private List<String> checkKeyCloakAccess() {

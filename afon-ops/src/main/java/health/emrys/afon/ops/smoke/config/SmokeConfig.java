@@ -5,7 +5,7 @@ import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.cdk.configs.WhitelistConfig;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.spark.connect.SparkConnectClient;
 
 import java.io.IOException;
@@ -39,9 +39,9 @@ public class SmokeConfig {
     }
 
     /**
-     * @return whether the config is of a project's TRE, which names the claim that its tokens carry the project in: set, and not blank
+     * @return whether the config is of a project stack's TRE, which names the claim that its tokens carry the project stack in: set, and not blank
      */
-    public static boolean isProject(AfonPropertyProvider properties) {
+    public static boolean isProjectStack(AfonPropertyProvider properties) {
         return properties.hasProperty(OIDC_PROJECT_CLAIM) && !properties.getValue(OIDC_PROJECT_CLAIM, "").isBlank();
     }
 
@@ -166,6 +166,6 @@ public class SmokeConfig {
     public static String sparkConnectToken() throws IOException {
         AfonPropertyProvider properties = smokeTestProperties();
         AfonPropertyProvider ofCloud    = properties.forCloud(new SmokeConfig(properties).cloud());
-        return SparkConnectClient.userToken(ofCloud, ProjectUserProvider.forActiveConfig().getConfiguredUser(ofCloud));
+        return SparkConnectClient.userToken(ofCloud, ProjectStackUserProvider.forActiveConfig().getConfiguredUser(ofCloud));
     }
 }

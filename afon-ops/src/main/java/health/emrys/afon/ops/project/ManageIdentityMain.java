@@ -4,11 +4,11 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import health.emrys.afon.ops.kube.tools.KeyCloakTunnel;
-import health.emrys.afon.project.AfonProject;
-import health.emrys.afon.project.ProjectException;
-import health.emrys.afon.project.FileProjectProvider;
-import health.emrys.afon.project.TreProject;
-import health.emrys.afon.project.ProjectEnv;
+import health.emrys.afon.project.ProjectStack;
+import health.emrys.afon.project.ProjectStackException;
+import health.emrys.afon.project.FileProjectStackProvider;
+import health.emrys.afon.project.TreProjectStack;
+import health.emrys.afon.project.ProjectStackEnv;
 import health.emrys.afon.security.IdentityProvider;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 
@@ -25,38 +25,38 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * Manages a project's place in the central identity, the one Keycloak that issues the tokens of every project:
+ * Manages a project stack's place in the central identity, the one Keycloak that issues the tokens of every project stack:
  * <pre>
- * manage-identity create &lt;project&gt; [--public-keys &lt;dir&gt;]
- * manage-identity add-member &lt;project&gt; &lt;email&gt; [--first-name &lt;name&gt;] [--last-name &lt;name&gt;]
- * manage-identity remove-member &lt;project&gt; &lt;email&gt;
- * manage-identity sync-members &lt;project&gt;
- * manage-identity invite &lt;project&gt; &lt;email&gt;
- * manage-identity remove-authenticator &lt;project&gt; &lt;email&gt;
- * manage-identity user-id &lt;project&gt; &lt;email&gt;
- * manage-identity close &lt;project&gt;
+ * manage-identity create &lt;project-stack&gt; [--secrets &lt;dir&gt;]
+ * manage-identity add-member &lt;project-stack&gt; &lt;email&gt; [--first-name &lt;name&gt;] [--last-name &lt;name&gt;]
+ * manage-identity remove-member &lt;project-stack&gt; &lt;email&gt;
+ * manage-identity sync-members &lt;project-stack&gt;
+ * manage-identity invite &lt;project-stack&gt; &lt;email&gt;
+ * manage-identity remove-authenticator &lt;project-stack&gt; &lt;email&gt;
+ * manage-identity user-id &lt;project-stack&gt; &lt;email&gt;
+ * manage-identity close &lt;project-stack&gt;
  * </pre>
  * <ul>
- *   <li>{@code create} makes the project's clients, group and token claims, or converges them; {@code <dir>} holds the
- *       secret of each of the project's clients, {@code tre.secret} and {@code git.secret}, which {@code project-secret} makes and
- *       the project's config is given too: the Git client has none if the project has no Git of its own.  It is the {@code keys} dir of the
- *       project's own dir if not given, see {@link FileProjectProvider#keysDir};</li>
+ *   <li>{@code create} makes the project stack's clients, group and token claims, or converges them; {@code <dir>} holds the
+ *       secret of each of the project stack's clients, {@code tre.secret} and {@code git.secret}, which {@code project-secret} makes and
+ *       the project stack's config is given too: the Git client has none if the project stack has no Git of its own.  It is the {@code keys} dir of the
+ *       project stack's own dir if not given, see {@link FileProjectStackProvider#secretsDir};</li>
  *   <li>{@code add-member} makes the member in the central identity if absent, with an invitation email, adds them to the
- *       project's group, and prints their user id, which each Data Provider whose contract names them makes their principal from;</li>
+ *       project stack's group, and prints their user id, which each Data Provider whose contract names them makes their principal from;</li>
  *   <li>{@code remove-member} removes the member from the group and ends their sessions;</li>
- *   <li>{@code sync-members} makes the project's group have the members that the project's file lists, and no others: it adds those that are
- *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A project has at least one member, so
+ *   <li>{@code sync-members} makes the project stack's group have the members that the project stack's file lists, and no others: it adds those that are
+ *       missing, as {@code add-member} does, and removes the others, as {@code remove-member} does.  A project stack has at least one member, so
  *       the group is never emptied by it;</li>
  *   <li>{@code invite} sends the invitation again to a member who is in the central identity, by email: for one who never got it, let it
  *       expire, or lost their second factor.  Unlike the invitation of {@code add-member}, which is a warning if it cannot be sent, it fails;</li>
- *   <li>{@code close} closes the project's TRE client, so that no token is issued for it.</li>
- *   <li>{@code <project>} is the id of the project, whose file the deployer writes in its own dir,
- *       {@code <afon-home>/projects/<project>/project.yaml}, see {@link FileProjectProvider#forProject}.</li>
+ *   <li>{@code close} closes the project stack's TRE client, so that no token is issued for it.</li>
+ *   <li>{@code <project-stack>} is the id of the project stack, whose file the deployer writes in its own dir,
+ *       {@code <afon-home>/projects/<project-stack>/project.yaml}, see {@link FileProjectStackProvider#forProjectStack}.</li>
  * </ul>
  * It runs in the config it is given, whose Keycloak admin credentials are in its {@code secret.properties}, and acts on the Keycloak at the
- * OIDC domain of the project's cloud: when run by {@code manage-project} it is in the project's home, and so in the config that the project is
+ * OIDC domain of the project stack's cloud: when run by {@code manage-project-stack} it is in the project stack's home, and so in the config that the project stack is
  * made from, that of its env.
- * A token already issued lasts until it expires.  What acts on the project as a whole is {@code manage-project}.
+ * A token already issued lasts until it expires.  What acts on the project stack as a whole is {@code manage-project-stack}.
  */
 public class ManageIdentityMain {
 
@@ -66,24 +66,24 @@ public class ManageIdentityMain {
     private static final String KUBECONFIG = "--kubeconfig";
 
     private static final String USAGE = String.join(System.lineSeparator(),
-        "Usage: manage-identity <action> <project> [<args>], where <action> is one of:",
-        "  create [" + SECRETS + " <dir>]  makes the project's clients, group and token claims, or converges them;",
-        "                                  <dir> holds tre.secret and git.secret, the secret of each client: the " + FileProjectProvider.KEYS_DIR + " dir",
-        "                                  of the project's own dir if not given",
+        "Usage: manage-identity <action> <project-stack> [<args>], where <action> is one of:",
+        "  create [" + SECRETS + " <dir>]  makes the project stack's clients, group and token claims, or converges them;",
+        "                                  <dir> holds tre.secret and git.secret, the secret of each client: the " + FileProjectStackProvider.SECRETS_DIR + " dir",
+        "                                  of the project stack's own dir if not given",
         "  add-member <email> [" + FIRST_NAME + " <name>] [" + LAST_NAME + " <name>]",
-        "                                  makes the member if absent, adds them to the project's group, prints their user id",
+        "                                  makes the member if absent, adds them to the project stack's group, prints their user id",
         "  remove-member <email>           removes the member from the group and ends their sessions",
-        "  sync-members                    makes the project's group have the members that its project.yaml lists, and no others",
+        "  sync-members                    makes the project stack's group have the members that its project.yaml lists, and no others",
         "  invite <email>                  sends the invitation again to a member who is in the central identity (it fails if it cannot be sent)",
         "  remove-authenticator <email>    removes the member's authenticators and ends their sessions, so that they enrol a new one, eg from the invitation",
-        "  user-id <email>                 prints the user id that the central identity gave the member, which manage-project-grants takes; it changes nothing",
-        "  close                           closes the project's TRE client, so that no token is issued for it",
+        "  user-id <email>                 prints the user id that the central identity gave the member, which manage-data takes; it changes nothing",
+        "  close                           closes the project stack's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
-        "  config, which that of a project that names its identity project has: run in its home, eg manage-project run <project> manage-identity ...;",
+        "  config, which that of a project stack that names its identity project stack has: run in its home, eg manage-project-stack run <project-stack> manage-identity ...;",
         "  else Keycloak is reached at its OIDC domain name, which must admit this machine",
-        "<project> is the id of the project, which is left out in the home of the project, whose config has it: manage-project run <project> manage-identity <action>, eg xyz-yyyy-nnnn, whose file the deployer writes in its own dir,",
-        "  <afon-home>/" + FileProjectProvider.PROJECTS_DIR + "/<project>/" + FileProjectProvider.FILE);
+        "<project-stack> is the id of the project stack, which is left out in the home of the project stack, whose config has it: manage-project-stack run <project-stack> manage-identity <action>, eg xyz-yyyy-nnnn, whose file the deployer writes in its own dir,",
+        "  <afon-home>/" + FileProjectStackProvider.PROJECTS_DIR + "/<project-stack>/" + FileProjectStackProvider.FILE);
 
     /**
      * Opens a tunnel to Keycloak in the cluster of a kubeconfig, and calls with its endpoint, which it closes when the call returns; or calls with
@@ -96,19 +96,19 @@ public class ManageIdentityMain {
     }
 
     /** The identity at the endpoint, ie {@code host:port}, or at its OIDC domain name if the endpoint is {@code null}. */
-    private final BiFunction<TreProject, String, IdentityProvider> identity;
+    private final BiFunction<TreProjectStack, String, IdentityProvider> identity;
     private final Tunnel tunnel;
-    /** The id of the project whose home this runs in, or {@code null}: what {@code <project>} is if it is left out. */
-    private final java.util.function.Supplier<String> defaultProject;
+    /** The id of the project stack whose home this runs in, or {@code null}: what {@code <project-stack>} is if it is left out. */
+    private final java.util.function.Supplier<String> defaultProjectStack;
     private final PrintStream out;
     private final PrintStream err;
     private final Path afonHome;
 
-    ManageIdentityMain(BiFunction<TreProject, String, IdentityProvider> identity, Tunnel tunnel, java.util.function.Supplier<String> defaultProject,
+    ManageIdentityMain(BiFunction<TreProjectStack, String, IdentityProvider> identity, Tunnel tunnel, java.util.function.Supplier<String> defaultProjectStack,
                        PrintStream out, PrintStream err, Path afonHome) {
         this.identity = identity;
         this.tunnel = tunnel;
-        this.defaultProject = defaultProject;
+        this.defaultProjectStack = defaultProjectStack;
         this.out = out;
         this.err = err;
         this.afonHome = afonHome;
@@ -137,38 +137,38 @@ public class ManageIdentityMain {
             }
         }
         String action = args[0];
-        // <project> is left out in the home of a project, whose config has its id
+        // <project-stack> is left out in the home of a project stack, whose config has its id
         int withoutProject = switch (action) {
             case "create", "close", "sync-members" -> 0;
             case "add-member", "remove-member", "invite", "remove-authenticator", "user-id" -> 1;
             default -> -1;
         };
-        String project;
+        String projectStack;
         List<String> rest;
         if (positional.size() == withoutProject) {
-            project = defaultProject.get();
-            if (project == null || project.isBlank()) {
-                return usage(action + " takes a <project>, unless it is run in the home of one: manage-project run <project> manage-identity " + action);
+            projectStack = defaultProjectStack.get();
+            if (projectStack == null || projectStack.isBlank()) {
+                return usage(action + " takes a <project-stack>, unless it is run in the home of one: manage-project-stack run <project-stack> manage-identity " + action);
             }
             rest = positional;
         } else if (positional.isEmpty()) {
-            return usage(action + " takes a <project>");
+            return usage(action + " takes a <project-stack>");
         } else {
-            project = positional.get(0);
+            projectStack = positional.get(0);
             rest = positional.subList(1, positional.size());
         }
         return switch (action) {
-            case "create" -> rest.isEmpty() ? with(project, options, (p, e) -> create(p, e, options)) : usage("create takes " + SECRETS + " <dir>, and no other argument");
-            case "add-member" -> rest.size() == 1 ? with(project, options, (p, e) -> addMember(p, e, rest.get(0), options))
+            case "create" -> rest.isEmpty() ? with(projectStack, options, (p, e) -> create(p, e, options)) : usage("create takes " + SECRETS + " <dir>, and no other argument");
+            case "add-member" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> addMember(p, e, rest.get(0), options))
                                                   : usage("add-member takes one <email>");
-            case "remove-member" -> rest.size() == 1 ? with(project, options, (p, e) -> removeMember(p, e, rest.get(0)))
+            case "remove-member" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> removeMember(p, e, rest.get(0)))
                                                      : usage("remove-member takes one <email>");
-            case "invite" -> rest.size() == 1 ? with(project, options, (p, e) -> invite(p, e, rest.get(0))) : usage("invite takes one <email>");
-            case "sync-members" -> rest.isEmpty() ? with(project, options, this::syncMembers) : usage("sync-members takes no argument");
-            case "remove-authenticator" -> rest.size() == 1 ? with(project, options, (p, e) -> removeAuthenticator(p, e, rest.get(0)))
+            case "invite" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> invite(p, e, rest.get(0))) : usage("invite takes one <email>");
+            case "sync-members" -> rest.isEmpty() ? with(projectStack, options, this::syncMembers) : usage("sync-members takes no argument");
+            case "remove-authenticator" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> removeAuthenticator(p, e, rest.get(0)))
                                                            : usage("remove-authenticator takes one <email>");
-            case "user-id" -> rest.size() == 1 ? with(project, options, (p, e) -> userId(p, e, rest.get(0))) : usage("user-id takes one <email>");
-            case "close" -> rest.isEmpty() ? with(project, options, this::close) : usage("close takes no argument");
+            case "user-id" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> userId(p, e, rest.get(0))) : usage("user-id takes one <email>");
+            case "close" -> rest.isEmpty() ? with(projectStack, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
     }
@@ -181,27 +181,27 @@ public class ManageIdentityMain {
 
     private interface Action {
         /** @param endpoint where Keycloak is reached, or {@code null} for its OIDC domain name */
-        void run(TreProject project, String endpoint) throws IOException;
+        void run(TreProjectStack projectStack, String endpoint) throws IOException;
     }
 
     /**
-     * Loads the project, then runs the action on it, reporting a failure as the status rather than a stack trace.
+     * Loads the project stack, then runs the action on it, reporting a failure as the status rather than a stack trace.
      */
-    private int with(String project, Map<String, String> options, Action action) {
-        FileProjectProvider provider;
+    private int with(String projectStack, Map<String, String> options, Action action) {
+        FileProjectStackProvider provider;
         try {
-            provider = FileProjectProvider.forProject(afonHome, project);
+            provider = FileProjectStackProvider.forProjectStack(afonHome, projectStack);
         } catch (IllegalArgumentException e) {
             return usage(e.getMessage());
         }
         if (!provider.exists()) {
-            err.printf("No project file %s: write the project's %s in its dir%n", provider.file(), FileProjectProvider.FILE);
+            err.printf("No project stack file %s: write the project stack's %s in its dir%n", provider.file(), FileProjectStackProvider.FILE);
             return 1;
         }
         try {
-            AfonProject loaded = provider.getProject();
-            if (!(loaded instanceof TreProject tre)) {
-                err.printf("Project %s has the role %s: it has no clients, group or members, and its stack is deployed by manage-project up%n", loaded.id(),
+            ProjectStack loaded = provider.getProjectStack();
+            if (!(loaded instanceof TreProjectStack tre)) {
+                err.printf("Project stack %s has the role %s: it has no clients, group or members, and its stack is deployed by manage-project-stack up%n", loaded.id(),
                            loaded.role());
                 return 1;
             }
@@ -212,7 +212,7 @@ public class ManageIdentityMain {
             }
             tunnel.run(tre.cloud(), kubeConfig, endpoint -> action.run(tre, endpoint));
             return 0;
-        } catch (ProjectException | IllegalStateException | IllegalArgumentException | IOException e) {
+        } catch (ProjectStackException | IllegalStateException | IllegalArgumentException | IOException e) {
             err.println(e.getMessage());
             return 1;
         } catch (InterruptedException e) {
@@ -225,94 +225,94 @@ public class ManageIdentityMain {
         }
     }
 
-    private void create(TreProject project, String endpoint, Map<String, String> options) throws IOException {
+    private void create(TreProjectStack projectStack, String endpoint, Map<String, String> options) throws IOException {
         Path dir = options.containsKey(SECRETS) ? Path.of(options.get(SECRETS))
-                                                    : FileProjectProvider.keysDir(afonHome, project.id().value());
+                                                    : FileProjectStackProvider.secretsDir(afonHome, projectStack.id().value());
         Map<String, String> secrets = new LinkedHashMap<>();
         secrets.put("tre", read(dir.resolve("tre.secret")));
-        if (project.git() != null) {
+        if (projectStack.git() != null) {
             secrets.put("git", read(dir.resolve("git.secret")));
         }
-        identity.apply(project, endpoint).ensureProject(project, secrets);
-        out.printf("Project %s is made in the central identity: client %s%s, and a group %s%n", project.id(),
-                   project.identity().treClient(), project.git() == null ? "" : " and " + project.identity().gitClient(), project.id());
+        identity.apply(projectStack, endpoint).ensureProject(projectStack, secrets);
+        out.printf("Project stack %s is made in the central identity: client %s%s, and a group %s%n", projectStack.id(),
+                   projectStack.identity().treClient(), projectStack.git() == null ? "" : " and " + projectStack.identity().gitClient(), projectStack.id());
     }
 
     private static String read(Path secret) throws IOException {
         if (!Files.isRegularFile(secret)) {
-            throw new IOException("No secret " + secret + ": make it with project-secret, which puts tre.secret and git.secret in the project's " + FileProjectProvider.KEYS_DIR + " dir");
+            throw new IOException("No secret " + secret + ": make it with project-secret, which puts tre.secret and git.secret in the project stack's " + FileProjectStackProvider.SECRETS_DIR + " dir");
         }
         return Files.readString(secret, StandardCharsets.UTF_8).strip();
     }
 
-    private void addMember(TreProject project, String endpoint, String email, Map<String, String> options) {
-        IdentityProvider provider = identity.apply(project, endpoint);
-        String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME), project.identity().treClient());
-        provider.addMember(project, userId);
-        record(project, () -> ProjectMembers.add(ProjectMembers.file(afonHome, project.id().value()), userId, email.toLowerCase(java.util.Locale.ROOT)));
-        if (project.members().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
+    private void addMember(TreProjectStack projectStack, String endpoint, String email, Map<String, String> options) {
+        IdentityProvider provider = identity.apply(projectStack, endpoint);
+        String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME), projectStack.identity().treClient());
+        provider.addMember(projectStack, userId);
+        record(projectStack, () -> ProjectMembers.add(ProjectMembers.file(afonHome, projectStack.id().value()), userId, email.toLowerCase(java.util.Locale.ROOT)));
+        if (projectStack.members().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
             err.printf("Note: %s is not listed in the members of %s: the next sync-members, and so up, takes them out of the group. List them there to keep them.%n",
-                       email, project.id());
+                       email, projectStack.id());
         }
         out.println(userId);
     }
 
-    private void removeMember(TreProject project, String endpoint, String email) throws IOException {
-        IdentityProvider provider = identity.apply(project, endpoint);
+    private void removeMember(TreProjectStack projectStack, String endpoint, String email) throws IOException {
+        IdentityProvider provider = identity.apply(projectStack, endpoint);
         Optional<String> userId = provider.findUser(email);
         if (userId.isEmpty()) {
             throw new IOException("No user " + email + " in the central identity");
         }
-        provider.removeMember(project, userId.get());
-        record(project, () -> ProjectMembers.remove(ProjectMembers.file(afonHome, project.id().value()), userId.get()));
-        out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId.get(), project.id());
+        provider.removeMember(projectStack, userId.get());
+        record(projectStack, () -> ProjectMembers.remove(ProjectMembers.file(afonHome, projectStack.id().value()), userId.get()));
+        out.printf("Removed %s (%s) from project stack %s, and ended their sessions%n", email, userId.get(), projectStack.id());
     }
 
     /**
      * Prints the user id of the member alone, one line, so that a script can take it: the immutable id that the central identity gave them, which is what
-     * {@code manage-project-grants add-member} and the members file hold.  It makes nothing, unlike {@code add-member}.
+     * {@code manage-data add-member} and the members file hold.  It makes nothing, unlike {@code add-member}.
      */
-    private void userId(TreProject project, String endpoint, String email) {
-        String userId = identity.apply(project, endpoint).findUser(email).orElseThrow(() -> new IllegalStateException(
+    private void userId(TreProjectStack projectStack, String endpoint, String email) {
+        String userId = identity.apply(projectStack, endpoint).findUser(email).orElseThrow(() -> new IllegalStateException(
             "No user " + email + " in the central identity: add-member makes them, and sends the invitation"));
         out.println(userId);
     }
 
-    private void removeAuthenticator(TreProject project, String endpoint, String email) {
-        int removed = identity.apply(project, endpoint).removeSecondFactor(email);
+    private void removeAuthenticator(TreProjectStack projectStack, String endpoint, String email) {
+        int removed = identity.apply(projectStack, endpoint).removeSecondFactor(email);
         if (removed == 0) {
             out.printf("%s has no authenticator: nothing is removed%n", email);
         } else {
             out.printf("Removed %d authenticator%s of %s, and ended their sessions: they enrol a new one from the invitation, "
-                       + "afon-cli.sh manage-project run %s manage-identity invite %s%n", removed, removed == 1 ? "" : "s", email, project.id(), email);
+                       + "afon-cli.sh manage-project-stack run %s manage-identity invite %s%n", removed, removed == 1 ? "" : "s", email, projectStack.id(), email);
         }
     }
 
-    private void invite(TreProject project, String endpoint, String email) {
-        identity.apply(project, endpoint).invite(email, project.identity().treClient());
+    private void invite(TreProjectStack projectStack, String endpoint, String email) {
+        identity.apply(projectStack, endpoint).invite(email, projectStack.identity().treClient());
         out.printf("Sent the invitation to %s%n", email);
     }
 
-    private void syncMembers(TreProject project, String endpoint) {
-        IdentityProvider provider = identity.apply(project, endpoint);
-        Map<String, String> current = provider.members(project);
+    private void syncMembers(TreProjectStack projectStack, String endpoint) {
+        IdentityProvider provider = identity.apply(projectStack, endpoint);
+        Map<String, String> current = provider.members(projectStack);
         Map<String, String> wanted = new LinkedHashMap<>();
-        for (TreProject.Member member : project.members()) {
-            String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName(), project.identity().treClient());
+        for (TreProjectStack.Member member : projectStack.members()) {
+            String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName(), projectStack.identity().treClient());
             wanted.put(userId, member.email());
             if (!current.containsKey(userId)) {
-                provider.addMember(project, userId);
-                out.printf("Added %s (%s) to project %s%n", member.email(), userId, project.id());
+                provider.addMember(projectStack, userId);
+                out.printf("Added %s (%s) to project stack %s%n", member.email(), userId, projectStack.id());
             }
         }
         current.forEach((userId, email) -> {
             if (!wanted.containsKey(userId)) {
-                provider.removeMember(project, userId);
-                out.printf("Removed %s (%s) from project %s, and ended their sessions%n", email, userId, project.id());
+                provider.removeMember(projectStack, userId);
+                out.printf("Removed %s (%s) from project stack %s, and ended their sessions%n", email, userId, projectStack.id());
             }
         });
-        record(project, () -> ProjectMembers.write(ProjectMembers.file(afonHome, project.id().value()), wanted));
-        out.printf("Project %s has %d member%s%n", project.id(), wanted.size(), wanted.size() == 1 ? "" : "s");
+        record(projectStack, () -> ProjectMembers.write(ProjectMembers.file(afonHome, projectStack.id().value()), wanted));
+        out.printf("Project stack %s has %d member%s%n", projectStack.id(), wanted.size(), wanted.size() == 1 ? "" : "s");
     }
 
     @FunctionalInterface
@@ -321,28 +321,28 @@ public class ManageIdentityMain {
     }
 
     /**
-     * Keeps the project's members file as the group is: what needs the members' ids reads it, rather than have them copied by hand.  The group in the identity is
+     * Keeps the project stack's members file as the group is: what needs the members' ids reads it, rather than have them copied by hand.  The group in the identity is
      * what changed, so a file that cannot be written is a warning, not a failure.
      */
-    private void record(TreProject project, Recording recording) {
+    private void record(TreProjectStack projectStack, Recording recording) {
         try {
             recording.run();
         } catch (IOException e) {
-            err.printf("Could not write the members file %s of project %s: %s%n", ProjectMembers.file(afonHome, project.id().value()), project.id(), e.getMessage());
+            err.printf("Could not write the members file %s of project stack %s: %s%n", ProjectMembers.file(afonHome, projectStack.id().value()), projectStack.id(), e.getMessage());
         }
     }
 
-    private void close(TreProject project, String endpoint) {
-        identity.apply(project, endpoint).closeProject(project);
-        out.printf("Closed the TRE client %s of project %s%n", project.identity().treClient(), project.id());
+    private void close(TreProjectStack projectStack, String endpoint) {
+        identity.apply(projectStack, endpoint).closeProject(projectStack);
+        out.printf("Closed the TRE client %s of project stack %s%n", projectStack.identity().treClient(), projectStack.id());
     }
 
     /**
-     * @return the KeyCloak of the project's cloud, at that cloud's OIDC domain, with the admin credentials of the config that this runs in
+     * @return the KeyCloak of the project stack's cloud, at that cloud's OIDC domain, with the admin credentials of the config that this runs in
      */
-    private static IdentityProvider identityOf(TreProject project, String endpoint) {
+    private static IdentityProvider identityOf(TreProjectStack projectStack, String endpoint) {
         OpsPropertyProvider properties = new OpsPropertyProvider();
-        return new KeyCloakProvider(properties, endpoint != null ? endpoint : properties.getOidcDomainName(project.cloud()));
+        return new KeyCloakProvider(properties, endpoint != null ? endpoint : properties.getOidcDomainName(projectStack.cloud()));
     }
 
     private static void tunnel(AfonCloud cloud, Path kubeConfig, KeyCloakTunnel.Call call) throws Exception {
@@ -351,7 +351,7 @@ public class ManageIdentityMain {
             KeyCloakTunnel.run(cloud, properties, kubeConfig, call);
             return;
         }
-        // the cluster of Keycloak that the config of a project names, if any; else it is reached at its OIDC domain name, which must admit this machine
+        // the cluster of Keycloak that the config of a project stack names, if any; else it is reached at its OIDC domain name, which must admit this machine
         String configured = properties.getValue(AfonProperty.KEYCLOAK_KUBECONFIG, "");
         if (configured == null || configured.isBlank()) {
             call.run(null);
@@ -363,7 +363,7 @@ public class ManageIdentityMain {
     public static void main(String[] args) {
         int status = new ManageIdentityMain(ManageIdentityMain::identityOf, ManageIdentityMain::tunnel,
                                              () -> new OpsPropertyProvider().getValue(AfonProperty.PROJECT_ID, ""), System.out, System.err,
-                                             ProjectEnv.defaultAfonHome()).run(args);
+                                             ProjectStackEnv.defaultAfonHome()).run(args);
         if (status != 0) {
             System.exit(status);
         }

@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * How the DNS zones of a project's domains are delegated from the zone of their parent domain, which must be done before the stack can get its
+ * How the DNS zones of a project stack's domains are delegated from the zone of their parent domain, which must be done before the stack can get its
  * certificates, see {@code docs/dns_config.md}.
  */
 public enum DnsDelegation {

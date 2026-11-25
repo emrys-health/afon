@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * What a Data Provider grants a project: the principal role and catalog role of the project, read-only access to one namespace, and a principal for each
+ * What a Data Provider grants a project stack: the principal role and catalog role of the project stack, read-only access to one namespace, and a principal for each
  * member it names.
  */
 class PolarisProjectGrantsTest {
@@ -206,7 +206,7 @@ class PolarisProjectGrantsTest {
         when(configurer.namespacesOf("dbt")).thenReturn(List.of());
         when(configurer.tableNamesOf("cvd", "staging")).thenReturn(List.of("smoke_test_unreleased"));
         when(configurer.tableNamesOf("cvd", "released")).thenReturn(List.of("smoke_test"));
-        // the roles that Polaris and the Data Provider have for their own uses are not projects
+        // the roles that Polaris and the Data Provider have for their own uses are not project stacks
         when(configurer.principalRoleNames()).thenReturn(List.of("service_admin", "cvd-2026Project", "philPrincipal", "Project"));
         when(configurer.principalsOf("cvd-2026Project")).thenReturn(List.of("afon:" + BOB, "afon:" + ALICE));
         when(configurer.catalogRolesOf("cvd-2026Project", "cvd")).thenReturn(List.of("cvd-2026Reader"));
@@ -225,20 +225,20 @@ class PolarisProjectGrantsTest {
         assertThat(overview.catalogs().get(0).namespaces()).containsEntry("staging", List.of("smoke_test_unreleased")).containsEntry("released", List.of("smoke_test"));
         // sorted, whatever order Polaris lists in
         assertThat(overview.catalogs().get(0).namespaces().keySet()).containsExactly("released", "staging");
-        assertThat(overview.projects()).hasSize(1);
-        PolarisProjectGrants.ProjectAccess project = overview.projects().get(0);
-        assertThat(project.project()).isEqualTo("cvd-2026");
-        assertThat(project.principalRole()).isEqualTo("cvd-2026Project");
-        assertThat(project.principals()).containsExactly("afon:" + ALICE, "afon:" + BOB);
-        assertThat(project.catalogs()).containsExactly(new PolarisProjectGrants.CatalogAccess("cvd", "cvd-2026Reader", List.of("read-only on released")));
+        assertThat(overview.projectStacks()).hasSize(1);
+        PolarisProjectGrants.ProjectAccess projectStack = overview.projectStacks().get(0);
+        assertThat(projectStack.projectStack()).isEqualTo("cvd-2026");
+        assertThat(projectStack.principalRole()).isEqualTo("cvd-2026Project");
+        assertThat(projectStack.principals()).containsExactly("afon:" + ALICE, "afon:" + BOB);
+        assertThat(projectStack.catalogs()).containsExactly(new PolarisProjectGrants.CatalogAccess("cvd", "cvd-2026Reader", List.of("read-only on released")));
     }
 
     @Test
     void showsOneProjectAndNothingForAProjectThatHasNoRole() throws Exception {
         aDataProviderWithOneProject();
 
-        assertThat(grants.show("cvd-2026").projects()).extracting(PolarisProjectGrants.ProjectAccess::project).containsExactly("cvd-2026");
-        assertThat(grants.show("diab-2026").projects()).isEmpty();
+        assertThat(grants.show("cvd-2026").projectStacks()).extracting(PolarisProjectGrants.ProjectAccess::projectStack).containsExactly("cvd-2026");
+        assertThat(grants.show("diab-2026").projectStacks()).isEmpty();
     }
 
     @Test

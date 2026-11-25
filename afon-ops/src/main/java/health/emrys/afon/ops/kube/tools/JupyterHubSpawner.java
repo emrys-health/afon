@@ -6,7 +6,7 @@ import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.commands.CliCommand;
@@ -76,7 +76,7 @@ public class JupyterHubSpawner {
     public JupyterHubSpawner(KubeClient client, String namespace) {
         this.client    = client;
         this.namespace = namespace;
-        users          = ProjectUserProvider.forActiveConfig();
+        users          = ProjectStackUserProvider.forActiveConfig();
     }
 
     /**

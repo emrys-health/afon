@@ -12,16 +12,16 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
 
-import static health.emrys.afon.project.ProjectFixtures.lower;
+import static health.emrys.afon.project.ProjectStackFixtures.lower;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Every test is run on every cloud.
  */
-class ProjectNamesTest {
+class ProjectStackNamesTest {
 
-    /** The config a project is made from: the account of each cloud, and what the cloud's create script reads. */
+    /** The config a project stack is made from: the account of each cloud, and what the cloud's create script reads. */
     private static Properties env(String... more) {
         Properties env = new Properties();
         env.setProperty("AZURE_SUBSCRIPTION", "sub-1");
@@ -42,50 +42,50 @@ class ProjectNamesTest {
         return env;
     }
 
-    private static Map<String, String> all(AfonProject project, Properties env) {
+    private static Map<String, String> all(ProjectStack projectStack, Properties env) {
         Map<String, String> all = new java.util.LinkedHashMap<>();
-        ProjectNames.derive(project, env, "dev").values().forEach(all::putAll);
+        ProjectStackNames.derive(projectStack, env, "dev").values().forEach(all::putAll);
         return all;
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void namesTheClusterAfterTheProjectOnEveryCloud(AfonCloud cloud) {
-        assertThat(all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env())).containsEntry("CLUSTER_NAME", "xyz-yyyy-nnnn-cluster");
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env())).containsEntry("CLUSTER_NAME", "idp-cluster");
+        assertThat(all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env())).containsEntry("CLUSTER_NAME", "xyz-yyyy-nnnn-cluster");
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env())).containsEntry("CLUSTER_NAME", "idp-cluster");
     }
 
     @Test
     void hashesTheCloudTheAccountAndTheProjectIntoAStableToken() {
-        String token = ProjectNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnn");
-        assertThat(token).hasSize(ProjectNames.TOKEN_LENGTH).matches("[0-9a-f]+");
-        assertThat(ProjectNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnn")).isEqualTo(token);
-        // the same project in another account, or another project in the account, has another
-        assertThat(ProjectNames.token(AfonCloud.AZURE, "sub-2", "xyz-yyyy-nnnn")).isNotEqualTo(token);
-        assertThat(ProjectNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnm")).isNotEqualTo(token);
-        assertThat(ProjectNames.token(AfonCloud.GCP, "sub-1", "xyz-yyyy-nnnn")).isNotEqualTo(token);
+        String token = ProjectStackNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnn");
+        assertThat(token).hasSize(ProjectStackNames.TOKEN_LENGTH).matches("[0-9a-f]+");
+        assertThat(ProjectStackNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnn")).isEqualTo(token);
+        // the same project stack in another account, or another project stack in the account, has another
+        assertThat(ProjectStackNames.token(AfonCloud.AZURE, "sub-2", "xyz-yyyy-nnnn")).isNotEqualTo(token);
+        assertThat(ProjectStackNames.token(AfonCloud.AZURE, "sub-1", "xyz-yyyy-nnnm")).isNotEqualTo(token);
+        assertThat(ProjectStackNames.token(AfonCloud.GCP, "sub-1", "xyz-yyyy-nnnn")).isNotEqualTo(token);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void namesWhatIsUniqueInTheWholeCloudAfterTheTokenOfTheProject(AfonCloud cloud) {
-        // the project names no Git bucket, so it has its own, not the env's, which projects from it would share
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
+        // the project stack names no Git bucket, so it has its own, not the env's, which project stacks from it would share
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
         String account = switch (cloud) {
             case AZURE -> "sub-1";
             case AWS -> "111111111111";
             case GCP -> "gcp-proj";
         };
-        String token = ProjectNames.token(cloud, account, "xyz-yyyy-nnnn");
-        Map<String, String> names = all(project, env());
+        String token = ProjectStackNames.token(cloud, account, "xyz-yyyy-nnnn");
+        Map<String, String> names = all(projectStack, env());
         String prefix = cloud.name() + "_";
         switch (cloud) {
             case AZURE -> {
                 assertThat(names).containsEntry("AZURE_STORAGE_ACCOUNT", "afonstorage" + token).containsEntry("AZURE_KEY_VAULT_NAME", "afon-kv-" + token);
-                // an Azure storage account has 3 to 24 lower-case letters and digits, whatever the project id
+                // an Azure storage account has 3 to 24 lower-case letters and digits, whatever the project stack id
                 assertThat(names.get("AZURE_STORAGE_ACCOUNT")).matches("[a-z0-9]{3,24}");
                 assertThat(names.get("AZURE_KEY_VAULT_NAME")).matches("[a-z][a-z0-9-]{2,23}");
-                // the containers of the catalogs, Git and the logs are in the account, so they are the project's own
+                // the containers of the catalogs, Git and the logs are in the account, so they are the project stack's own
                 assertThat(names).doesNotContainKeys("AZURE_BUCKET_NAME_azure", "AZURE_POLARIS_LOG_BUCKET");
             }
             case AWS, GCP -> {
@@ -101,18 +101,18 @@ class ProjectNamesTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void keepsTheGitBucketTheProjectNames(AfonCloud cloud) {
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud));
-        assertThat(project.create().gitBucket()).isNotNull();
-        assertThat(all(project, env())).doesNotContainKey(cloud.name() + "_GITEA_BUCKET");
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud));
+        assertThat(projectStack.create().gitBucket()).isNotNull();
+        assertThat(all(projectStack, env())).doesNotContainKey(cloud.name() + "_GITEA_BUCKET");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void namesNothingTheEnvDoesNotUse(AfonCloud cloud) {
-        // no Polaris log bucket in the env: logs are not shipped, and are not turned on by a project
+        // no Polaris log bucket in the env: logs are not shipped, and are not turned on by a project stack
         Properties env = env(cloud.name() + "_POLARIS_LOG_BUCKET", "", cloud.name() + "_GITEA_BUCKET", "");
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
-        assertThat(all(project, env)).doesNotContainKeys(cloud.name() + "_POLARIS_LOG_BUCKET", cloud.name() + "_GITEA_BUCKET");
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud).replace("    gitBucket: xyz-yyyy-nnnn-gitea\n", ""));
+        assertThat(all(projectStack, env)).doesNotContainKeys(cloud.name() + "_POLARIS_LOG_BUCKET", cloud.name() + "_GITEA_BUCKET");
     }
 
     @ParameterizedTest
@@ -123,9 +123,9 @@ class ProjectNamesTest {
             case AWS -> "AWS_ACCOUNT_ID";
             case GCP -> "GCP_PROJECT_ID";
         };
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud));
-        Map<String, String> here = all(project, env());
-        Map<String, String> there = all(project, env(account, "another-account"));
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud));
+        Map<String, String> here = all(projectStack, env());
+        Map<String, String> there = all(projectStack, env(account, "another-account"));
         here.forEach((name, value) -> {
             if (!name.equals("CLUSTER_NAME") && !name.endsWith("_DOMAIN_NAME")) {
                 assertThat(there.get(name)).as(name).isNotEqualTo(value);
@@ -142,41 +142,41 @@ class ProjectNamesTest {
             case AWS -> "AWS_ACCOUNT_ID";
             case GCP -> "GCP_PROJECT_ID";
         });
-        assertThatThrownBy(() -> all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env))
-            .isInstanceOf(ProjectException.class).hasMessageContaining("is not set in the config the project is made from");
+        assertThatThrownBy(() -> all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env))
+            .isInstanceOf(ProjectStackException.class).hasMessageContaining("is not set in the config the project stack is made from");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void findsTheProjectOfAGlobalName(AfonCloud cloud) {
-        TreProject project = ProjectFixtures.tre(ProjectFixtures.example(cloud));
-        String name = ProjectNames.globalNames(project, env()).get(0);
-        assertThat(ProjectNames.find(project, env(), name)).isTrue();
-        assertThat(ProjectNames.find(project, env(), name.toUpperCase())).isTrue();
-        assertThat(ProjectNames.find(project, env(), "another-name")).isFalse();
-        assertThat(ProjectNames.find(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env(), name)).isFalse();
+        TreProjectStack projectStack = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud));
+        String name = ProjectStackNames.globalNames(projectStack, env()).get(0);
+        assertThat(ProjectStackNames.find(projectStack, env(), name)).isTrue();
+        assertThat(ProjectStackNames.find(projectStack, env(), name.toUpperCase())).isTrue();
+        assertThat(ProjectStackNames.find(projectStack, env(), "another-name")).isFalse();
+        assertThat(ProjectStackNames.find(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env(), name)).isFalse();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void writesTheNamesIntoTheConfigOfTheProjectAndSetsWhatDependsOnThemAgain(AfonCloud cloud, @TempDir Path home) throws IOException {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\nCLUSTER_NAME=${ENV_NAME}-cluster\n" + ProjectEnvTest.ACCOUNTS);
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\nCLUSTER_NAME=${ENV_NAME}-cluster\n" + ProjectStackEnvTest.ACCOUNTS);
         String c = lower(cloud);
         Files.writeString(envConfig.resolve("afon-" + c + ".properties"),
                           cloud.name() + "_STORAGE_ACCOUNT=${ENV_NAME}afonstorage\n"
                               + cloud.name() + "_POLARIS_LOG_BUCKET=${" + cloud.name() + "_STORAGE_ACCOUNT}-polaris-logs\n"
                               + cloud.name() + "_CATALOG_IDS=" + c + "\n");
-        Path file = ProjectFixtures.writeExample(home.resolve("project.yaml"), cloud);
-        ProjectFixtures.writeSecrets(home);
-        Path config = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud)), envConfig, home, file);
+        Path file = ProjectStackFixtures.writeExample(home.resolve("project.yaml"), cloud);
+        ProjectStackFixtures.writeSecrets(home);
+        Path config = ProjectStackEnv.configure(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), envConfig, home, file);
         String common = Files.readString(config.resolve("afon.properties"));
         assertThat(common).contains("CLUSTER_NAME=xyz-yyyy-nnnn-cluster");
-        // CLUSTER_NAME is the env's first, then the project's, which wins as it is later
+        // CLUSTER_NAME is the env's first, then the project stack's, which wins as it is later
         assertThat(common.indexOf("CLUSTER_NAME=${ENV_NAME}-cluster")).isLessThan(common.indexOf("CLUSTER_NAME=xyz-yyyy-nnnn-cluster"));
         if (cloud == AfonCloud.AZURE) {
             String azure = Files.readString(config.resolve("afon-azure.properties"));
-            assertThat(azure).contains("AZURE_STORAGE_ACCOUNT=afonstorage" + ProjectNames.token(cloud, "sub-1", "xyz-yyyy-nnnn"));
+            assertThat(azure).contains("AZURE_STORAGE_ACCOUNT=afonstorage" + ProjectStackNames.token(cloud, "sub-1", "xyz-yyyy-nnnn"));
             // the property set in terms of the account is written again, after it, so that a shell sourcing the file sees the new account
             assertThat(azure.lastIndexOf("AZURE_POLARIS_LOG_BUCKET=${AZURE_STORAGE_ACCOUNT}-polaris-logs"))
                 .isGreaterThan(azure.lastIndexOf("AZURE_STORAGE_ACCOUNT=afonstorage"));
@@ -184,7 +184,7 @@ class ProjectNamesTest {
     }
 
     private static String withId(AfonCloud cloud, String id) {
-        return ProjectFixtures.example(cloud).replace("xyz-yyyy-nnnn", id);
+        return ProjectStackFixtures.example(cloud).replace("xyz-yyyy-nnnn", id);
     }
 
     @ParameterizedTest
@@ -197,40 +197,40 @@ class ProjectNamesTest {
             case AWS -> 100;
         };
         String fits = "a".repeat(limit - "full--cluster".length());
-        assertThat(ProjectFixtures.tre(withId(cloud, fits.length() > 30 ? "a".repeat(30) : fits)).id().value()).isNotEmpty();
+        assertThat(ProjectStackFixtures.tre(withId(cloud, fits.length() > 30 ? "a".repeat(30) : fits)).id().value()).isNotEmpty();
         if (limit - "full--cluster".length() >= 30) {
             return;
         }
-        assertThatThrownBy(() -> FileProjectProvider.parse(withId(cloud, "a".repeat(limit - "full--cluster".length() + 1))))
-            .isInstanceOf(ProjectException.class).hasMessageContaining("is too long for " + lower(cloud), "over the limit of " + limit);
+        assertThatThrownBy(() -> FileProjectStackProvider.parse(withId(cloud, "a".repeat(limit - "full--cluster".length() + 1))))
+            .isInstanceOf(ProjectStackException.class).hasMessageContaining("is too long for " + lower(cloud), "over the limit of " + limit);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesADomainThatAnotherProjectOfTheCloudHas(AfonCloud cloud) {
-        TreProject mine = ProjectFixtures.tre(ProjectFixtures.example(cloud));
-        // the same domains, as the file has it, under another project id
-        TreProject other = ProjectFixtures.tre(ProjectFixtures.example(cloud).replaceFirst("id: xyz-yyyy-nnnn", "id: other-project"));
-        assertThat(ProjectNames.domainCollisions(mine, java.util.List.of(mine, other)))
+        TreProjectStack mine = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud));
+        // the same domains, as the file has it, under another project stack id
+        TreProjectStack other = ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud).replaceFirst("id: xyz-yyyy-nnnn", "id: other-project"));
+        assertThat(ProjectStackNames.domainCollisions(mine, java.util.List.of(mine, other)))
             .anyMatch(p -> p.contains("jupyter.xyz-yyyy-nnnn.example.org") && p.contains("also that of other-project"));
-        // the domain of another cloud's project is another's
+        // the domain of another cloud's project stack is another's
         AfonCloud elsewhere = cloud == AfonCloud.AWS ? AfonCloud.GCP : AfonCloud.AWS;
-        TreProject far = ProjectFixtures.tre(ProjectFixtures.example(elsewhere).replaceFirst("id: xyz-yyyy-nnnn", "id: far-project"));
-        assertThat(ProjectNames.domainCollisions(mine, java.util.List.of(far))).isEmpty();
-        // and a project does not collide with itself
-        assertThat(ProjectNames.domainCollisions(mine, java.util.List.of(mine))).isEmpty();
+        TreProjectStack far = ProjectStackFixtures.tre(ProjectStackFixtures.example(elsewhere).replaceFirst("id: xyz-yyyy-nnnn", "id: far-project"));
+        assertThat(ProjectStackNames.domainCollisions(mine, java.util.List.of(far))).isEmpty();
+        // and a project stack does not collide with itself
+        assertThat(ProjectStackNames.domainCollisions(mine, java.util.List.of(mine))).isEmpty();
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void putsTheDomainsOfTheTreUnderTheProjectInPlaceOfTheEnvs(AfonCloud cloud) {
-        // azure-jupyter.dev.click of the env is azure-jupyter.<project>.dev.click, which the zone of dev.click delegates, as it does the env's
+        // azure-jupyter.dev.click of the env is azure-jupyter.<project-stack>.dev.click, which the zone of dev.click delegates, as it does the env's
         String c = lower(cloud);
-        Map<String, String> names = all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env());
+        Map<String, String> names = all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env());
         assertThat(names).containsEntry(cloud.name() + "_POLARIS_DOMAIN_NAME", c + "-polaris.xyz-yyyy-nnnn.dev.click")
                          .containsEntry(cloud.name() + "_JUPYTER_DOMAIN_NAME", c + "-jupyter.xyz-yyyy-nnnn.dev.click");
-        // the central identity serves the identity's domain, which is not a project's
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env())).doesNotContainKeys(cloud.name() + "_POLARIS_DOMAIN_NAME",
+        // the central identity serves the identity's domain, which is not a project stack's
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env())).doesNotContainKeys(cloud.name() + "_POLARIS_DOMAIN_NAME",
                                                                                                                     cloud.name() + "_JUPYTER_DOMAIN_NAME");
     }
 
@@ -238,7 +238,7 @@ class ProjectNamesTest {
     @EnumSource(AfonCloud.class)
     void derivesNoDomainTheEnvHasNone(AfonCloud cloud) {
         Properties env = env(cloud.name() + "_POLARIS_DOMAIN_NAME", "");
-        assertThat(all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env)).doesNotContainKey(cloud.name() + "_POLARIS_DOMAIN_NAME")
+        assertThat(all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env)).doesNotContainKey(cloud.name() + "_POLARIS_DOMAIN_NAME")
                                                                                 .containsKey(cloud.name() + "_JUPYTER_DOMAIN_NAME");
     }
 
@@ -247,20 +247,20 @@ class ProjectNamesTest {
     void cannotPutAProjectUnderARegisteredDomain(AfonCloud cloud) {
         // emryspolaris.click has no parent domain: xyz.click would be under the top level domain, which nobody here owns
         Properties env = env(cloud.name() + "_JUPYTER_DOMAIN_NAME", "emryspolaris.click");
-        assertThatThrownBy(() -> all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env))
-            .isInstanceOf(ProjectException.class).hasMessageContaining("has no parent domain", "stacks.tre.domains");
+        assertThatThrownBy(() -> all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env))
+            .isInstanceOf(ProjectStackException.class).hasMessageContaining("has no parent domain", "stacks.tre.domains");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void aDomainOfTheProjectFileWinsOverTheDerivedOne(AfonCloud cloud, @TempDir Path home) throws IOException {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
-        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectEnvTest.ACCOUNTS);
+        Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ProjectStackEnvTest.ACCOUNTS);
         Files.writeString(envConfig.resolve("afon-" + lower(cloud) + ".properties"),
                           cloud.name() + "_JUPYTER_DOMAIN_NAME=" + lower(cloud) + "-jupyter.dev.click\n");
-        Path file = ProjectFixtures.writeExample(home.resolve("project.yaml"), cloud);
-        ProjectFixtures.writeSecrets(home);
-        Path config = ProjectEnv.configure(ProjectFixtures.tre(ProjectFixtures.example(cloud)), envConfig, home, file);
+        Path file = ProjectStackFixtures.writeExample(home.resolve("project.yaml"), cloud);
+        ProjectStackFixtures.writeSecrets(home);
+        Path config = ProjectStackEnv.configure(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), envConfig, home, file);
         String properties = Files.readString(config.resolve("afon-" + lower(cloud) + ".properties"));
         // the example names its Jupyter domain, which is the one written; the Polaris domain is derived
         assertThat(properties).contains(cloud.name() + "_JUPYTER_DOMAIN_NAME=jupyter.xyz-yyyy-nnnn.example.org")
@@ -273,38 +273,38 @@ class ProjectNamesTest {
         // azure-oidc.dev.click of the env is azure-oidc.idp.dev.click: the env may have a Keycloak of its own at its domain
         String c = lower(cloud);
         Properties env = env(cloud.name() + "_OIDC_DOMAIN_NAME", c + "-oidc.dev.click");
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env))
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env))
             .containsEntry(cloud.name() + "_OIDC_DOMAIN_NAME", c + "-oidc.idp.dev.click");
-        // and the TRE of a project leaves the OIDC domain, which is the identity's, alone
-        assertThat(all(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env)).doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
+        // and the TRE of a project stack leaves the OIDC domain, which is the identity's, alone
+        assertThat(all(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env)).doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesTheOidcDomainOfTheEnvForAllCloudsWhenTheCloudHasNoneOfItsOwn(AfonCloud cloud) {
         Properties env = env("OIDC_DOMAIN_NAME", "oidc.dev.click");
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env))
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env))
             .containsEntry(cloud.name() + "_OIDC_DOMAIN_NAME", "oidc.idp.dev.click");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void leavesTheOidcDomainOfTheEnvAsItIsWhenItHasNoParentDomainOrNone(AfonCloud cloud) {
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env("OIDC_DOMAIN_NAME", "dev.click")))
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env("OIDC_DOMAIN_NAME", "dev.click")))
             .doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
-        assertThat(all(ProjectFixtures.identity(ProjectFixtures.identityExample(cloud)), env()))
+        assertThat(all(ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud)), env()))
             .doesNotContainKey(cloud.name() + "_OIDC_DOMAIN_NAME");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void givesTheIdentityADatabaseOfItsOwnSoThatItDoesNotShareTheRealmOfTheEnvsKeycloak(AfonCloud cloud) {
-        var identity = ProjectFixtures.identity(ProjectFixtures.identityExample(cloud));
+        var identity = ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud));
         Properties env = env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-dev");
-        assertThat(ProjectNames.derive(identity, env, "dev").get("secret.properties"))
+        assertThat(ProjectStackNames.derive(identity, env, "dev").get("secret.properties"))
             .containsOnlyKeys("KEYCLOAK_DB_URL").containsEntry("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-idp");
         // the parameters of the URL are kept
-        assertThat(ProjectNames.derive(identity, env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak?sslmode=require"), "dev")
+        assertThat(ProjectStackNames.derive(identity, env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak?sslmode=require"), "dev")
                                .get("secret.properties")).containsEntry("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak-idp?sslmode=require");
     }
 
@@ -313,10 +313,10 @@ class ProjectNamesTest {
     void derivesNoDatabaseForATreOrWhenTheEnvHasNoneToDeriveFrom(AfonCloud cloud) {
         Properties env = env("KEYCLOAK_DB_URL", "jdbc:postgresql://db.example.org:5432/keycloak");
         // a TRE uses the identity's Keycloak, with no database of its own
-        assertThat(ProjectNames.derive(ProjectFixtures.tre(ProjectFixtures.example(cloud)), env, "dev")).doesNotContainKey("secret.properties");
-        var identity = ProjectFixtures.identity(ProjectFixtures.identityExample(cloud));
-        assertThat(ProjectNames.derive(identity, env(), "dev")).doesNotContainKey("secret.properties");
-        assertThat(ProjectNames.derive(identity, env("KEYCLOAK_DB_URL", "not-a-url"), "dev")).doesNotContainKey("secret.properties");
+        assertThat(ProjectStackNames.derive(ProjectStackFixtures.tre(ProjectStackFixtures.example(cloud)), env, "dev")).doesNotContainKey("secret.properties");
+        var identity = ProjectStackFixtures.identity(ProjectStackFixtures.identityExample(cloud));
+        assertThat(ProjectStackNames.derive(identity, env(), "dev")).doesNotContainKey("secret.properties");
+        assertThat(ProjectStackNames.derive(identity, env("KEYCLOAK_DB_URL", "not-a-url"), "dev")).doesNotContainKey("secret.properties");
     }
 
     @ParameterizedTest
@@ -324,12 +324,12 @@ class ProjectNamesTest {
     void putsThePolarisDomainOfADataProjectUnderItsProjectUnlessItsFileGivesOne(AfonCloud cloud) {
         String c = lower(cloud);
         Properties env = env(cloud.name() + "_POLARIS_DOMAIN_NAME", c + "-polaris.dev.click");
-        var data = ProjectFixtures.data(ProjectFixtures.dataExample(cloud));
+        var data = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud));
         assertThat(all(data, env)).containsEntry(cloud.name() + "_POLARIS_DOMAIN_NAME", c + "-polaris.lon.dev.click");
-        // what the file says is for the config of the project to take, so nothing is derived for it
-        var named = ProjectFixtures.data(ProjectFixtures.dataExample(cloud) + "stacks:\n  data: {domain: polaris.lon.example.org}\n");
+        // what the file says is for the config of the project stack to take, so nothing is derived for it
+        var named = ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud) + "stacks:\n  data: {domain: polaris.lon.example.org}\n");
         assertThat(all(named, env)).doesNotContainKey(cloud.name() + "_POLARIS_DOMAIN_NAME");
-        assertThat(ProjectNames.domainCollisions(named, java.util.List.of(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)
+        assertThat(ProjectStackNames.domainCollisions(named, java.util.List.of(ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud)
             .replace("id: lon", "id: nw") + "stacks:\n  data: {domain: polaris.lon.example.org}\n")))).hasSize(1);
     }
 
@@ -337,7 +337,7 @@ class ProjectNamesTest {
     @EnumSource(AfonCloud.class)
     void refusesToDeriveThePolarisDomainOfADataProjectFromOneWithNoParent(AfonCloud cloud) {
         Properties env = env(cloud.name() + "_POLARIS_DOMAIN_NAME", "polaris.click");
-        assertThatThrownBy(() -> all(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)), env)).isInstanceOf(ProjectException.class)
+        assertThatThrownBy(() -> all(ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud)), env)).isInstanceOf(ProjectStackException.class)
                                                                                                     .hasMessageContaining("stacks.data.domain");
     }
 
@@ -345,14 +345,14 @@ class ProjectNamesTest {
     @EnumSource(AfonCloud.class)
     void givesADataProjectCatalogsOfItsOwnInPlaceOfTheEnvs(AfonCloud cloud) {
         String p = cloud.name() + "_";
-        var derived = ProjectNames.derive(ProjectFixtures.data(ProjectFixtures.dataExample(cloud)), env(), "dev");
+        var derived = ProjectStackNames.derive(ProjectStackFixtures.data(ProjectStackFixtures.dataExample(cloud)), env(), "dev");
         Map<String, String> catalogs = derived.get("catalogs-" + lower(cloud) + ".properties");
         assertThat(catalogs).containsEntry(p + "CATALOG_IDS", "cvd,dbt")
                             .containsEntry(p + "CATALOG_NAME_cvd", "cvd").containsEntry(p + "CATALOG_TYPE_cvd", "internal")
                             .containsEntry(p + "CATALOG_NAME_dbt", "dbt").containsEntry(p + "CATALOG_TYPE_dbt", "internal");
-        String token = ProjectNames.token(cloud, ProjectNames.account(cloud, env(), "dev"), "lon");
+        String token = ProjectStackNames.token(cloud, ProjectStackNames.account(cloud, env(), "dev"), "lon");
         if (cloud == AfonCloud.AZURE) {
-            // a container of the project's storage account
+            // a container of the project stack's storage account
             assertThat(catalogs).containsEntry(p + "BUCKET_NAME_cvd", "cvd").containsEntry(p + "BUCKET_NAME_dbt", "dbt");
         } else {
             assertThat(catalogs).containsEntry(p + "BUCKET_NAME_cvd", "afon-" + token + "-cvd").containsEntry(p + "BUCKET_NAME_dbt", "afon-" + token + "-dbt");

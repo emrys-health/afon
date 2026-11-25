@@ -9,7 +9,7 @@ import health.emrys.afon.config.{AfonCloud, AfonUserProvider}
 import health.emrys.afon.polaris.config.{CatalogConfigurer, PolarisProjectGrants, PolarisRestClient}
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper
 import health.emrys.afon.polaris.keycloak.KeyCloakHelper.Trust
-import health.emrys.afon.project.{FileProjectProvider, TreProject}
+import health.emrys.afon.project.{FileProjectStackProvider, TreProjectStack}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.scalatest.GivenWhenThen
@@ -26,7 +26,7 @@ import scala.jdk.CollectionConverters._
 /**
  * What a Data Provider grants a project, against a real Polaris: the Polaris of a Data Provider, in a container, that trusts the tokens of the central
  * identity, also in one, and the members of a project, who sign in to it as they would, with the token that the identity issues them.  The grants
- * are those of {@code manage-project-grants}: the Data Provider lets a project in, and names its members, and neither is for the identity's side to do.
+ * are those of {@code manage-data}: the Data Provider lets a project in, and names its members, and neither is for the identity's side to do.
  * Needs docker only.
  */
 abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier with GivenWhenThen {
@@ -139,9 +139,9 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
   /** The secret of the TRE client, as project-secret makes it: 256 bits as hex, which is what the identity provider is given. */
   private def clientSecret(): String = java.util.UUID.randomUUID().toString.replace("-", "") + java.util.UUID.randomUUID().toString.replace("-", "")
 
-  private def treProject(id: String, provider: String = "lon"): TreProject =
-    FileProjectProvider.parse(
-      s"""project: {id: $id, cloud: ${cloud.toString.toLowerCase}}
+  private def treProject(id: String, provider: String = "lon"): TreProjectStack =
+    FileProjectStackProvider.parse(
+      s"""project-stack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:
@@ -150,7 +150,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
          |stacks:
          |  create: {auditBucket: $id-audit}
          |  tre: {domains: {${cloud.name}_JUPYTER_DOMAIN_NAME: jupyter.$id.example.org}}
-         |""".stripMargin).asInstanceOf[TreProject]
+         |""".stripMargin).asInstanceOf[TreProjectStack]
 
   private def userId(userName: String): String = adminGet(s"/admin/realms/$KEYCLOAK_REALM/users?exact=true&username=$userName").get(0).get("id").asText()
 
@@ -159,7 +159,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
    * the identity's side, and here a password is set and nothing is left to do.  Their token is that of the project's TRE client, which takes a password here
    * only, so that no browser is needed.
    */
-  private def member(project: TreProject, email: String): String = {
+  private def member(project: TreProjectStack, email: String): String = {
     val id = identity.ensureUser(email, "Test", "User")
     identity.addMember(project, id)
     adminPut(identity, s"/admin/realms/$KEYCLOAK_REALM/users/$id/reset-password", s"""{"type":"password","value":"$email-pw","temporary":false}""")
@@ -171,7 +171,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
   }
 
   /** The TRE client takes a password and a secret in this test, instead of the browser login and the key: the token that the identity issues is the same. */
-  private def letTheClientTakeAPassword(project: TreProject, secondFactor: Boolean = true): Unit = {
+  private def letTheClientTakeAPassword(project: TreProjectStack, secondFactor: Boolean = true): Unit = {
     val uuid = adminGet(s"/admin/realms/$KEYCLOAK_REALM/clients?clientId=${project.identity().treClient()}").get(0).get("id").asText()
     val client = adminGet(s"/admin/realms/$KEYCLOAK_REALM/clients/$uuid").asInstanceOf[com.fasterxml.jackson.databind.node.ObjectNode]
     client.put("clientAuthenticatorType", "client-secret")
@@ -204,7 +204,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
     ()
   }
 
-  private def tokenOf(project: TreProject, email: String): String = {
+  private def tokenOf(project: TreProjectStack, email: String): String = {
     val form = Seq("grant_type" -> "password", "client_id" -> project.identity().treClient(), "client_secret" -> "tre-secret", "username" -> email,
                    "password" -> s"$email-pw").map { case (k, v) => s"$k=${java.net.URLEncoder.encode(v, StandardCharsets.UTF_8)}" }.mkString("&")
     val request = HttpRequest.newBuilder(URI.create(s"$keycloakUrl/realms/$KEYCLOAK_REALM/protocol/openid-connect/token"))
@@ -239,7 +239,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
   }
 
   /** What the tests share: the project, registered in the identity, and its members alice and bob, who are both in its group, with the tokens that the identity issues them. */
-  private case class World(project: TreProject, alice: String, bob: String, aliceToken: String, bobToken: String)
+  private case class World(project: TreProjectStack, alice: String, bob: String, aliceToken: String, bobToken: String)
 
   private lazy val world: World = {
     polaris

@@ -79,11 +79,11 @@ class NetworkSmokeMainTest {
     void aTreIsAProjectsWhenItsConfigNamesTheProjectClaim() {
         AfonPropertyProvider properties = new FilePropertyProvider("../templates/config");
         // the config template has the key empty, or not at all, as a stack outside a project has it
-        assertThat(SmokeConfig.isProject(properties)).isFalse();
+        assertThat(SmokeConfig.isProjectStack(properties)).isFalse();
         properties.setValue(OIDC_PROJECT_CLAIM, "  ");
-        assertThat(SmokeConfig.isProject(properties)).isFalse();
+        assertThat(SmokeConfig.isProjectStack(properties)).isFalse();
         properties.setValue(OIDC_PROJECT_CLAIM, "project");
-        assertThat(SmokeConfig.isProject(properties)).isTrue();
+        assertThat(SmokeConfig.isProjectStack(properties)).isTrue();
     }
 
     @Test

@@ -61,17 +61,17 @@ class SparkRunnerDataProjectTest {
 
     @Test
     void aProjectWithPolarisAdminClientAndNoProjectClaimIsADataProject() throws IOException {
-        assertThat(SparkRunner.isDataProject(properties("PROJECT_ID=lon", "POLARIS_ID=root", "POLARIS_SECRET=s"))).isTrue();
+        assertThat(SparkRunner.isDataProjectStack(properties("PROJECT_ID=lon", "POLARIS_ID=root", "POLARIS_SECRET=s"))).isTrue();
     }
 
     @Test
     void aTreProjectIsNotOneAsItsTokensNameTheProject() throws IOException {
-        assertThat(SparkRunner.isDataProject(properties("PROJECT_ID=cvd-2026", "POLARIS_ID=root", "OIDC_PROJECT_CLAIM=project"))).isFalse();
+        assertThat(SparkRunner.isDataProjectStack(properties("PROJECT_ID=cvd-2026", "POLARIS_ID=root", "OIDC_PROJECT_CLAIM=project"))).isFalse();
     }
 
     @Test
     void aDeploymentOutsideAProjectIsNotOne() throws IOException {
-        assertThat(SparkRunner.isDataProject(properties("POLARIS_ID=root"))).isFalse();
+        assertThat(SparkRunner.isDataProjectStack(properties("POLARIS_ID=root"))).isFalse();
     }
 
     @Test

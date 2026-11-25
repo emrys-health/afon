@@ -26,7 +26,7 @@
 #   ./pods.sh delete --user alice@tre.example
 #   ./pods.sh delete --all --yes
 #
-# Run in a project, so that it is that project's cluster, with afon-cli.sh manage-project run <project> project-pods ...
+# Run in a project, so that it is that project's cluster, with afon-cli.sh manage-project-stack run <project> project-pods ...
 
 set -euo pipefail
 

@@ -14,29 +14,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The templates of a {@value FileProjectProvider#FILE}, one for each role, {@code project-<role>.yaml} in the {@code templates/project} dir of the
+ * The templates of a {@value FileProjectStackProvider#FILE}, one for each role, {@code project-<role>.yaml} in the {@code templates/project} dir of the
  * Afon distribution, which the deployer completes.  What is in {@code <angle brackets>} is what only the deployer knows, so the file
  * is not valid until it is replaced.  The templates are written once, for every cloud: {@code ${id}}, {@code ${cloud}}, {@code ${CLOUD}},
  * {@code ${env}} and {@code ${nodePool}}, the cluster's nodes, are replaced.  A variable is a whole value, never a section, so
  * that a template is valid YAML as it is written, as a plain value, and an editor can check it.
  */
-public final class ProjectTemplate {
+public final class ProjectStackTemplate {
 
     /** Where the templates are in the Afon distribution, from its dir. */
     public static final String DIR = "templates/project";
 
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{([A-Za-z]+)}");
 
-    private ProjectTemplate() {
+    private ProjectStackTemplate() {
     }
 
     /**
      * @param dir  the dir of the templates
-     * @param env  the env whose config the project is made from, or {@code null} to leave it for the deployer
-     * @return the project file for the project, from the template of the role, to complete
+     * @param env  the env whose config the project stack is made from, or {@code null} to leave it for the deployer
+     * @return the project stack file for the project stack, from the template of the role, to complete
      * @throws IllegalArgumentException if the template of the role is not there, or has a variable that is not known
      */
-    public static String render(@NonNull Path dir, @NonNull ProjectRole role, @NonNull AfonCloud cloud, @NonNull String id, @Nullable String env) {
+    public static String render(@NonNull Path dir, @NonNull ProjectStackRole role, @NonNull AfonCloud cloud, @NonNull String id, @Nullable String env) {
         Path file = dir.resolve("project-" + role.value() + ".yaml");
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("No template " + file);
@@ -68,9 +68,9 @@ public final class ProjectTemplate {
      * @return the node pool of the cluster, as a flow mapping: what the role needs, the identity running Keycloak only and a Data Provider Polaris only, or empty on a cloud with
      * no node pool property
      */
-    static String nodePool(ProjectRole role, AfonCloud cloud) {
+    static String nodePool(ProjectStackRole role, AfonCloud cloud) {
         // the identity runs Keycloak only, and a Data Provider Polaris only, so they take the smaller nodes
-        boolean identity = role != ProjectRole.TRE;
+        boolean identity = role != ProjectStackRole.TRE;
         return switch (cloud) {
             case AZURE -> pool("vmSize", identity ? "Standard_D2s_v3" : "Standard_D4s_v6", 2);
             case GCP -> pool("machineType", identity ? "e2-standard-2" : "e2-standard-4", 2);

@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.spark;
 
-import health.emrys.afon.project.ProjectUserProvider;
+import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
 import org.apache.spark.sql.Dataset;
@@ -46,7 +46,7 @@ public class SparkTestReader extends SparkRunner {
 
     public static void main(String[] args) {
         var properties = new OpsPropertyProvider();
-        parseAndExecute(new SparkTestReader(properties), properties, ProjectUserProvider.forActiveConfig(), args);
+        parseAndExecute(new SparkTestReader(properties), properties, ProjectStackUserProvider.forActiveConfig(), args);
     }
 
 }

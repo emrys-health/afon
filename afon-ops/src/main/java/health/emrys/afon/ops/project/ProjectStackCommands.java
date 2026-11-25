@@ -1,12 +1,12 @@
 package health.emrys.afon.ops.project;
 
 import health.emrys.afon.config.StackId;
-import health.emrys.afon.project.AfonProject;
+import health.emrys.afon.project.ProjectStack;
 import health.emrys.afon.project.DnsDelegation;
-import health.emrys.afon.project.IdentityProject;
-import health.emrys.afon.project.ProjectPlan;
-import health.emrys.afon.project.ProjectPlan.Stage;
-import health.emrys.afon.project.ProjectPlan.StageId;
+import health.emrys.afon.project.IdentityProjectStack;
+import health.emrys.afon.project.ProjectStackPlan;
+import health.emrys.afon.project.ProjectStackPlan.Stage;
+import health.emrys.afon.project.ProjectStackPlan.StageId;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -15,33 +15,33 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * The Afon commands that run each stage of a project's {@link ProjectPlan}, in the order that brings the project up, takes it down, or
- * rebuilds what lives for a day, with no more than what to run: running them is for {@link ManageProjectMain}.
+ * The Afon commands that run each stage of a project stack's {@link ProjectStackPlan}, in the order that brings the project stack up, takes it down, or
+ * rebuilds what lives for a day, with no more than what to run: running them is for {@link ManageProjectStackMain}.
  * <ul>
- *   <li>{@code create}: the script {@code <cloud>-create} for the TRE's stack, which makes what outlives the stacks, if the project names
- *       an egress IP, {@code db-whitelist}, which allows it on the database, and {@code dns-create-zones} for each stack that serves a domain, and, if the project says {@code dns.delegation: route53},
+ *   <li>{@code create}: the script {@code <cloud>-create} for the TRE's stack, which makes what outlives the stacks, if the project stack names
+ *       an egress IP, {@code db-whitelist}, which allows it on the database, and {@code dns-create-zones} for each stack that serves a domain, and, if the project stack says {@code dns.delegation: route53},
  *       {@code dns-delegate --route53}, which delegates its zone from the parent domain, and on AWS {@code aws-issue-cert --stack}, which issues the ACM
  *       certificates of its domains, as the stacks look them up;</li>
- *   <li>{@code register}: {@code manage-identity create}, in the project's home like the rest, so that it uses the config that the project is
- *       made from, that of its env, and its Keycloak admin credentials, never those of whichever env is active.  If the project names the
- *       identity project, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project, so that
- *       no address is admitted to it.  {@code manage-identity sync-members} follows, which makes the group of the project have the
+ *   <li>{@code register}: {@code manage-identity create}, in the project stack's home like the rest, so that it uses the config that the project stack is
+ *       made from, that of its env, and its Keycloak admin credentials, never those of whichever env is active.  If the project stack names the
+ *       identity project stack, it reaches the admin API of that Keycloak through a port-forward to its pod, in the cluster of that project stack, so that
+ *       no address is admitted to it.  {@code manage-identity sync-members} follows, which makes the group of the project stack have the
  *       members that the file lists, and no others;</li>
  *   <li>{@code identity}, {@code git}, {@code tre} and {@code data}: {@code manage-stack setup} or {@code delete} of the stack, the identity's being
- *       that of the project with the identity role, and a Data Provider's its Polaris, which it sets up with its catalogs.</li>
+ *       that of the project stack with the identity role, and a Data Provider's its Polaris, which it sets up with its catalogs.</li>
  * </ul>
- * Taking a project down deletes its stacks, and leaves what it made outside them, its buckets and its place in the central identity, which
- * are kept until the project is closed on purpose: {@code manage-identity close}.
+ * Taking a project stack down deletes its stacks, and leaves what it made outside them, its buckets and its place in the central identity, which
+ * are kept until the project stack is closed on purpose: {@code manage-identity close}.
  */
-final class ProjectCommands {
+final class ProjectStackCommands {
 
     /**
-     * A command of Afon, run in the home of a project, see {@link health.emrys.afon.project.ProjectHome}.
+     * A command of Afon, run in the home of a project stack, see {@link health.emrys.afon.project.ProjectStackHome}.
      *
-     * @param project the id of the project whose home it runs in: the project that is run, or the identity project that it names
+     * @param projectStack the id of the project stack whose home it runs in: the project stack that is run, or the identity project stack that it names
      * @param args    the args of the command, {@code manage-stack setup gcp-full}
      */
-    record Invocation(String project, List<String> args) {
+    record Invocation(String projectStack, List<String> args) {
     }
 
     /**
@@ -54,9 +54,9 @@ final class ProjectCommands {
      */
     record Command(StageId stage, List<Invocation> before, List<Invocation> run, String note) {
 
-        /** @return a stage of one command, in the home of the project */
-        static Command of(StageId stage, String project, String... args) {
-            return new Command(stage, List.of(), List.of(new Invocation(project, List.of(args))), null);
+        /** @return a stage of one command, in the home of the project stack */
+        static Command of(StageId stage, String projectStack, String... args) {
+            return new Command(stage, List.of(), List.of(new Invocation(projectStack, List.of(args))), null);
         }
 
         boolean skipped() {
@@ -68,41 +68,41 @@ final class ProjectCommands {
      * What the stacks file says of the stacks.
      *
      * @param defined    whether a stack is defined: a stage whose stack is not is skipped
-     * @param declaresGit whether a stack deploys Git, which the stage of a project's own Git, if skipped, is then deployed with
+     * @param declaresGit whether a stack deploys Git, which the stage of a project stack's own Git, if skipped, is then deployed with
      */
     record Stacks(Predicate<StackId> defined, Predicate<StackId> declaresGit) {
     }
 
-    private ProjectCommands() {
+    private ProjectStackCommands() {
     }
 
     /**
-     * @param identityProject the identity project that the project names, or {@code null} if it names none: the registration then reaches the
+     * @param identityProjectStack the identity project stack that the project stack names, or {@code null} if it names none: the registration then reaches the
      *                        admin API of the central identity at its public domain name, as it does not know whose cluster it is
-     * @param identityKubeconfig the kubeconfig of the identity project's stack, which the registration reaches Keycloak through, or {@code null}
-     *                        if there is no identity project
-     * @return the commands that bring the project up
+     * @param identityKubeconfig the kubeconfig of the identity project stack's stack, which the registration reaches Keycloak through, or {@code null}
+     *                        if there is no identity project stack
+     * @return the commands that bring the project stack up
      */
-    static List<Command> up(ProjectPlan plan, Stacks stacks, IdentityProject identityProject, Path identityKubeconfig) {
+    static List<Command> up(ProjectStackPlan plan, Stacks stacks, IdentityProjectStack identityProjectStack, Path identityKubeconfig) {
         List<Command> commands = new ArrayList<>();
-        AfonProject project = plan.project();
-        String id = project.id().value();
-        String cloud = project.cloud().toString();
+        ProjectStack projectStack = plan.projectStack();
+        String id = projectStack.id().value();
+        String cloud = projectStack.cloud().toString();
         for (Stage stage : plan.stages()) {
             switch (stage.id()) {
                 case CREATE -> {
-                    List<Invocation> run = new ArrayList<>(List.of(new Invocation(id, List.of(cloud + "-create", project.stack().toString()))));
-                    if (project.egressIp() != null) {
-                        // the address that the project names, which the database has not heard of, unlike the one it inherits from its env
+                    List<Invocation> run = new ArrayList<>(List.of(new Invocation(id, List.of(cloud + "-create", projectStack.stack().toString()))));
+                    if (projectStack.egressIp() != null) {
+                        // the address that the project stack names, which the database has not heard of, unlike the one it inherits from its env
                         run.add(new Invocation(id, List.of("db-whitelist", cloud)));
                     }
-                    // the domains of the project's stacks are its own, so the zones that serve them are made, once <cloud>-create has made the resource
+                    // the domains of the project stack's stacks are its own, so the zones that serve them are made, once <cloud>-create has made the resource
                     // group they are in; they are delegated from the parent domain by dns-delegate, as docs/dns_config.md says
                     for (Stage serving : plan.stages()) {
                         if (serving.stack() != null && List.of(StageId.IDENTITY, StageId.GIT, StageId.TRE, StageId.DATA).contains(serving.id())
                             && stacks.defined().test(serving.stack())) {
                             run.add(new Invocation(id, List.of("dns-create-zones", cloud, serving.stack().toString())));
-                            if (project.dnsDelegation() == DnsDelegation.ROUTE53) {
+                            if (projectStack.dnsDelegation() == DnsDelegation.ROUTE53) {
                                 // so that the stage after can get its certificates: the zones are reached from the parent domain
                                 run.add(new Invocation(id, List.of("dns-delegate", cloud, serving.stack().toString(), "--route53")));
                                 if (cloud.equals("aws")) {
@@ -115,9 +115,9 @@ final class ProjectCommands {
                     }
                     commands.add(new Command(stage.id(), List.of(), run, null));
                 }
-                case REGISTER -> commands.add(register(id, cloud, identityProject, identityKubeconfig));
+                case REGISTER -> commands.add(register(id, cloud, identityProjectStack, identityKubeconfig));
                 case IDENTITY, GIT -> commands.add(stackCommand(plan, stage, "setup", stacks));
-                case TRE, DATA -> commands.add(withIdentityKubeconfig(stackCommand(plan, stage, "setup", stacks), cloud, identityProject));
+                case TRE, DATA -> commands.add(withIdentityKubeconfig(stackCommand(plan, stage, "setup", stacks), cloud, identityProjectStack));
             }
         }
         return commands;
@@ -126,41 +126,41 @@ final class ProjectCommands {
     /**
      * The registration in the central identity calls its admin API, which the ingress of its Keycloak may admit only the addresses of the
      * allowed CIDRs, which need not include this machine, so it reaches Keycloak through a port-forward to its pod, in the cluster of the
-     * identity project, whose kubeconfig the stage before it writes, in the identity project's own home.  Nothing is admitted to, so there is
+     * identity project stack, whose kubeconfig the stage before it writes, in the identity project stack's own home.  Nothing is admitted to, so there is
      * nothing to take off afterwards, even if the registration fails, and nothing is left running: the tunnel lives as long as the command.
      */
-    private static Command register(String id, String cloud, IdentityProject identityProject, Path identityKubeconfig) {
-        if (identityProject == null) {
+    private static Command register(String id, String cloud, IdentityProjectStack identityProjectStack, Path identityKubeconfig) {
+        if (identityProjectStack == null) {
             return new Command(StageId.REGISTER, List.of(), List.of(new Invocation(id, List.of("manage-identity", "create", id)),
                                                                    new Invocation(id, List.of("manage-identity", "sync-members", id))), null);
         }
-        String stack = identityProject.stack().toString();
+        String stack = identityProjectStack.stack().toString();
         List<Invocation> run = List.of(new Invocation(id, List.of("manage-identity", "create", id, "--kubeconfig", identityKubeconfig.toString())),
                                        new Invocation(id, List.of("manage-identity", "sync-members", id, "--kubeconfig", identityKubeconfig.toString())));
         return new Command(StageId.REGISTER,
-            List.of(new Invocation(identityProject.id().value(), List.of(identityProject.cloud().toString() + "-update-kube-config", stack))),
+            List.of(new Invocation(identityProjectStack.id().value(), List.of(identityProjectStack.cloud().toString() + "-update-kube-config", stack))),
             run,
             null);
     }
 
     /**
-     * The TRE's stacks configure the Keycloak of the identity project, in its cluster, through a port-forward, for which the identity project's
+     * The TRE's stacks configure the Keycloak of the identity project stack, in its cluster, through a port-forward, for which the identity project stack's
      * kubeconfig is written first, in its own home, so that it is there, and of the cluster as it is now, when the stage is resumed.
      */
-    private static Command withIdentityKubeconfig(Command command, String cloud, IdentityProject identityProject) {
-        if (identityProject == null || command.skipped()) {
+    private static Command withIdentityKubeconfig(Command command, String cloud, IdentityProjectStack identityProjectStack) {
+        if (identityProjectStack == null || command.skipped()) {
             return command;
         }
         return new Command(command.stage(),
-                           List.of(new Invocation(identityProject.id().value(), List.of(identityProject.cloud().toString() + "-update-kube-config",
-                                                                        identityProject.stack().toString()))),
+                           List.of(new Invocation(identityProjectStack.id().value(), List.of(identityProjectStack.cloud().toString() + "-update-kube-config",
+                                                                        identityProjectStack.stack().toString()))),
                            command.run(), command.note());
     }
 
     /**
-     * @return the commands that take the project down: its stacks are deleted, the last that was set up first
+     * @return the commands that take the project stack down: its stacks are deleted, the last that was set up first
      */
-    static List<Command> down(ProjectPlan plan, Stacks stacks) {
+    static List<Command> down(ProjectStackPlan plan, Stacks stacks) {
         List<Command> commands = new ArrayList<>();
         for (Stage stage : plan.stages()) {
             if (stage.id() == StageId.IDENTITY || stage.id() == StageId.GIT || stage.id() == StageId.TRE || stage.id() == StageId.DATA) {
@@ -174,7 +174,7 @@ final class ProjectCommands {
     /**
      * @return the commands that rebuild what lives for a day: each such stack is deleted, then set up again
      */
-    static List<Command> nightly(ProjectPlan plan, Stacks stacks) {
+    static List<Command> nightly(ProjectStackPlan plan, Stacks stacks) {
         List<Command> commands = new ArrayList<>();
         for (Stage stage : plan.nightlyStages()) {
             commands.add(stackCommand(plan, stage, "delete", stacks));
@@ -183,16 +183,16 @@ final class ProjectCommands {
         return commands;
     }
 
-    private static Command stackCommand(ProjectPlan plan, Stage stage, String action, Stacks stacks) {
+    private static Command stackCommand(ProjectStackPlan plan, Stage stage, String action, Stacks stacks) {
         StackId stack = stage.stack();
         if (!stacks.defined().test(stack)) {
-            StackId tre = plan.project().stack();
+            StackId tre = plan.projectStack().stack();
             String note = stage.id() == StageId.GIT && stacks.declaresGit().test(tre)
                 ? "Git is deployed with " + tre + ", as no stack " + stack + " is defined in the stacks file"
                 : "no stack " + stack + " is defined in the stacks file";
             return new Command(stage.id(), List.of(), List.of(), note);
         }
-        return Command.of(stage.id(), plan.project().id().value(), "manage-stack", action, stack.toString());
+        return Command.of(stage.id(), plan.projectStack().id().value(), "manage-stack", action, stack.toString());
     }
 
     /**
@@ -246,7 +246,7 @@ final class ProjectCommands {
         Invocation stackCommand = run.get(index);
         List<String> args = new ArrayList<>(stackCommand.args());
         args.add(step);
-        run.set(index, new Invocation(stackCommand.project(), List.copyOf(args)));
+        run.set(index, new Invocation(stackCommand.projectStack(), List.copyOf(args)));
         List<Command> resumed = new ArrayList<>(commands);
         resumed.set(0, new Command(first.stage(), first.before(), run, first.note()));
         return resumed;

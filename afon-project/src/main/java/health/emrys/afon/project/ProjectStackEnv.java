@@ -30,34 +30,34 @@ import java.util.stream.Stream;
 import static health.emrys.afon.config.AfonProperty.*;
 
 /**
- * The env of a project: its config, {@code config-<project>}, and its cdktf, {@code cdktf-<project>}, both in the Afon home, as an env
- * is for any deployment.  They keep the stacks, tofu state and kubeconfigs of the project apart from those of every other env and
- * project, and stay as the record of its deployments, see {@link ProjectHome} for running in it.
+ * The env of a project stack: its config, {@code config-<project-stack>}, and its cdktf, {@code cdktf-<project-stack>}, both in the Afon home, as an env
+ * is for any deployment.  They keep the stacks, tofu state and kubeconfigs of the project stack apart from those of every other env and
+ * project stack, and stay as the record of its deployments, see {@link ProjectStackHome} for running in it.
  * <p>
- * The config is made from the config of the deployer's env that the project names, which holds what {@code project.yaml} does not (the account, node pools,
+ * The config is made from the config of the deployer's env that the project stack names, which holds what {@code project.yaml} does not (the account, node pools,
  * secrets), with the properties derived from {@code project.yaml} written over it: the scripts source the properties files, and the
  * Java side reads them, so both see one config, the later line of a file winning.  Configuring again replaces the files, so the config
- * of a project is always what its {@code project.yaml} and its env say.
+ * of a project stack is always what its {@code project.yaml} and its env say.
  */
-public final class ProjectEnv {
+public final class ProjectStackEnv {
 
     public static final String CONFIG_PREFIX = "config-";
     public static final String CDKTF_PREFIX = "cdktf-";
 
     static final String COMMON_FILE = "afon.properties";
-    static final String BLOCK_HEADER = "# --- Derived from project.yaml by manage-project: do not edit, configure it again ---";
+    static final String BLOCK_HEADER = "# --- Derived from project.yaml by manage-project-stack: do not edit, configure it again ---";
 
     /**
      * What a properties file may be given, as it is sourced by a shell: no space, quote, {@code $}, {@code ;} or the like, but the {@code ,} of a node pool and the {@code ?} and {@code =} of the parameters of a database URL.
      */
     private static final Pattern SAFE_VALUE = Pattern.compile("[A-Za-z0-9._:/@,\\[\\]+?=-]+");
 
-    private ProjectEnv() {
+    private ProjectStackEnv() {
     }
 
     /**
-     * @return the config dir of the deployer's env, {@code <afon-home>/config-<env>}, which a project is made from.  In the home of a project, which
-     * links no env, it is that of the Afon home that the project's home is made from, found through its {@code projects} link, as a project that
+     * @return the config dir of the deployer's env, {@code <afon-home>/config-<env>}, which a project stack is made from.  In the home of a project stack, which
+     * links no env, it is that of the Afon home that the project stack's home is made from, found through its {@code projects} link, as a project stack that
      * names another's, eg a TRE that names a Data Provider, is looked up in the config of that one's env
      * @throws IllegalArgumentException if {@code env} is not the name of an env, ie it could name a path
      */
@@ -76,27 +76,27 @@ public final class ProjectEnv {
     }
 
     /**
-     * @return the Afon home that the home of a project is made from, which is where its {@code projects} entry is linked from, or {@code null} if
-     * the home is not a project's, ie its {@code projects} entry is not a link
+     * @return the Afon home that the home of a project stack is made from, which is where its {@code projects} entry is linked from, or {@code null} if
+     * the home is not a project stack's, ie its {@code projects} entry is not a link
      */
     private static Path sharedAfonHome(Path afonHome) {
-        Path projects = afonHome.resolve(FileProjectProvider.PROJECTS_DIR);
+        Path projectStacks = afonHome.resolve(FileProjectStackProvider.PROJECTS_DIR);
         try {
-            return Files.isSymbolicLink(projects) ? projects.toRealPath().getParent() : null;
+            return Files.isSymbolicLink(projectStacks) ? projectStacks.toRealPath().getParent() : null;
         } catch (IOException e) {
             return null;
         }
     }
 
     /**
-     * The stacks of a project read the copy of its file that {@code configure} makes in its config, not the file: a file changed since, eg a member added to
+     * The stacks of a project stack read the copy of its file that {@code configure} makes in its config, not the file: a file changed since, eg a member added to
      * it, is not what they deploy.
      *
-     * @return whether the project's file was changed after {@code configure} made the copy of it; not if there is no copy, which is another matter, that
-     * the project is not configured
+     * @return whether the project stack's file was changed after {@code configure} made the copy of it; not if there is no copy, which is another matter, that
+     * the project stack is not configured
      */
-    public static boolean fileIsNewerThanItsCopy(Path afonHome, AfonProject project, Path projectFile) {
-        Path copy = configDir(afonHome, project).resolve(FileProjectProvider.FILE);
+    public static boolean fileIsNewerThanItsCopy(Path afonHome, ProjectStack projectStack, Path projectFile) {
+        Path copy = configDir(afonHome, projectStack).resolve(FileProjectStackProvider.FILE);
         try {
             return Files.isRegularFile(copy) && Files.isRegularFile(projectFile)
                    && Files.getLastModifiedTime(projectFile).compareTo(Files.getLastModifiedTime(copy)) > 0;
@@ -106,89 +106,89 @@ public final class ProjectEnv {
     }
 
     /**
-     * @return the config dir of the project, {@code <afon-home>/config-<project>}
+     * @return the config dir of the project stack, {@code <afon-home>/config-<project-stack>}
      */
-    public static @NonNull Path configDir(Path afonHome, AfonProject project) {
-        return afonHome.resolve(CONFIG_PREFIX + project.id());
+    public static @NonNull Path configDir(Path afonHome, ProjectStack projectStack) {
+        return afonHome.resolve(CONFIG_PREFIX + projectStack.id());
     }
 
     /**
-     * @return the cdktf dir of the project, {@code <afon-home>/cdktf-<project>}
+     * @return the cdktf dir of the project stack, {@code <afon-home>/cdktf-<project-stack>}
      */
-    public static @NonNull Path cdktfDir(Path afonHome, AfonProject project) {
-        return afonHome.resolve(CDKTF_PREFIX + project.id());
+    public static @NonNull Path cdktfDir(Path afonHome, ProjectStack projectStack) {
+        return afonHome.resolve(CDKTF_PREFIX + projectStack.id());
     }
 
     /**
-     * @return the properties derived from the project, by the name of the properties file they go in, {@code afon.properties} for those
-     * of every cloud and {@code afon-<cloud>.properties} for those of the project's cloud
-     * @throws ProjectException if a value cannot be written to a properties file that a shell sources
+     * @return the properties derived from the project stack, by the name of the properties file they go in, {@code afon.properties} for those
+     * of every cloud and {@code afon-<cloud>.properties} for those of the project stack's cloud
+     * @throws ProjectStackException if a value cannot be written to a properties file that a shell sources
      */
-    public static Map<String, Map<String, String>> derive(AfonProject project) {
-        return derive(project, null);
+    public static Map<String, Map<String, String>> derive(ProjectStack projectStack) {
+        return derive(projectStack, null);
     }
 
     /**
-     * As {@link #derive(AfonProject)}, with the kubeconfig of the identity project's cluster, which a TRE project's stacks configure its
+     * As {@link #derive(ProjectStack)}, with the kubeconfig of the identity project stack's cluster, which a TRE project stack's stacks configure its
      * Keycloak through, or {@code null} if it names none.
      */
-    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig) {
-        return derive(project, identityKubeconfig, null);
+    public static Map<String, Map<String, String>> derive(ProjectStack projectStack, Path identityKubeconfig) {
+        return derive(projectStack, identityKubeconfig, null);
     }
 
     /**
-     * As {@link #derive(AfonProject, Path)}, with the names of the project's resources, which depend on the config the project is made from, if
-     * it is given, see {@link ProjectNames}.
+     * As {@link #derive(ProjectStack, Path)}, with the names of the project stack's resources, which depend on the config the project stack is made from, if
+     * it is given, see {@link ProjectStackNames}.
      *
-     * @param env the config the project is made from, with its references resolved, or {@code null} for no names
+     * @param env the config the project stack is made from, with its references resolved, or {@code null} for no names
      */
-    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig, Properties env) {
-        return derive(project, identityKubeconfig, null, env);
+    public static Map<String, Map<String, String>> derive(ProjectStack projectStack, Path identityKubeconfig, Properties env) {
+        return derive(projectStack, identityKubeconfig, null, env);
     }
 
     /**
-     * As {@link #derive(AfonProject, Path, Properties)}, with the cloud of the identity project's cluster, which differs from the project's when the
+     * As {@link #derive(ProjectStack, Path, Properties)}, with the cloud of the identity project stack's cluster, which differs from the project stack's when the
      * identity is on another cloud, eg a Data Provider on Azure that uses an identity on AWS: the kubectl context of the port-forward to Keycloak is then
      * checked to be of that cloud.
      *
-     * @param identityCloud the cloud of the identity project, or {@code null} if it names none
+     * @param identityCloud the cloud of the identity project stack, or {@code null} if it names none
      */
-    public static Map<String, Map<String, String>> derive(AfonProject project, Path identityKubeconfig, AfonCloud identityCloud, Properties env) {
-        AfonCloud cloud = project.cloud();
+    public static Map<String, Map<String, String>> derive(ProjectStack projectStack, Path identityKubeconfig, AfonCloud identityCloud, Properties env) {
+        AfonCloud cloud = projectStack.cloud();
         String prefix = cloud.name() + "_";
         Map<String, String> common = new LinkedHashMap<>();
         Map<String, String> cloudSpecific = new LinkedHashMap<>();
-        common.put(PROJECT_ID.getName(), project.id().value());
+        common.put(PROJECT_ID.getName(), projectStack.id().value());
         if (identityKubeconfig != null) {
             common.put(KEYCLOAK_KUBECONFIG.getName(), identityKubeconfig.toString());
             if (identityCloud != null && identityCloud != cloud) {
                 common.put(KEYCLOAK_CLOUD.getName(), identityCloud.toString().toLowerCase(java.util.Locale.ROOT));
             }
         }
-        if (project.egressIp() != null) {
-            cloudSpecific.put(prefix + "EGRESS_IP", project.egressIp());
+        if (projectStack.egressIp() != null) {
+            cloudSpecific.put(prefix + "EGRESS_IP", projectStack.egressIp());
         }
-        if (!project.nodePool().isEmpty()) {
+        if (!projectStack.nodePool().isEmpty()) {
             String property = switch (cloud) {
                 case AZURE -> AZURE_AKS_NODE_POOL.getName();
                 case GCP -> GCP_GKE_NODE_POOL.getName();
-                case AWS -> throw new ProjectException(FileProjectProvider.FILE, List.of("cluster.nodePool is not available on aws"));
+                case AWS -> throw new ProjectStackException(FileProjectStackProvider.FILE, List.of("cluster.nodePool is not available on aws"));
             };
-            cloudSpecific.put(property, project.nodePool().entrySet().stream().map(e -> e.getKey() + ":" + e.getValue())
+            cloudSpecific.put(property, projectStack.nodePool().entrySet().stream().map(e -> e.getKey() + ":" + e.getValue())
                                               .collect(Collectors.joining(",")));
         }
-        if (project instanceof IdentityProject identity) {
+        if (projectStack instanceof IdentityProjectStack identity) {
             // it deploys the identity, so it uses no other: nothing of the clients, the Data Providers or the TRE, and no external identity
             if (identity.domain() != null) {
                 cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", identity.domain());
             }
-        } else if (project instanceof DataProject data) {
+        } else if (projectStack instanceof DataProjectStack data) {
             // a Data Provider deploys its Polaris, with nothing of the clients, the Data Providers or the TRE, and it trusts the central identity, which
             // is at the host of its issuer: that is its OIDC domain, as the config reads the issuer as being at the OIDC domain of the cloud
             if (data.domain() != null) {
                 cloudSpecific.put(prefix + "POLARIS_DOMAIN_NAME", data.domain());
             }
-            DataProject.Identity identity = data.identity();
+            DataProjectStack.Identity identity = data.identity();
             common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
             common.put(OIDC_ACR.getName(), identity.acr());
             common.put(OIDC_AUDIENCE.getName(), identity.audience());
@@ -197,18 +197,18 @@ public final class ProjectEnv {
                 cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", issuerHost);
             }
         } else {
-            deriveTre((TreProject) project, prefix, common, cloudSpecific);
+            deriveTre((TreProjectStack) projectStack, prefix, common, cloudSpecific);
         }
 
         Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
         byFile.put(COMMON_FILE, common);
         byFile.put("afon-" + cloud.toString().toLowerCase(Locale.ROOT) + ".properties", cloudSpecific);
-        if (project instanceof TreProject tre) {
+        if (projectStack instanceof TreProjectStack tre) {
             byFile.putAll(deriveDataProviders(tre, env));
         }
-        if (project instanceof DataProject) {
+        if (projectStack instanceof DataProjectStack) {
             // a Data Provider holds its own catalogs and no others: the stack makes those of every cloud that the config lists, so those of the other
-            // clouds, which the env lists for its own stacks, are emptied (the project's cloud has its own list, from the names of its resources)
+            // clouds, which the env lists for its own stacks, are emptied (the project stack's cloud has its own list, from the names of its resources)
             for (AfonCloud other : AfonCloud.values()) {
                 if (other != cloud) {
                     byFile.computeIfAbsent("catalogs-" + other.toString().toLowerCase(Locale.ROOT) + ".properties", file -> new LinkedHashMap<>())
@@ -217,8 +217,8 @@ public final class ProjectEnv {
             }
         }
         if (env != null) {
-            // the names of the project's resources go first, so that what the file says is not overridden by them
-            ProjectNames.derive(project, env, project.env()).forEach((file, names) -> {
+            // the names of the project stack's resources go first, so that what the file says is not overridden by them
+            ProjectStackNames.derive(projectStack, env, projectStack.env()).forEach((file, names) -> {
                 Map<String, String> explicit = byFile.getOrDefault(file, Map.of());
                 Map<String, String> merged = new LinkedHashMap<>(names);
                 merged.putAll(explicit);
@@ -232,7 +232,7 @@ public final class ProjectEnv {
             }
         }));
         if (!problems.isEmpty()) {
-            throw new ProjectException(FileProjectProvider.FILE, problems);
+            throw new ProjectStackException(FileProjectStackProvider.FILE, problems);
         }
         return byFile;
     }
@@ -247,11 +247,11 @@ public final class ProjectEnv {
         }
     }
 
-    private static void deriveTre(TreProject project, String prefix, Map<String, String> common, Map<String, String> cloudSpecific) {
-        TreProject.Identity identity = project.identity();
+    private static void deriveTre(TreProjectStack projectStack, String prefix, Map<String, String> common, Map<String, String> cloudSpecific) {
+        TreProjectStack.Identity identity = projectStack.identity();
         common.put(OIDC_ISSUER_URL.getName(), identity.issuerUrl());
         common.put(OIDC_AUDIENCE.getName(), identity.treClient());
-        // the TRE signs its members in with the project's client, not the env's: its tokens carry the project's audience, claim and acr.  The id and the
+        // the TRE signs its members in with the project stack's client, not the env's: its tokens carry the project stack's audience, claim and acr.  The id and the
         // secret of the client are written together, see configure
         if (identity.gitClient() != null) {
             common.put(OIDC_GIT_AUDIENCE.getName(), identity.gitClient());
@@ -259,42 +259,42 @@ public final class ProjectEnv {
         common.put(OIDC_ACR.getName(), identity.acr());
         common.put(OIDC_PROJECT_CLAIM.getName(), identity.projectClaim());
         common.put(OIDC_USER_CLAIM.getName(), identity.userClaim());
-        if (project.git() != null) {
-            common.put(GIT_DOMAIN_NAME.getName(), project.git().domain());
+        if (projectStack.git() != null) {
+            common.put(GIT_DOMAIN_NAME.getName(), projectStack.git().domain());
         }
-        if (project.tre().teardown() != null) {
-            common.put(TRE_TEARDOWN_TIME.getName(), project.tre().teardown());
+        if (projectStack.tre().teardown() != null) {
+            common.put(TRE_TEARDOWN_TIME.getName(), projectStack.tre().teardown());
         }
-        common.put(TRE_TEARDOWN_TIME_ZONE.getName(), project.tre().timeZone());
+        common.put(TRE_TEARDOWN_TIME_ZONE.getName(), projectStack.tre().timeZone());
 
         cloudSpecific.put(prefix + "KEYCLOAK_EXTERNAL", "true");
         // the TRE's OIDC domain is the identity's, which the issuer names: the config reads the issuer as being at the OIDC domain of the cloud, and the
-        // identity is not at the env's own, when it is deployed by a project, so it would otherwise be refused
+        // identity is not at the env's own, when it is deployed by a project stack, so it would otherwise be refused
         String issuerHost = issuerHost(identity.issuerUrl());
         if (issuerHost != null) {
             cloudSpecific.put(prefix + "OIDC_DOMAIN_NAME", issuerHost);
         }
-        cloudSpecific.put(prefix + "AUDIT_BUCKET", project.create().auditBucket());
-        if (project.create().gitBucket() != null) {
-            cloudSpecific.put(prefix + "GITEA_BUCKET", project.create().gitBucket());
+        cloudSpecific.put(prefix + "AUDIT_BUCKET", projectStack.create().auditBucket());
+        if (projectStack.create().gitBucket() != null) {
+            cloudSpecific.put(prefix + "GITEA_BUCKET", projectStack.create().gitBucket());
         }
-        project.tre().domains().forEach((property, domain) -> (property.startsWith(prefix) ? cloudSpecific : common).put(property, domain));
+        projectStack.tre().domains().forEach((property, domain) -> (property.startsWith(prefix) ? cloudSpecific : common).put(property, domain));
     }
 
     /**
-     * The catalogs of the Data Providers that the project names, as catalogs like any other, in the {@code catalogs-<cloud>.properties} of the cloud of each
-     * one's storage, with the source {@link AfonCatalogs.Source#DATA_PROVIDER}: {@code <CLOUD>_CATALOG_IDS}, which keeps the ids that the config the project is
+     * The catalogs of the Data Providers that the project stack names, as catalogs like any other, in the {@code catalogs-<cloud>.properties} of the cloud of each
+     * one's storage, with the source {@link AfonCatalogs.Source#DATA_PROVIDER}: {@code <CLOUD>_CATALOG_IDS}, which keeps the ids that the config the project stack is
      * made from lists, and for each id {@code _CATALOG_NAME_<id>} (its name at the endpoint), {@code _CATALOG_TYPE_<id>} ({@code rest}, as it is an Iceberg REST
      * catalog that is reached), {@code _CATALOG_SOURCE_<id>}, {@code _CATALOG_URI_<id>}, {@code _CATALOG_AUDIENCE_<id>} and {@code _BUCKET_NAME_<id>} (its
      * storage, which is the Data Provider's).  The id is that of the entry, with its hyphens as underscores, for it names properties that a shell sources.
      * The scripts that make and delete the storage of a stack's catalogs skip those of this source.
      *
-     * @param env the config the project is made from, or {@code null} for none
+     * @param env the config the project stack is made from, or {@code null} for none
      */
-    private static Map<String, Map<String, String>> deriveDataProviders(TreProject project, Properties env) {
+    private static Map<String, Map<String, String>> deriveDataProviders(TreProjectStack projectStack, Properties env) {
         Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
         Map<String, Set<String>> ids = new LinkedHashMap<>();
-        for (TreProject.DataProvider provider : project.dataProviders()) {
+        for (TreProjectStack.DataProvider provider : projectStack.dataProviders()) {
             String prefix = provider.cloud().name() + "_";
             String file = "catalogs-" + provider.cloud().toString().toLowerCase(Locale.ROOT) + ".properties";
             Map<String, String> catalogs = byFile.computeIfAbsent(file, f -> new LinkedHashMap<>());
@@ -311,7 +311,7 @@ public final class ProjectEnv {
             });
             String id = provider.id().replace('-', '_');
             if (!ofCloud.add(id)) {
-                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
                     "dataProviders: '%s' is the catalog id '%s', which another catalog of %s has already", provider.id(), id, provider.cloud())));
             }
             catalogs.put(prefix + "CATALOG_NAME_" + id, provider.catalogName());
@@ -332,34 +332,34 @@ public final class ProjectEnv {
     }
 
     /**
-     * Configures the project: makes its config env, replacing what an earlier configure made: the files of the config dir of the env it is made from, with the derived
+     * Configures the project stack: makes its config env, replacing what an earlier configure made: the files of the config dir of the env it is made from, with the derived
      * properties written at the end of the properties files, and {@code project.yaml} itself, as the record of what was deployed.
      * The cdktf dir is made, empty, if it is absent.
      *
-     * @param envConfig   the config dir of the env the project is made from, {@code config-<env>}, which holds what the project file does not
-     * @param projectFile the project file, which is copied into the config env
-     * @return the config dir of the project
-     * @throws IllegalArgumentException if the config dir is not a dir, or is that of the project itself
+     * @param envConfig   the config dir of the env the project stack is made from, {@code config-<env>}, which holds what the project stack file does not
+     * @param projectFile the project stack file, which is copied into the config env
+     * @return the config dir of the project stack
+     * @throws IllegalArgumentException if the config dir is not a dir, or is that of the project stack itself
      * @throws UncheckedIOException     if a file cannot be read or written
      */
-    public static Path configure(AfonProject project, Path envConfig, Path afonHome, Path projectFile) {
+    public static Path configure(ProjectStack projectStack, Path envConfig, Path afonHome, Path projectFile) {
         if (!Files.isDirectory(envConfig)) {
             throw new IllegalArgumentException("The config dir " + envConfig + " is not a directory");
         }
-        Path target = configDir(afonHome, project);
+        Path target = configDir(afonHome, projectStack);
         if (envConfig.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
-            throw new IllegalArgumentException("The config dir " + envConfig + " is that of the project itself: name another env for it to be made from");
+            throw new IllegalArgumentException("The config dir " + envConfig + " is that of the project stack itself: name another env for it to be made from");
         }
-        // the config the project is made from, with its references resolved, which the names of the project's resources depend on (the account)
+        // the config the project stack is made from, with its references resolved, which the names of the project stack's resources depend on (the account)
         Properties envProperties = envProperties(envConfig);
-        IdentityRef identityRef = identityRef(project, afonHome);
-        Map<String, Map<String, String>> derived = derive(project, identityRef == null ? null : identityRef.kubeconfig(),
+        IdentityRef identityRef = identityRef(projectStack, afonHome);
+        Map<String, Map<String, String>> derived = derive(projectStack, identityRef == null ? null : identityRef.kubeconfig(),
                                                           identityRef == null ? null : identityRef.cloud(), envProperties);
-        if (project instanceof DataProject data) {
+        if (projectStack instanceof DataProjectStack data) {
             admitTheTres(data, afonHome, envProperties, derived);
         }
-        if (project instanceof TreProject tre) {
-            // both in secret.properties, where the env has them and which is read after afon.properties, so that the env's client id does not override the project's
+        if (projectStack instanceof TreProjectStack tre) {
+            // both in secret.properties, where the env has them and which is read after afon.properties, so that the env's client id does not override the project stack's
             Map<String, String> secrets = derived.computeIfAbsent("secret.properties", file -> new LinkedHashMap<>());
             secrets.put(OAUTH2_CLIENT_ID.getName(), tre.identity().treClient());
             secrets.put(OAUTH2_CLIENT_SECRET.getName(), clientSecretOf(tre, afonHome));
@@ -370,38 +370,38 @@ public final class ProjectEnv {
                 append(target.resolve(file.getKey()), file.getValue());
             }
             reevaluateDependents(target, derived);
-            Files.copy(projectFile, target.resolve(FileProjectProvider.FILE), StandardCopyOption.REPLACE_EXISTING);
-            if (project instanceof TreProject tre && tre.dataProviders().stream().anyMatch(provider -> provider.project() != null)) {
-                writeResolvedProviders(tre, target.resolve(FileProjectProvider.FILE));
+            Files.copy(projectFile, target.resolve(FileProjectStackProvider.FILE), StandardCopyOption.REPLACE_EXISTING);
+            if (projectStack instanceof TreProjectStack tre && tre.dataProviders().stream().anyMatch(provider -> provider.projectStack() != null)) {
+                writeResolvedProviders(tre, target.resolve(FileProjectStackProvider.FILE));
             }
-            Files.createDirectories(cdktfDir(afonHome, project));
+            Files.createDirectories(cdktfDir(afonHome, projectStack));
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot configure project " + project.id() + ": the config env is " + target, e);
+            throw new UncheckedIOException("Cannot configure project stack " + projectStack.id() + ": the config env is " + target, e);
         }
         return target;
     }
 
     /**
-     * @return the secret of the project's TRE client, which {@code project-secret} made in the project's {@code keys} dir, and which the identity is given
-     * when the project is made in it: the TRE's JupyterHub and the gate in front of it sign members in with it
-     * @throws ProjectException if there is none
+     * @return the secret of the project stack's TRE client, which {@code project-secret} made in the project stack's {@code keys} dir, and which the identity is given
+     * when the project stack is made in it: the TRE's JupyterHub and the gate in front of it sign members in with it
+     * @throws ProjectStackException if there is none
      */
-    static String clientSecretOf(TreProject project, Path afonHome) {
-        Path file = FileProjectProvider.keysDir(afonHome, project.id().value()).resolve("tre.secret");
+    static String clientSecretOf(TreProjectStack projectStack, Path afonHome) {
+        Path file = FileProjectStackProvider.secretsDir(afonHome, projectStack.id().value()).resolve("tre.secret");
         try {
             String secret = Files.isRegularFile(file) ? Files.readString(file, StandardCharsets.UTF_8).strip() : "";
             if (secret.isEmpty()) {
-                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
-                    "no secret for the TRE client %s: make it with afon-cli.sh project-secret %s tre, then configure the project again, as the config of the TRE has it",
-                    project.identity().treClient(), project.id().value())));
+                throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
+                    "no secret for the TRE client %s: make it with afon-cli.sh project-secret %s tre, then configure the project stack again, as the config of the TRE has it",
+                    projectStack.identity().treClient(), projectStack.id().value())));
             }
             if (!SAFE_VALUE.matcher(secret).matches()) {
-                throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
+                throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
                     "the secret in %s has a character that a properties file sourced by a shell cannot hold: make another with project-secret --force", file)));
             }
             return secret;
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot read the secret of the TRE client " + project.identity().treClient() + " in " + file, e);
+            throw new UncheckedIOException("Cannot read the secret of the TRE client " + projectStack.identity().treClient() + " in " + file, e);
         }
     }
 
@@ -410,7 +410,7 @@ public final class ProjectEnv {
      * already allows, in {@code <CLOUD>_POLARIS_ALLOWED_CIDRS}, which the deploy and {@code polaris-whitelist} both restrict its ingress to.  With no TRE naming
      * it, the property is left as the config has it: a Polaris with none is open, as it is for any other stack, and is guarded by its token checks alone.
      */
-    private static void admitTheTres(DataProject data, Path afonHome, Properties env, Map<String, Map<String, String>> derived) {
+    private static void admitTheTres(DataProjectStack data, Path afonHome, Properties env, Map<String, Map<String, String>> derived) {
         List<String> egress = TreEgress.of(afonHome, data);
         if (egress.isEmpty()) {
             return;
@@ -428,16 +428,16 @@ public final class ProjectEnv {
     }
 
     /**
-     * Writes the catalogs that the project names of the Data Providers' projects as they were resolved, each in full, in the copy of the project
-     * file that the config holds, as the record of what was deployed: the file is read where the Data Providers' projects are not looked up, ie by the
-     * commands that run in the project's home, which then see what was deployed, not what the Data Providers' files say now.  The comments of the file
+     * Writes the catalogs that the project stack names of the Data Providers' project stacks as they were resolved, each in full, in the copy of the project stack
+     * file that the config holds, as the record of what was deployed: the file is read where the Data Providers' project stacks are not looked up, ie by the
+     * commands that run in the project stack's home, which then see what was deployed, not what the Data Providers' files say now.  The comments of the file
      * are lost in the copy.
      */
-    private static void writeResolvedProviders(TreProject project, Path copy) throws IOException {
+    private static void writeResolvedProviders(TreProjectStack projectStack, Path copy) throws IOException {
         Map<String, Object> root = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()))
             .load(Files.readString(copy, StandardCharsets.UTF_8));
         List<Map<String, Object>> dataProviders = new ArrayList<>();
-        for (TreProject.DataProvider provider : project.dataProviders()) {
+        for (TreProjectStack.DataProvider provider : projectStack.dataProviders()) {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("id", provider.id());
             entry.put("catalogUri", provider.catalogUri());
@@ -453,43 +453,43 @@ public final class ProjectEnv {
         options.setIndent(2);
         options.setIndicatorIndent(2);
         options.setIndentWithIndicator(true);
-        Files.writeString(copy, "# The dataProviders are the catalogs that the project names of its Data Providers' projects, resolved by configure.\n"
+        Files.writeString(copy, "# The dataProviders are the catalogs that the project stack names of its Data Providers' project stacks, resolved by configure.\n"
                                 + new org.yaml.snakeyaml.Yaml(options).dump(root), StandardCharsets.UTF_8);
     }
 
     /**
-     * The identity project that a project names: where the kubeconfig of its cluster is, and its cloud.
+     * The identity project stack that a project stack names: where the kubeconfig of its cluster is, and its cloud.
      */
     record IdentityRef(Path kubeconfig, AfonCloud cloud) {
     }
 
     /**
-     * @return the cluster of the identity project that the project names, where its stack writes the kubeconfig, or {@code null} if it names none
-     * @throws ProjectException if the identity project has no file, or is not an identity project
+     * @return the cluster of the identity project stack that the project stack names, where its stack writes the kubeconfig, or {@code null} if it names none
+     * @throws ProjectStackException if the identity project stack has no file, or is not an identity project stack
      */
-    static IdentityRef identityRef(AfonProject project, Path afonHome) {
-        String id = project.identityProject();
+    static IdentityRef identityRef(ProjectStack projectStack, Path afonHome) {
+        String id = projectStack.identityProjectStack();
         if (id == null) {
             return null;
         }
-        FileProjectProvider provider = FileProjectProvider.forProject(afonHome, id);
+        FileProjectStackProvider provider = FileProjectStackProvider.forProjectStack(afonHome, id);
         if (!provider.exists()) {
-            throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
-                "identity.project names %s, which has no file %s: make it first, as the project that deploys the central identity", id, provider.file())));
+            throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
+                "identity.project-stack names %s, which has no file %s: make it first, as the project stack that deploys the central identity", id, provider.file())));
         }
-        if (!(provider.getProject() instanceof IdentityProject identity)) {
-            throw new ProjectException(FileProjectProvider.FILE, List.of(String.format(
-                "identity.project names %s, which is not an identity project", id)));
+        if (!(provider.getProjectStack() instanceof IdentityProjectStack identity)) {
+            throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
+                "identity.project-stack names %s, which is not an identity project stack", id)));
         }
         return new IdentityRef(cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config"), identity.cloud());
     }
 
     /**
-     * @return the properties of the config dir that the names of a project's resources are made from, with their references resolved
+     * @return the properties of the config dir that the names of a project stack's resources are made from, with their references resolved
      */
     public static Properties envProperties(Path envConfig) {
         Properties properties = new FilePropertyProvider(envConfig.toString(), List.of("afon", "catalogs"), true).getProperties();
-        // the database of the env's Keycloak, which is a secret, from which the identity project names a database of its own
+        // the database of the env's Keycloak, which is a secret, from which the identity project stack names a database of its own
         try {
             String url = new FilePropertyProvider(envConfig.toString(), List.of("afon", "secret"), true).getValue(AfonProperty.KEYCLOAK_DB_URL, "");
             if (url != null && !url.isBlank()) {

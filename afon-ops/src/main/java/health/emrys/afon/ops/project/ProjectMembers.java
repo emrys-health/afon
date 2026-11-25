@@ -1,6 +1,6 @@
 package health.emrys.afon.ops.project;
 
-import health.emrys.afon.project.FileProjectProvider;
+import health.emrys.afon.project.FileProjectStackProvider;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,25 +14,25 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The members of a TRE project, by their user id in the central identity, kept in the project's dir as {@code members.csv}: a line for each, {@code <user id>,<email>},
+ * The members of a TRE project stack, by their user id in the central identity, kept in the project stack's dir as {@code members.csv}: a line for each, {@code <user id>,<email>},
  * written by {@code manage-identity} as it makes, adds or removes them, so that what needs their ids, eg the grants of a Data Provider, reads them from
  * there and nobody copies them by hand.  A line that starts with {@code #} is a comment.
  */
 final class ProjectMembers {
 
-    /** The name of the file, in the project's dir. */
+    /** The name of the file, in the project stack's dir. */
     static final String FILE = "members.csv";
 
-    private static final String HEADER = "# The members of the project: <user id>,<email>.  Written by manage-identity, which keeps it as the project's group is.";
+    private static final String HEADER = "# The members of the project stack: <user id>,<email>.  Written by manage-identity, which keeps it as the project stack's group is.";
 
     private ProjectMembers() {
     }
 
     /**
-     * @return the file of the members of the project: {@code <afon-home>/projects/<project>/members.csv}
+     * @return the file of the members of the project stack: {@code <afon-home>/projects/<project-stack>/members.csv}
      */
-    static Path file(Path afonHome, String project) {
-        return FileProjectProvider.projectDir(afonHome, project).resolve(FILE);
+    static Path file(Path afonHome, String projectStack) {
+        return FileProjectStackProvider.projectDir(afonHome, projectStack).resolve(FILE);
     }
 
     /**
@@ -87,8 +87,8 @@ final class ProjectMembers {
     }
 
     /**
-     * @param missing the emails that the project's file lists and the members file has no one of: not yet synced, so the grant would leave them out
-     * @param extra   the emails that the members file has and the project's file does not list: not the project's members, so the next sync takes them out
+     * @param missing the emails that the project stack's file lists and the members file has no one of: not yet synced, so the grant would leave them out
+     * @param extra   the emails that the members file has and the project stack's file does not list: not the project stack's members, so the next sync takes them out
      */
     record Drift(Set<String> missing, Set<String> extra) {
         boolean none() {
@@ -97,7 +97,7 @@ final class ProjectMembers {
     }
 
     /**
-     * How the members file differs from the members that the project's file lists, which is the authority: by email, in lower case.  An entry of the file with no
+     * How the members file differs from the members that the project stack's file lists, which is the authority: by email, in lower case.  An entry of the file with no
      * email, as a list of user ids only has, is not compared.
      */
     static Drift drift(Map<String, String> inFile, Collection<String> listed) {

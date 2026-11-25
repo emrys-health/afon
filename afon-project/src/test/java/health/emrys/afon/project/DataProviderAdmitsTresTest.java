@@ -12,12 +12,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static health.emrys.afon.project.ProjectFixtures.lower;
+import static health.emrys.afon.project.ProjectStackFixtures.lower;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * A Data Provider's Polaris admits the egress IPs of the TRE projects that name its catalogs, in {@code <CLOUD>_POLARIS_ALLOWED_CIDRS}, when it is configured.
+ * A Data Provider's Polaris admits the egress IPs of the TRE project stacks that name its catalogs, in {@code <CLOUD>_POLARIS_ALLOWED_CIDRS}, when it is configured.
  * Every test is run on every cloud.
  */
 class DataProviderAdmitsTresTest {
@@ -42,13 +42,13 @@ class DataProviderAdmitsTresTest {
     private Path dataFile(AfonCloud cloud) throws IOException {
         Path file = home.resolve("projects/lon/project.yaml");
         Files.createDirectories(file.getParent());
-        Files.writeString(file, ProjectFixtures.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
+        Files.writeString(file, ProjectStackFixtures.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
         return file;
     }
 
-    /** A TRE project of the given id, whose {@code dataProviders} are the lines given. */
+    /** A TRE project stack of the given id, whose {@code dataProviders} are the lines given. */
     private void tre(AfonCloud cloud, String id, String egressLine, String providers) throws IOException {
-        String yaml = ProjectFixtures.example(cloud).replace("xyz-yyyy-nnnn", id).replace("  egressIp: 203.0.113.10\n", egressLine)
+        String yaml = ProjectStackFixtures.example(cloud).replace("xyz-yyyy-nnnn", id).replace("  egressIp: 203.0.113.10\n", egressLine)
                                      .replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n" + providers + "\nmembers:")
                                      .replace("  cloud: " + lower(cloud) + "\n", "  cloud: " + lower(cloud) + "\n  env: dev\n");
         Path file = home.resolve("projects/" + id + "/project.yaml");
@@ -56,13 +56,13 @@ class DataProviderAdmitsTresTest {
         Files.writeString(file, yaml);
     }
 
-    private static final String NAMES_LON = "  named:\n    - {project: lon, catalogs: [cvd]}";
+    private static final String NAMES_LON = "  named:\n    - {project-stack: lon, catalogs: [cvd]}";
 
     private AfonPropertyProvider configureLon(AfonCloud cloud, String envExtra) throws IOException {
         Path file = dataFile(cloud);
         Path env = env(cloud, envExtra);
-        ProjectFixtures.writeSecrets(home);
-        return new FilePropertyProvider(ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file).toString());
+        ProjectStackFixtures.writeSecrets(home);
+        return new FilePropertyProvider(ProjectStackEnv.configure(new FileProjectStackProvider(file).getProjectStack(), env, home, file).toString());
     }
 
     private static String allowed(AfonPropertyProvider properties, AfonCloud cloud) {
@@ -113,10 +113,10 @@ class DataProviderAdmitsTresTest {
         tre(cloud, "xyz-yyyy-nnnn", "", NAMES_LON);
         Path file = dataFile(cloud);
         Path env = env(cloud, "");
-        ProjectFixtures.writeSecrets(home);
-        assertThatThrownBy(() -> ProjectEnv.configure(new FileProjectProvider(file).getProject(), env, home, file))
-            .isInstanceOf(ProjectException.class)
+        ProjectStackFixtures.writeSecrets(home);
+        assertThatThrownBy(() -> ProjectStackEnv.configure(new FileProjectStackProvider(file).getProjectStack(), env, home, file))
+            .isInstanceOf(ProjectStackException.class)
             .hasMessageContaining("xyz-yyyy-nnnn reads this Data Provider")
-            .hasMessageContaining("project.egressIp");
+            .hasMessageContaining("project-stack.egressIp");
     }
 }

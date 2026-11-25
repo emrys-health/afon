@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.project.TreProject;
+import health.emrys.afon.project.TreProjectStack;
 import health.emrys.afon.rest.HttpResponses;
 import health.emrys.afon.rest.RestClient;
 import health.emrys.afon.security.IdentityProvider;
@@ -92,7 +92,7 @@ public class KeyCloakProvider implements IdentityProvider {
     private final String adminPassword;
     private final String loginTheme;
     private Smtp smtp;
-    /** The config that this runs in, if it is made from one: where a project's domains are, when its file does not give them, see {@link #treRedirectUris}. */
+    /** The config that this runs in, if it is made from one: where a project stack's domains are, when its file does not give them, see {@link #treRedirectUris}. */
     private AfonPropertyProvider config;
     /**
      * How often, and how long apart, a token request failing with an I/O or server error is tried: up to five minutes, as
@@ -1135,7 +1135,7 @@ public class KeyCloakProvider implements IdentityProvider {
         return response;
     }
 
-    // ---- Projects: a client per project, and a group ----
+    // ---- Projects: a client per project stack, and a group ----
 
     /** The Gitea provider name that its OIDC callback path is under, {@code /user/oauth2/<name>/callback}. */
     static final String GITEA_AUTH_NAME = "keycloak";
@@ -1147,38 +1147,38 @@ public class KeyCloakProvider implements IdentityProvider {
     private static final String AUDIENCE_MAPPER_PREFIX = "aud-";
 
     /**
-     * The exact redirect URIs of the project's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
-     * the remote desktop are served under.  The domain is the one that the project's file gives, else the one that its config has, which is derived
-     * from the env's (see {@code ProjectNames}), as a project's TRE has its domains derived unless the file names them.
+     * The exact redirect URIs of the project stack's TRE client: JupyterHub's and the oauth2-proxy gate's, which VS Code and
+     * the remote desktop are served under.  The domain is the one that the project stack's file gives, else the one that its config has, which is derived
+     * from the env's (see {@code ProjectStackNames}), as a project stack's TRE has its domains derived unless the file names them.
      *
-     * @param config the config that the project runs in, or {@code null} if none
+     * @param config the config that the project stack runs in, or {@code null} if none
      */
-    static List<String> treRedirectUris(TreProject project, AfonPropertyProvider config) {
-        return callbackURIs(treDomain(project, config));
+    static List<String> treRedirectUris(TreProjectStack projectStack, AfonPropertyProvider config) {
+        return callbackURIs(treDomain(projectStack, config));
     }
 
     /**
-     * @return the Jupyter domain of the project's TRE: the one that the project's file gives, else the one that its config has
+     * @return the Jupyter domain of the project stack's TRE: the one that the project stack's file gives, else the one that its config has
      */
-    static String treDomain(TreProject project, AfonPropertyProvider config) {
-        String property = project.cloud().name() + "_JUPYTER_DOMAIN_NAME";
-        String domain = project.tre().domains().get(property);
+    static String treDomain(TreProjectStack projectStack, AfonPropertyProvider config) {
+        String property = projectStack.cloud().name() + "_JUPYTER_DOMAIN_NAME";
+        String domain = projectStack.tre().domains().get(property);
         if ((domain == null || domain.isBlank()) && config != null) {
             domain = config.getProperties().getProperty(property);
         }
         if (domain == null || domain.isBlank()) {
             throw new IllegalArgumentException(format(
-                "%s is neither in stacks.tre.domains of the project's file nor in its config, which the redirect URIs of the project's TRE client are made from: "
-                + "configure the project, and run this in its home", property));
+                "%s is neither in stacks.tre.domains of the project stack's file nor in its config, which the redirect URIs of the project stack's TRE client are made from: "
+                + "configure the project stack, and run this in its home", property));
         }
         return domain.trim();
     }
 
     /**
-     * The exact redirect URI of the project's Git client: Gitea's OIDC callback.
+     * The exact redirect URI of the project stack's Git client: Gitea's OIDC callback.
      */
-    static List<String> gitRedirectUris(TreProject project) {
-        return List.of(format("https://%s/user/oauth2/%s/callback", project.git().domain(), GITEA_AUTH_NAME));
+    static List<String> gitRedirectUris(TreProjectStack projectStack) {
+        return List.of(format("https://%s/user/oauth2/%s/callback", projectStack.git().domain(), GITEA_AUTH_NAME));
     }
 
     @Override
@@ -1337,7 +1337,7 @@ public class KeyCloakProvider implements IdentityProvider {
                 }
             }
             if (removed > 0) {
-                // a session that passed the second factor with the device that is gone is ended, as it is for a member removed from a project
+                // a session that passed the second factor with the device that is gone is ended, as it is for a member removed from a project stack
                 HttpResponse logout = restClient.post(format("/admin/realms/%s/users/%s/logout", KEYCLOAK_REALM, id), "", token);
                 if (isFailure(logout)) {
                     throw new IOException(format("Could not end the sessions of %s: HTTP %d", address, logout.getCode()));
@@ -1426,7 +1426,7 @@ public class KeyCloakProvider implements IdentityProvider {
             String token = adminToken();
             String id = userIdOf(token, address);
             if (id == null) {
-                throw new IllegalStateException("No user " + address + " in the central identity: add them to a project first");
+                throw new IllegalStateException("No user " + address + " in the central identity: add them to a project stack first");
             }
             HttpResponse response = sendInvitation(token, id, address, clientId);
             if (isFailure(response)) {
@@ -1439,23 +1439,23 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void ensureProject(TreProject project, Map<String, String> secrets) {
-        String id = project.id().value();
-        TreProject.Identity identity = project.identity();
+    public void ensureProject(TreProjectStack projectStack, Map<String, String> secrets) {
+        String id = projectStack.id().value();
+        TreProjectStack.Identity identity = projectStack.identity();
         try {
             String token = adminToken();
             String realm = KEYCLOAK_REALM;
             ensurePrincipalInUserProfile(token);
             ensureAcrLevel(token, realm, identity.acr());
-            String treDomain = treDomain(project, config);
+            String treDomain = treDomain(projectStack, config);
             String tre = ensureProjectClient(token, realm, identity.treClient(), callbackURIs(treDomain), "https://" + treDomain + "/", secretOf(secrets, "tre"),
                                              ensureBrowserFlow(token, realm, identity.treClient(), id), identity.acr());
-            // a project with no Git of its own has Git deployed with its TRE, so no Git client
-            String git = project.git() == null ? null
-                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(project), "https://" + project.git().domain() + "/", secretOf(secrets, "git"),
+            // a project stack with no Git of its own has Git deployed with its TRE, so no Git client
+            String git = projectStack.git() == null ? null
+                : ensureProjectClient(token, realm, identity.gitClient(), gitRedirectUris(projectStack), "https://" + projectStack.git().domain() + "/", secretOf(secrets, "git"),
                                       ensureBrowserFlow(token, realm, identity.gitClient(), id), identity.acr());
             List<String> treAudiences = new ArrayList<>(List.of(identity.treClient()));
-            project.dataProviders().forEach(provider -> treAudiences.add(provider.audience()));
+            projectStack.dataProviders().forEach(provider -> treAudiences.add(provider.audience()));
             convergeProjectClient(token, realm, tre, identity.treClient(), id, identity, treAudiences);
             if (git != null) {
                 convergeProjectClient(token, realm, git, identity.gitClient(), id, identity, List.of(identity.gitClient()));
@@ -1465,10 +1465,10 @@ public class KeyCloakProvider implements IdentityProvider {
             if (git != null) {
                 grantRole(token, realm, group, git, id);
             }
-            logger.info("KeyCloak project {} has client {}{}, and a group of the same name as the project", id, identity.treClient(),
+            logger.info("KeyCloak project stack {} has client {}{}, and a group of the same name as the project stack", id, identity.treClient(),
                         git == null ? "" : " and " + identity.gitClient());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to make KeyCloak project " + id, e);
+            throw new RuntimeException("Failed to make KeyCloak project stack " + id, e);
         }
     }
 
@@ -1491,9 +1491,9 @@ public class KeyCloakProvider implements IdentityProvider {
     private static final int MAX_CLIENT_SECRET_LENGTH = 255;
 
     /**
-     * Makes, or converges, a project's client: standard flow only (no direct grants, service accounts or implicit flow), with
+     * Makes, or converges, a project stack's client: standard flow only (no direct grants, service accounts or implicit flow), with
      * PKCE allowed and not required, full scope off so that no role but its own reaches a token, and authenticating with the secret that it is given.  Its login
-     * is the flow that only the project's members pass, after a second factor, see {@link KeyCloakProjectFlow}.
+     * is the flow that only the project stack's members pass, after a second factor, see {@link KeyCloakProjectFlow}.
      *
      * @return the client's internal UUID
      */
@@ -1525,28 +1525,28 @@ public class KeyCloakProvider implements IdentityProvider {
                 // of a password alone, which carries the project claim and the audiences all the same
                 "default.acr.values", acr,
                 "minimum.acr.value", acr))));
-        HttpResponse created = postJson(token, format("/admin/realms/%s/clients", realm), json, "project client " + clientId);
+        HttpResponse created = postJson(token, format("/admin/realms/%s/clients", realm), json, "project stack client " + clientId);
         String uuid = clientUuid(token, realm, clientId);
         if (uuid == null) {
             throw new IOException(format("KeyCloak made client %s but does not list it", clientId));
         }
         if (created.getCode() == HttpStatus.SC_CONFLICT
-            && isFailure(putJson(token, format("/admin/realms/%s/clients/%s", realm, uuid), json, "project client " + clientId))) {
-            throw new IOException("Could not update KeyCloak project client " + clientId);
+            && isFailure(putJson(token, format("/admin/realms/%s/clients/%s", realm, uuid), json, "project stack client " + clientId))) {
+            throw new IOException("Could not update KeyCloak project stack client " + clientId);
         }
         return uuid;
     }
 
     /**
-     * Gives the client the role that marks a member of the project, and the mappers of its tokens' claims.  The role is named
-     * by the project's id, so that the mapper, which puts the names of the roles in a claim, puts the project's id in it.
-     * The mapper is limited to the client's own roles, so a token of this client names this project and no other, even for
-     * a user on several projects, and a token of a non-member lacks the claim, whatever grant issued it.  The {@code roles}
+     * Gives the client the role that marks a member of the project stack, and the mappers of its tokens' claims.  The role is named
+     * by the project stack's id, so that the mapper, which puts the names of the roles in a claim, puts the project stack's id in it.
+     * The mapper is limited to the client's own roles, so a token of this client names this project stack and no other, even for
+     * a user on several project stacks, and a token of a non-member lacks the claim, whatever grant issued it.  The {@code roles}
      * scope, which would add other clients' audiences, is taken off.
      */
-    private void convergeProjectClient(String token, String realm, String uuid, String clientId, String projectId,
-                                       TreProject.Identity identity, List<String> audiences) throws IOException {
-        ensureRole(token, realm, uuid, projectId);
+    private void convergeProjectClient(String token, String realm, String uuid, String clientId, String projectStackId,
+                                       TreProjectStack.Identity identity, List<String> audiences) throws IOException {
+        ensureRole(token, realm, uuid, projectStackId);
         removeDefaultScope(token, realm, uuid, "roles");
         upsertMapper(token, realm, uuid, Map.of(
             "name", "project",
@@ -1585,7 +1585,7 @@ public class KeyCloakProvider implements IdentityProvider {
                     "id.token.claim", "false",
                     "introspection.token.claim", "true")));
         }
-        // a Data Provider no longer in the project loses its audience
+        // a Data Provider no longer in the project stack loses its audience
         for (Map<String, Object> existing : projectMappers(token, realm, uuid)) {
             String name = String.valueOf(existing.get("name"));
             if (name.startsWith(AUDIENCE_MAPPER_PREFIX) && !wanted.contains(name)) {
@@ -1625,16 +1625,16 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     /**
-     * Makes, or converges, the browser login of a project's client, {@link KeyCloakProjectFlow}: what is absent is made, and each
+     * Makes, or converges, the browser login of a project stack's client, {@link KeyCloakProjectFlow}: what is absent is made, and each
      * requirement and configuration is set as it should be, so that a login that was made is never left open while it is converged.
      *
      * @return the id of the top flow, which the client binds its login to
      */
-    private String ensureBrowserFlow(String token, String realm, String clientId, String projectId) throws IOException {
-        KeyCloakProjectFlow.Node top = KeyCloakProjectFlow.of(clientId, projectId);
+    private String ensureBrowserFlow(String token, String realm, String clientId, String projectStackId) throws IOException {
+        KeyCloakProjectFlow.Node top = KeyCloakProjectFlow.of(clientId, projectStackId);
         if (flowIdOrNull(token, realm, top.name()) == null) {
             String json = mapper.writeValueAsString(Map.of("alias", top.name(), "providerId", "basic-flow", "topLevel", true, "builtIn", false,
-                                                          "description", "The login of the project's client " + clientId));
+                                                          "description", "The login of the project stack's client " + clientId));
             if (isFailure(postJson(token, format("/admin/realms/%s/authentication/flows", realm), json, "flow " + top.name()))) {
                 throw new IOException("Could not make KeyCloak flow " + top.name());
             }
@@ -1793,31 +1793,31 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
-    public void addMember(TreProject project, String userId) {
+    public void addMember(TreProjectStack projectStack, String userId) {
         try {
             String token = adminToken();
-            String group = requireGroup(token, project);
+            String group = requireGroup(token, projectStack);
             HttpResponse response = putJson(token, format("/admin/realms/%s/users/%s/groups/%s", KEYCLOAK_REALM, userId, group), "",
-                                            "membership of " + userId + " in " + project.id());
+                                            "membership of " + userId + " in " + projectStack.id());
             if (isFailure(response)) {
-                throw new IOException(format("Could not add user %s to group %s: HTTP %d", userId, project.id(), response.getCode()));
+                throw new IOException(format("Could not add user %s to group %s: HTTP %d", userId, projectStack.id(), response.getCode()));
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to add a member to project " + project.id(), e);
+            throw new RuntimeException("Failed to add a member to project stack " + projectStack.id(), e);
         }
     }
 
     @Override
-    public Map<String, String> members(TreProject project) {
+    public Map<String, String> members(TreProjectStack projectStack) {
         try {
             String token = adminToken();
-            String group = requireGroup(token, project);
+            String group = requireGroup(token, projectStack);
             Map<String, String> members = new LinkedHashMap<>();
             int first = 0;
             int page = 100;
             while (true) {
                 List<Map<String, Object>> users = getList(token, format("/admin/realms/%s/groups/%s/members?first=%d&max=%d", KEYCLOAK_REALM, group, first, page),
-                                                          "members of group " + project.id());
+                                                          "members of group " + projectStack.id());
                 users.forEach(user -> members.put(String.valueOf(user.get("id")), String.valueOf(user.get("email"))));
                 if (users.size() < page) {
                     return members;
@@ -1825,18 +1825,18 @@ public class KeyCloakProvider implements IdentityProvider {
                 first += page;
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to list the members of project " + project.id(), e);
+            throw new RuntimeException("Failed to list the members of project stack " + projectStack.id(), e);
         }
     }
 
     @Override
-    public void removeMember(TreProject project, String userId) {
+    public void removeMember(TreProjectStack projectStack, String userId) {
         try {
             String token = adminToken();
-            String group = requireGroup(token, project);
+            String group = requireGroup(token, projectStack);
             HttpResponse response = restClient.delete(format("/admin/realms/%s/users/%s/groups/%s", KEYCLOAK_REALM, userId, group), token);
             if (isFailure(response) && response.getCode() != HttpStatus.SC_NOT_FOUND) {
-                throw new IOException(format("Could not remove user %s from group %s: HTTP %d", userId, project.id(), response.getCode()));
+                throw new IOException(format("Could not remove user %s from group %s: HTTP %d", userId, projectStack.id(), response.getCode()));
             }
             // ends their sessions in the central identity; a token already issued lasts until it expires
             HttpResponse logout = restClient.post(format("/admin/realms/%s/users/%s/logout", KEYCLOAK_REALM, userId), "", token);
@@ -1844,21 +1844,21 @@ public class KeyCloakProvider implements IdentityProvider {
                 throw new IOException(format("Could not end the sessions of user %s: HTTP %d", userId, logout.getCode()));
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to remove a member from project " + project.id(), e);
+            throw new RuntimeException("Failed to remove a member from project stack " + projectStack.id(), e);
         }
     }
 
-    private String requireGroup(String token, TreProject project) throws IOException {
-        String group = groupId(token, KEYCLOAK_REALM, project.id().value());
+    private String requireGroup(String token, TreProjectStack projectStack) throws IOException {
+        String group = groupId(token, KEYCLOAK_REALM, projectStack.id().value());
         if (group == null) {
-            throw new IOException(format("KeyCloak has no group for project %s: make it with manage-identity create", project.id()));
+            throw new IOException(format("KeyCloak has no group for project stack %s: make it with manage-identity create", projectStack.id()));
         }
         return group;
     }
 
     @Override
-    public void closeProject(TreProject project) {
-        String clientId = project.identity().treClient();
+    public void closeProject(TreProjectStack projectStack) {
+        String clientId = projectStack.identity().treClient();
         try {
             String token = adminToken();
             String uuid = clientUuid(token, KEYCLOAK_REALM, clientId);
@@ -1872,9 +1872,9 @@ public class KeyCloakProvider implements IdentityProvider {
             if (isFailure(putJson(token, uri, mapper.writeValueAsString(client), "client " + clientId))) {
                 throw new IOException("Could not disable KeyCloak client " + clientId);
             }
-            logger.info("Closed KeyCloak client {}: no token is issued for project {}", clientId, project.id());
+            logger.info("Closed KeyCloak client {}: no token is issued for project stack {}", clientId, projectStack.id());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to close project " + project.id(), e);
+            throw new RuntimeException("Failed to close project stack " + projectStack.id(), e);
         }
     }
 

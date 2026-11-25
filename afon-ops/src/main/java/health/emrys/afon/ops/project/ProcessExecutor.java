@@ -8,13 +8,13 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Runs the Afon commands of a project in processes of their own, with the console as theirs.
+ * Runs the Afon commands of a project stack in processes of their own, with the console as theirs.
  * <p>
- * A command of a project's home, which is given {@code --home}, must not switch the config or cdktf of that home to an env that the deployer's
+ * A command of a project stack's home, which is given {@code --home}, must not switch the config or cdktf of that home to an env that the deployer's
  * own shell names, as the launcher would on seeing {@code AFON_ENV}, {@code AFON_CONFIG_ENV} or {@code AFON_CDKTF_ENV}, so those are not passed on.
- * Nor may it act on the cluster that the deployer's shell points kubectl at, so such a command has {@code KUBECONFIG} of the project's own cluster, if it has one.
+ * Nor may it act on the cluster that the deployer's shell points kubectl at, so such a command has {@code KUBECONFIG} of the project stack's own cluster, if it has one.
  */
-final class ProcessExecutor implements ManageProjectMain.Executor {
+final class ProcessExecutor implements ManageProjectStackMain.Executor {
 
     private static final List<String> ENV_SWITCHES = List.of("AFON_ENV", "AFON_CONFIG_ENV", "AFON_CDKTF_ENV");
 
@@ -24,7 +24,7 @@ final class ProcessExecutor implements ManageProjectMain.Executor {
     }
 
     /**
-     * Takes the env switches out of the env of the process, if the command is of a project's home.
+     * Takes the env switches out of the env of the process, if the command is of a project stack's home.
      */
     static void withoutEnvSwitches(ProcessBuilder builder, List<String> command) {
         if (command.contains("--home")) {
@@ -33,9 +33,9 @@ final class ProcessExecutor implements ManageProjectMain.Executor {
     }
 
     /**
-     * Points the kubectl of a command of a project's home at the cluster of the project: {@code KUBECONFIG} is the kubeconfig that the project's stack wrote in
+     * Points the kubectl of a command of a project stack's home at the cluster of the project stack: {@code KUBECONFIG} is the kubeconfig that the project stack's stack wrote in
      * its cdktf dir, whatever the deployer's shell has, as the scripts that use kubectl act on the cluster that it points at, which would otherwise be the
-     * deployer's, eg another project's.  Left as it is if the command is not of a project's home, or the project has no kubeconfig yet.
+     * deployer's, eg another project stack's.  Left as it is if the command is not of a project stack's home, or the project stack has no kubeconfig yet.
      */
     static void withKubeconfigOfTheProject(ProcessBuilder builder, List<String> command) {
         Path kubeconfig = command.contains("--home") ? kubeconfigOf(command) : null;
@@ -45,7 +45,7 @@ final class ProcessExecutor implements ManageProjectMain.Executor {
     }
 
     /**
-     * @return the kubeconfig of the project whose cdktf dir the command is given, {@code <cdktf>/kube/<stack>.config}: the only one, or else the one that
+     * @return the kubeconfig of the project stack whose cdktf dir the command is given, {@code <cdktf>/kube/<stack>.config}: the only one, or else the one that
      * {@code current.config} links to, which the last write of one points it at; {@code null} if there is none
      */
     static Path kubeconfigOf(List<String> command) {
@@ -71,7 +71,7 @@ final class ProcessExecutor implements ManageProjectMain.Executor {
     }
 
     /**
-     * @param extraEnv more env for the process, eg the cloud of the project
+     * @param extraEnv more env for the process, eg the cloud of the project stack
      */
     @Override
     public int run(List<String> command, Map<String, String> extraEnv) throws IOException {

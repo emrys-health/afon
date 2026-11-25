@@ -30,7 +30,7 @@
 #   remove   removes the restriction, so that Keycloak can be reached from anywhere, until the next deploy.
 #
 # With --stack, the cluster is that of the stack, by its id, eg azure-keycloak, as its kubeconfig in the cdktf dir has it, written by
-# `<cloud>-update-kube-config`, whatever KUBECONFIG and the current context are; as `manage-project up` does, for the identity project's.
+# `<cloud>-update-kube-config`, whatever KUBECONFIG and the current context are; as `manage-project-stack up` does, for the identity project's.
 #
 # Env vars:
 #   CONTEXT         kubectl context of the cluster (defaults to the current context), whose kind must be that of the cloud.

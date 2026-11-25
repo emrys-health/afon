@@ -25,9 +25,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * What a Data Provider grants a project, by the command: it calls Polaris only for an action it understands.
+ * What a Data Provider grants a project stack, by the command: it calls Polaris only for an action it understands.
  */
-class ManageProjectGrantsMainTest {
+class ManageDataMainTest {
 
     private static final String ALICE = "11111111-aaaa-bbbb-cccc-000000000001";
     private static final String BOB = "22222222-aaaa-bbbb-cccc-000000000002";
@@ -38,18 +38,18 @@ class ManageProjectGrantsMainTest {
     private final PolarisProjectGrants grants = mock(PolarisProjectGrants.class);
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();
     private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-    private ManageProjectGrantsMain command;
+    private ManageDataMain command;
     private boolean polarisCalled;
 
-    /** The emails that the project's file lists, or null for a project that this home has no file of. */
+    /** The emails that the project stack's file lists, or null for a project stack that this home has no file of. */
     private List<String> listed;
 
     @BeforeEach
     void command() {
-        command = new ManageProjectGrantsMain(() -> {
+        command = new ManageDataMain(() -> {
             polarisCalled = true;
             return grants;
-        }, new PrintStream(out), new PrintStream(err), dir, project -> listed);
+        }, new PrintStream(out), new PrintStream(err), dir, projectStack -> listed);
     }
 
     private void membersFileOfTheProject(String content) throws IOException {
@@ -71,7 +71,7 @@ class ManageProjectGrantsMainTest {
         assertThat(command.run(new String[]{"grant", "cvd-2026", "cvd", "--members", file.toString()})).isZero();
 
         verify(grants).grant("cvd-2026", "cvd", "released", List.of(ALICE, BOB));
-        assertThat(out.toString()).contains("Project cvd-2026 may read cvd.released, read-only, and has 2 member(s)", "Added afon:" + ALICE, "Removed afon:old");
+        assertThat(out.toString()).contains("Project stack cvd-2026 may read cvd.released, read-only, and has 2 member(s)", "Added afon:" + ALICE, "Removed afon:old");
     }
 
     @Test
@@ -181,8 +181,8 @@ class ManageProjectGrantsMainTest {
         verify(grants).addMember("cvd-2026", ALICE);
         verify(grants).removeMember("cvd-2026", BOB);
         verify(grants).release("cvd", "patients", "released");
-        assertThat(out.toString()).contains("Added afon:" + ALICE + " to project cvd-2026", "Removed afon:" + BOB + " from project cvd-2026",
-                                            "Project cvd-2026 may no longer read cvd; 1 member(s) lost its role", "Moved patients of cvd from staging to released");
+        assertThat(out.toString()).contains("Added afon:" + ALICE + " to project stack cvd-2026", "Removed afon:" + BOB + " from project stack cvd-2026",
+                                            "Project stack cvd-2026 may no longer read cvd; 1 member(s) lost its role", "Moved patients of cvd from staging to released");
     }
 
     @Test
@@ -210,8 +210,8 @@ class ManageProjectGrantsMainTest {
     @Test
     void callsPolarisOnlyForAnActionItUnderstands() {
         assertThat(command.run(new String[]{})).isZero();
-        assertThat(out.toString()).contains("Usage: manage-project-grants");
-        // the members file is the project's own if none is given, so a project and a catalog are all that it needs
+        assertThat(out.toString()).contains("Usage: manage-data");
+        // the members file is the project stack's own if none is given, so a project stack and a catalog are all that it needs
         assertThat(command.run(new String[]{"grant", "cvd-2026"})).isEqualTo(2);
         assertThat(command.run(new String[]{"add-member", "cvd-2026"})).isEqualTo(2);
         assertThat(command.run(new String[]{"revoke", "cvd-2026", "cvd", "--namespace", "x"})).isEqualTo(2);
@@ -224,8 +224,8 @@ class ManageProjectGrantsMainTest {
 
     @Test
     void readsTheMembersOfAFile() throws Exception {
-        assertThat(ManageProjectGrantsMain.members(members(ALICE + "\n# c\n" + BOB + "\n"))).containsExactly(ALICE, BOB);
-        assertThatThrownBy(() -> ManageProjectGrantsMain.members(dir.resolve("absent"))).isInstanceOf(IOException.class);
+        assertThat(ManageDataMain.members(members(ALICE + "\n# c\n" + BOB + "\n"))).containsExactly(ALICE, BOB);
+        assertThatThrownBy(() -> ManageDataMain.members(dir.resolve("absent"))).isInstanceOf(IOException.class);
     }
 
     @Test
@@ -238,7 +238,7 @@ class ManageProjectGrantsMainTest {
 
         assertThat(command.run(new String[]{"show"})).isZero();
 
-        assertThat(out.toString()).contains("Catalogs:", "cvd: released [smoke_test]", "Project cvd-2026 (principal role cvd-2026Project)",
+        assertThat(out.toString()).contains("Catalogs:", "cvd: released [smoke_test]", "Project stack cvd-2026 (principal role cvd-2026Project)",
                                             "members (2): afon:" + ALICE + " (alice@tre.example), afon:" + BOB,
                                             "cvd: catalog role cvd-2026Reader, read-only on released");
         assertThat(out.toString()).doesNotContain("afon:" + BOB + " (");
@@ -250,7 +250,7 @@ class ManageProjectGrantsMainTest {
 
         assertThat(command.run(new String[]{"show", "diab-2026"})).isZero();
 
-        assertThat(out.toString()).contains("Project diab-2026 has been granted nothing here");
+        assertThat(out.toString()).contains("Project stack diab-2026 has been granted nothing here");
         verify(grants).show("diab-2026");
     }
 

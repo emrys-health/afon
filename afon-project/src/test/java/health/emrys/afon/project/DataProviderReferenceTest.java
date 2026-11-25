@@ -9,13 +9,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static health.emrys.afon.project.ProjectFixtures.lower;
+import static health.emrys.afon.project.ProjectStackFixtures.lower;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * A TRE project names the catalog of a Data Provider's project, {@code {project: lon, catalogs: [cvd]}} in {@code dataProviders.named}, and takes its endpoint, audience and storage from
- * that project, as its file and the config it is made from say them.  Every test is run on every cloud.
+ * A TRE project stack names the catalog of a Data Provider's project stack, {@code {project: lon, catalogs: [cvd]}} in {@code dataProviders.named}, and takes its endpoint, audience and storage from
+ * that project stack, as its file and the config it is made from say them.  Every test is run on every cloud.
  */
 class DataProviderReferenceTest {
 
@@ -24,7 +24,7 @@ class DataProviderReferenceTest {
     @TempDir
     Path home;
 
-    /** The Afon home with the env that the Data Provider is made from, and the Data Provider's project, on the cloud. */
+    /** The Afon home with the env that the Data Provider is made from, and the Data Provider's project stack, on the cloud. */
     private void provider(AfonCloud cloud) throws IOException {
         Path env = Files.createDirectories(home.resolve("config-dev"));
         Files.writeString(env.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
@@ -32,23 +32,23 @@ class DataProviderReferenceTest {
         Files.writeString(env.resolve("catalogs.properties"), "");
         Path file = home.resolve("projects/lon/project.yaml");
         Files.createDirectories(file.getParent());
-        Files.writeString(file, ProjectFixtures.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
+        Files.writeString(file, ProjectStackFixtures.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
     }
 
-    /** The TRE project's file, whose {@code dataProviders} are the lines given, under it. */
-    private TreProject tre(AfonCloud cloud, String providers) throws IOException {
-        String yaml = ProjectFixtures.example(cloud).replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n" + providers + "\nmembers:");
+    /** The TRE project stack's file, whose {@code dataProviders} are the lines given, under it. */
+    private TreProjectStack tre(AfonCloud cloud, String providers) throws IOException {
+        String yaml = ProjectStackFixtures.example(cloud).replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n" + providers + "\nmembers:");
         Path file = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
         Files.createDirectories(file.getParent());
         Files.writeString(file, yaml);
-        return (TreProject) FileProjectProvider.forProject(home, "xyz-yyyy-nnnn").getProject();
+        return (TreProjectStack) FileProjectStackProvider.forProjectStack(home, "xyz-yyyy-nnnn").getProjectStack();
     }
 
-    private ProjectException invalid(AfonCloud cloud, String providers) throws IOException {
-        assertThatThrownBy(() -> tre(cloud, providers)).isInstanceOf(ProjectException.class);
+    private ProjectStackException invalid(AfonCloud cloud, String providers) throws IOException {
+        assertThatThrownBy(() -> tre(cloud, providers)).isInstanceOf(ProjectStackException.class);
         try {
             tre(cloud, providers);
-        } catch (ProjectException e) {
+        } catch (ProjectStackException e) {
             return e;
         }
         throw new AssertionError();
@@ -63,11 +63,11 @@ class DataProviderReferenceTest {
     @EnumSource(AfonCloud.class)
     void takesTheEndpointTheAudienceAndTheStorageOfTheCatalogFromTheDataProvidersProject(AfonCloud cloud) throws IOException {
         provider(cloud);
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd]}"));
-        assertThat(project.dataProviders()).hasSize(1);
-        TreProject.DataProvider provider = project.dataProviders().get(0);
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [cvd]}"));
+        assertThat(projectStack.dataProviders()).hasSize(1);
+        TreProjectStack.DataProvider provider = projectStack.dataProviders().get(0);
         assertThat(provider.id()).isEqualTo("lon-cvd");
-        assertThat(provider.project()).isEqualTo("lon");
+        assertThat(provider.projectStack()).isEqualTo("lon");
         assertThat(provider.catalogUri()).isEqualTo("https://" + lower(cloud) + "-polaris.lon.dev.click/api/catalog");
         assertThat(provider.catalogName()).isEqualTo("cvd");
         assertThat(provider.audience()).isEqualTo("provider-lon");
@@ -77,7 +77,7 @@ class DataProviderReferenceTest {
             case AWS -> "111111111111";
             case GCP -> "gcp-proj";
         };
-        String token = ProjectNames.token(cloud, account, "lon");
+        String token = ProjectStackNames.token(cloud, account, "lon");
         assertThat(provider.bucket()).isEqualTo(cloud == AfonCloud.AZURE ? "afonstorage" + token : "afon-" + token + "-cvd");
     }
 
@@ -86,14 +86,14 @@ class DataProviderReferenceTest {
     void takesTheCloudOfTheDataProviderNotTheProjects(AfonCloud cloud) throws IOException {
         AfonCloud other = AfonCloud.values()[(cloud.ordinal() + 1) % AfonCloud.values().length];
         provider(other);
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [dbt]}"));
-        assertThat(project.cloud()).isEqualTo(cloud);
-        assertThat(project.dataProviders().get(0).cloud()).isEqualTo(other);
-        assertThat(project.dataProviders().get(0).catalogName()).isEqualTo("dbt");
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [dbt]}"));
+        assertThat(projectStack.cloud()).isEqualTo(cloud);
+        assertThat(projectStack.dataProviders().get(0).cloud()).isEqualTo(other);
+        assertThat(projectStack.dataProviders().get(0).catalogName()).isEqualTo("dbt");
     }
 
     /**
-     * End to end, in the config that a TRE is deployed with: the catalogs that its file names of a Data Provider's project, as that project and its env say
+     * End to end, in the config that a TRE is deployed with: the catalogs that its file names of a Data Provider's project stack, as that project stack and its env say
      * them, are in its catalogs file as catalogs from the Data Provider, read as any catalog is, and are not among those the stack makes.
      */
     @ParameterizedTest
@@ -101,9 +101,9 @@ class DataProviderReferenceTest {
     void configuresATreWithTheCatalogsOfTheDataProvidersItNames(AfonCloud cloud) throws IOException {
         provider(cloud);
         Files.writeString(home.resolve("config-dev/secret.properties"), "");
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd, dbt]}"));
-        ProjectFixtures.writeSecrets(home);
-        Path config = ProjectEnv.configure(project, home.resolve("config-dev"), home, home.resolve("projects/xyz-yyyy-nnnn/project.yaml"));
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [cvd, dbt]}"));
+        ProjectStackFixtures.writeSecrets(home);
+        Path config = ProjectStackEnv.configure(projectStack, home.resolve("config-dev"), home, home.resolve("projects/xyz-yyyy-nnnn/project.yaml"));
 
         var catalogs = new health.emrys.afon.config.AfonCatalogs(new health.emrys.afon.config.FilePropertyProvider(config.toString()));
         var fromDataProviders = catalogs.bySource(health.emrys.afon.config.AfonCatalogs.Source.DATA_PROVIDER);
@@ -120,25 +120,25 @@ class DataProviderReferenceTest {
     @EnumSource(AfonCloud.class)
     void mixesCatalogsNamedAndDefinedInFull(AfonCloud cloud) throws IOException {
         provider(cloud);
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd, dbt]}")
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [cvd, dbt]}")
             + "\n  defined:\n    - {id: outside, catalogUri: \"https://polaris.example.org/api/catalog\", catalogName: w, audience: provider-outside, bucket: b}");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::id).containsExactly("lon-cvd", "lon-dbt", "outside");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::project).containsExactly("lon", "lon", null);
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::id).containsExactly("lon-cvd", "lon-dbt", "outside");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::projectStack).containsExactly("lon", "lon", null);
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void takesSeveralCatalogsOfOneDataProviderNamedTogether(AfonCloud cloud) throws IOException {
         provider(cloud);
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd, dbt]}"));
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::id).containsExactly("lon-cvd", "lon-dbt");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::catalogName).containsExactly("cvd", "dbt");
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [cvd, dbt]}"));
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::id).containsExactly("lon-cvd", "lon-dbt");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::catalogName).containsExactly("cvd", "dbt");
         // one Polaris, one audience, and storage that is the Data Provider's: the endpoint and the audience are the same, the bucket is the catalog's
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::catalogUri).containsOnly("https://" + lower(cloud) + "-polaris.lon.dev.click/api/catalog");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::audience).containsOnly("provider-lon");
-        assertThat(project.dataProviders()).extracting(TreProject.DataProvider::project).containsOnly("lon");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::catalogUri).containsOnly("https://" + lower(cloud) + "-polaris.lon.dev.click/api/catalog");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::audience).containsOnly("provider-lon");
+        assertThat(projectStack.dataProviders()).extracting(TreProjectStack.DataProvider::projectStack).containsOnly("lon");
         if (cloud != AfonCloud.AZURE) {
-            assertThat(project.dataProviders().get(0).bucket()).isNotEqualTo(project.dataProviders().get(1).bucket());
+            assertThat(projectStack.dataProviders().get(0).bucket()).isNotEqualTo(projectStack.dataProviders().get(1).bucket());
         }
     }
 
@@ -146,7 +146,7 @@ class DataProviderReferenceTest {
     @EnumSource(AfonCloud.class)
     void refusesAnIdThatANamedCatalogAndADefinedEntryShare(AfonCloud cloud) throws IOException {
         provider(cloud);
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd]}")
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd]}")
             + "\n  defined:\n    - {id: lon-cvd, catalogUri: \"https://q\", catalogName: w, audience: a, bucket: b}").problems())
             .anyMatch(p -> p.contains("dataProviders.defined[0].id 'lon-cvd' is used by another Data Provider"));
     }
@@ -154,15 +154,15 @@ class DataProviderReferenceTest {
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void refusesAProjectThatIsNotThereIsNotADataProjectOrHasNotTheCatalog(AfonCloud cloud) throws IOException {
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd]}")).problems())
-            .anyMatch(p -> p.startsWith("dataProviders.named[0].project names lon, which has no file"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd]}")).problems())
+            .anyMatch(p -> p.startsWith("dataProviders.named[0].project-stack names lon, which has no file"));
         provider(cloud);
         Files.createDirectories(home.resolve("projects/idp"));
-        Files.writeString(home.resolve("projects/idp/project.yaml"), ProjectFixtures.identityExample(cloud).replace("id: idp", "id: idp"));
-        assertThat(invalid(cloud, named("{project: idp, catalogs: [cvd]}")).problems()).anyMatch(p -> p.contains("which has the role identity, not data"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [xyz]}")).problems())
+        Files.writeString(home.resolve("projects/idp/project.yaml"), ProjectStackFixtures.identityExample(cloud).replace("id: idp", "id: idp"));
+        assertThat(invalid(cloud, named("{project-stack: idp, catalogs: [cvd]}")).problems()).anyMatch(p -> p.contains("which has the role identity, not data"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [xyz]}")).problems())
             .anyMatch(p -> p.contains("dataProviders.named[0].catalog 'xyz' is not a catalog of lon, which has [cvd, dbt]"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd], bucket: b}")).problems())
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd], bucket: b}")).problems())
             .anyMatch(p -> p.contains("dataProviders.named[0].bucket is not a known key"));
     }
 
@@ -170,13 +170,13 @@ class DataProviderReferenceTest {
     @EnumSource(AfonCloud.class)
     void refusesAnEntryWithNoCatalogsOrWhoseCatalogsAreNotAListOfThem(AfonCloud cloud) throws IOException {
         provider(cloud);
-        assertThat(invalid(cloud, named("{project: lon}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: []}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: cvd}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd, cvd]}")).problems()).anyMatch(p -> p.contains("catalogs[1] 'cvd' is listed twice"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd, xyz]}")).problems()).anyMatch(p -> p.contains("catalog 'xyz' is not a catalog of lon"));
-        assertThat(invalid(cloud, named("{project: lon, catalog: cvd}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalog is not a known key"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd], id: x}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].id is not a known key"));
+        assertThat(invalid(cloud, named("{project-stack: lon}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: []}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: cvd}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalogs must be a non-empty list"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd, cvd]}")).problems()).anyMatch(p -> p.contains("catalogs[1] 'cvd' is listed twice"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd, xyz]}")).problems()).anyMatch(p -> p.contains("catalog 'xyz' is not a catalog of lon"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalog: cvd}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].catalog is not a known key"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd], id: x}")).problems()).anyMatch(p -> p.contains("dataProviders.named[0].id is not a known key"));
     }
 
     @ParameterizedTest
@@ -185,7 +185,7 @@ class DataProviderReferenceTest {
         provider(cloud);
         assertThat(invalid(cloud, "  named: []").problems()).anyMatch(p -> p.contains("dataProviders names no catalog"));
         assertThat(invalid(cloud, "  other: []").problems()).anyMatch(p -> p.contains("dataProviders.other is not a known key"));
-        assertThat(invalid(cloud, "  - {project: lon, catalogs: [cvd]}").problems()).anyMatch(p -> p.contains("dataProviders must be a mapping of named and defined"));
+        assertThat(invalid(cloud, "  - {project-stack: lon, catalogs: [cvd]}").problems()).anyMatch(p -> p.contains("dataProviders must be a mapping of named and defined"));
     }
 
     @ParameterizedTest
@@ -194,8 +194,8 @@ class DataProviderReferenceTest {
         provider(cloud);
         Files.writeString(home.resolve("projects/lon/project.yaml"), Files.readString(home.resolve("projects/lon/project.yaml"))
                                                                           .replace("https://id.example.org", "https://other.example.org"));
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd]}")).problems())
-            .anyMatch(p -> p.contains("lon trusts the identity at https://other.example.org/realms/polaris, and this project uses the one at https://id.example.org"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd]}")).problems())
+            .anyMatch(p -> p.contains("lon trusts the identity at https://other.example.org/realms/polaris, and this project stack uses the one at https://id.example.org"));
     }
 
     @ParameterizedTest
@@ -203,34 +203,34 @@ class DataProviderReferenceTest {
     void saysWhyADataProviderWithNoPolarisDomainCannotBeRead(AfonCloud cloud) throws IOException {
         provider(cloud);
         Files.writeString(home.resolve("config-dev/afon-" + lower(cloud) + ".properties"), "");
-        assertThat(invalid(cloud, named("{project: lon, catalogs: [cvd]}")).problems()).anyMatch(p -> p.contains("its Polaris has no domain"));
+        assertThat(invalid(cloud, named("{project-stack: lon, catalogs: [cvd]}")).problems()).anyMatch(p -> p.contains("its Polaris has no domain"));
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void isLookedUpInTheAfonHomeSoNotByAFileOnItsOwn(AfonCloud cloud) {
-        String yaml = ProjectFixtures.example(cloud).replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n" + named("{project: lon, catalogs: [cvd]}") + "\nmembers:");
-        assertThatThrownBy(() -> FileProjectProvider.parse(yaml)).isInstanceOf(ProjectException.class)
-                                                                .hasMessageContaining("looked up in the projects of the Afon home");
+        String yaml = ProjectStackFixtures.example(cloud).replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n" + named("{project-stack: lon, catalogs: [cvd]}") + "\nmembers:");
+        assertThatThrownBy(() -> FileProjectStackProvider.parse(yaml)).isInstanceOf(ProjectStackException.class)
+                                                                .hasMessageContaining("looked up in the project stacks of the Afon home");
     }
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
     void writesTheResolvedCatalogsInTheCopyOfTheFileThatConfigureKeeps(AfonCloud cloud) throws IOException {
         provider(cloud);
-        TreProject project = tre(cloud, named("{project: lon, catalogs: [cvd]}"));
+        TreProjectStack projectStack = tre(cloud, named("{project-stack: lon, catalogs: [cvd]}"));
         Path projectFile = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
-        ProjectFixtures.writeSecrets(home);
-        Path config = ProjectEnv.configure(project, home.resolve("config-dev"), home, projectFile);
-        // the copy is what the commands in the project's home read, where the Data Providers' projects are not looked up: it holds the catalog in full, as defined
-        TreProject copied = (TreProject) new FileProjectProvider(config.resolve("project.yaml")).getProject();
+        ProjectStackFixtures.writeSecrets(home);
+        Path config = ProjectStackEnv.configure(projectStack, home.resolve("config-dev"), home, projectFile);
+        // the copy is what the commands in the project stack's home read, where the Data Providers' project stacks are not looked up: it holds the catalog in full, as defined
+        TreProjectStack copied = (TreProjectStack) new FileProjectStackProvider(config.resolve("project.yaml")).getProjectStack();
         assertThat(copied.dataProviders()).hasSize(1);
         assertThat(copied.dataProviders().get(0).id()).isEqualTo("lon-cvd");
-        assertThat(copied.dataProviders().get(0).catalogUri()).isEqualTo(project.dataProviders().get(0).catalogUri());
+        assertThat(copied.dataProviders().get(0).catalogUri()).isEqualTo(projectStack.dataProviders().get(0).catalogUri());
         assertThat(copied.dataProviders().get(0).audience()).isEqualTo("provider-lon");
-        assertThat(copied.dataProviders().get(0).bucket()).isEqualTo(project.dataProviders().get(0).bucket());
-        assertThat(copied.dataProviders().get(0).project()).isNull();
+        assertThat(copied.dataProviders().get(0).bucket()).isEqualTo(projectStack.dataProviders().get(0).bucket());
+        assertThat(copied.dataProviders().get(0).projectStack()).isNull();
         // the deployer's own file is left as it is
-        assertThat(Files.readString(projectFile)).contains("{project: lon, catalogs: [cvd]}");
+        assertThat(Files.readString(projectFile)).contains("{project-stack: lon, catalogs: [cvd]}");
     }
 }

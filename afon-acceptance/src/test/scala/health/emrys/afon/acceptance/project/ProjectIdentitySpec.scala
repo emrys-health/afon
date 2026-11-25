@@ -6,7 +6,7 @@ import health.emrys.afon.acceptance.fixtures.SpecPretifier
 import health.emrys.afon.acceptance.tags.{Project, ProjectIdentity}
 import health.emrys.afon.cdk.DockerImages
 import health.emrys.afon.config.AfonCloud
-import health.emrys.afon.project.{FileProjectProvider, TreProject}
+import health.emrys.afon.project.{FileProjectStackProvider, TreProjectStack}
 import health.emrys.afon.security.keycloak.KeyCloakConfigurer.KEYCLOAK_REALM
 import health.emrys.afon.security.keycloak.KeyCloakProvider
 import org.scalatest.GivenWhenThen
@@ -78,12 +78,12 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
   /** The secret of each client of a project, as project-secret makes it: the identity provider and the TRE have the same. */
   private def secrets(): java.util.Map[String, String] = Map("tre" -> "tre-client-secret", "git" -> "git-client-secret").asJava
 
-  private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): TreProject = {
+  private def projectOf(id: String, providers: Seq[String], ownGit: Boolean = true): TreProjectStack = {
     val git = if (ownGit) s"\n         |  git: {domain: git.$id.example.org}" else ""
     val catalogs = providers.map(name =>
       s"    - {id: $name, catalogUri: 'https://polaris.$name.example/api', catalogName: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
-    FileProjectProvider.parse(
-      s"""project: {id: $id, cloud: ${cloud.toString.toLowerCase}}
+    FileProjectStackProvider.parse(
+      s"""project-stack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:
@@ -92,7 +92,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
          |stacks:
          |  create: {auditBucket: $id-audit, gitBucket: $id-git}$git
          |  tre: {domains: {${cloud.name}_JUPYTER_DOMAIN_NAME: jupyter.$id.example.org}}
-         |""".stripMargin).asInstanceOf[TreProject]
+         |""".stripMargin).asInstanceOf[TreProjectStack]
   }
 
   private def admin(): String = provider.adminToken()
@@ -544,7 +544,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
       val (first, second) = ("cfg-2026-0011", "cfg-2026-0012")
       val afonHome = Files.createTempDirectory("afon-home")
       runScript("project/secret.sh", afonHome, first, "tre")
-      val secret = Files.readString(afonHome.resolve(s"projects/$first/keys/tre.secret")).strip()
+      val secret = Files.readString(afonHome.resolve(s"projects/$first/secrets/tre.secret")).strip()
       val firstProject = projectOf(first, Seq("data1"), ownGit = false)
       val secondProject = projectOf(second, Seq("data1"), ownGit = false)
       provider.ensureProject(firstProject, Map("tre" -> secret).asJava)

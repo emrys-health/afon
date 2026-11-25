@@ -1,21 +1,21 @@
-# The central identity: the one Keycloak that signs users in for every project, deployed by a project of its own.  Made by
-#   afon-cli.sh manage-project init ${id} --role identity ${cloud} --made-from ${env}
+# The central identity: the one Keycloak that signs users in for every project stack, deployed by a project stack of its own.  Made by
+#   afon-cli.sh manage-project-stack init ${id} --role identity ${cloud} --made-from ${env}
 # Complete what is in <angle brackets>, then check it, configure it and bring it up:
-#   afon-cli.sh manage-project validate ${id}
-#   afon-cli.sh manage-project configure ${id}
-#   afon-cli.sh manage-project up ${id}
+#   afon-cli.sh manage-project-stack validate ${id}
+#   afon-cli.sh manage-project-stack configure ${id}
+#   afon-cli.sh manage-project-stack up ${id}
 # See docs/projects.md.
-project:
+project-stack:
   id: ${id}
   cloud: ${cloud}
   role: identity
-  # the env whose config the project is made from: where it deploys (account, region, domain names, secrets) is that env's
+  # the env whose config the project stack is made from: where it deploys (account, region, domain names, secrets) is that env's
   env: ${env}
   # the address its cluster leaves from, reserved apart from its stack so that a rebuild keeps it: afon-cli.sh ${cloud}-egress-ip create <name>
   egressIp: <egress-ip>
 
-# its domain is that of the env with the project's id as a label after the first, eg azure-oidc.emrys2.click is azure-oidc.${id}.emrys2.click:
-# the TRE projects name it in identity.issuerUrl.  To give it another, uncomment and edit:
+# its domain is that of the env with the project stack's id as a label after the first, eg azure-oidc.emrys2.click is azure-oidc.${id}.emrys2.click:
+# the TRE project stacks name it in identity.issuerUrl.  To give it another, uncomment and edit:
 # stacks:
 #   identity:
 #     domain: azure-oidc.${id}.example.org
