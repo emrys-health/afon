@@ -4,6 +4,9 @@
 # docker push emryshealth/spark_jars:4.0.1
 
 # See SparkWorkloads.SPARK_IMAGE
+ARG UV_VERSION=0.12.15
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
 FROM apache/spark:4.0.1
 
 # Switch to root to modify the internal directories and install tools if needed
@@ -30,6 +33,22 @@ RUN /opt/spark/bin/spark-submit \
 # the gRPC interceptor and the session extension, which let into Spark Connect only a client with an OIDC token of the realm, and
 # refuse JVM code: without the interceptor the Spark Connect server does not start
 COPY afon-spark-additional-*.jar /opt/spark/jars/
+
+# The Python that runs the users' Python UDFs, on the executors.  PySpark refuses a UDF from a client whose Python is of another minor
+# version (PYTHON_VERSION_MISMATCH), and the clients are the notebooks of afon-desktop (scripts/docker/afon/desktop), whose
+# jupyter/pyspark-notebook base has Python 3.11, while the Python of this image's Ubuntu 22.04 is 3.10.  So keep PYTHON_VERSION the
+# minor version of the notebooks' Python, and the libraries the versions of theirs, which pandas UDFs and Arrow need on the executors.
+# Spark Connect's server takes the path of the Python of the executors from PYSPARK_PYTHON, in its own environment: the driver and
+# the workers run this same image.
+ARG PYTHON_VERSION=3.11
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
+COPY --from=uv /uv /usr/local/bin/
+RUN uv venv --python ${PYTHON_VERSION} /opt/pyspark-python \
+ && uv pip install --python /opt/pyspark-python/bin/python --no-cache numpy==1.24.4 pandas==2.0.3 pyarrow==13.0.0 \
+ && chmod -R a+rX /opt/uv /opt/pyspark-python \
+ && rm /usr/local/bin/uv \
+ && /opt/pyspark-python/bin/python --version
+ENV PYSPARK_PYTHON=/opt/pyspark-python/bin/python
 
 # Switch back to the default non-root user (spark) for security
 USER 185
