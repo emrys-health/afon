@@ -246,19 +246,40 @@ public class KubeClient implements AutoCloseable {
      */
     public ExecResult exec(String namespace, String pod, String container, Duration timeout, String... command)
     throws ApiException, IOException, InterruptedException, TimeoutException {
-        logger.info("Executing\n{}\nin {}/{}{}", Credentials.redact(String.join(" ", command)), namespace, pod,
-                    container == null ? "" : " (container " + container + ")");
+        return exec(namespace, pod, container, timeout, null, command);
+    }
+
+    /**
+     * The equivalent of {@code kubectl exec -i -n <namespace> <pod> [-c <container>] -- <command...> < stdin}: the command reads the
+     * given bytes from its standard input, which is then closed.  The input is never logged, so it may hold a credential, which is
+     * then in no command line.  A command should not wait for the end of its input, which not every server passes on, but read as
+     * many bytes as it is told to.  Blocks until the command completes or the timeout elapses.
+     *
+     * @param container may be null, in which case the pod must have exactly one container
+     * @param stdin     the standard input of the command, or null for none
+     */
+    public ExecResult exec(String namespace, String pod, String container, Duration timeout, byte @Nullable [] stdin, String... command)
+    throws ApiException, IOException, InterruptedException, TimeoutException {
+        logger.info("Executing\n{}\nin {}/{}{}{}", Credentials.redact(String.join(" ", command)), namespace, pod,
+                    container == null ? "" : " (container " + container + ")",
+                    stdin == null ? "" : ", with " + stdin.length + " bytes of input");
         Process process = new Exec(execApiClient())
             .newExecutionBuilder(namespace, pod, command)
             .setContainer(container)
-            .setStdin(false)
+            .setStdin(stdin != null)
             .setTty(false)
             .execute();
         try {
-            process.getOutputStream().close();
-            // Drain both streams concurrently so neither blocks the remote process by filling up.
+            // Drain both streams concurrently so neither blocks the remote process by filling up, before writing its input, which the
+            // process may answer before it has read all of it.
             CompletableFuture<String> stdout = readAsync(process.getInputStream());
             CompletableFuture<String> stderr = readAsync(process.getErrorStream());
+            try (var input = process.getOutputStream()) {
+                if (stdin != null) {
+                    input.write(stdin);
+                    input.flush();
+                }
+            }
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 throw new TimeoutException("Command '" + Credentials.redact(String.join(" ", command)) + "' in " + namespace + "/" + pod
                                                + " did not complete within " + timeout);

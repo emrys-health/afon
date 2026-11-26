@@ -367,9 +367,9 @@ with the token in its header, a Python UDF on the executors, whose Python must b
 
 It asks JupyterHub to spawn the pod of the configured user (`USER_ID`), as the `network` test does. A pod spawned so has no `OIDC_TOKEN`, which the
 hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`. The token and the
-notebook are sent on the standard input of `kubectl exec`, so the token is in no command line, and the notebook runs in a temporary directory of the pod,
+notebook are sent on the standard input of an exec through the Kubernetes API (`KubeClient`), so the token is in no command line, and the notebook runs in a temporary directory of the pod,
 removed afterwards, with `jupyter nbconvert --execute`. Every cell is run, even after one fails, and the test fails if any cell raised an error. The
-executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/AwsSmokeTest.ipynb`.
+executed notebook, with its outputs, is written to `smoke/notebooks/AwsSmokeTest.ipynb` in the JVM's temporary directory (`java.io.tmpdir`).
 
 The notebook is AWS's: its catalog `test_aws` is the `aws` warehouse of the Polaris it names, and it reads the table `admin.deployments` that
 `spark-polaris` writes, so the suite runs it after that test. Deselect it when testing another cloud. Another notebook is run with

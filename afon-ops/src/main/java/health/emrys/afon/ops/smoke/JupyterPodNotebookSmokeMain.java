@@ -9,18 +9,17 @@ import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import health.emrys.afon.ops.kube.ExecResult;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
-import static health.emrys.afon.config.ConfigUtils.afonHome;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.isProjectStack;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
@@ -34,11 +33,11 @@ import static java.lang.String.format;
  * <p>The pod is the configured user's ({@code USER_ID}), which JupyterHub is asked to spawn, as the network test does.  A pod
  * spawned so has no {@code OIDC_TOKEN}, which the hub only injects at a user's sign-in, so the user's token is got from Keycloak
  * here and given to the notebook as {@code OIDC_TOKEN}.  The token and the notebook are sent to the pod on the standard input
- * of {@code kubectl exec}, so the token is in no command line, and the notebook is run in a temporary directory of the pod,
- * removed afterwards, with {@code jupyter nbconvert --execute}.
+ * of an exec through the Kubernetes API, with {@link KubeClient}, so the token is in no command line, and the notebook is run in
+ * a temporary directory of the pod, removed afterwards, with {@code jupyter nbconvert --execute}.
  *
  * <p>Every cell is run, even after one fails, and the test fails if any cell raised an error.  The executed notebook, with its
- * outputs, is written to {@code $AFON_HOME/smoke/notebooks/<notebook file name>}.
+ * outputs, is written to {@code <java.io.tmpdir>/smoke/notebooks/<notebook file name>}.
  *
  * <p>Skipped, and passes, for a project stack's TRE, whose Polaris and Spark Connect admit only the members' tokens, which the
  * configured user is not, as for {@code spark-polaris-smoke}.
@@ -60,8 +59,8 @@ public class JupyterPodNotebookSmokeMain {
     /**
      * How long a cell may run, and the notebook in all.
      */
-    static final int CELL_TIMEOUT_SECONDS     = 600;
-    static final int NOTEBOOK_TIMEOUT_MINUTES = 20;
+    static final int      CELL_TIMEOUT_SECONDS = 600;
+    static final Duration NOTEBOOK_TIMEOUT     = Duration.ofMinutes(20);
 
     /**
      * Reads the token, then the size of the notebook, then the notebook, from its standard input, runs the notebook with the token
@@ -124,76 +123,59 @@ public class JupyterPodNotebookSmokeMain {
     /**
      * @return the executed notebook
      */
-    String runInPod(String pod, Path notebook, String token) throws IOException, InterruptedException {
-        List<String> command = List.of(
-            "kubectl", "exec", "-i", "-n", KUBERNETES_NAMESPACE, "-c", NOTEBOOK_CONTAINER, pod, "--",
-            "sh", "-c", SCRIPT);
+    static String runInPod(KubeClient client, String pod, Path notebook, String token) throws Exception {
         logger.info("Running {} in pod {}", notebook, pod);
-        Process process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT).start();
-        CompletableFuture<byte[]> stdout = CompletableFuture.supplyAsync(() -> {
-            try {
-                return process.getInputStream().readAllBytes();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        try (OutputStream stdin = process.getOutputStream()) {
-            stdin.write(input(token, Files.readAllBytes(notebook)));
+        ExecResult result = client.exec(KUBERNETES_NAMESPACE, pod, NOTEBOOK_CONTAINER, NOTEBOOK_TIMEOUT,
+                                        input(token, Files.readAllBytes(notebook)), "sh", "-c", SCRIPT);
+        if (!result.isSuccess()) {
+            throw new IllegalStateException(format("Could not run %s in pod %s (exit %d): %s", notebook, pod, result.exitCode(),
+                                                   Credentials.redact(result.stderr())));
         }
-        if (!process.waitFor(NOTEBOOK_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
-            process.destroyForcibly();
-            throw new IllegalStateException(format("%s did not complete in pod %s within %d minutes", notebook, pod, NOTEBOOK_TIMEOUT_MINUTES));
-        }
-        String executed = new String(stdout.join(), StandardCharsets.UTF_8);
-        if (process.exitValue() != 0) {
-            throw new IllegalStateException(format(
-                "Could not run %s in pod %s (exit %d): see the output of nbconvert above",
-                notebook, pod, process.exitValue()));
-        }
-        return executed;
+        return result.stdout();
     }
 
     /**
      * @return whether the notebook ran in the user's pod with no error in any cell
      */
-    boolean run(Path notebook) throws Exception {
+    List<String> run(Path notebook) throws Exception {
         if (isProjectStack(properties)) {
-            logger.warn("Not run for a project's TRE, whose Polaris admits only the tokens of its members, which the configured user is not");
-            return true;
+            throw new RuntimeException("Not run for a project's TRE, whose Polaris admits only the tokens of its members, which the configured user is not");
         }
         if (!Files.isRegularFile(notebook)) {
             throw new IllegalArgumentException("No notebook " + notebook.toAbsolutePath());
         }
         String pod;
+        String executedNotebook;
         try (KubeClient client = new KubeClient(properties)) {
-            pod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
+            pod              = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
+            executedNotebook = runInPod(client, pod, notebook, sparkConnectToken());
         }
-        String executedNotebook = runInPod(pod, notebook, sparkConnectToken());
         Path   saved            = Path.of(System.getProperty("java.io.tmpdir"), "smoke", "notebooks", notebook.getFileName().toString());
         Files.createDirectories(saved.getParent());
         Files.writeString(saved, executedNotebook);
         List<String> errors = parse(executedNotebook);
         if (errors.isEmpty()) {
             logger.info("{} ran in pod {} with no error; the executed notebook is {}", notebook.getFileName(), pod, saved);
-            return true;
         }
         logger.error(
             "{} of the cells of {} failed in pod {}, see the executed notebook {}:\n{}", errors.size(), notebook.getFileName(), pod,
             saved, String.join("\n", errors));
-        return false;
+        return errors;
     }
 
     public static void main(String[] args) {
-        int  exitCode = 0;
         Path notebook = Path.of(args.length > 0 ? args[0] : DEFAULT_NOTEBOOK);
+        List<String> errors = new  ArrayList<>();
         try {
-            if (!new JupyterPodNotebookSmokeMain(smokeTestProperties()).run(notebook)) {
-                exitCode = 1;
-            }
+            JupyterPodNotebookSmokeMain app = new JupyterPodNotebookSmokeMain(smokeTestProperties());
+            errors.addAll(app.run(notebook));
         } catch (Exception e) {
-            logger.error("Could not run {} in a Jupyter pod", notebook, e);
-            exitCode = 1;
+            String msg = format("Could not run %s in a Jupyter pod", notebook);
+            logger.error(msg, e);
+            throw new IllegalStateException(msg, e);
         }
-        System.exit(exitCode);
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException(String.join("\n", errors));
+        }
     }
 }
