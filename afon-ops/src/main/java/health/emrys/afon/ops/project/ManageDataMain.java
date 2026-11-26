@@ -106,7 +106,7 @@ public class ManageDataMain {
         if (!provider.exists()) {
             return null;
         }
-        return provider.getProjectStack() instanceof TreProjectStack tre ? tre.members().stream().map(TreProjectStack.Member::email).toList() : null;
+        return provider.getProjectStack() instanceof TreProjectStack tre ? tre.allMembers().stream().map(TreProjectStack.Member::email).toList() : null;
     }
 
     /**

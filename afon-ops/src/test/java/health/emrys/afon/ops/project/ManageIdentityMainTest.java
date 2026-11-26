@@ -3,6 +3,8 @@ package health.emrys.afon.ops.project;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.project.TreProjectStack;
 import health.emrys.afon.security.IdentityProvider;
+import health.emrys.afon.security.keycloak.KeyCloakMemberLogin;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -32,6 +34,9 @@ class ManageIdentityMainTest {
     private static final String PROJECT_STACK = "xyz-yyyy-nnnn";
 
     private final IdentityProvider identity = mock(IdentityProvider.class);
+    private final KeyCloakMemberLogin login = mock(KeyCloakMemberLogin.class);
+    /** The realms that the member was signed in to. */
+    private final java.util.List<String> realms = new java.util.ArrayList<>();
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();
     private final ByteArrayOutputStream err = new ByteArrayOutputStream();
     @TempDir
@@ -62,7 +67,10 @@ class ManageIdentityMainTest {
             } finally {
                 tunnels.add("close");
             }
-        }, () -> defaultProjectStack, new PrintStream(out), new PrintStream(err), home);
+        }, () -> defaultProjectStack, new PrintStream(out), new PrintStream(err), home, realm -> {
+            realms.add(realm.toString());
+            return login;
+        });
     }
 
     @ParameterizedTest
@@ -174,7 +182,7 @@ class ManageIdentityMainTest {
         when(identity.ensureUser("ADA@example.org", null, null, "xyz-yyyy-nnnn-tre")).thenReturn("id-ada");
 
         assertThat(command.run(new String[]{"add-member", PROJECT_STACK, "alice@tre.example"})).isZero();
-        assertThat(err.toString()).contains("alice@tre.example is not listed in the members of " + PROJECT_STACK, "sync-members");
+        assertThat(err.toString()).contains("alice@tre.example is not listed in the members or smokeMembers of " + PROJECT_STACK, "sync-members");
         err.reset();
 
         // a member that the project stack's file lists is not warned about
@@ -411,5 +419,99 @@ class ManageIdentityMainTest {
         assertThat(command.run(new String[]{"user-id", PROJECT_STACK, "bob@tre.example"})).isEqualTo(1);
         assertThat(err.toString()).contains("No user bob@tre.example in the central identity");
         assertThat(command.run(new String[]{"user-id", PROJECT_STACK})).isEqualTo(2);
+    }
+
+    private Path secretsOf(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        Path file = home.resolve("projects/" + PROJECT_STACK + "/project.yaml");
+        Files.writeString(file, Files.readString(file) + "smokeMembers:\n  - smoke@example.org\n");
+        Path secrets = home.resolve("projects/" + PROJECT_STACK + "/secrets");
+        Files.createDirectories(secrets);
+        Files.writeString(secrets.resolve("tre.secret"), "client-secret\n");
+        when(identity.findUser("smoke@example.org")).thenReturn(Optional.of("id-smoke"));
+        when(identity.redirectUrisOf(PROJECT_STACK + "-tre")).thenReturn(java.util.List.of("https://hub.example/other", "https://hub.example/hub/oauth_callback"));
+        return secrets;
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesTheSmokeTestMemberCredentialsAndKeepsThemWithoutPrintingThem(AfonCloud cloud) throws Exception {
+        Path secrets = secretsOf(cloud);
+        when(login.login(eq(PROJECT_STACK + "-tre"), eq("client-secret"), eq("https://hub.example/hub/oauth_callback"), eq("smoke@example.org"), any(), eq(null), any()))
+            .thenReturn(new KeyCloakMemberLogin.Token("jwt", new ObjectMapper().readTree("{\"project\":[\"x\"],\"acr\":\"mfa\"}"), "SECRETFROMPAGE"));
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isZero();
+
+        SmokeMemberCredentials kept = SmokeMemberCredentials.read(secrets, "smoke@example.org").orElseThrow();
+        assertThat(kept.email()).isEqualTo("smoke@example.org");
+        assertThat(kept.totpSecret()).isEqualTo("SECRETFROMPAGE");
+        assertThat(kept.password()).hasSize(32);
+        verify(identity).setPassword("smoke@example.org", kept.password(), "Smoke", "Tests");
+        assertThat(out.toString()).contains("Gave smoke@example.org", "smoke-members.csv", "mfa").doesNotContain(kept.password(), "SECRETFROMPAGE");
+        assertThat(realms).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void leavesAMemberWhoHasAnAuthenticatorAsTheyAre(AfonCloud cloud) throws Exception {
+        Path secrets = secretsOf(cloud);
+        when(identity.hasSecondFactor("smoke@example.org")).thenReturn(true);
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("smoke@example.org has an authenticator that this did not make");
+        verify(identity, never()).setPassword(any(), any(), any(), any());
+        verifyNoInteractions(login);
+        assertThat(SmokeMemberCredentials.read(secrets, "smoke@example.org")).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void doesNothingToAMemberWhoseCredentialsItKeepsAlready(AfonCloud cloud) throws Exception {
+        Path secrets = secretsOf(cloud);
+        new SmokeMemberCredentials("smoke@example.org", "pw", "totp").write(secrets);
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isZero();
+
+        assertThat(out.toString()).contains("has the credentials of the smoke tests already");
+        verify(identity, never()).setPassword(any(), any(), any(), any());
+        verifyNoInteractions(login);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsForAnUnknownSmokeTestMemberAndTakesNoArgument(AfonCloud cloud) throws Exception {
+        secretsOf(cloud);
+        when(identity.findUser("smoke@example.org")).thenReturn(Optional.empty());
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isEqualTo(1);
+        assertThat(err.toString()).contains("No user smoke@example.org in the central identity");
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK, "x"})).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void failsWhenTheFileListsNoSmokeMembers(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("lists no smokeMembers");
+        verifyNoInteractions(login);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    @SuppressWarnings("unchecked")
+    void keepsTheAuthenticatorTheRealmHasEvenWhenTheLoginFailsAfterEnrollingIt(AfonCloud cloud) throws Exception {
+        Path secrets = secretsOf(cloud);
+        when(login.login(any(), any(), any(), any(), any(), eq(null), any())).thenAnswer(call -> {
+            ((java.util.function.Consumer<String>) call.getArgument(6)).accept("ENROLLED");
+            throw new KeyCloakMemberLogin.MemberLoginException("the token endpoint refused");
+        });
+
+        assertThat(command.run(new String[]{"smoke-credentials", PROJECT_STACK})).isEqualTo(1);
+
+        assertThat(SmokeMemberCredentials.read(secrets, "smoke@example.org")).hasValueSatisfying(kept -> assertThat(kept.totpSecret()).isEqualTo("ENROLLED"));
     }
 }

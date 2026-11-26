@@ -42,7 +42,7 @@ class ProjectWhitelistTest {
         Files.createDirectories(data.getParent());
         Files.writeString(data, ProjectStackTemplates.dataExample(dataProviderCloud).replace("role: data\n", "role: data\n  env: dev\n"));
         String yaml = ProjectStackTemplates.example(cloud)
-                                      .replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n  named:\n    - {project-stack: lon, catalogs: [cvd, dbt]}\nmembers:");
+                                      .replaceAll("(?s)dataProviders:.*?\\nmembers:", "dataProviders:\n  named:\n    - {projectStack: lon, catalogs: [cvd, dbt]}\nmembers:");
         Path file = home.resolve("projects/xyz-yyyy-nnnn/project.yaml");
         Files.createDirectories(file.getParent());
         Files.writeString(file, yaml);

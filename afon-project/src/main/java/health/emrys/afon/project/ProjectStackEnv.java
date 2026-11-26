@@ -258,6 +258,7 @@ public final class ProjectStackEnv {
         }
         common.put(OIDC_ACR.getName(), identity.acr());
         common.put(OIDC_PROJECT_CLAIM.getName(), identity.projectClaim());
+        projectStack.smokeTestMember().ifPresent(member -> common.put(SMOKE_MEMBER.getName(), member.email()));
         common.put(OIDC_USER_CLAIM.getName(), identity.userClaim());
         if (projectStack.git() != null) {
             common.put(GIT_DOMAIN_NAME.getName(), projectStack.git().domain());
@@ -475,11 +476,11 @@ public final class ProjectStackEnv {
         FileProjectStackProvider provider = FileProjectStackProvider.forProjectStack(afonHome, id);
         if (!provider.exists()) {
             throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
-                "identity.project-stack names %s, which has no file %s: make it first, as the project stack that deploys the central identity", id, provider.file())));
+                "identity.projectStack names %s, which has no file %s: make it first, as the project stack that deploys the central identity", id, provider.file())));
         }
         if (!(provider.getProjectStack() instanceof IdentityProjectStack identity)) {
             throw new ProjectStackException(FileProjectStackProvider.FILE, List.of(String.format(
-                "identity.project-stack names %s, which is not an identity project stack", id)));
+                "identity.projectStack names %s, which is not an identity project stack", id)));
         }
         return new IdentityRef(cdktfDir(afonHome, identity).resolve("kube").resolve(identity.stack() + ".config"), identity.cloud());
     }

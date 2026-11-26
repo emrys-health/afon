@@ -63,7 +63,7 @@ public final class ProjectStackNames {
             }
             String name = clusterName(stage.stack().type(), projectStack.id().value());
             if (name.length() > limit) {
-                problems.add(String.format("project-stack.id '%s' is too long for %s: the cluster of the stack %s would be named %s, %d characters, over the limit of %d",
+                problems.add(String.format("projectStack.id '%s' is too long for %s: the cluster of the stack %s would be named %s, %d characters, over the limit of %d",
                                            projectStack.id(), projectStack.cloud().toString().toLowerCase(Locale.ROOT), stage.stack(), name, name.length(), limit));
             }
         }

@@ -20,13 +20,14 @@ import java.util.Map;
  * @param dnsDelegation how the DNS zones of its domains are delegated, see {@link ProjectStack#dnsDelegation()}
  * @param identity  how the project stack uses the central identity that issues its tokens
  * @param dataProviders the Data Providers' project stack catalogs, reached directly
- * @param members   the project stack's members, at least one, which {@code up} makes the project stack's group have, and no others
+ * @param members   the project stack's members, at least one, which {@code up} makes the project stack's group have, with the smoke members, and no others
+ * @param smokeMembers the members that exist for the smoke tests to sign in as, none if the file lists none, kept apart from the members that people use
  * @param create    what outlives the nightly teardown
  * @param git       the project stack's own Git, or {@code null} if Git is deployed with the TRE, as it is by the stacks of a TRE that declare it
  * @param tre       the project stack's TRE
  */
 public record TreProjectStack(@NonNull ProjectStackId id, @NonNull AfonCloud cloud, @Nullable String env, @Nullable String egressIp,
-                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<DataProvider> dataProviders, @NonNull List<Member> members, @NonNull Create create, @Nullable Git git,
+                         @NonNull Map<String, String> nodePool, @NonNull DnsDelegation dnsDelegation, @NonNull Identity identity, @NonNull List<DataProvider> dataProviders, @NonNull List<Member> members, @NonNull List<Member> smokeMembers, @NonNull Create create, @Nullable Git git,
                          @NonNull Tre tre) implements ProjectStack {
 
     @Override
@@ -99,6 +100,23 @@ public record TreProjectStack(@NonNull ProjectStackId id, @NonNull AfonCloud clo
      * @param lastName  their last name, or {@code null}
      */
     public record Member(@NonNull String email, @Nullable String firstName, @Nullable String lastName) {
+    }
+
+    /**
+     * @return the members that people use and the smoke members, who are all in the project stack's group, and so all sign in to its TRE
+     */
+    @Override
+    public @NonNull List<Member> allMembers() {
+        List<Member> all = new java.util.ArrayList<>(members);
+        all.addAll(smokeMembers);
+        return List.copyOf(all);
+    }
+
+    /**
+     * @return the smoke member that the smoke tests sign in as, to test the TRE as a member would use it: the first that the file lists, none if it lists none
+     */
+    public java.util.Optional<Member> smokeTestMember() {
+        return smokeMembers.stream().findFirst();
     }
 
     /**

@@ -119,9 +119,9 @@ class ManageProjectStackMainTest {
     void failsOnAnInvalidFileListingItsProblems(AfonCloud cloud) throws Exception {
         setUp(cloud);
         Files.createDirectories(home.resolve("projects/bad-project"));
-        Files.writeString(home.resolve("projects/bad-project/project.yaml"), "project-stack: {id: Bad_Id}\n");
+        Files.writeString(home.resolve("projects/bad-project/project.yaml"), "projectStack: {id: Bad_Id}\n");
         assertThat(command.run(new String[]{"validate", "bad-project"})).isEqualTo(1);
-        assertThat(err.toString()).contains("is not a valid project stack", "project-stack.id", "project-stack.cloud is required");
+        assertThat(err.toString()).contains("is not a valid project stack", "projectStack.id", "projectStack.cloud is required");
     }
 
     @ParameterizedTest
@@ -131,7 +131,7 @@ class ManageProjectStackMainTest {
         Files.createDirectories(home.resolve("projects/other-project"));
         ProjectStackTemplates.write(home, "other-project", cloud);
         assertThat(command.run(new String[]{"validate", "other-project"})).isEqualTo(1);
-        assertThat(err.toString()).contains("project-stack.id 'xyz-yyyy-nnnn' is not 'other-project', the name of the dir that holds it");
+        assertThat(err.toString()).contains("projectStack.id 'xyz-yyyy-nnnn' is not 'other-project', the name of the dir that holds it");
     }
 
     @ParameterizedTest
@@ -669,7 +669,7 @@ class ManageProjectStackMainTest {
         assertThat(out.toString()).doesNotContain("db-whitelist");
     }
 
-    private static final String NAMES_THE_IDENTITY = "identity:\n  project-stack: idp\n";
+    private static final String NAMES_THE_IDENTITY = "identity:\n  projectStack: idp\n";
 
     /** The project stack, which names the identity project stack, and the identity project stack, both configured. */
     private void setUpWithIdentity(AfonCloud cloud) throws Exception {
@@ -1148,7 +1148,7 @@ class ManageProjectStackMainTest {
         ProjectStackTemplates.writeIdentity(home, "idp", other);
         Path file = home.resolve("projects/lon/project.yaml");
         Files.createDirectories(file.getParent());
-        Files.writeString(file, ProjectStackTemplates.dataExample(cloud).replace("identity: {", "identity: {project-stack: idp, "));
+        Files.writeString(file, ProjectStackTemplates.dataExample(cloud).replace("identity: {", "identity: {projectStack: idp, "));
         assertThat(command.run(new String[]{"up", "lon", "--dry-run"})).isZero();
         String c = lower(cloud);
         String o = lower(other);
@@ -1168,7 +1168,7 @@ class ManageProjectStackMainTest {
         Files.createDirectories(data.getParent());
         Files.writeString(data, ProjectStackTemplates.dataExample(cloud).replace("role: data\n", "role: data\n  env: dev\n"));
         Path file = home.resolve("projects/" + PROJECT_STACK + "/project.yaml");
-        Files.writeString(file, Files.readString(file).replaceAll("(?s)dataProviders:.*?\nmembers:", "dataProviders:\n  named:\n    - {project-stack: lon, catalogs: [cvd]}\nmembers:"));
+        Files.writeString(file, Files.readString(file).replaceAll("(?s)dataProviders:.*?\nmembers:", "dataProviders:\n  named:\n    - {projectStack: lon, catalogs: [cvd]}\nmembers:"));
         assertThat(command.run(new String[]{"validate", PROJECT_STACK})).isZero();
         assertThat(out.toString()).contains("is a valid tre project stack", "with 1 Data Provider catalog(s)");
 
@@ -1176,6 +1176,6 @@ class ManageProjectStackMainTest {
         Files.delete(data);
         out.reset();
         assertThat(command.run(new String[]{"validate", PROJECT_STACK})).isEqualTo(1);
-        assertThat(err.toString()).contains("dataProviders.named[0].project-stack names lon, which has no file");
+        assertThat(err.toString()).contains("dataProviders.named[0].projectStack names lon, which has no file");
     }
 }

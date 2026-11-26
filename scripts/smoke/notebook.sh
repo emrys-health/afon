@@ -24,7 +24,8 @@
 #
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
 # 'check-oidc <cloud>', then
-# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user',
+# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user', or, in a project's TRE (the config has SMOKE_MEMBER), that of the smoke
+# member with '--token smoke-member', and runs the notebooks of scripts/smoke/project-notebooks.csv, port-forwarding the Trino coordinator too if one is Trino's,
 # port-forwards the Spark Connect driver of the cluster of the stack (KUBECONFIG, else that of '<cloud>-update-kube-config tre'), then runs the notebook with
 # 'jupyter-execute'.  The commands are run as 'smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
@@ -60,6 +61,7 @@ list_notebooks() {
 }
 
 LIST=
+NOTEBOOKS_GIVEN=
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -68,7 +70,7 @@ while [ $# -gt 0 ]; do
         echo "Option $1 requires a value" >&2
         exit 1
       fi
-      NOTEBOOKS_FILE="$2"; shift 2 ;;
+      NOTEBOOKS_FILE="$2"; NOTEBOOKS_GIVEN=true; shift 2 ;;
     --env|-e)
       if [ -z "${2:-}" ]; then
         echo "Option $1 requires a value" >&2
@@ -80,6 +82,35 @@ while [ $# -gt 0 ]; do
     *) ARGS+=("$1"); shift ;;
   esac
 done
+CONFIG_DIR="$AFON_HOME/config${AFON_ENV:+-$AFON_ENV}"
+
+# The raw value of the property $1, as written in the config, eg aws-oidc.${ENV_NAME}.click.
+raw_prop() {
+  grep -h "^$1=" "$CONFIG_DIR"/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
+}
+
+# The value of the property $1, with the references to other properties, ${NAME}, replaced by their values, as the config does, eg
+# aws-oidc.emrys2.click.  A reference to a property that is not set is left as it is.  Nested references are resolved, up to 5 deep.
+prop() {
+  local value name replacement rest depth=0
+  value=$(raw_prop "$1")
+  while [ "$depth" -lt 5 ] && [[ "$value" =~ \$\{([A-Za-z0-9_]+)\} ]]; do
+    name="${BASH_REMATCH[1]}"
+    replacement=$(raw_prop "$name")
+    [ -n "$replacement" ] || break
+    value="${value//\$\{$name\}/$replacement}"
+    depth=$((depth + 1))
+  done
+  printf '%s\n' "$value"
+}
+
+
+# A project's TRE, which the config says by naming the member that the smoke tests sign in as: its notebooks are those of its own file, unless --notebooks gave
+# another, and run with that member's token, as only the tokens of the project are admitted there
+SMOKE_MEMBER=$(prop SMOKE_MEMBER)
+if [ -n "$SMOKE_MEMBER" ] && [ -z "$NOTEBOOKS_GIVEN" ]; then
+  NOTEBOOKS_FILE="$AFON_ROOT/scripts/smoke/project-notebooks.csv"
+fi
 if [ -n "$LIST" ]; then
   list_notebooks; exit 0
 fi
@@ -138,32 +169,10 @@ afon() {
   fi
 }
 
-# the config of the afon env, if there is one, else the current config
-CONFIG_DIR="$AFON_HOME/config${AFON_ENV:+-$AFON_ENV}"
 if [ ! -d "$CONFIG_DIR" ]; then
   echo "No config $CONFIG_DIR for the afon env '${AFON_ENV:-}'" >&2
   exit 1
 fi
-
-# The raw value of the property $1, as written in the config, eg aws-oidc.${ENV_NAME}.click.
-raw_prop() {
-  grep -h "^$1=" "$CONFIG_DIR"/*.properties 2>/dev/null | tail -1 | cut -d= -f2- || true
-}
-
-# The value of the property $1, with the references to other properties, ${NAME}, replaced by their values, as the config does, eg
-# aws-oidc.emrys2.click.  A reference to a property that is not set is left as it is.  Nested references are resolved, up to 5 deep.
-prop() {
-  local value name replacement rest depth=0
-  value=$(raw_prop "$1")
-  while [ "$depth" -lt 5 ] && [[ "$value" =~ \$\{([A-Za-z0-9_]+)\} ]]; do
-    name="${BASH_REMATCH[1]}"
-    replacement=$(raw_prop "$name")
-    [ -n "$replacement" ] || break
-    value="${value//\$\{$name\}/$replacement}"
-    depth=$((depth + 1))
-  done
-  printf '%s\n' "$value"
-}
 
 require() {
   if [ -z "$2" ]; then
@@ -192,12 +201,16 @@ if ! afon check-oidc "$CLOUD" >/dev/null; then
 fi
 echo "OIDC provider at $OIDC_HOST is ready"
 
-TOKEN_LINE="^Access token for user '\([^']*\)' on cloud '[^']*': "
-TOKEN_OUTPUT=$(afon check-oidc "$CLOUD" --token user 2>&1 || true)
-USER_ID=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}.*/\1/p" | tail -1)
-OIDC_TOKEN=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n "s/${TOKEN_LINE}//p" | tail -1)
+# the token of USER_ID, who is the admin, or, in a project's TRE, which admits only the tokens of its project, that of the member that the smoke tests sign in as,
+# signed in as a member is, with the project and the second factor in it
+TOKEN_KIND=user
+[ -z "$SMOKE_MEMBER" ] || TOKEN_KIND=smoke-member
+TOKEN_LINE="^Access token for (user|smoke member) '([^']*)' on cloud '[^']*': "
+TOKEN_OUTPUT=$(afon check-oidc "$CLOUD" --token "$TOKEN_KIND" 2>&1 || true)
+USER_ID=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n -E "s/${TOKEN_LINE}.*/\2/p" | tail -1)
+OIDC_TOKEN=$(printf '%s\n' "$TOKEN_OUTPUT" | sed -n -E "s/${TOKEN_LINE}//p" | tail -1)
 if [ -z "$OIDC_TOKEN" ]; then
-  echo "check-oidc --token gave no access token for USER_ID:" >&2
+  echo "check-oidc --token $TOKEN_KIND gave no access token:" >&2
   printf '%s\n' "$TOKEN_OUTPUT" | tail -20 >&2
   exit 1
 fi
@@ -249,6 +262,36 @@ if [ -z "$LOCAL_PORT" ]; then
   exit 1
 fi
 export SPARK_REMOTE="sc://localhost:$LOCAL_PORT"
+
+# In a project's TRE, the notebooks that read through Trino reach its coordinator as a pod does, by its HTTPS port, which this forwards to a free local port, trusting
+# its self-signed certificate, which names localhost: TRINO_HOST, TRINO_PORT and TRINO_CA_CERT tell the notebook
+if [ -n "$SMOKE_MEMBER" ] && printf '%s\n' "${NOTEBOOKS[@]}" | grep -qi trino; then
+  TRINO_POD=$(kubectl get pods -o name | grep 'pod/trino-coordinator' | head -1)
+  if [ -z "$TRINO_POD" ]; then
+    echo "No trino-coordinator pod in the cluster of KUBECONFIG $KUBECONFIG: is Trino deployed?" >&2
+    exit 1
+  fi
+  TRINO_CA_FILE=$(mktemp)
+  kubectl get secret trino-tls -o 'jsonpath={.data.ca\.crt}' | base64 -d > "$TRINO_CA_FILE"
+  TRINO_FORWARD_LOG=$(mktemp)
+  kubectl port-forward "$TRINO_POD" ":8443" >"$TRINO_FORWARD_LOG" 2>&1 &
+  TRINO_FORWARD_PID=$!
+  trap 'kill $PORT_FORWARD_PID $TRINO_FORWARD_PID 2>/dev/null || true; rm -f "$PORT_FORWARD_LOG" "$TRINO_FORWARD_LOG" "$TRINO_CA_FILE"' EXIT
+  TRINO_LOCAL_PORT=
+  for _ in $(seq 1 30); do
+    TRINO_LOCAL_PORT=$(sed -n 's/^Forwarding from 127\.0\.0\.1:\([0-9][0-9]*\) -> .*/\1/p' "$TRINO_FORWARD_LOG" | head -1)
+    if [ -n "$TRINO_LOCAL_PORT" ] || ! kill -0 "$TRINO_FORWARD_PID" 2>/dev/null; then
+      break
+    fi
+    sleep 0.5
+  done
+  if [ -z "$TRINO_LOCAL_PORT" ]; then
+    echo "Could not port-forward $TRINO_POD:" >&2
+    cat "$TRINO_FORWARD_LOG" >&2
+    exit 1
+  fi
+  export TRINO_HOST=localhost TRINO_PORT="$TRINO_LOCAL_PORT" TRINO_CA_CERT="$TRINO_CA_FILE"
+fi
 
 cd "$AFON_ROOT"
 FAILED=()

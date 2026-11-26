@@ -39,7 +39,7 @@ class ProjectStackUserProviderTest {
 
     private static TreProjectStack projectStack(AfonCloud cloud, String members) {
         return tre(ProjectStackFixtures.render("""
-            project-stack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
+            projectStack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
             identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
             dataProviders:
               defined:

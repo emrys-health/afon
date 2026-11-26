@@ -49,7 +49,7 @@ abstract class ProjectCloudSpec(cloud: AfonCloud) extends SpecPretifier with Giv
   /** A project of the cloud, made as the example is, with the id given. */
   private def projectOf(id: String): ProjectStack =
     FileProjectStackProvider.parse(
-      s"""project-stack: {id: $id, cloud: $lower}
+      s"""projectStack: {id: $id, cloud: $lower}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:

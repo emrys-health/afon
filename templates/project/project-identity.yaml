@@ -5,7 +5,7 @@
 #   afon-cli.sh manage-project-stack configure ${id}
 #   afon-cli.sh manage-project-stack up ${id}
 # See docs/projects.md.
-project-stack:
+projectStack:
   id: ${id}
   cloud: ${cloud}
   role: identity

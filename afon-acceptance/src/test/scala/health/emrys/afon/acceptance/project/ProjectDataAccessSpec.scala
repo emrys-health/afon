@@ -141,7 +141,7 @@ abstract class ProjectDataAccessSpec(cloud: AfonCloud) extends SpecPretifier wit
 
   private def treProject(id: String, provider: String = "lon"): TreProjectStack =
     FileProjectStackProvider.parse(
-      s"""project-stack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
+      s"""projectStack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:

@@ -7,5 +7,6 @@ dependencies = [
     "jupyter>=1.0.0",
     "ipykernel>=6.29.0",
     "pyspark-client==4.0.1",
-    "fastparquet>=2025.7.0"
+    "fastparquet>=2025.7.0",
+    "trino==0.340.0"
 ]

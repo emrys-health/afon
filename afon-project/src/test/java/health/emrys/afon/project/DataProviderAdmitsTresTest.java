@@ -56,7 +56,7 @@ class DataProviderAdmitsTresTest {
         Files.writeString(file, yaml);
     }
 
-    private static final String NAMES_LON = "  named:\n    - {project-stack: lon, catalogs: [cvd]}";
+    private static final String NAMES_LON = "  named:\n    - {projectStack: lon, catalogs: [cvd]}";
 
     private AfonPropertyProvider configureLon(AfonCloud cloud, String envExtra) throws IOException {
         Path file = dataFile(cloud);
@@ -117,6 +117,6 @@ class DataProviderAdmitsTresTest {
         assertThatThrownBy(() -> ProjectStackEnv.configure(new FileProjectStackProvider(file).getProjectStack(), env, home, file))
             .isInstanceOf(ProjectStackException.class)
             .hasMessageContaining("xyz-yyyy-nnnn reads this Data Provider")
-            .hasMessageContaining("project-stack.egressIp");
+            .hasMessageContaining("projectStack.egressIp");
     }
 }

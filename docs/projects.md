@@ -106,7 +106,7 @@ own address. In `~/.afon/projects/idp/project.yaml`, replace the egress IP with 
 does not delegate it, so the domain does not resolve and Keycloak cannot get its certificate. The result is:
 
 ```yaml
-project-stack:
+projectStack:
   id: idp
   cloud: aws
   role: identity
@@ -177,7 +177,7 @@ afon-cli.sh azure-egress-ip show afon-egress-ip-lon
 ```
 
 ```yaml
-project-stack:
+projectStack:
   id: lon
   cloud: azure
   role: data
@@ -185,7 +185,7 @@ project-stack:
   egressIp: <the address of lon>
 
 identity:
-  project-stack: idp
+  projectStack: idp
   issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
   audience: provider-lon
@@ -436,20 +436,20 @@ stack needs:
 - the identity project stack that deploys the identity.
 
 ```yaml
-project-stack:
+projectStack:
   id: cvd-2026
   cloud: aws
   env: emrys2
   egressIp: <the address of cvd-2026>
 
 identity:
-  project-stack: idp
+  projectStack: idp
   issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
 dataProviders:
   named:
-    - project-stack: lon
+    - projectStack: lon
       catalogs: [cvd]
 
 members:
@@ -471,7 +471,7 @@ whitelist allows, and the cloud of that storage, which is not the project stack'
 read them from the Data Provider's project stack, which has to be made, with the config of its env there, though not yet
 up; they refuse a project stack or catalog that is not there, and a Data Provider that trusts another identity than the
 one the TRE uses. Each catalog is an entry in the TRE, with the id `<project-stack>-<catalog>`: a TRE that reads two
-catalogs of a Data Provider, which `lon` has not, names them together, `- {project-stack: lon, catalogs: [cvd, dbt]}`,
+catalogs of a Data Provider, which `lon` has not, names them together, `- {projectStack: lon, catalogs: [cvd, dbt]}`,
 and has `lon-cvd` and `lon-dbt`. `configure` writes the catalogs in full, as `defined`, into the copy of the file in the
 project stack's config, as the record of what was deployed. It also writes them into the project stack's config as
 catalogs, like any other, in the `catalogs-<cloud>.properties` of the cloud of their storage: each id, which is that of
@@ -678,15 +678,23 @@ spark-polaris-smoke`, see [The Spark write test](smoke_tests.md#the-spark-write-
 release cvd smoke_test` releases the first. It says `PASS`, `FAIL` or `INCONCLUSIVE` for each step, and the first `FAIL`
 says where to look.
 
-**How the notebooks are run.** Until [#411](https://github.com/emrys-health/afon/issues/411) (smoke tests that sign in as
-a user) is built, `project-spark-reads-data-providers.ipynb` and `project-trino-reads-data-providers.ipynb` can only be
-run interactively, by a member who is signed in to the TRE's JupyterHub, in a notebook of their own pod: the token that
-they check, `OIDC_TOKEN`, is put in the pod's environment by the hub at the member's sign-in, and nothing else has one
-that a project's TRE accepts. They are not run by `smoke-test` or `smoke-notebook` (they are not in `notebooks.csv`,
-which runs notebooks as an admin from `users.csv`) or from the CLI. To run one: sign in to the TRE's JupyterHub as a
-member, copy the notebook into the pod (`afon-cli.sh manage-project-stack run cvd-2026 kube-user-cp --user <you> to
-<path>`, see [Jupyter](jupyter.md#copying-notebooks-to-and-from-jupyter-user-pod), or upload it in JupyterLab), run all
-its cells, and read the summary at the end. `kube-user-cp ... from` copies the notebook with its results back.
+**How the notebooks are run.** Two ways, both as a member, as the token they check, `OIDC_TOKEN`, is a member's: nothing else has
+one that a project's TRE accepts.
+
+- **From the CLI, as the smoke member** ([#411](https://github.com/emrys-health/afon/issues/411)). `smoke-notebook`, run in
+  the project stack's home, signs in as the first of the `smokeMembers` (see [Members](#members)), after `manage-identity
+  smoke-credentials`, and runs `project-spark-reads-data-providers.ipynb` and `project-trino-reads-data-providers.ipynb` on
+  your machine, which reaches Spark Connect and the Trino coordinator of the TRE by port-forwards, from its own file,
+  `scripts/smoke/project-notebooks.csv`, as `smoke-notebook` does in a project:
+  `afon-cli.sh manage-project-stack run cvd-2026 smoke-notebook aws`. It fails if a step does, and prints the notebook's
+  output, which it also writes to the `smoke/notebooks` dir of the project stack's home. The smoke member is a member, so
+  each Data Provider must have granted it too: run `manage-data grant` again on it when the smoke members change, as it
+  reads the members from `members.csv`. Run from your machine, the step that the notebook pod cannot call the Data
+  Provider directly is not concluded (`network-smoke` tests it from a member's pod).
+- **Interactively, as a person.** Sign in to the TRE's JupyterHub as a member, copy the notebook into the pod
+  (`afon-cli.sh manage-project-stack run cvd-2026 kube-user-cp --user <you> to <path>`, see
+  [Jupyter](jupyter.md#copying-notebooks-to-and-from-jupyter-user-pod), or upload it in JupyterLab), run all its cells, and
+  read the summary at the end. `kube-user-cp ... from` copies the notebook with its results back.
 
 The same notebook runs as a member of either TRE, with nothing edited. It works out what to expect in three steps:
 
@@ -825,20 +833,20 @@ if two project stacks of one cloud would leave from the same address, whether th
 Project stacks that are not up together may share one.
 
 ```yaml
-project-stack:
+projectStack:
   id: diab-2026
   cloud: aws
   env: emrys2
   egressIp: <the address of diab-2026>
 
 identity:
-  project-stack: idp
+  projectStack: idp
   issuerUrl: https://aws-oidc.idp.emrys2.click/realms/polaris
   acr: mfa
 
 dataProviders:
   named:
-    - project-stack: nw
+    - projectStack: nw
       catalogs: [diab]
 
 members:
@@ -1021,10 +1029,12 @@ Data Provider, so its members have no role there:
 afon-cli.sh manage-project-stack run lon spark-polaris-smoke
 afon-cli.sh manage-project-stack run lon manage-data grant cvd-2026 cvd
 afon-cli.sh manage-project-stack run lon manage-data release cvd smoke_test
+afon-cli.sh manage-project-stack run lon manage-data show
 
 afon-cli.sh manage-project-stack run nw spark-polaris-smoke
 afon-cli.sh manage-project-stack run nw manage-data grant diab-2026 diab
 afon-cli.sh manage-project-stack run nw manage-data release diab smoke_test
+afon-cli.sh manage-project-stack run nw manage-data show
 ```
 
 `spark-polaris-smoke` and `release` are for trying the setup with synthetic tables: a Data Provider releases its real
@@ -1108,13 +1118,13 @@ afon-cli.sh manage-project-stack find afon-5edcf267da-polaris-logs
 `names` lists them. `find` says which project stack owns a storage account, key vault or bucket name, from the files
 under `~/.afon/projects`.
 
-The env specifies the subscription or account used by the project stacks.  The same account can be shared by project stacks,
-as resource names are kept distinct for each project stack.
+The env specifies the subscription or account used by the project stacks.  The same account can be shared by project
+stacks, as resource names are kept distinct for each project stack.
 
 ## Running a command in a project stack
 
-`manage-project-stack run` runs a command in the home of a project stack, so that you need not specify the home or the cdktf dir,
-as these are identified by the project stack id: 
+`manage-project-stack run` runs a command in the home of a project stack, so that you need not specify the home or the
+cdktf dir, as these are identified by the project stack id:
 
 ```shell
 afon-cli.sh manage-project-stack run idp aws-cluster identity
@@ -1137,6 +1147,31 @@ members:
     firstName: Bob
     lastName: Hope
 ```
+
+**The smoke members.** The smoke tests of a project's TRE sign in as a member, as a person does, so that they test the TRE
+as a member uses it. The members above are for people, so the members for the tests are listed apart, in `smokeMembers`,
+which takes the same entries, is optional, and may not list a member:
+
+```yaml
+smokeMembers:
+  - smoke@tre.example
+```
+
+They are in the project's group too, so `up` and `sync-members` make them, and they sign in as members do. `configure`
+writes the first one to `SMOKE_MEMBER` in the project stack's config, and there is none if the list is empty. The
+smoke tests need a smoke member's password and the secret of their authenticator, which a person alone knows, so give
+them those once the project stack is up:
+
+```shell
+afon-cli.sh manage-project-stack run cvd-2026 manage-identity smoke-credentials
+```
+
+The command sets a random password for each smoke member, signs them in to the TRE's client, and enrols an authenticator
+whose secret it keeps with the password in `secrets/smoke-members.csv` of the project stack, a line `<email>,<password>,<secret>`
+for each smoke member, readable by its owner only. It prints neither. It also gives a smoke member that has no names the first and last name that the file lists, else
+`Smoke Tests`, because the realm asks a member for them on a page that a login that is scripted cannot fill in. It does nothing for a member who has the file already, and it refuses one who has an
+authenticator already, who may be a real person: list another, or `remove-authenticator` first if this one is made for
+the tests.
 
 The members are managed via the `manage-identity` command:
 
@@ -1486,12 +1521,10 @@ Provider that its file names:
 
 ### Members, invitations and the setup of a TRE
 
-- **Not built: the smoke tests of a TRE that sign in as a user
-  ([#411](https://github.com/emrys-health/afon/issues/411)).** The suite signs in as a user of `users.csv`, who is only
-  an admin in a project's TRE, which admits only the tokens of the project. So the tests that need a token, and the
-  notebooks `project-spark-reads-data-providers` and `project-trino-reads-data-providers`, cannot run from the CLI: the
-  notebooks are run interactively, by a member signed in to the JupyterHub, in their pod. `network-smoke` works, through
-  the pod of a signed-in member, and has been run against `cvd-2026`.
+- **Partly built: the smoke tests of a TRE that sign in as a user
+  ([#411](https://github.com/emrys-health/afon/issues/411)).** `smoke-notebook` runs the two project notebooks from the CLI as
+  the smoke member, see [How the notebooks are run](#a-first-tre-project). The other tests that need a token, `smoke-test`'s
+  Trino and Spark tests, still sign in as `USER_ID`, who is only an admin in a project's TRE: they are not run as a member.
 - **Not built: rotating a client's secret, and stopping a removed member's servers.** `manage-identity rotate-secret`
   does not exist. A secret can be replaced by hand, with `project-secret <project> tre --force`, then `manage-identity
   create` to give the identity the new one, `configure` and a redeploy of the TRE, which has not been tried.

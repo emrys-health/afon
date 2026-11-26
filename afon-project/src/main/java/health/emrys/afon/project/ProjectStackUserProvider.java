@@ -61,7 +61,7 @@ public final class ProjectStackUserProvider implements AfonUserProvider {
     @Override
     public synchronized List<AfonUser> getUsers() {
         if (users == null) {
-            users = merge(admins.getUsers(), projectStack.members());
+            users = merge(admins.getUsers(), projectStack.allMembers());
         }
         return users;
     }

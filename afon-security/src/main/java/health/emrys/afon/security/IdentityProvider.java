@@ -224,6 +224,29 @@ public interface IdentityProvider {
     int removeSecondFactor(String email);
 
     /**
+     * @return whether the user has an authenticator, a one-time password credential, which they or a login enrolled
+     * @throws IllegalStateException if there is no user with this email
+     */
+    boolean hasSecondFactor(String email);
+
+    /**
+     * Sets the user's password, to stay, and has the account ready to sign in to with it: the email verified, and none of the actions that an invitation requires
+     * (to verify the email, update the password and enrol a second factor) left to do, so that the login is the password, then the second factor that the flow of
+     * the client asks, and no page that a browser would walk the user through, which includes the one that asks for the names that the user has none of: they are
+     * set to those given, only if the user has none.  For a member that the tests sign in as, who has not accepted an invitation.
+     *
+     * @param firstName the first name to give a user who has none
+     * @param lastName  the last name to give a user who has none
+     * @throws IllegalStateException if there is no user with this email, or the identity refuses
+     */
+    void setPassword(String email, String password, String firstName, String lastName);
+
+    /**
+     * @return the redirect URIs that the client has, none if there is no such client
+     */
+    List<String> redirectUrisOf(String clientId);
+
+    /**
      * Makes the project stack's clients, group and token claims in the central identity, converging them if they exist: a client
      * for the TRE, whose tokens carry the audiences of the project stack's Data Provider catalogs, and one for Git, whose tokens carry
      * no Data Provider audience.  Each authenticates with the secret it is given, which is the one the TRE is configured with, and each token

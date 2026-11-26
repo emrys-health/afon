@@ -35,7 +35,7 @@ class KeyCloakProviderProjectTest {
      * {@code ${CLOUD}} in upper case.  No cloud is special, so every test is run on every cloud.
      */
     private static final String TEMPLATE = """
-        project-stack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
+        projectStack: {id: xyz-yyyy-nnnn, cloud: ${cloud}}
         identity: {issuerUrl: "https://id.example.org/realms/polaris", acr: mfa}
         dataProviders:
           defined:
@@ -529,6 +529,104 @@ class KeyCloakProviderProjectTest {
         assertThat(provider.removeSecondFactor("alice@tre.example")).isZero();
 
         assertThat(requests).noneMatch(call -> call.startsWith("DELETE") || call.endsWith("/logout"));
+    }
+
+    /**
+     * A KeyCloak that has the user of the email, or none, with the credentials, and the client {@code xyz-yyyy-nnnn-tre} with the redirect URIs, answering what
+     * is asked of it to sign a member in to, and recording the calls with their bodies.
+     */
+    /** What the identity has of the user of the sign-in tests. */
+    private String userRepresentation = "{\"id\":\"the-user-id\"}";
+
+    private void keycloakForSigningIn(boolean userExists, String credentials, int passwordCode) {
+        keycloak.removeContext("/");
+        keycloak.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            String call = exchange.getRequestMethod() + " " + path;
+            String body = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            requests.add(call);
+            bodies.add(body);
+            if (path.endsWith("/protocol/openid-connect/token")) {
+                reply(exchange, 200, "{\"access_token\":\"the-token\"}");
+            } else if (call.equals("GET /admin/realms/polaris/users")) {
+                reply(exchange, 200, userExists ? "[{\"id\":\"the-user-id\"}]" : "[]");
+            } else if (call.equals("GET /admin/realms/polaris/users/the-user-id")) {
+                reply(exchange, 200, userRepresentation);
+            } else if (call.equals("GET /admin/realms/polaris/users/the-user-id/credentials")) {
+                reply(exchange, 200, credentials);
+            } else if (call.equals("PUT /admin/realms/polaris/users/the-user-id/reset-password")) {
+                reply(exchange, passwordCode, "");
+            } else if (call.equals("GET /admin/realms/polaris/clients")) {
+                reply(exchange, 200, "xyz-yyyy-nnnn-tre".equals(exchange.getRequestURI().getQuery().replace("clientId=", "")) ? "[{\"id\":\"the-client-uuid\"}]" : "[]");
+            } else if (call.equals("GET /admin/realms/polaris/clients/the-client-uuid")) {
+                reply(exchange, 200, "{\"redirectUris\":[\"https://jupyter.example.org/oauth2/callback\",\"https://jupyter.example.org/hub/oauth_callback\"]}");
+            } else {
+                reply(exchange, call.startsWith("POST") ? 201 : 204, "");
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void saysWhetherAUserHasAnAuthenticator(AfonCloud cloud) {
+        keycloakForSigningIn(true, "[{\"id\":\"c1\",\"type\":\"password\"}]", 204);
+        assertThat(provider.hasSecondFactor("Alice@Tre.Example")).isFalse();
+
+        keycloakForSigningIn(true, "[{\"id\":\"c1\",\"type\":\"password\"},{\"id\":\"c2\",\"type\":\"otp\"}]", 204);
+        assertThat(provider.hasSecondFactor("alice@tre.example")).isTrue();
+
+        keycloakForSigningIn(false, "[]", 204);
+        assertThatThrownBy(() -> provider.hasSecondFactor("nobody@tre.example")).isInstanceOf(IllegalStateException.class).hasMessageContaining("No user nobody@tre.example");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void setsAPasswordToStayAndReadiesTheAccountToSignInToWithNoActionLeftToDo(AfonCloud cloud) {
+        keycloakForSigningIn(true, "[]", 204);
+
+        provider.setPassword("Alice@Tre.Example", "the-new-password", "Smoke", "Tests");
+
+        int account = requests.indexOf("PUT /admin/realms/polaris/users/the-user-id");
+        int password = requests.indexOf("PUT /admin/realms/polaris/users/the-user-id/reset-password");
+        assertThat(account).isNotNegative();
+        assertThat(bodies.get(account)).contains("\"emailVerified\":true").contains("\"requiredActions\":[]");
+        assertThat(password).isGreaterThan(account);
+        assertThat(bodies.get(password)).contains("\"type\":\"password\"").contains("\"value\":\"the-new-password\"").contains("\"temporary\":false");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesTheNamesToAUserWhoHasNoneAndKeepsThoseThatTheyHave(AfonCloud cloud) {
+        keycloakForSigningIn(true, "[]", 204);
+        provider.setPassword("alice@tre.example", "pw", "Smoke", "Tests");
+        assertThat(bodies.get(requests.indexOf("PUT /admin/realms/polaris/users/the-user-id"))).contains("\"firstName\":\"Smoke\"").contains("\"lastName\":\"Tests\"");
+
+        requests.clear();
+        bodies.clear();
+        userRepresentation = "{\"id\":\"the-user-id\",\"firstName\":\"Alice\",\"lastName\":\"\"}";
+        keycloakForSigningIn(true, "[]", 204);
+        provider.setPassword("alice@tre.example", "pw", "Smoke", "Tests");
+        assertThat(bodies.get(requests.indexOf("PUT /admin/realms/polaris/users/the-user-id"))).doesNotContain("firstName").contains("\"lastName\":\"Tests\"");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesToSetThePasswordOfAUserWhoIsNotInTheIdentityOrWhenTheIdentityRefuses(AfonCloud cloud) {
+        keycloakForSigningIn(false, "[]", 204);
+        assertThatThrownBy(() -> provider.setPassword("nobody@tre.example", "x", "A", "B")).isInstanceOf(IllegalStateException.class).hasMessageContaining("No user nobody@tre.example");
+
+        keycloakForSigningIn(true, "[]", 400);
+        assertThatThrownBy(() -> provider.setPassword("alice@tre.example", "x", "A", "B")).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Could not set the password").hasMessageContaining("HTTP 400").hasMessageNotContaining("the-new-password");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void givesTheRedirectUrisOfAClientOrNoneForAClientThatIsNotThere(AfonCloud cloud) {
+        keycloakForSigningIn(true, "[]", 204);
+
+        assertThat(provider.redirectUrisOf("xyz-yyyy-nnnn-tre")).containsExactly("https://jupyter.example.org/oauth2/callback", "https://jupyter.example.org/hub/oauth_callback");
+        assertThat(provider.redirectUrisOf("no-such-client")).isEmpty();
     }
 
     @ParameterizedTest

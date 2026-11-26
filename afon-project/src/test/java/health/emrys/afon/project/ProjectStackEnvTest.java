@@ -58,6 +58,18 @@ class ProjectStackEnvTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
+    void derivesTheSmokeMemberTheSmokeTestsSignInAsFromTheFile(AfonCloud cloud) throws IOException {
+        OnCloud setup = on(cloud);
+        Files.writeString(setup.projectFile(), Files.readString(setup.projectFile())
+                                                   + "smokeMembers:\n  - Grace@example.org\n  - henry@example.org\n");
+
+        var derived = ProjectStackEnv.derive(new FileProjectStackProvider(setup.projectFile()).getProjectStack());
+
+        assertThat(derived.get("afon.properties")).containsEntry("SMOKE_MEMBER", "grace@example.org");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
     void derivesTheCommonAndTheCloudProperties(AfonCloud cloud) throws IOException {
         String prefix = cloud.name() + "_";
         String file = "afon-" + lower(cloud) + ".properties";
@@ -67,6 +79,7 @@ class ProjectStackEnvTest {
         assertThat(derived.get("afon.properties")).containsEntry("PROJECT_ID", "xyz-yyyy-nnnn")
             .containsEntry("OIDC_AUDIENCE", "xyz-yyyy-nnnn-tre").containsEntry("OIDC_GIT_AUDIENCE", "xyz-yyyy-nnnn-git")
             .containsEntry("OIDC_PROJECT_CLAIM", "project").containsEntry("OIDC_USER_CLAIM", "polaris_principal")
+            .doesNotContainKey("SMOKE_MEMBER")
             .containsEntry("GIT_DOMAIN_NAME", "git.xyz-yyyy-nnnn.example.org").containsEntry("TRE_TEARDOWN_TIME", "22:00")
             .containsEntry("TRE_TEARDOWN_TIME_ZONE", "Europe/London");
         // the identity is at the host of its issuer, whatever the env's own OIDC domain is
@@ -209,13 +222,13 @@ class ProjectStackEnvTest {
     void namesTheKubeconfigOfTheIdentityProjectsClusterForTheKeycloakItConfigures(AfonCloud cloud, @TempDir Path home) throws IOException {
         Path envConfig = Files.createDirectories(home.resolve("config-dev"));
         Files.writeString(envConfig.resolve("afon.properties"), "ENV_NAME=dev\n" + ACCOUNTS);
-        String yaml = ProjectStackFixtures.example(cloud).replace("identity:\n", "identity:\n  project-stack: idp\n");
+        String yaml = ProjectStackFixtures.example(cloud).replace("identity:\n", "identity:\n  projectStack: idp\n");
         Path file = Files.createDirectories(home.resolve("projects/xyz-yyyy-nnnn")).resolve("project.yaml");
         Files.writeString(file, yaml);
         // the identity project stack is made first
         ProjectStackFixtures.writeSecrets(home);
         assertThatThrownBy(() -> ProjectStackEnv.configure(ProjectStackFixtures.tre(yaml), envConfig, home, file))
-            .isInstanceOf(ProjectStackException.class).hasMessageContaining("identity.project-stack names idp, which has no file");
+            .isInstanceOf(ProjectStackException.class).hasMessageContaining("identity.projectStack names idp, which has no file");
         Path identityFile = Files.createDirectories(home.resolve("projects/idp")).resolve("project.yaml");
         Files.writeString(identityFile, ProjectStackFixtures.identityExample(cloud));
         ProjectStackFixtures.writeSecrets(home);
@@ -565,7 +578,7 @@ class ProjectStackEnvTest {
             Path idp = home.resolve("projects/idp/project.yaml");
             Files.createDirectories(idp.getParent());
             Files.writeString(idp, ProjectStackFixtures.identityExample(identityCloud));
-            Files.writeString(file, ProjectStackFixtures.dataExample(cloud).replace("identity: {", "identity: {project-stack: idp, "));
+            Files.writeString(file, ProjectStackFixtures.dataExample(cloud).replace("identity: {", "identity: {projectStack: idp, "));
             ProjectStackFixtures.writeSecrets(home);
             Path config = ProjectStackEnv.configure(new FileProjectStackProvider(file).getProjectStack(), env, home, file);
             AfonPropertyProvider properties = new FilePropertyProvider(config.toString());

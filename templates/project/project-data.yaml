@@ -5,7 +5,7 @@
 #   afon-cli.sh manage-project-stack configure ${id}
 #   afon-cli.sh manage-project-stack up ${id}
 # See docs/projects.md.
-project-stack:
+projectStack:
   id: ${id}
   cloud: ${cloud}
   role: data
@@ -15,9 +15,9 @@ project-stack:
   egressIp: <egress-ip>
 
 # the central identity that its Polaris trusts, the same that the TREs sign in to: its issuer, the acr that proves a second factor, and the audience
-# that the tokens for this Data Provider carry, provider-${id} if not given; project-stack is the id of the identity project stack, which deploys the identity
+# that the tokens for this Data Provider carry, provider-${id} if not given; projectStack is the id of the identity project stack, which deploys the identity
 identity:
-  project-stack: <identity-project-stack>
+  projectStack: <identity-project-stack>
   issuerUrl: https://<identity-domain>/realms/polaris
   acr: mfa
   audience: provider-${id}

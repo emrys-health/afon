@@ -1317,6 +1317,72 @@ public class KeyCloakProvider implements IdentityProvider {
     }
 
     @Override
+    public boolean hasSecondFactor(String email) {
+        String address = email.toLowerCase(Locale.ROOT);
+        try {
+            String token = adminToken();
+            String id = userIdOf(token, address);
+            if (id == null) {
+                throw new IllegalStateException("No user " + address + " in the central identity");
+            }
+            return getList(token, format("/admin/realms/%s/users/%s/credentials", KEYCLOAK_REALM, id), "the credentials of " + address).stream()
+                .anyMatch(credential -> "otp".equals(credential.get("type")));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read the authenticators of KeyCloak user " + address, e);
+        }
+    }
+
+    @Override
+    public void setPassword(String email, String password, String firstName, String lastName) {
+        String address = email.toLowerCase(Locale.ROOT);
+        try {
+            String token = adminToken();
+            String id = userIdOf(token, address);
+            if (id == null) {
+                throw new IllegalStateException("No user " + address + " in the central identity");
+            }
+            // the profile that the realm requires to be complete before it lets a user in, or it asks for it on a page: the names that the user has are kept
+            Map<String, Object> user = getMap(token, format("/admin/realms/%s/users/%s", KEYCLOAK_REALM, id), "the account of " + address);
+            Map<String, Object> account = new LinkedHashMap<>();
+            account.put("emailVerified", true);
+            account.put("requiredActions", List.of());
+            if (isBlank(user.get("firstName"))) {
+                account.put("firstName", firstName);
+            }
+            if (isBlank(user.get("lastName"))) {
+                account.put("lastName", lastName);
+            }
+            HttpResponse prepared = putJson(token, format("/admin/realms/%s/users/%s", KEYCLOAK_REALM, id), mapper.writeValueAsString(account), "the account of " + address);
+            if (isFailure(prepared)) {
+                throw new IllegalStateException(format("Could not ready the account of %s to sign in to: HTTP %d", address, prepared.getCode()));
+            }
+            // the password is in the body only, which is never logged
+            HttpResponse set = putJson(token, format("/admin/realms/%s/users/%s/reset-password", KEYCLOAK_REALM, id),
+                                       mapper.writeValueAsString(Map.of("type", "password", "value", password, "temporary", false)), "the password of " + address);
+            if (isFailure(set)) {
+                throw new IllegalStateException(format("Could not set the password of %s: HTTP %d", address, set.getCode()));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to set the password of KeyCloak user " + address, e);
+        }
+    }
+
+    private static boolean isBlank(Object name) {
+        return name == null || name.toString().isBlank();
+    }
+
+    @Override
+    public List<String> redirectUrisOf(String clientId) {
+        try {
+            String token = adminToken();
+            String uuid = clientUuid(token, KEYCLOAK_REALM, clientId);
+            return uuid == null ? List.of() : readRedirectUris(token, format("/admin/realms/%s/clients/%s", KEYCLOAK_REALM, uuid));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read the redirect URIs of KeyCloak client " + clientId, e);
+        }
+    }
+
+    @Override
     public int removeSecondFactor(String email) {
         String address = email.toLowerCase(Locale.ROOT);
         try {

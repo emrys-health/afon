@@ -13,7 +13,7 @@ import java.util.Properties;
 import static health.emrys.afon.config.ConfigUtils.configDir;
 
 /**
- * The catalog of a Data Provider that a TRE project stack's file names, {@code {project-stack: lon, catalogs: [cvd]}}, read from the Data Provider's own project stack, a
+ * The catalog of a Data Provider that a TRE project stack's file names, {@code {projectStack: lon, catalogs: [cvd]}}, read from the Data Provider's own project stack, a
  * project stack with the role {@link ProjectStackRole#DATA} of the same Afon home, as the properties of its config would give it: its Polaris is at its domain, the
  * audience of the tokens for it is that of its identity, and the storage of the catalog is the project stack's own.  What the Data Provider's file and the config
  * it is made from say once, so the TRE need not say it again, and cannot say it wrong.
@@ -41,12 +41,12 @@ final class DataProviderResolution {
         try {
             FileProjectStackProvider file = FileProjectStackProvider.forProjectStack(afonHome, projectStack);
             if (!file.exists()) {
-                problems.add(String.format("%s.project-stack names %s, which has no file %s: make it first, as the project stack that deploys the Data Provider",
+                problems.add(String.format("%s.projectStack names %s, which has no file %s: make it first, as the project stack that deploys the Data Provider",
                                            path, projectStack, file.file()));
                 return null;
             }
             if (!(file.getProjectStack() instanceof DataProjectStack data)) {
-                problems.add(String.format("%s.project-stack names %s, which has the role %s, not data", path, projectStack, file.getProjectStack().role()));
+                problems.add(String.format("%s.projectStack names %s, which has the role %s, not data", path, projectStack, file.getProjectStack().role()));
                 return null;
             }
             if (!data.catalogs().contains(catalog)) {

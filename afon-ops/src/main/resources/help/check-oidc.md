@@ -8,6 +8,7 @@ Usage:
   afon-cli.sh check-oidc <cloud> --token
   afon-cli.sh check-oidc <cloud> --token user
   afon-cli.sh check-oidc <cloud> --token <username>
+  afon-cli.sh check-oidc <cloud> --token smoke-member
 
 Exits with 1 if the provider is not ready.
 With --token, once the provider is ready, also shows an OIDC access token, as JupyterHub injects into a user's pod as
@@ -17,3 +18,6 @@ OIDC_TOKEN, eg for the OIDC notebook smoke test:
                 secret, by the client-credentials flow, with no MFA.
   --token <username>  the same, for that user from users.csv, which works only if it has a confidential client, ie
                 is USER_ID.
+  --token smoke-member  in a project, the token of its smoke member (SMOKE_MEMBER), as the project's TRE issues it to a
+                a member: by signing in to the TRE's client with the password and the authenticator that
+                manage-identity smoke-credentials gave them, so the token has the project and the MFA.

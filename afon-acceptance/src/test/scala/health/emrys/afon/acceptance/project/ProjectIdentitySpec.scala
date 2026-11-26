@@ -83,7 +83,7 @@ abstract class ProjectIdentitySpec(cloud: AfonCloud) extends SpecPretifier with 
     val catalogs = providers.map(name =>
       s"    - {id: $name, catalogUri: 'https://polaris.$name.example/api', catalogName: $id, audience: provider-$name, bucket: $name-$id}").mkString("\n")
     FileProjectStackProvider.parse(
-      s"""project-stack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
+      s"""projectStack: {id: $id, cloud: ${cloud.toString.toLowerCase}}
          |identity: {issuerUrl: 'https://id.example.org/realms/polaris', acr: mfa}
          |dataProviders:
          |  defined:

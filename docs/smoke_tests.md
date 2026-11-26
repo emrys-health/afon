@@ -98,6 +98,17 @@ To get the same token yourself, eg to run the notebook some other way, use:
 Without `user`, `--token` gives the token of the Polaris admin (`POLARIS_ID`) instead, which is not what
 the smoke test needs: the admin is not one of the users whose access `users-acl.csv` configures.
 
+In a project, `--token smoke-member` gives the token of its smoke member instead, signed in as a member is, with the
+project and the MFA in it, which `user` does not have, as it is the admin's client-credentials token. It needs the
+member's credentials from `manage-identity smoke-credentials`, see [Projects](projects.md#members):
+
+```shell
+afon-cli.sh manage-project-stack run cvd-2026 check-oidc <cloud> --token smoke-member
+```
+
+A one-time password is good for one sign-in, so when two sign-ins of the same member are within the same 30 seconds, the second is
+refused the code it sends first, and sends one of the next time step.
+
 ## Running in JupyterHub
 
 Open the notebook in a user's Jupyter pod and run all cells. `OIDC_TOKEN` is already injected into the pod by
@@ -306,8 +317,7 @@ afon-cli.sh manage-project-stack run lon spark-polaris-smoke
 
 Releasing `smoke_test` (`afon-cli.sh manage-project-stack run lon manage-data release cvd smoke_test`) gives the projects that `lon` has let in a table with
 rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb` with Spark, `project-trino-reads-data-providers.ipynb` with Trino), and
-leaves `smoke_test_unreleased` in `staging`, which they must be refused. Until [#411](https://github.com/emrys-health/afon/issues/411) (smoke tests that sign in as a user) is built, those two notebooks can only be run interactively, by a member who is signed in to the TRE's
-JupyterHub, in a notebook of their own pod, which has `OIDC_TOKEN` only after that sign-in: they are not run by `smoke-test` or `smoke-notebook`, nor from the CLI.
+leaves `smoke_test_unreleased` in `staging`, which they must be refused. In a project's TRE, `smoke-notebook` runs those two notebooks from the CLI, as the smoke member, and a member can run them in their pod.
 See [Projects](projects.md#a-first-tre-project).
 
 Writing the tables is a test, never part of an operation: nothing that deploys or

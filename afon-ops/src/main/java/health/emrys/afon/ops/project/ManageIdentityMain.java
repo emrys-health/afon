@@ -10,6 +10,7 @@ import health.emrys.afon.project.FileProjectStackProvider;
 import health.emrys.afon.project.TreProjectStack;
 import health.emrys.afon.project.ProjectStackEnv;
 import health.emrys.afon.security.IdentityProvider;
+import health.emrys.afon.security.keycloak.KeyCloakMemberLogin;
 import health.emrys.afon.security.keycloak.KeyCloakProvider;
 
 import java.io.IOException;
@@ -77,6 +78,8 @@ public class ManageIdentityMain {
         "  invite <email>                  sends the invitation again to a member who is in the central identity (it fails if it cannot be sent)",
         "  remove-authenticator <email>    removes the member's authenticators and ends their sessions, so that they enrol a new one, eg from the invitation",
         "  user-id <email>                 prints the user id that the central identity gave the member, which manage-data takes; it changes nothing",
+        "  smoke-credentials               gives each of the smokeMembers of project.yaml a password and an authenticator that the tests know, kept in",
+        "                                  " + FileProjectStackProvider.SECRETS_DIR + "/" + SmokeMemberCredentials.FILE + "; it refuses one who has an authenticator, who may be a real person",
         "  close                           closes the project stack's TRE client, so that no token is issued for it",
         "Any action takes " + KUBECONFIG + " <file>: the kubeconfig of the cluster of the central identity, whose Keycloak is then reached through a",
         "  port-forward to its pod, as its ingress may not admit this machine to its admin API.  Without it, that of KEYCLOAK_KUBECONFIG in the",
@@ -103,9 +106,17 @@ public class ManageIdentityMain {
     private final PrintStream out;
     private final PrintStream err;
     private final Path afonHome;
+    /** The login to a realm, at its issuer URL, as a member signs in to it. */
+    private final java.util.function.Function<java.net.URI, KeyCloakMemberLogin> memberLogin;
 
     ManageIdentityMain(BiFunction<TreProjectStack, String, IdentityProvider> identity, Tunnel tunnel, java.util.function.Supplier<String> defaultProjectStack,
                        PrintStream out, PrintStream err, Path afonHome) {
+        this(identity, tunnel, defaultProjectStack, out, err, afonHome, KeyCloakMemberLogin::new);
+    }
+
+    ManageIdentityMain(BiFunction<TreProjectStack, String, IdentityProvider> identity, Tunnel tunnel, java.util.function.Supplier<String> defaultProjectStack,
+                       PrintStream out, PrintStream err, Path afonHome, java.util.function.Function<java.net.URI, KeyCloakMemberLogin> memberLogin) {
+        this.memberLogin = memberLogin;
         this.identity = identity;
         this.tunnel = tunnel;
         this.defaultProjectStack = defaultProjectStack;
@@ -139,7 +150,7 @@ public class ManageIdentityMain {
         String action = args[0];
         // <project-stack> is left out in the home of a project stack, whose config has its id
         int withoutProject = switch (action) {
-            case "create", "close", "sync-members" -> 0;
+            case "create", "close", "sync-members", "smoke-credentials" -> 0;
             case "add-member", "remove-member", "invite", "remove-authenticator", "user-id" -> 1;
             default -> -1;
         };
@@ -168,6 +179,7 @@ public class ManageIdentityMain {
             case "remove-authenticator" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> removeAuthenticator(p, e, rest.get(0)))
                                                            : usage("remove-authenticator takes one <email>");
             case "user-id" -> rest.size() == 1 ? with(projectStack, options, (p, e) -> userId(p, e, rest.get(0))) : usage("user-id takes one <email>");
+            case "smoke-credentials" -> rest.isEmpty() ? with(projectStack, options, this::smokeCredentials) : usage("smoke-credentials takes no argument");
             case "close" -> rest.isEmpty() ? with(projectStack, options, this::close) : usage("close takes no argument");
             default -> usage("Unknown action '" + action + "'");
         };
@@ -238,6 +250,62 @@ public class ManageIdentityMain {
                    projectStack.identity().treClient(), projectStack.git() == null ? "" : " and " + projectStack.identity().gitClient(), projectStack.id());
     }
 
+    /**
+     * Gives each smoke member that the file lists a password and an authenticator that the tests know: it sets the password, and signs the member in to the
+     * project stack's TRE client, which walks them through enrolling an authenticator that the login answers, as a member does with a phone, keeping the secret
+     * that the page shows.  It is for members made for the tests: it does nothing to one who has an authenticator that it did not make, who may be a real person.
+     */
+    private void smokeCredentials(TreProjectStack projectStack, String endpoint) throws IOException {
+        if (projectStack.smokeMembers().isEmpty()) {
+            throw new IOException("The file of " + projectStack.id() + " lists no smokeMembers: list the members that the smoke tests sign in as there, and sync-members");
+        }
+        for (TreProjectStack.Member member : projectStack.smokeMembers()) {
+            smokeCredentials(projectStack, endpoint, member.email(), member.firstName(), member.lastName());
+        }
+    }
+
+    private void smokeCredentials(TreProjectStack projectStack, String endpoint, String email, String firstName, String lastName) throws IOException {
+        Path dir = FileProjectStackProvider.secretsDir(afonHome, projectStack.id().value());
+        if (SmokeMemberCredentials.read(dir, email).isPresent()) {
+            out.printf("%s has the credentials of the smoke tests already, in %s%n", email, dir.resolve(SmokeMemberCredentials.FILE));
+            return;
+        }
+        IdentityProvider provider = identity.apply(projectStack, endpoint);
+        if (provider.findUser(email).isEmpty()) {
+            throw new IOException("No user " + email + " in the central identity: up makes the smoke members, in its register stage, or sync-members does");
+        }
+        if (provider.hasSecondFactor(email)) {
+            throw new IOException(email + " has an authenticator that this did not make, and may be a real person's, so it is left as it is: list a member made for the tests "
+                                  + "in smokeMembers, or, if this one is, remove-authenticator first");
+        }
+        String client = projectStack.identity().treClient();
+        String redirectUri = provider.redirectUrisOf(client).stream().filter(uri -> uri.endsWith("/hub/oauth_callback")).findFirst().orElseThrow(
+            () -> new IOException("The client " + client + " has no redirect URI for JupyterHub's callback in the central identity: create makes it"));
+        String password = SmokeMemberCredentials.randomPassword();
+        provider.setPassword(email, password, firstName == null ? "Smoke" : firstName, lastName == null ? "Tests" : lastName);
+        KeyCloakMemberLogin.Token token;
+        try {
+            token = memberLogin.apply(java.net.URI.create(projectStack.identity().issuerUrl()))
+                               .login(client, read(dir.resolve("tre.secret")), redirectUri, email, password, null,
+                                      // kept as soon as the realm has the authenticator, as nothing else knows its secret if the login then fails
+                                      enrolled -> keep(new SmokeMemberCredentials(email, password, enrolled), dir));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while signing " + email + " in", e);
+        }
+        new SmokeMemberCredentials(email, password, token.totpSecret()).write(dir);
+        out.printf("Gave %s a password and an authenticator, kept in %s: signing in to %s gave a token with the project %s and the acr %s%n", email,
+                   dir.resolve(SmokeMemberCredentials.FILE), client, token.claims().path(projectStack.identity().projectClaim()), token.claims().path("acr").asText());
+    }
+
+    private void keep(SmokeMemberCredentials credentials, Path dir) {
+        try {
+            credentials.write(dir);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
     private static String read(Path secret) throws IOException {
         if (!Files.isRegularFile(secret)) {
             throw new IOException("No secret " + secret + ": make it with project-secret, which puts tre.secret and git.secret in the project stack's " + FileProjectStackProvider.SECRETS_DIR + " dir");
@@ -250,8 +318,8 @@ public class ManageIdentityMain {
         String userId = provider.ensureUser(email, options.get(FIRST_NAME), options.get(LAST_NAME), projectStack.identity().treClient());
         provider.addMember(projectStack, userId);
         record(projectStack, () -> ProjectMembers.add(ProjectMembers.file(afonHome, projectStack.id().value()), userId, email.toLowerCase(java.util.Locale.ROOT)));
-        if (projectStack.members().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
-            err.printf("Note: %s is not listed in the members of %s: the next sync-members, and so up, takes them out of the group. List them there to keep them.%n",
+        if (projectStack.allMembers().stream().noneMatch(member -> member.email().equalsIgnoreCase(email))) {
+            err.printf("Note: %s is not listed in the members or smokeMembers of %s: the next sync-members, and so up, takes them out of the group. List them there to keep them.%n",
                        email, projectStack.id());
         }
         out.println(userId);
@@ -297,7 +365,7 @@ public class ManageIdentityMain {
         IdentityProvider provider = identity.apply(projectStack, endpoint);
         Map<String, String> current = provider.members(projectStack);
         Map<String, String> wanted = new LinkedHashMap<>();
-        for (TreProjectStack.Member member : projectStack.members()) {
+        for (TreProjectStack.Member member : projectStack.allMembers()) {
             String userId = provider.ensureUser(member.email(), member.firstName(), member.lastName(), projectStack.identity().treClient());
             wanted.put(userId, member.email());
             if (!current.containsKey(userId)) {

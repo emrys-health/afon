@@ -84,6 +84,13 @@ public sealed interface ProjectStack permits TreProjectStack, IdentityProjectSta
     }
 
     /**
+     * @return everyone who is in the project stack's group: its members, and the smoke members that the smoke tests sign in as
+     */
+    default @NonNull List<TreProjectStack.Member> allMembers() {
+        return members();
+    }
+
+    /**
      * @return the id of the identity project stack, ie the project stack with the role {@link ProjectStackRole#IDENTITY}, that deploys the central identity that the
      * project stack uses, or {@code null} if it uses none that Afon deployed: a TRE project stack and a data project stack use the central identity, the identity
      * project stack is it

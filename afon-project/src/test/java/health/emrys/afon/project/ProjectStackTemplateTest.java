@@ -85,7 +85,7 @@ class ProjectStackTemplateTest {
         Path dir = Files.createTempDirectory("templates");
         assertThatThrownBy(() -> ProjectStackTemplate.render(dir, ProjectStackRole.TRE, AfonCloud.AZURE, "xyz-yyyy-nnnn", null))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No template");
-        Files.writeString(dir.resolve("project-tre.yaml"), "project-stack: {id: ${nope}}\n");
+        Files.writeString(dir.resolve("project-tre.yaml"), "projectStack: {id: ${nope}}\n");
         assertThatThrownBy(() -> ProjectStackTemplate.render(dir, ProjectStackRole.TRE, AfonCloud.AZURE, "xyz-yyyy-nnnn", null))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("${nope}");
     }

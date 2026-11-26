@@ -39,7 +39,7 @@ final class TreEgress {
         for (TreProjectStack tre : readers(afonHome, data)) {
             String ip = egressIp(afonHome, tre);
             if (ip == null) {
-                problems.add(String.format("project stack %s reads this Data Provider, but leaves from no known address, so it could not be admitted: set project-stack.egressIp in its file, "
+                problems.add(String.format("project stack %s reads this Data Provider, but leaves from no known address, so it could not be admitted: set projectStack.egressIp in its file, "
                                            + "or %s_EGRESS_IP in the config it is made from", tre.id(), tre.cloud().name()));
             } else {
                 addresses.add(ip);
