@@ -188,9 +188,10 @@ public class JupyterPodNotebookSmokeMain {
             if (Files.isRegularFile(cliPath)) {
                 return cliPath;
             }
-            throw new IllegalArgumentException(format("No notebook at %s, nor %s" ,
+            throw new IllegalArgumentException(format("No notebook at %s, nor %s, nor %s" ,
                                                       notebook.toAbsolutePath(),
-                                                      fromRoot));
+                                                      fromRoot.toAbsolutePath(),
+                                                      cliPath.toAbsolutePath()));
         }
         return notebook;
     }
