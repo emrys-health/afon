@@ -16,10 +16,12 @@ import org.slf4j.LoggerFactory;
 import health.emrys.afon.ops.kube.ExecResult;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -153,9 +155,7 @@ public class JupyterPodNotebookSmokeMain {
         if (isProjectStack(properties)) {
             throw new RuntimeException("Not run for a project's TRE, whose Polaris admits only the tokens of its members, which the configured user is not");
         }
-        if (!Files.isRegularFile(notebook)) {
-            throw new IllegalArgumentException("No notebook " + notebook.toAbsolutePath());
-        }
+
         String pod;
         String executedNotebook;
         try (KubeClient client = new KubeClient(properties)) {
@@ -176,8 +176,23 @@ public class JupyterPodNotebookSmokeMain {
         return errors;
     }
 
+    private static Path pathOf(String relativePath) {
+        Path notebook = Paths.get(relativePath);
+        if (!Files.isRegularFile(notebook)) {
+            Path fromRoot = Path.of("..", File.separator, relativePath);
+            if (Files.isRegularFile(fromRoot)) {
+                return fromRoot;
+            }
+            throw new IllegalArgumentException(format("No notebook at %s, nor %s" ,
+                                                      notebook.toAbsolutePath(),
+                                                      fromRoot));
+        }
+        return notebook;
+    }
+
+
     public static void main(String[] args) {
-        Path         notebook = Path.of(args.length > 0 ? args[0] : DEFAULT_NOTEBOOK);
+        Path         notebook = pathOf(args.length > 0 ? args[0] : DEFAULT_NOTEBOOK);
         List<String> errors   = new ArrayList<>();
         try {
             SmokeConfig smokeConfig = new SmokeConfig();
