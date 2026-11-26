@@ -52,10 +52,14 @@ public class JupyterPodNotebookSmokeMain {
 
     static final String DEFAULT_NOTEBOOK = "demo/notebooks/AwsSmokeTest.ipynb";
 
-    /** The container of a user's pod that runs the notebook server, as KubeSpawner names it. */
+    /**
+     * The container of a user's pod that runs the notebook server, as KubeSpawner names it.
+     */
     static final String NOTEBOOK_CONTAINER = "notebook";
 
-    /** How long a cell may run, and the notebook in all. */
+    /**
+     * How long a cell may run, and the notebook in all.
+     */
     static final int CELL_TIMEOUT_SECONDS     = 600;
     static final int NOTEBOOK_TIMEOUT_MINUTES = 20;
 
@@ -65,7 +69,8 @@ public class JupyterPodNotebookSmokeMain {
      * The notebook is read by its size, with head, rather than up to the end of the input, so that nothing hangs on an end that the
      * exec does not pass on.
      */
-    static final String SCRIPT = String.join("\n",
+    static final String SCRIPT = String.join(
+        "\n",
         "set -eu",
         "dir=$(mktemp -d)",
         "trap 'rm -rf \"$dir\"' EXIT",
@@ -103,9 +108,9 @@ public class JupyterPodNotebookSmokeMain {
      * @return the errors that the cells of the executed notebook raised, as "cell <n>: <name>: <value>", with any credentials
      * redacted; none if every cell ran
      */
-    static List<String> errorsOf(String executed) throws IOException {
+    static List<String> parse(String executedNotebook) throws IOException {
         List<String> errors = new ArrayList<>();
-        JsonNode     cells  = JSON.readTree(executed).path("cells");
+        JsonNode     cells  = JSON.readTree(executedNotebook).path("cells");
         for (int i = 0; i < cells.size(); i++) {
             for (JsonNode output : cells.get(i).path("outputs")) {
                 if ("error".equals(output.path("output_type").asText())) {
@@ -120,8 +125,9 @@ public class JupyterPodNotebookSmokeMain {
      * @return the executed notebook
      */
     String runInPod(String pod, Path notebook, String token) throws IOException, InterruptedException {
-        List<String> command = List.of("kubectl", "exec", "-i", "-n", KUBERNETES_NAMESPACE, "-c", NOTEBOOK_CONTAINER, pod, "--",
-                                       "sh", "-c", SCRIPT);
+        List<String> command = List.of(
+            "kubectl", "exec", "-i", "-n", KUBERNETES_NAMESPACE, "-c", NOTEBOOK_CONTAINER, pod, "--",
+            "sh", "-c", SCRIPT);
         logger.info("Running {} in pod {}", notebook, pod);
         Process process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT).start();
         CompletableFuture<byte[]> stdout = CompletableFuture.supplyAsync(() -> {
@@ -140,8 +146,9 @@ public class JupyterPodNotebookSmokeMain {
         }
         String executed = new String(stdout.join(), StandardCharsets.UTF_8);
         if (process.exitValue() != 0) {
-            throw new IllegalStateException(format("Could not run %s in pod %s (exit %d): see the output of nbconvert above",
-                                                   notebook, pod, process.exitValue()));
+            throw new IllegalStateException(format(
+                "Could not run %s in pod %s (exit %d): see the output of nbconvert above",
+                notebook, pod, process.exitValue()));
         }
         return executed;
     }
@@ -161,17 +168,18 @@ public class JupyterPodNotebookSmokeMain {
         try (KubeClient client = new KubeClient(properties)) {
             pod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
         }
-        String executed = runInPod(pod, notebook, sparkConnectToken());
-        Path   saved    = Path.of(afonHome(), "smoke", "notebooks", notebook.getFileName().toString());
+        String executedNotebook = runInPod(pod, notebook, sparkConnectToken());
+        Path   saved            = Path.of(System.getProperty("java.io.tmpdir"), "smoke", "notebooks", notebook.getFileName().toString());
         Files.createDirectories(saved.getParent());
-        Files.writeString(saved, executed);
-        List<String> errors = errorsOf(executed);
+        Files.writeString(saved, executedNotebook);
+        List<String> errors = parse(executedNotebook);
         if (errors.isEmpty()) {
             logger.info("{} ran in pod {} with no error; the executed notebook is {}", notebook.getFileName(), pod, saved);
             return true;
         }
-        logger.error("{} of the cells of {} failed in pod {}, see the executed notebook {}:\n{}", errors.size(), notebook.getFileName(), pod,
-                     saved, String.join("\n", errors));
+        logger.error(
+            "{} of the cells of {} failed in pod {}, see the executed notebook {}:\n{}", errors.size(), notebook.getFileName(), pod,
+            saved, String.join("\n", errors));
         return false;
     }
 
