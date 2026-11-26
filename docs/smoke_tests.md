@@ -358,6 +358,24 @@ stack aws-full torn down in 07:10
 regression suite completed in 27:03
 ```
 
+#### The notebook in a Jupyter pod
+
+The `jupyter-pod-aws` test (`jupyter-pod-notebook-smoke`, [JupyterPodNotebookSmokeMain](../afon-ops/src/main/java/health/emrys/afon/ops/smoke/JupyterPodNotebookSmokeMain.java))
+runs [demo/notebooks/AwsSmokeTest.ipynb](../demo/notebooks/AwsSmokeTest.ipynb) in a user's own Jupyter pod, as the user would, rather than from your machine
+as `smoke-notebook` does: with the pod's Python and Spark Connect client, its network policy and its certificate of Trino. So it checks Spark Connect,
+with the token in its header, a Python UDF on the executors, whose Python must be that of the pod, and Trino over HTTPS, from where a user runs them.
+
+It asks JupyterHub to spawn the pod of the configured user (`USER_ID`), as the `network` test does. A pod spawned so has no `OIDC_TOKEN`, which the
+hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`. The token and the
+notebook are sent on the standard input of `kubectl exec`, so the token is in no command line, and the notebook runs in a temporary directory of the pod,
+removed afterwards, with `jupyter nbconvert --execute`. Every cell is run, even after one fails, and the test fails if any cell raised an error. The
+executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/AwsSmokeTest.ipynb`.
+
+The notebook is AWS's: its catalog `test_aws` is the `aws` warehouse of the Polaris it names, and it reads the table `admin.deployments` that
+`spark-polaris` writes, so the suite runs it after that test. Deselect it when testing another cloud. Another notebook is run with
+`./afon.sh -a jupyter-pod-notebook-smoke -- <notebook>`. Like `spark-polaris`, it is skipped, and passes, for a project's TRE, whose Polaris admits
+only the tokens of its members.
+
 ## Other smoke tests
 
 - `ops.demo.GeneratePySparkKeycloakMain` and `ops.demo.GeneratePySparkContextMain` generate PySpark code declaring

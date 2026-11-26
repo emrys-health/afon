@@ -1,5 +1,6 @@
 package health.emrys.afon.cdk.configs;
 
+import health.emrys.afon.spark.Constants;
 import health.emrys.afon.cdk.CdkUtils;
 import health.emrys.afon.cdk.CloudPlatform;
 import health.emrys.afon.cdk.DockerImageResolver;
@@ -706,6 +707,11 @@ public class JupyterHubConfig {
                    # Inject the user's OIDC token, read by the Spark Connector and Polaris.
                    if auth_state:
                        spawner.environment['OIDC_TOKEN'] = auth_state.get('access_token', '')
+                       # And Spark Connect's address with the token in its header, which PySpark connects to when a session is
+                       # built with no remote, so that SparkSession.builder.getOrCreate() needs neither.  Only with a token, as
+                       # with SPARK_REMOTE set PySpark refuses a local session, and Spark Connect refuses a call with no token.
+                       if auth_state.get('access_token'):
+                           spawner.environment['SPARK_REMOTE'] = '%24$s' + auth_state['access_token']
                        if auth_state.get('id_token'):
                            spawner.environment['OIDC_ID_TOKEN'] = auth_state['id_token']
                c.Spawner.auth_state_hook = _on_spawn
@@ -721,7 +727,16 @@ public class JupyterHubConfig {
             SINGLEUSER_LABEL_KEY, SINGLEUSER_LABEL_VALUE,
             pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL,
             vncSecretName(""), VNC_PASSWORD_KEY,
-            TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME);
+            TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME,
+            sparkRemoteWithoutToken());
+    }
+
+    /**
+     * @return the connection string of Spark Connect that the hub puts in a user's pod as {@code SPARK_REMOTE}, but for the user's
+     * token, which follows it: Spark Connect takes the token from the header that it names, see SparkConnectGuardInterceptor
+     */
+    static String sparkRemoteWithoutToken() {
+        return SparkWorkloads.SPARK_CONNECT_URL + ";" + Constants.TOKEN_HEADER + "=";
     }
 
     /**

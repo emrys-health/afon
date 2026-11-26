@@ -78,9 +78,15 @@ driver and executors, the server runs no JVM code of its clients: no Scala or Ja
 clouds' object stores (`s3`, `s3a`, `gs`, `abfs(s)`, `wasb(s)`), never on the servers' local disks, and no table is made in `spark_catalog`, which
 every session shares and keeps on local disk. See `afon-spark-additional`.
 
+JupyterHub also puts that connection string, with the user's token, in the pod as `SPARK_REMOTE`, which PySpark connects to when a session is built
+with no `remote`, so a notebook names neither the server nor the token, but for its catalogs. It holds the same token as `OIDC_TOKEN`, from the sign-in
+that started the pod, so it expires with it. With `SPARK_REMOTE` set, PySpark refuses a local session (`master("local[*]")`, `CANNOT_CONFIGURE_SPARK_CONNECT_MASTER`): unset it
+first, with `os.environ.pop("SPARK_REMOTE")`. An explicit `remote(...)` is still taken over it.
+
 ```python
 OIDC_TOKEN = os.environ["OIDC_TOKEN"]
-spark = (SparkSession.builder.remote(f"sc://spark-connector-0-driver-svc:15002/;x-afon-token={OIDC_TOKEN}")
+# Spark Connect, with the token, from SPARK_REMOTE
+spark = (SparkSession.builder
     .config("spark.sql.catalog.aws", "org.apache.iceberg.spark.SparkCatalog")
     .config("spark.sql.catalog.aws.type", "rest")
     .config("spark.sql.catalog.aws.uri", "https://<polaris-host>/api/catalog")

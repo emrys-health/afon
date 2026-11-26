@@ -39,6 +39,8 @@ import static java.lang.String.format;
 public class SparkWorkloads {
     /** Name of the {@code SparkApplication} serving Spark Connect, which the network policies select its pods by. */
     public static final String SPARK_CONNECTOR_NAME = "spark-connector";
+    /** Where the notebooks reach Spark Connect: the Service the operator makes for the {@code SparkApplication}'s driver. */
+    public static final String SPARK_CONNECT_URL = "sc://" + SPARK_CONNECTOR_NAME + "-0-driver-svc:15002/";
     /** The trigger holding the name of the {@code SparkCluster}, which replaces the resources applying it when it changes. */
     private static final String CLUSTER_NAME_TRIGGER = "clusterName";
     /**
