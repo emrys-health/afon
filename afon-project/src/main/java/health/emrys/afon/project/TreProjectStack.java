@@ -115,7 +115,7 @@ public record TreProjectStack(@NonNull ProjectStackId id, @NonNull AfonCloud clo
     /**
      * @return the smoke member that the smoke tests sign in as, to test the TRE as a member would use it: the first that the file lists, none if it lists none
      */
-    public java.util.Optional<Member> smokeTestMember() {
+    public java.util.Optional<Member> smokeMember() {
         return smokeMembers.stream().findFirst();
     }
 

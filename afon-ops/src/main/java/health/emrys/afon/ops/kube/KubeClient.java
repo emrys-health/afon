@@ -3,6 +3,7 @@ package health.emrys.afon.ops.kube;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.ConfigUtils;
+import io.kubernetes.client.Copy;
 import io.kubernetes.client.Exec;
 import io.kubernetes.client.PortForward;
 import io.kubernetes.client.openapi.ApiClient;
@@ -296,6 +297,22 @@ public class KubeClient implements AutoCloseable {
         } finally {
             process.destroy();
         }
+    }
+
+    /**
+     * Copies a local file into the pod, as {@code kubectl cp <local> <pod>:<remote>} does, so that the pod needs {@code tar}.
+     *
+     * @param remote the path of the file in the pod, whose directory exists
+     */
+    public void copyToPod(String pod, java.nio.file.Path local, String remote) throws ApiException, IOException {
+        new Copy(execApiClient()).copyFileToPod("default", pod, null, local, java.nio.file.Path.of(remote));
+    }
+
+    /**
+     * Copies a file of the pod to a local file, as {@code kubectl cp <pod>:<remote> <local>} does.
+     */
+    public void copyFromPod(String pod, String remote, java.nio.file.Path local) throws ApiException, IOException {
+        new Copy(execApiClient()).copyFileFromPod("default", pod, null, remote, local);
     }
 
     public ExecResult exec(String pod, String... command)

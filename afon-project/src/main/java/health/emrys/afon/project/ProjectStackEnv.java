@@ -258,7 +258,7 @@ public final class ProjectStackEnv {
         }
         common.put(OIDC_ACR.getName(), identity.acr());
         common.put(OIDC_PROJECT_CLAIM.getName(), identity.projectClaim());
-        projectStack.smokeTestMember().ifPresent(member -> common.put(SMOKE_MEMBER.getName(), member.email()));
+        projectStack.smokeMember().ifPresent(member -> common.put(SMOKE_MEMBER.getName(), member.email()));
         common.put(OIDC_USER_CLAIM.getName(), identity.userClaim());
         if (projectStack.git() != null) {
             common.put(GIT_DOMAIN_NAME.getName(), projectStack.git().domain());

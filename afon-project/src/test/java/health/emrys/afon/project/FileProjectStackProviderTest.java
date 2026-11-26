@@ -124,12 +124,12 @@ class FileProjectStackProviderTest {
     void listsTheSmokeMembersApartFromTheMembersAndSignsTheSmokeTestsInAsTheFirst(AfonCloud cloud) {
         TreProjectStack none = (TreProjectStack) FileProjectStackProvider.parse(valid(cloud));
         assertThat(none.smokeMembers()).isEmpty();
-        assertThat(none.smokeTestMember()).isEmpty();
+        assertThat(none.smokeMember()).isEmpty();
 
         TreProjectStack listed = (TreProjectStack) FileProjectStackProvider.parse(
             valid(cloud) + "smokeMembers:\n  - Smoke@example.org\n  - {email: smoke2@example.org, firstName: Smoke, lastName: Two}\n");
         assertThat(listed.smokeMembers()).extracting(TreProjectStack.Member::email).containsExactly("smoke@example.org", "smoke2@example.org");
-        assertThat(listed.smokeTestMember().orElseThrow().email()).isEqualTo("smoke@example.org");
+        assertThat(listed.smokeMember().orElseThrow().email()).isEqualTo("smoke@example.org");
         assertThat(listed.members()).extracting(TreProjectStack.Member::email).containsExactly("ada@example.org");
         assertThat(listed.allMembers()).extracting(TreProjectStack.Member::email).containsExactly("ada@example.org", "smoke@example.org", "smoke2@example.org");
     }

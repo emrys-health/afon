@@ -317,7 +317,7 @@ afon-cli.sh manage-project-stack run lon spark-polaris-smoke
 
 Releasing `smoke_test` (`afon-cli.sh manage-project-stack run lon manage-data release cvd smoke_test`) gives the projects that `lon` has let in a table with
 rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb` with Spark, `project-trino-reads-data-providers.ipynb` with Trino), and
-leaves `smoke_test_unreleased` in `staging`, which they must be refused. In a project's TRE, `smoke-notebook` runs those two notebooks from the CLI, as the smoke member, and a member can run them in their pod.
+leaves `smoke_test_unreleased` in `staging`, which they must be refused. In a project's TRE, `smoke-notebook` runs those two notebooks in the pod of the smoke member, which it signs in to the hub (or, with `--local`, from your machine), and a member can run them in their own.
 See [Projects](projects.md#a-first-tre-project).
 
 Writing the tables is a test, never part of an operation: nothing that deploys or

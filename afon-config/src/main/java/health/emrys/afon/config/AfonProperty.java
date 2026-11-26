@@ -284,8 +284,8 @@ public enum AfonProperty {
     /** The project stack's immutable id, eg {@code xyz-yyyy-nnnn}, which names its clients, group and principal role.  Set for a project stack. */
     PROJECT_ID("PROJECT_ID"),
     /**
-     * The email of the member that the smoke tests sign in as, to test the project stack's TRE as a member uses it: the one that {@code project.yaml} marks with
-     * {@code smokeTests: true}, else its first member.  Set for a project stack's TRE.
+     * The email of the smoke member, to sign in as in the smoke tests, which test the project stack's TRE as a member uses it: the first of the {@code smokeMembers} of
+     * {@code project.yaml}.  Set for a project stack's TRE that lists any, and not otherwise.
      */
     SMOKE_MEMBER("SMOKE_MEMBER"),
     /** The domain of the project stack's Git.  Set for a project stack. */

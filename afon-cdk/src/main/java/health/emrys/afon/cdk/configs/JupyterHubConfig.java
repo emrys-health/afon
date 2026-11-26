@@ -106,7 +106,16 @@ public class JupyterHubConfig {
     private static final String CONFIG_MAP_NAME  = "hub-config";
     private static final String CONFIG_FILE      = "jupyterhub_config.py";
     private static final String CONFIG_MOUNT     = "/etc/jupyterhub";
-    private static final String SECRET_NAME      = "jupyterhub-secrets";
+    /** The secret that holds the hub's secrets. */
+    public static final String SECRET_NAME      = "jupyterhub-secrets";
+    /** The key, in {@link #SECRET_NAME}, of the token of the hub's service for the smoke tests, see {@link #SMOKE_SERVICE}. */
+    public static final String SMOKE_API_TOKEN_KEY = "smoke.apiToken";
+    /**
+     * The hub's service for the smoke tests, which only a TRE that lists smoke members has: it has a token of its own for the hub's API, and a role of only what they need, which is to read users and start and stop their
+     * servers, so that nothing has to mint the token of a user, which the hub then keeps for ever.  Not {@code admin:users}, which includes {@code admin:auth_state}, the
+     * OIDC tokens that the hub keeps of its users.
+     */
+    public static final String SMOKE_SERVICE = "afon-smoke";
 
     /**
      * JupyterHub owns the domain root so that a bare visit to the domain lands on the hub, which
@@ -281,12 +290,7 @@ public class JupyterHubConfig {
                                     .name(SECRET_NAME)
                                     .namespace("default")
                                     .build())
-            .data(Map.of(
-                "proxy.token", sha256Hex("proxy-token:" + cookieSecret),
-                "hub.cookieSecret", sha256Hex("cookie-secret:" + cookieSecret),
-                "hub.cryptKey", sha256Hex("crypt-key:" + cookieSecret),
-                "oauth.clientId", oauthClientId(),
-                "oauth.clientSecret", oauthClientSecret()))
+            .data(hubSecrets(cookieSecret))
             .dependsOn(eksDependOn)
             .build();
 
@@ -457,6 +461,32 @@ public class JupyterHubConfig {
         }
     }
 
+    private List<DeploymentSpecTemplateSpecContainerEnv> hubEnvironment() {
+        List<DeploymentSpecTemplateSpecContainerEnv> env = new ArrayList<>(List.of(
+            envFromSecret("CONFIGPROXY_AUTH_TOKEN", SECRET_NAME, "proxy.token"),
+            envFromSecret("JPY_COOKIE_SECRET", SECRET_NAME, "hub.cookieSecret"),
+            envFromSecret("JUPYTERHUB_CRYPT_KEY", SECRET_NAME, "hub.cryptKey")));
+        if (hasSmokeService()) {
+            env.add(envFromSecret("AFON_SMOKE_API_TOKEN", SECRET_NAME, SMOKE_API_TOKEN_KEY));
+        }
+        env.add(envFromSecret("OAUTH_CLIENT_ID", SECRET_NAME, "oauth.clientId"));
+        env.add(envFromSecret("OAUTH_CLIENT_SECRET", SECRET_NAME, "oauth.clientSecret"));
+        return env;
+    }
+
+    private Map<String, String> hubSecrets(String cookieSecret) {
+        Map<String, String> data = new java.util.LinkedHashMap<>();
+        data.put("proxy.token", sha256Hex("proxy-token:" + cookieSecret));
+        data.put("hub.cookieSecret", sha256Hex("cookie-secret:" + cookieSecret));
+        data.put("hub.cryptKey", sha256Hex("crypt-key:" + cookieSecret));
+        if (hasSmokeService()) {
+            data.put(SMOKE_API_TOKEN_KEY, sha256Hex("smoke-api-token:" + cookieSecret));
+        }
+        data.put("oauth.clientId", oauthClientId());
+        data.put("oauth.clientSecret", oauthClientSecret());
+        return data;
+    }
+
     private void deployHub(List<ITerraformDependable> dependsOn) {
         DeploymentSpecTemplateSpecContainer hubContainer = DeploymentSpecTemplateSpecContainer
             .builder()
@@ -464,12 +494,7 @@ public class JupyterHubConfig {
             .image(images.jupyterhubHub())
             .command(List.of("jupyterhub"))
             .args(List.of("--config", CONFIG_MOUNT + "/" + CONFIG_FILE))
-            .env(List.of(
-                envFromSecret("CONFIGPROXY_AUTH_TOKEN", SECRET_NAME, "proxy.token"),
-                envFromSecret("JPY_COOKIE_SECRET", SECRET_NAME, "hub.cookieSecret"),
-                envFromSecret("JUPYTERHUB_CRYPT_KEY", SECRET_NAME, "hub.cryptKey"),
-                envFromSecret("OAUTH_CLIENT_ID", SECRET_NAME, "oauth.clientId"),
-                envFromSecret("OAUTH_CLIENT_SECRET", SECRET_NAME, "oauth.clientSecret")))
+            .env(hubEnvironment())
             .port(List.of(DeploymentSpecTemplateSpecContainerPort.builder()
                                                                  .containerPort(HUB_PORT)
                                                                  .protocol("TCP")
@@ -728,7 +753,7 @@ public class JupyterHubConfig {
             pythonDictOf(auditPodLabels(properties)), AUDIT_USER_LABEL,
             vncSecretName(""), VNC_PASSWORD_KEY,
             TRINO_CA_CERT_ENV, TrinoWorkloads.TLS_CA_KEY, TRINO_CA_DIR, TrinoWorkloads.TLS_SECRET_NAME,
-            sparkRemoteWithoutToken());
+            sparkRemoteWithoutToken()) + smokeServiceConfig();
     }
 
     /**
@@ -737,6 +762,31 @@ public class JupyterHubConfig {
      */
     static String sparkRemoteWithoutToken() {
         return SparkWorkloads.SPARK_CONNECT_URL + ";" + Constants.TOKEN_HEADER + "=";
+    }
+
+    /**
+     * @return whether the hub has the service for the smoke tests: only a TRE that lists smoke members, {@code SMOKE_MEMBER}, has it, so that a TRE that does not, eg
+     * a production one, has nothing of the smoke tests in its hub: no service, no token and no role
+     */
+    private boolean hasSmokeService() {
+        return !properties.getValue(AfonProperty.SMOKE_MEMBER, "").isBlank();
+    }
+
+    /**
+     * @return the lines of the hub's config that make the service for the smoke tests, with a token of its own for the hub's API and a role of only what they need: to read users
+     * and to start and stop their servers, and not their auth_state, which holds their OIDC tokens.  Without it the token of a user has to be minted, which the hub keeps for ever
+     */
+    private String smokeServiceConfig() {
+        if (!hasSmokeService()) {
+            return "";
+        }
+        return """
+               
+               # --- The service for the smoke tests: this TRE lists smoke members.  Its token is in the hub's secret; its role is only to read users and to start and stop their
+               #     servers, and not their auth_state, which holds their OIDC tokens. ---
+               c.JupyterHub.services = [{'name': '%1$s', 'api_token': os.environ['AFON_SMOKE_API_TOKEN']}]
+               c.JupyterHub.load_roles = [{'name': '%1$s', 'scopes': ['servers', 'read:users'], 'services': ['%1$s']}]
+               """.formatted(SMOKE_SERVICE);
     }
 
     /**

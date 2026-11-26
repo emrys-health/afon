@@ -9,8 +9,6 @@ import health.emrys.afon.config.FilePropertyProvider;
 import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.commands.CliCommand;
-import health.emrys.afon.ops.kube.commands.DeployCommand;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.jspecify.annotations.NonNull;
@@ -31,6 +29,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+
+import health.emrys.afon.cdk.configs.JupyterHubConfig;
 
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_LABELS;
 import static health.emrys.afon.cdk.configs.JupyterHubConfig.HUB_PORT;
@@ -83,21 +83,68 @@ public class JupyterHubSpawner {
      * @return the name of the user's notebook pod once the hub reports their server as ready.
      */
     public String spawnWithJupyterToken(AfonPropertyProvider properties) throws Exception {
-        String     email  = findEmailFor(properties.getValue(USER_ID));
-        ExecResult result = getJupyterTokenFor(email, client);
-        if (result.isSuccess()) {
-            String token = result.stdout().strip();
-            logger.info("JupyterHub Token: {}", token);
-            logger.warn(
-                format("Note that user with email '%s' will not have an OIDC token if they then login through Guacamole",
-                       email));
-            String pod = spawn(email, Duration.ofMinutes(5), token);
-            logger.info("Pod {} running", pod);
-            return pod;
-        } else {
-            String msg = "Could not get token. Error: " + result.stderr();
-            logger.error(msg);
-            throw new Exception(msg);
+        String email = findEmailFor(properties.getValue(USER_ID));
+        String token = apiToken(email);
+        if (token == null) {
+            throw new IllegalStateException("Could not get a token for the hub's API: the hub has no user " + email);
+        }
+        logger.warn(format("Note that user with email '%s' will not have an OIDC token if they then login through Guacamole", email));
+        String pod = spawn(email, Duration.ofMinutes(5), token);
+        logger.info("Pod {} running", pod);
+        return pod;
+    }
+
+    /**
+     * Stops the user's notebook server, if the hub has one, through the hub's API, so that the hub knows it is gone and starts a new one, with the user's token as it is
+     * then, at their next sign-in; and waits for its pod to be gone.
+     */
+    public void stopServer(String email, Duration timeout) throws Exception {
+        String apiToken = apiToken(email);
+        if (apiToken == null) {
+            // the hub has never had the user, who has signed in to it never, so there is no server of theirs to stop
+            logger.info("The hub has no user {}, so there is no server to stop", email);
+            return;
+        }
+        try (PortForwarder forward = new PortForwarder(client, namespace, findHubPod(), 0, HUB_PORT)) {
+            String server = "http://localhost:" + forward.localPort() + "/hub/api/users/" + URLEncoder.encode(email, StandardCharsets.UTF_8) + "/server";
+            HttpResponse<String> stopped = send("DELETE", server, apiToken);
+            // 204 stopped, 202 stopping, 400 not running, 404 the hub does not know the user: the user has no server to stop
+            if (!List.of(202, 204, 400, 404).contains(stopped.statusCode())) {
+                expect(stopped, 202, 204);
+            }
+        }
+        Instant deadline = Instant.now().plus(timeout);
+        while (findUserPod(email).isPresent()) {
+            if (Instant.now().isAfter(deadline)) {
+                throw new TimeoutException("The pod of " + email + " is still there after " + timeout + ", though the hub was asked to stop the server");
+            }
+            Thread.sleep(2_000);
+        }
+    }
+
+    /**
+     * @return the name of the user's notebook pod, once there is one that was made after {@code after}, which is running and ready: the pod of the sign-in that
+     * was made then, which has the user's token as it was then
+     */
+    public String awaitPod(String email, Instant after, Duration timeout) throws Exception {
+        Instant deadline = Instant.now().plus(timeout);
+        while (true) {
+            for (V1Pod pod : client.listPods()) {
+                Map<String, String> annotations = pod.getMetadata() == null ? null : pod.getMetadata().getAnnotations();
+                boolean theirs = annotations != null && email.equals(annotations.get(USERNAME_ANNOTATION));
+                boolean newer = pod.getMetadata() != null && pod.getMetadata().getCreationTimestamp() != null
+                                && pod.getMetadata().getCreationTimestamp().toInstant().isAfter(after.minusSeconds(5));
+                boolean ready = pod.getStatus() != null && "Running".equals(pod.getStatus().getPhase()) && pod.getStatus().getContainerStatuses() != null
+                                && !pod.getStatus().getContainerStatuses().isEmpty() && pod.getStatus().getContainerStatuses().stream().allMatch(c -> Boolean.TRUE.equals(c.getReady()));
+                if (theirs && newer && ready && pod.getMetadata().getDeletionTimestamp() == null) {
+                    return pod.getMetadata().getName();
+                }
+            }
+            if (Instant.now().isAfter(deadline)) {
+                throw new TimeoutException("No notebook pod of " + email + " that is running and was made since the sign-in, within " + timeout
+                                           + ": did the hub start their server? (kubectl get pods; the hub's logs)");
+            }
+            Thread.sleep(POLL_INTERVAL.toMillis());
         }
     }
 
@@ -108,8 +155,8 @@ public class JupyterHubSpawner {
                 + URLEncoder.encode(email, StandardCharsets.UTF_8);
 
             if (send("GET", userUrl, apiToken).statusCode() == 404) {
-                logger.info("User {} not known to the hub; creating", email);
-                expect(send("POST", userUrl, apiToken), 201);
+                // the smoke service may not make users, which would give it their auth_state: a user is made by their first sign-in
+                throw new IllegalStateException("The hub has no user " + email + ": they are made by their first sign-in to the hub");
             }
 
             String               server  = userUrl + "/server";
@@ -220,18 +267,52 @@ public class JupyterHubSpawner {
         return podLabels != null && podLabels.entrySet().containsAll(labels.entrySet());
     }
 
+    /** What an email is made of, for the one that is put in the command that mints a token. */
+    private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+");
+
+    /** The tokens for the hub's API that have been got, by email: they are kept for the life of this, as getting one is a call into the hub. */
+    private final Map<String, String> tokens = new java.util.HashMap<>();
+
     /**
-     * Note this is fragile as the command to mint a Jupyter token is not fixed.
+     * The token for the hub's API with which to make the user, start their server and stop it: that of the hub's service for the smoke tests, which the hub's
+     * secret holds, see {@link JupyterHubConfig#SMOKE_SERVICE}.  A hub that was deployed before it has none, so for such a hub the hub mints the token of the user,
+     * with its own command, which it keeps for ever: it is a fall back, which a deploy of the TRE does away with.  The token is never logged.
+     *
+     * @return the token, or {@code null} if the hub has none of its service and no such user
      */
-    private ExecResult getJupyterTokenFor(String email, KubeClient client) throws Exception {
-        CliCommand command = new DeployCommand(client,
-                                               "hub-deployment",
-                                               "hub",
-                                               "jupyterhub token --config /etc/jupyterhub/jupyterhub_config.py " + email);
-        List<ExecResult> results = command.run();
-        assert results.size() == 1;
-        ExecResult result = results.get(0);
-        return result;
+    private String apiToken(String email) throws Exception {
+        if (tokens.containsKey(email)) {
+            return tokens.get(email);
+        }
+        String token;
+        try {
+            token = new String(client.secretValue(namespace, JupyterHubConfig.SECRET_NAME, JupyterHubConfig.SMOKE_API_TOKEN_KEY), StandardCharsets.UTF_8).strip();
+        } catch (IllegalStateException | ApiException e) {
+            logger.warn("The hub has no service for the smoke tests ({}): it was deployed without it, so a token of {} is minted, which it keeps for ever. Deploy the TRE again to do away with that",
+                        e.getMessage(), email);
+            token = mintTokenFor(email);
+        }
+        if (token != null) {
+            tokens.put(email, token);
+        }
+        return token;
+    }
+
+    /**
+     * @return the token, or {@code null} if the hub has no such user
+     */
+    private String mintTokenFor(String email) throws Exception {
+        if (!EMAIL.matcher(email).matches()) {
+            throw new IllegalArgumentException("Not an email to mint a hub token for: " + email);
+        }
+        ExecResult result = client.execInDeployment(namespace, "hub-deployment", "hub", "jupyterhub", "token", "--config", "/etc/jupyterhub/jupyterhub_config.py", email);
+        if (result.isSuccess()) {
+            return result.stdout().strip();
+        }
+        if (result.stderr().contains("No such user")) {
+            return null;
+        }
+        throw new IllegalStateException("Could not get a hub token for " + email + ": " + result.stderr());
     }
 
 }

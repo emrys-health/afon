@@ -14,6 +14,7 @@
 #   --notebooks
 #             the CSV file of the notebooks (default: scripts/smoke/notebooks.csv)
 #   --list    lists the notebooks and exits
+#   --local   in a project's TRE, runs the notebooks from this machine, not in the pod of its smoke member
 #
 # The notebooks are read from the notebooks file, whose first line is the header 'name|file|description', and
 # each other line a notebook: its name, its file, in scripts/smoke/notebooks if not an absolute path, and its description.  Blank lines and lines
@@ -22,10 +23,13 @@
 # Each executed notebook, with its outputs, is written to $AFON_HOME/smoke/notebooks/<notebook file name>, leaving the
 # original clean.
 #
+# In a project's TRE (the config has SMOKE_MEMBER) the notebooks are those of scripts/smoke/project-notebooks.csv, unless --notebooks gives another file, and, unless
+# --local, nothing below runs: the afon command 'smoke-pod-notebook' signs the smoke member in to the TRE's JupyterHub and runs the notebooks in the member's notebook pod, as a
+# member's are, with the executed notebooks written to $AFON_HOME/smoke/notebooks.  With --local, or elsewhere, they are run from this machine:
+#
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
 # 'check-oidc <cloud>', then
-# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user', or, in a project's TRE (the config has SMOKE_MEMBER), that of the smoke
-# member with '--token smoke-member', and runs the notebooks of scripts/smoke/project-notebooks.csv, port-forwarding the Trino coordinator too if one is Trino's,
+# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user', or, in a project's TRE, that of the smoke member with '--token smoke-member',
 # port-forwards the Spark Connect driver of the cluster of the stack (KUBECONFIG, else that of '<cloud>-update-kube-config tre'), then runs the notebook with
 # 'jupyter-execute'.  The commands are run as 'smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
@@ -61,6 +65,7 @@ list_notebooks() {
 }
 
 LIST=
+LOCAL=
 NOTEBOOKS_GIVEN=
 ARGS=()
 while [ $# -gt 0 ]; do
@@ -78,6 +83,7 @@ while [ $# -gt 0 ]; do
       fi
       export AFON_ENV="$2"; shift 2 ;;
     --list|-l) LIST=true; shift ;;
+    --local) LOCAL=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) ARGS+=("$1"); shift ;;
   esac
@@ -105,7 +111,7 @@ prop() {
 }
 
 
-# A project's TRE, which the config says by naming the member that the smoke tests sign in as: its notebooks are those of its own file, unless --notebooks gave
+# A project's TRE, which the config says by naming its smoke member, SMOKE_MEMBER: its notebooks are those of its own file, unless --notebooks gave
 # another, and run with that member's token, as only the tokens of the project are admitted there
 SMOKE_MEMBER=$(prop SMOKE_MEMBER)
 if [ -n "$SMOKE_MEMBER" ] && [ -z "$NOTEBOOKS_GIVEN" ]; then
@@ -189,6 +195,16 @@ OIDC_HOST="${OIDC_HOST:-$(prop OIDC_DOMAIN_NAME)}"
 require "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME" "$POLARIS_HOST"
 require "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME or OIDC_DOMAIN_NAME" "$OIDC_HOST"
 
+# In a project's TRE the notebooks are run, by default, in the notebook pod of its smoke member, signed in to the JupyterHub as a member is: they are run where a
+# member's are, with the token that the hub gives the pod, the cluster's own addresses and the pod's network policy.  The afon command does it all.  With --local they
+# are run from this machine as below, with the smoke member's token from Keycloak and port-forwards to Spark Connect and Trino, which tests the reads but not the pod.
+if [ -n "$SMOKE_MEMBER" ] && [ -z "$LOCAL" ]; then
+  RESULTS_DIR="$AFON_HOME/smoke/notebooks"
+  mkdir -p "$RESULTS_DIR"
+  afon smoke-pod-notebook "$RESULTS_DIR" "${NOTEBOOKS[@]}"
+  exit $?
+fi
+
 # the python env that runs the notebooks, set up and checked first: its failures are clearer here than in jupyter-execute
 if ! afon python-setup; then
   echo "The python env is not ready: see above" >&2
@@ -201,7 +217,7 @@ if ! afon check-oidc "$CLOUD" >/dev/null; then
 fi
 echo "OIDC provider at $OIDC_HOST is ready"
 
-# the token of USER_ID, who is the admin, or, in a project's TRE, which admits only the tokens of its project, that of the member that the smoke tests sign in as,
+# the token of USER_ID, who is the admin, or, in a project's TRE, which admits only the tokens of its project, that of its smoke member,
 # signed in as a member is, with the project and the second factor in it
 TOKEN_KIND=user
 [ -z "$SMOKE_MEMBER" ] || TOKEN_KIND=smoke-member
@@ -264,7 +280,7 @@ fi
 export SPARK_REMOTE="sc://localhost:$LOCAL_PORT"
 
 # In a project's TRE, the notebooks that read through Trino reach its coordinator as a pod does, by its HTTPS port, which this forwards to a free local port, trusting
-# its self-signed certificate, which names localhost: TRINO_HOST, TRINO_PORT and TRINO_CA_CERT tell the notebook
+# its self-signed certificate, which names localhost: AFON_TRINO_HOST, AFON_TRINO_PORT and TRINO_CA_CERT tell the notebook
 if [ -n "$SMOKE_MEMBER" ] && printf '%s\n' "${NOTEBOOKS[@]}" | grep -qi trino; then
   TRINO_POD=$(kubectl get pods -o name | grep 'pod/trino-coordinator' | head -1)
   if [ -z "$TRINO_POD" ]; then
@@ -290,7 +306,7 @@ if [ -n "$SMOKE_MEMBER" ] && printf '%s\n' "${NOTEBOOKS[@]}" | grep -qi trino; t
     cat "$TRINO_FORWARD_LOG" >&2
     exit 1
   fi
-  export TRINO_HOST=localhost TRINO_PORT="$TRINO_LOCAL_PORT" TRINO_CA_CERT="$TRINO_CA_FILE"
+  export AFON_TRINO_HOST=localhost AFON_TRINO_PORT="$TRINO_LOCAL_PORT" TRINO_CA_CERT="$TRINO_CA_FILE"
 fi
 
 cd "$AFON_ROOT"

@@ -681,16 +681,22 @@ says where to look.
 **How the notebooks are run.** Two ways, both as a member, as the token they check, `OIDC_TOKEN`, is a member's: nothing else has
 one that a project's TRE accepts.
 
-- **From the CLI, as the smoke member** ([#411](https://github.com/emrys-health/afon/issues/411)). `smoke-notebook`, run in
-  the project stack's home, signs in as the first of the `smokeMembers` (see [Members](#members)), after `manage-identity
-  smoke-credentials`, and runs `project-spark-reads-data-providers.ipynb` and `project-trino-reads-data-providers.ipynb` on
-  your machine, which reaches Spark Connect and the Trino coordinator of the TRE by port-forwards, from its own file,
-  `scripts/smoke/project-notebooks.csv`, as `smoke-notebook` does in a project:
-  `afon-cli.sh manage-project-stack run cvd-2026 smoke-notebook aws`. It fails if a step does, and prints the notebook's
-  output, which it also writes to the `smoke/notebooks` dir of the project stack's home. The smoke member is a member, so
-  each Data Provider must have granted it too: run `manage-data grant` again on it when the smoke members change, as it
-  reads the members from `members.csv`. Run from your machine, the step that the notebook pod cannot call the Data
-  Provider directly is not concluded (`network-smoke` tests it from a member's pod).
+- **From the CLI, in the pod of the smoke member** ([#411](https://github.com/emrys-health/afon/issues/411)). `smoke-notebook`,
+  run in the project stack's home, runs `project-spark-reads-data-providers.ipynb` and
+  `project-trino-reads-data-providers.ipynb`, the notebooks of `scripts/smoke/project-notebooks.csv`, as a member's are: it
+  signs the first of the `smokeMembers` (see [Members](#members)) in to the TRE's JupyterHub, as a browser does, after
+  `manage-identity smoke-credentials`, which has the hub start their pod with their token, and runs the notebooks in that
+  pod, so that the token, the cluster's own addresses and the network policy of the pod are a member's.
+  `afon-cli.sh manage-project-stack run cvd-2026 smoke-notebook aws`. It first stops the member's server, if it has one, so
+  that the sign-in starts a new one, whose token is fresh, and it leaves the pod running after. It fails if a step does and
+  prints the notebook's output, which it also writes to the `smoke/notebooks` dir of the project stack's home. The smoke
+  member is a member, so each Data Provider must have granted it too: run `manage-data grant` again on it when the smoke
+  members change, as it reads the members from `members.csv`.
+- **From the CLI, from your machine.** `smoke-notebook --local` runs the same notebooks on your machine, as the smoke member's
+  token from Keycloak (`check-oidc --token smoke-member`), through port-forwards to the TRE's Spark Connect and Trino. It is
+  quicker and has no pod to start, and it tests the member's reads and refusals, but not the pod: the network policy of the
+  notebook pod is not concluded, and the token is not the one that the hub gives. It is for trying things, and the run in the
+  pod is the one that mirrors what a member does.
 - **Interactively, as a person.** Sign in to the TRE's JupyterHub as a member, copy the notebook into the pod
   (`afon-cli.sh manage-project-stack run cvd-2026 kube-user-cp --user <you> to <path>`, see
   [Jupyter](jupyter.md#copying-notebooks-to-and-from-jupyter-user-pod), or upload it in JupyterLab), run all its cells, and
@@ -1157,7 +1163,9 @@ smokeMembers:
   - smoke@tre.example
 ```
 
-They are in the project's group too, so `up` and `sync-members` make them, and they sign in as members do. `configure`
+They are in the project's group too, so `up` and `sync-members` make them, and they sign in as members do. JupyterHub's list of
+the users that it admits, and Guacamole's logins, are made when the TRE is deployed, so a smoke member that is added to a
+TRE that is up is not admitted by its hub, which answers 403, until `configure` and `up <project-stack> --from tre`. `configure`
 writes the first one to `SMOKE_MEMBER` in the project stack's config, and there is none if the list is empty. The
 smoke tests need a smoke member's password and the secret of their authenticator, which a person alone knows, so give
 them those once the project stack is up:
@@ -1522,7 +1530,7 @@ Provider that its file names:
 ### Members, invitations and the setup of a TRE
 
 - **Partly built: the smoke tests of a TRE that sign in as a user
-  ([#411](https://github.com/emrys-health/afon/issues/411)).** `smoke-notebook` runs the two project notebooks from the CLI as
+  ([#411](https://github.com/emrys-health/afon/issues/411)).** `smoke-notebook` runs the two project notebooks in the pod of
   the smoke member, see [How the notebooks are run](#a-first-tre-project). The other tests that need a token, `smoke-test`'s
   Trino and Spark tests, still sign in as `USER_ID`, who is only an admin in a project's TRE: they are not run as a member.
 - **Not built: rotating a client's secret, and stopping a removed member's servers.** `manage-identity rotate-secret`

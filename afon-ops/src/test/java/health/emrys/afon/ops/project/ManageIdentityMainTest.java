@@ -435,7 +435,7 @@ class ManageIdentityMainTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void givesTheSmokeTestMemberCredentialsAndKeepsThemWithoutPrintingThem(AfonCloud cloud) throws Exception {
+    void givesTheSmokeMemberCredentialsAndKeepsThemWithoutPrintingThem(AfonCloud cloud) throws Exception {
         Path secrets = secretsOf(cloud);
         when(login.login(eq(PROJECT_STACK + "-tre"), eq("client-secret"), eq("https://hub.example/hub/oauth_callback"), eq("smoke@example.org"), any(), eq(null), any()))
             .thenReturn(new KeyCloakMemberLogin.Token("jwt", new ObjectMapper().readTree("{\"project\":[\"x\"],\"acr\":\"mfa\"}"), "SECRETFROMPAGE"));
@@ -480,7 +480,7 @@ class ManageIdentityMainTest {
 
     @ParameterizedTest
     @EnumSource(AfonCloud.class)
-    void failsForAnUnknownSmokeTestMemberAndTakesNoArgument(AfonCloud cloud) throws Exception {
+    void failsForAnUnknownSmokeMemberAndTakesNoArgument(AfonCloud cloud) throws Exception {
         secretsOf(cloud);
         when(identity.findUser("smoke@example.org")).thenReturn(Optional.empty());
 
