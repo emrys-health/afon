@@ -59,10 +59,11 @@ import static java.lang.String.format;
 
 public class NetworkSmokeMain {
 
-    static final  Logger               logger = LoggerFactory.getLogger(NetworkSmokeMain.class);
-    private final AfonPropertyProvider properties;
-    private final KubeClient           client;
-    private final Set<String>          allowedIngressHosts;
+    static final         Logger               logger           = LoggerFactory.getLogger(NetworkSmokeMain.class);
+    private static final String               SPARK_MASTER_SVC = "spark-master-svc.default.svc.cluster.local";
+    private final        AfonPropertyProvider properties;
+    private final        KubeClient           client;
+    private final        Set<String>          allowedIngressHosts;
 
     private NetworkSmokeMain(AfonPropertyProvider properties, KubeClient client) {
         this.properties          = properties;
@@ -95,19 +96,21 @@ public class NetworkSmokeMain {
         results.addAll(checkNetworkWithPods(
             sparkPods(pod -> !isSparkMaster(pod)), List.of(
                 this::checkCanSeeAllowedDomains,
-                this::checkCannotSeeOtherBuckets)));
+                this::checkCannotSee)));
         results.addAll(checkNetworkWithPods(
             sparkPods(this::isSparkMaster), List.of(
-                this::checkCannotSeeOtherBuckets)));
-        results.addAll(checkNetworkWithPods(jupyterPods(), List.of(
-            this::checkCannotSeeOtherBuckets,
-            this::checkVncPasswordIsNotShared,
-            this::checkNotebookOnlyReachableFromHubAndGuacamole,
-            this::checkNotebookTrustsTrinoOverHttps)));
+                this::checkCannotSee)));
+        results.addAll(checkNetworkWithPods(
+            jupyterPods(), List.of(
+                this::checkCannotSee,
+                this::checkVncPasswordIsNotShared,
+                this::checkNotebookOnlyReachableFromHubAndGuacamole,
+                this::checkNotebookTrustsTrinoOverHttps)));
         for (String pod : jupyterPods()) {
-            results.addAll(checkCannotSee(pod, new String[] {
-                "spark-master-svc.default.svc.cluster.local:8080",
-                "spark-connector-0-driver-svc:4040"
+            results.addAll(checkCannotSee(
+                pod, new String[]{
+                    SPARK_MASTER_SVC + ":8080",
+                    "spark-connector-0-driver-svc:4040"
                 }));
         }
         return results;
@@ -130,12 +133,12 @@ public class NetworkSmokeMain {
      * UI is off, and a connection refused would not show that the policy holds.
      */
     private List<ExecResult> checkSparkUisReachableFromNoPod() throws Exception {
-        String     polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
-        SparkNames sparkNames     = SparkNames.from(properties);
-        List<ExecResult> results  = new ArrayList<>();
+        String           polarisPodName = KubeClient.nameOfPod(client.getOnlyPodBegginingWith("polaris-deployment"));
+        SparkNames       sparkNames     = SparkNames.from(properties);
+        List<ExecResult> results        = new ArrayList<>();
         for (V1Pod pod : client.listPods()) {
             String name = KubeClient.nameOfPod(pod);
-            int port;
+            int    port;
             if (name == null || pod.getStatus() == null || pod.getStatus().getPodIP() == null) {
                 continue;
             } else if (name.startsWith(sparkNames.master())) {
@@ -341,13 +344,15 @@ public class NetworkSmokeMain {
         logger.info("Using cloud {} and KeyCloak host {}", cloud, host);
         if (Boolean.parseBoolean(properties.getCloudValue(cloud, KEYCLOAK_EXTERNAL, "false").trim())) {
             return List.of(new ExecResult(
-                0, format("Not checked: the KeyCloak at %s is another stack's, as %s_KEYCLOAK_EXTERNAL=true", host,
-                          cloud.name()), "", command, "localhost"));
+                0, format(
+                "Not checked: the KeyCloak at %s is another stack's, as %s_KEYCLOAK_EXTERNAL=true", host,
+                cloud.name()), "", command, "localhost"));
         }
         if (AllowedCidrs.of(properties, cloud, "keycloak").isEmpty()) {
             return List.of(new ExecResult(
-                0, format("Not checked: the KeyCloak at %s is open to all, as %s is not set", host,
-                          KEYCLOAK_ALLOWED_CIDRS.forCloud(cloud).map(Enum::name).orElse("its allowed CIDRs")), "", command,
+                0, format(
+                "Not checked: the KeyCloak at %s is open to all, as %s is not set", host,
+                KEYCLOAK_ALLOWED_CIDRS.forCloud(cloud).map(Enum::name).orElse("its allowed CIDRs")), "", command,
                 "localhost"));
         }
         KeyCloakProvider keyCloak = new KeyCloakProvider(cloudProperties);
@@ -366,21 +371,25 @@ public class NetworkSmokeMain {
         String error;
         try {
             adminToken.call();
-            error = format("Obtained an admin token from the KeyCloak at %s from here, which is not meant to be allowed to reach its "
-                           + "admin side", host);
+            error = format(
+                "Obtained an admin token from the KeyCloak at %s from here, which is not meant to be allowed to reach its "
+                + "admin side", host);
         } catch (Exception e) {
             int code = refusalCodeOf(e);
             if (code == 403) {
-                String msg = format("The ingress of the KeyCloak at %s refused an admin token request from here with HTTP 403, as it "
-                                    + "should", host);
+                String msg = format(
+                    "The ingress of the KeyCloak at %s refused an admin token request from here with HTTP 403, as it "
+                    + "should", host);
                 logger.info(msg);
                 return new ExecResult(0, msg, "", command, "localhost");
             }
             error = code > 0
-                    ? format("The KeyCloak at %s answered an admin token request from here with HTTP %d rather than its ingress refusing "
-                             + "it with 403, so its admin side is reachable from here: %s", host, code, e.getMessage())
-                    : format("Could not tell whether the admin side of the KeyCloak at %s is reachable from here: %s", host,
-                             e.getMessage());
+                    ? format(
+                "The KeyCloak at %s answered an admin token request from here with HTTP %d rather than its ingress refusing "
+                + "it with 403, so its admin side is reachable from here: %s", host, code, e.getMessage())
+                    : format(
+                "Could not tell whether the admin side of the KeyCloak at %s is reachable from here: %s", host,
+                e.getMessage());
         }
         return new ExecResult(-1, "", error + adminRestrictionAdvice(), command, "localhost");
     }
@@ -398,14 +407,16 @@ public class NetworkSmokeMain {
         } catch (Exception e) {
             int code = refusalCodeOf(e);
             if (code > 0 && code != 403) {
-                String msg = format("The login side of the KeyCloak at %s is reachable from here: it refused an unknown client with HTTP %d",
-                                    host, code);
+                String msg = format(
+                    "The login side of the KeyCloak at %s is reachable from here: it refused an unknown client with HTTP %d",
+                    host, code);
                 logger.info(msg);
                 return new ExecResult(0, msg, "", command, "localhost");
             }
             error = code == 403
-                    ? format("The ingress of the KeyCloak at %s refused a login from here with HTTP 403, but logins must be open to all: "
-                             + "%s", host, e.getMessage())
+                    ? format(
+                "The ingress of the KeyCloak at %s refused a login from here with HTTP 403, but logins must be open to all: "
+                + "%s", host, e.getMessage())
                     : format("Could not reach the login side of the KeyCloak at %s from here: %s", host, e.getMessage());
         }
         return new ExecResult(-1, "", error, command, "localhost");
@@ -488,8 +499,8 @@ public class NetworkSmokeMain {
     private List<String> sparkPods(Predicate<String> which) throws Exception {
         SparkNames sparkNames = SparkNames.from(properties);
         List<String> pods = client.listPods().stream().map(x -> x.getMetadata().getName()).filter(name -> {
-            return name.contains(sparkNames.master()) ||name.contains(sparkNames.worker()) ||
-                name.contains(SPARK_CONNECTOR_NAME);
+            return name.contains(sparkNames.master()) || name.contains(sparkNames.worker()) ||
+                   name.contains(SPARK_CONNECTOR_NAME);
         }).filter(which).toList();
         logger.info("Checking Spark pods: {}", pods);
         return pods;
@@ -499,7 +510,9 @@ public class NetworkSmokeMain {
         return pod.contains(SparkNames.from(properties).master());
     }
 
-    /** The label of the notebook pods, which the network policy of the notebooks selects. */
+    /**
+     * The label of the notebook pods, which the network policy of the notebooks selects.
+     */
     static final String NOTEBOOK_POD_LABEL = "afon-role=jupyter-singleuser";
 
     protected List<String> jupyterPods() throws Exception {
@@ -520,15 +533,16 @@ public class NetworkSmokeMain {
         return pods;
     }
 
-    private List<ExecResult> checkCannotSeeOtherBuckets(String pod) throws Exception {
+    private List<ExecResult> checkCannotSee(String pod) throws Exception {
         String[] providers = new String[]{
             "unreachablebucket.eu-west-2.amazonaws.com",
             "unreachablebucket.blob.core.windows.net",
             "pypi.io",
             "pypi.org",
             "pypi.org",
-            GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT
-            };
+            GuacamoleConfig.SVC_NAME + ":" + GuacamoleConfig.WEB_PORT,
+            SPARK_MASTER_SVC + ":6066" // Spark master's REST endpoint
+        };
         List<ExecResult> results = checkCannotSee(pod, providers);
         return results;
     }
@@ -568,7 +582,9 @@ public class NetworkSmokeMain {
         return results;
     }
 
-    /** Where a notebook reaches the Trino coordinator, a name its certificate holds. */
+    /**
+     * Where a notebook reaches the Trino coordinator, a name its certificate holds.
+     */
     static final String TRINO_URL = format("https://%s:%d/v1/info", CdkHelper.TRINO_SERVICE_NAME, TrinoWorkloads.HTTPS_PORT);
 
     /**
@@ -587,10 +603,11 @@ public class NetworkSmokeMain {
         }
         logger.info("Checking {} can reach {} trusting ${}", pod, TRINO_URL, JupyterHubConfig.TRINO_CA_CERT_ENV);
         String ca = "\"$" + JupyterHubConfig.TRINO_CA_CERT_ENV + "\"";
-        String script = String.join("; ",
-                                    "test -s " + ca + " || { echo \"no certificate at " + ca + "\" >&2; exit 2; }",
-                                    "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 20 --retry 3 "
-                                    + "--retry-all-errors --cacert " + ca + " " + TRINO_URL);
+        String script = String.join(
+            "; ",
+            "test -s " + ca + " || { echo \"no certificate at " + ca + "\" >&2; exit 2; }",
+            "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 20 --retry 3 "
+            + "--retry-all-errors --cacert " + ca + " " + TRINO_URL);
         return List.of(trustsTrino(client.exec(pod, "sh", "-c", script)));
     }
 
@@ -603,8 +620,10 @@ public class NetworkSmokeMain {
     static ExecResult trustsTrino(ExecResult curl) {
         String status = curl.stdout().strip();
         if (curl.isSuccess() && status.matches("[1-5]\\d\\d")) {
-            return new ExecResult(0, format("%s reached %s over HTTPS, trusting $%s (HTTP %s)", curl.host(), TRINO_URL,
-                                            JupyterHubConfig.TRINO_CA_CERT_ENV, status), "", curl.command(), curl.host());
+            return new ExecResult(
+                0, format(
+                "%s reached %s over HTTPS, trusting $%s (HTTP %s)", curl.host(), TRINO_URL,
+                JupyterHubConfig.TRINO_CA_CERT_ENV, status), "", curl.command(), curl.host());
         }
         String why = switch (curl.exitCode()) {
             case 2 -> "the certificate is not mounted";
@@ -612,8 +631,10 @@ public class NetworkSmokeMain {
             case 6, 7, 28 -> "the coordinator could not be connected to: is the network policy allowing it?";
             default -> "curl failed";
         };
-        return new ExecResult(-1, curl.stdout(), format("%s could not reach %s over HTTPS, as %s: %s", curl.host(), TRINO_URL, why,
-                                                        curl.stderr()), curl.command(), curl.host());
+        return new ExecResult(
+            -1, curl.stdout(), format(
+            "%s could not reach %s over HTTPS, as %s: %s", curl.host(), TRINO_URL, why,
+            curl.stderr()), curl.command(), curl.host());
     }
 
     /**
@@ -625,8 +646,9 @@ public class NetworkSmokeMain {
         try {
             secondsToConnect = Double.parseDouble(connect.stdout().strip());
         } catch (NumberFormatException e) {
-            return new ExecResult(-1, connect.stdout(), format("Could not tell whether %s was reached: %s", target, connect.stderr()),
-                                  connect.command(), connect.host());
+            return new ExecResult(
+                -1, connect.stdout(), format("Could not tell whether %s was reached: %s", target, connect.stderr()),
+                connect.command(), connect.host());
         }
         return secondsToConnect == 0
                ? new ExecResult(0, format("%s cannot be reached from %s", target, connect.host()), "", connect.command(), connect.host())
