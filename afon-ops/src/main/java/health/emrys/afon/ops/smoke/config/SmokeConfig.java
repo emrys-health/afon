@@ -1,22 +1,18 @@
 package health.emrys.afon.ops.smoke.config;
 
+import health.emrys.afon.cdk.configs.WhitelistConfig;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.cdk.configs.WhitelistConfig;
 import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.spark.connect.SparkConnectClient;
 
 import java.io.IOException;
-
 import java.util.List;
 import java.util.Locale;
 
-import static health.emrys.afon.config.AfonProperty.AWS_EGRESS_IP;
-import static health.emrys.afon.config.AfonProperty.OIDC_PROJECT_CLAIM;
-import static health.emrys.afon.config.AfonProperty.TRE_CLOUD;
 import static health.emrys.afon.cdk.configs.SparkWorkloads.SPARK_CONNECTOR_NAME;
+import static health.emrys.afon.config.AfonProperty.*;
 import static java.lang.String.format;
 
 public class SmokeConfig {

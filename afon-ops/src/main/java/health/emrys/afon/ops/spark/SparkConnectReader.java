@@ -41,17 +41,6 @@ public class SparkConnectReader {
 //        app.sparkConnectRead("westmids", "azure"); // this is slow
     }
 
-    /**
-     * Run
-     * kubectl port-forward pod/spark-connector-0-driver 15002:15002
-     * for this.
-     */
-    public void sparkConnectRead(String warehouse, String catalogName) throws IOException {
-        SparkConnectClient client = new SparkConnectClient(properties, users);
-        SparkSession       spark  = client.sparkSession(warehouse, catalogName);
-        readTable(warehouse, spark);
-    }
-
     private static void readTable(String warehouse, SparkSession spark) {
         String       fqn = String.format("%s.synthetic_ehr.observations", warehouse);
         Dataset<Row> df  = spark.read().table(fqn);

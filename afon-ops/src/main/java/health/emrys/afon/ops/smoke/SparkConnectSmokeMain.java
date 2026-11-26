@@ -51,7 +51,7 @@ public class SparkConnectSmokeMain {
         AfonCloud cloud = new SmokeConfig(properties).cloud();
         // as seen by the cloud, whose Polaris and KeyCloak the smoke test calls
         this.properties = properties.forCloud(cloud);
-        this.users = users;
+        this.users      = users;
         String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
         this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
         catalog = catalogFor(cloud, new AfonCatalogs(properties));
@@ -100,6 +100,14 @@ public class SparkConnectSmokeMain {
                     SparkSession spark = readTable(new SparkConnectClient(properties, users));
                     logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
                     spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
+
+                    try {
+                        SparkConnectClient withInvalidToken = new SparkConnectClient(properties, users.getConfiguredUser(properties), "bogus");
+                        readTable(withInvalidToken);
+                        exitCode = 1;
+                    } catch (Exception e) {
+                        logger.info("As expected, bogus token failed", e);
+                    }
                 }
             }
         } catch (IOException e) {
