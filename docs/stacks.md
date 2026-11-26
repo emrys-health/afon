@@ -489,6 +489,46 @@ controllers an IRSA role that can only read the repositories under the path of t
 key, as Kyverno verifies with the public key alone. The IAM actions the deployer needs are in
 [scripts/aws/roles.md](../scripts/aws/roles.md#image-signing-signingsh).
 
+###### GCP: the key and the registry
+
+On GCP the Cloud KMS key and the Artifact Registry repository are made outside the stack, so that they outlive it, by
+`gcp-signing`, which is idempotent. Set the properties of `afon-gcp.properties` it reads, then run it as the deployer, ie
+the `gcloud` account that is logged in (`gcp-login`), which is also the identity cosign signs with:
+```shell
+# GCP_IMAGE_REGISTRY=<location>-docker.pkg.dev/<project>/afon/emrys
+# GCP_COSIGN_KEY=gcpkms://projects/<project>/locations/<location>/keyRings/afon/cryptoKeys/afon-image-signing
+afon-cli.sh gcp-signing create       # the key ring and key, and the Docker repository
+afon-cli.sh signing-public-key gcp   # GCP_COSIGN_PUBLIC_KEY, the public key of the Cloud KMS key
+afon-cli.sh docker-image --sign --cloud gcp
+```
+`docker-image --sign` and `--verify --signatures` log in to the registry first, with the token of `gcloud auth
+print-access-token`, so that no separate login is needed; if that fails they go on, as the registry may already be logged
+in to.
+
+What `gcp-signing create` makes:
+- The key is an asymmetric `EC_SIGN_P256_SHA256` key, in a key ring. The deployer is given
+  `roles/cloudkms.signerVerifier` on the key alone, not on the key ring or the project, which lets it sign and read the
+  public key, and no other account is given it, so no other account can sign. Whoever can change the policy of the key,
+  or of what it is in, can still give itself the right to, as with any key. Run it again as another deployer to add it:
+  `show` lists who may sign.
+- The Docker repository of `GCP_IMAGE_REGISTRY` (Artifact Registry has one repository, and the images are paths in it, so
+  unlike ECR there is one to make, not one for each image), where the deployer may write
+  (`roles/artifactregistry.writer`) and untagged images are deleted after 14 days, those that a tagged image index refers
+  to being kept. Tags are not immutable, as Artifact Registry cannot exempt the `sha256-*.sig` tags that cosign appends
+  to.
+- The key and the repository outlive the stack. `gcp-signing delete` deletes the repository, with its images, and
+  schedules the destruction of the versions of the key, which can be restored for a day. Cloud KMS cannot delete a key or
+  a key ring, so they stay, and the next `create` makes a new version.
+
+The nodes pull from the repository with their service account, in the project of the cluster. Kyverno reads the
+signatures as the service account of the node too, unless `GCP_WORKLOAD_IDENTITY=true`, which is never inferred from the
+registry: the stack then enables Workload Identity on the cluster, and gives the admission, background and reports
+controllers of Kyverno a Google service account that can only read the repository (`roles/artifactregistry.reader`), with
+no access to the key, as Kyverno verifies with the public key alone. With Workload Identity the pods have no service
+account of the node, but that of the Google service account their Kubernetes one is bound to, if any, so it also stops
+other pods using the node's. **Changing the flag on an existing cluster** changes its nodes. The roles the deployer needs
+are in [scripts/gcp/roles.md](../scripts/gcp/roles.md#image-signing-signingsh).
+
 ##### Deploy the mirrored images
 
 With `<CLOUD>_IMAGE_REGISTRY` set, the stacks of the cloud pull the images that are not first-party from the registry, not from where

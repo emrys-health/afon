@@ -25,7 +25,10 @@
 #   ./enforce-check.sh aws sigtest
 #   ./enforce-check.sh azure default registry.example/afon/postgres:16-alpine@sha256:...
 
+# No -e, even when run by afon-cli-scripts.sh, which has it: a pod that is rejected, which is what is checked, fails its command, and the result of
+# each command is looked at
 set -uo pipefail
+set +e
 
 usage() {
   echo "Usage: ${BASH_SOURCE[0]} <aws|azure|gcp> <namespace> [<signed image>]" >&2

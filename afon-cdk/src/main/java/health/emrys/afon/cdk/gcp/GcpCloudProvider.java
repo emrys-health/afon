@@ -15,6 +15,7 @@ import com.hashicorp.cdktf.providers.google.compute_router_nat.ComputeRouterNatC
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetwork;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkConfig;
 import com.hashicorp.cdktf.providers.google.compute_subnetwork.ComputeSubnetworkSecondaryIpRange;
+import com.hashicorp.cdktf.providers.google.artifact_registry_repository_iam_member.ArtifactRegistryRepositoryIamMember;
 import com.hashicorp.cdktf.providers.google.container_cluster.*;
 import com.hashicorp.cdktf.providers.google.data_google_compute_addresses.DataGoogleComputeAddresses;
 import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoogleDnsManagedZone;
@@ -22,6 +23,9 @@ import com.hashicorp.cdktf.providers.google.data_google_dns_managed_zone.DataGoo
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSet;
 import com.hashicorp.cdktf.providers.google.dns_record_set.DnsRecordSetConfig;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProvider;
+import com.hashicorp.cdktf.providers.google.service_account.ServiceAccount;
+import com.hashicorp.cdktf.providers.google.service_account_iam_member.ServiceAccountIamMember;
+import com.hashicorp.cdktf.providers.helm.release.ReleaseSet;
 import com.hashicorp.cdktf.providers.google.provider.GoogleProviderConfig;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProvider;
 import com.hashicorp.cdktf.providers.helm.provider.HelmProviderKubernetes;
@@ -55,10 +59,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static health.emrys.afon.config.AfonCloud.GCP;
 import static health.emrys.afon.config.AfonProperty.GCP_SECRETS_ENABLED;
+import static health.emrys.afon.config.AfonProperty.GCP_WORKLOAD_IDENTITY;
 import static java.lang.String.format;
 
 /**
@@ -92,6 +98,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     private final String             projectId;
     private final String             clusterName;
     private final boolean            secretsEnabled;
+    private final boolean            workloadIdentity;
     private final String             egressIp;
     private final AfonPropertyProvider properties;
     private       KubernetesProvider k8sProvider;
@@ -144,6 +151,7 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
         this.secretsEnabled = Boolean.parseBoolean(properties.getValue(GCP_SECRETS_ENABLED, "false"));
         this.clusterName = clusterName(properties.getValue(AfonProperty.CLUSTER_NAME), stackId);
         String gcpRegion = properties.getValue(AfonProperty.GCP_REGION);
+        this.workloadIdentity = Boolean.parseBoolean(properties.getValue(GCP_WORKLOAD_IDENTITY, "false").trim());
         String vpcName     = "gke-private-vpc-" + clusterName;
         String subnetName  = "gke-private-subnet-" + clusterName;
 
@@ -268,9 +276,15 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
             // GKE has no CiliumNetworkPolicy, so the rules by domain name of the notebooks' and Spark's egress are FQDNNetworkPolicy
             // resources, which GKE registers only on a cluster with this on (see NetworkConfig.DomainPolicy)
             .enableFqdnNetworkPolicy(true)
+            // The pods get the identity of their Kubernetes service account, not that of the node, if bound to one: the metadata server of GKE
+            // replaces that of the node, on the nodes too, so that the pods cannot use the node's service account
+            .workloadIdentityConfig(workloadIdentity ? ContainerClusterWorkloadIdentityConfig
+                .builder().workloadPool(projectId + WORKLOAD_POOL_SUFFIX).build() : null)
             .nodeConfig(ContainerClusterNodeConfig
                             .builder()
                             .machineType(nodePool.getOrDefault("machineType", "e2-medium"))
+                            .workloadMetadataConfig(workloadIdentity ? ContainerClusterNodeConfigWorkloadMetadataConfig
+                                .builder().mode("GKE_METADATA").build() : null)
                             .build())
             .nodeLocations(List.of("europe-west2-a", "europe-west2-b"))
             .removeDefaultNodePool(false)
@@ -403,6 +417,76 @@ public class GcpCloudProvider extends AbstractHttpsCloudProvider {
     @Override
     public NetworkConfig.DomainPolicy domainPolicy() {
         return NetworkConfig.DomainPolicy.GKE_FQDN;
+    }
+
+    private static final String       KYVERNO_NAMESPACE        = "kyverno";
+    /** The service accounts of Kyverno that read images, so verify them: the admission controller, and the controllers of the background scan and of the reports. */
+    private static final List<String> KYVERNO_SERVICE_ACCOUNTS = List.of("kyverno-admission-controller", "kyverno-background-controller",
+                                                                         "kyverno-reports-controller");
+    /** The values of its chart that annotate each of those service accounts. */
+    private static final List<String> KYVERNO_CHART_VALUES     = List.of("admissionController", "backgroundController", "reportsController");
+    private static final String       WORKLOAD_POOL_SUFFIX     = ".svc.id.goog";
+    private static final Pattern      ARTIFACT_REGISTRY        = Pattern.compile("^([a-z0-9-]+)-docker\\.pkg\\.dev/([a-z][a-z0-9.:-]*)/([a-z][a-z0-9-]*)(?:/.*)?$");
+
+    /**
+     * @return the location, project and repository of the registry if it is an Artifact Registry repository, ie
+     * {@code <location>-docker.pkg.dev/<project>/<repository>[/<path>]}, else empty
+     */
+    static Optional<List<String>> artifactRegistry(String imageRegistry) {
+        Matcher registry = ARTIFACT_REGISTRY.matcher(imageRegistry == null ? "" : imageRegistry.strip());
+        return registry.matches() ? Optional.of(List.of(registry.group(1), registry.group(2), registry.group(3))) : Optional.empty();
+    }
+
+    /**
+     * @return the id of the Google service account that Kyverno reads the registry as: {@code kyverno-<cluster name>}, which a project holding several
+     * clusters needs to be one each, shortened with a hash of the name if it exceeds the 30 characters of an id
+     */
+    static String registryServiceAccountId(String clusterName) {
+        String id = ("kyverno-" + clusterName).toLowerCase().replaceAll("[^a-z0-9-]", "-");
+        if (id.length() <= 30) {
+            return id.replaceAll("-+$", "");
+        }
+        return id.substring(0, 21).replaceAll("-+$", "") + "-" + format("%08x", id.hashCode());
+    }
+
+    /**
+     * Gives the service accounts of Kyverno, through Workload Identity, a Google service account that can read the images of the Artifact Registry
+     * repository of {@code GCP_IMAGE_REGISTRY}, and nothing else: in particular it cannot use the Cloud KMS key that signs them, as Kyverno verifies
+     * with the public key.  The repository is made by {@code gcp-signing}, and is looked up.  Nothing without {@code GCP_WORKLOAD_IDENTITY}, when Kyverno
+     * reads as the service account of the node, nor for a registry that is not an Artifact Registry.
+     */
+    @Override
+    public List<ReleaseSet> kyvernoRegistryValues(String imageRegistry) {
+        Optional<List<String>> registry = artifactRegistry(imageRegistry);
+        if (!workloadIdentity || registry.isEmpty()) {
+            return List.of();
+        }
+        ServiceAccount account = ServiceAccount.Builder
+            .create(this, "kyvernoRegistryServiceAccount")
+            .project(projectId)
+            .accountId(registryServiceAccountId(clusterName))
+            .displayName("Kyverno of " + clusterName + ": reads the signed images")
+            .build();
+        ArtifactRegistryRepositoryIamMember.Builder
+            .create(this, "kyvernoRegistryReader")
+            .project(registry.get().get(1))
+            .location(registry.get().get(0))
+            .repository(registry.get().get(2))
+            .role("roles/artifactregistry.reader")
+            .member("serviceAccount:" + account.getEmail())
+            .build();
+        for (String kubernetesAccount : KYVERNO_SERVICE_ACCOUNTS) {
+            ServiceAccountIamMember.Builder
+                .create(this, "kyvernoWorkloadIdentity-" + kubernetesAccount)
+                .serviceAccountId(account.getName())
+                .role("roles/iam.workloadIdentityUser")
+                .member(format("serviceAccount:%s%s[%s/%s]", projectId, WORKLOAD_POOL_SUFFIX, KYVERNO_NAMESPACE, kubernetesAccount))
+                // the workload pool exists once the cluster does
+                .dependsOn(List.of(gkeCluster))
+                .build();
+        }
+        return KYVERNO_CHART_VALUES.stream().map(controller -> ReleaseSet
+            .builder().name(controller + ".rbac.serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account").value(account.getEmail()).build()).toList();
     }
 
     @Override

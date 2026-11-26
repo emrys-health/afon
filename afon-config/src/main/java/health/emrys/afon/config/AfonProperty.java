@@ -150,6 +150,13 @@ public enum AfonProperty {
      * {@code KyvernoComponent}; in the others it only records them.  Optional: none, ie only audited.
      */
     GCP_IMAGE_POLICY_ENFORCED_NAMESPACES("GCP_IMAGE_POLICY_ENFORCED_NAMESPACES"),
+    /**
+     * Whether the GKE cluster has Workload Identity, which gives each Kubernetes service account that is bound to a Google one its identity, in
+     * place of that of the node, which the pods then cannot use.  The Kyverno of a stack reads the signatures from the Artifact Registry of
+     * {@code GCP_IMAGE_REGISTRY} as such an account.  Optional: {@code false} when empty, ie the pods have the service account of the node.
+     * It is never inferred from {@code GCP_IMAGE_REGISTRY}.
+     */
+    GCP_WORKLOAD_IDENTITY("GCP_WORKLOAD_IDENTITY"),
     /** GCS bucket that Gitea keeps its LFS objects, attachments, packages etc in, under {@code gitea/<cluster>/}. */
     GCP_GITEA_BUCKET("GCP_GITEA_BUCKET"),
     /**

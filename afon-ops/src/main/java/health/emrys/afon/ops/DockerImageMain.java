@@ -303,8 +303,19 @@ public class DockerImageMain {
         return matcher.matches() ? Optional.of(List.of(matcher.group(1), matcher.group(2))) : Optional.empty();
     }
 
+    private static final java.util.regex.Pattern ARTIFACT_REGISTRY = java.util.regex.Pattern.compile("^([a-z0-9-]+-docker\\.pkg\\.dev)(/.*)?$");
+
     /**
-     * Logs in to the registry if it is an ACR, with {@code az acr login}, or an ECR, with the token of {@code aws ecr get-login-password}, so that the
+     * @return the host of the registry if it is an Artifact Registry, ie {@code <location>-docker.pkg.dev/<project>/<repository>[/<path>]}, else empty
+     */
+    static Optional<String> artifactRegistry(String registry) {
+        var matcher = ARTIFACT_REGISTRY.matcher(registry == null ? "" : registry.strip());
+        return matcher.matches() ? Optional.of(matcher.group(1)) : Optional.empty();
+    }
+
+    /**
+     * Logs in to the registry if it is an ACR, with {@code az acr login}, an ECR, with the token of {@code aws ecr get-login-password}, or an Artifact
+     * Registry, with the access token of {@code gcloud auth print-access-token}, so that the
      * images can be copied to it and signed.  A failure is only reported, as the registry may already be logged in to, eg with a docker login of a
      * service principal, and a login that is really missing fails the copy with its own error.
      */
@@ -322,6 +333,13 @@ public class DockerImageMain {
                 info("Logging in to the registry %s with the token of aws ecr get-login-password%n", host);
                 String token = DockerImageSigner.outputs().output(List.of("aws", "ecr", "get-login-password", "--region", ecr.get().get(1)));
                 DockerImageSigner.dockerLogin(host, "AWS", token);
+                return;
+            }
+            var gar = artifactRegistry(registry);
+            if (gar.isPresent()) {
+                info("Logging in to the registry %s with the token of gcloud auth print-access-token%n", gar.get());
+                String token = DockerImageSigner.outputs().output(List.of("gcloud", "auth", "print-access-token"));
+                DockerImageSigner.dockerLogin(gar.get(), "oauth2accesstoken", token);
             }
         } catch (IOException e) {
             info("Could not log in, going on as the registry may be logged in to already: %s%n", e.getMessage());

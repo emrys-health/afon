@@ -19,6 +19,8 @@ The identity running `afon-cli.sh manage-stack ... gcp-polaris`, ie the active `
 | `roles/dns.admin`                         | Reading the Polaris DNS zone, and creating the Polaris DNS record set.  `roles/dns.reader` is not enough                                                                                         |
 | `roles/serviceusage.serviceUsageConsumer` | Using the project's APIs                                                                                                                                                                                    |
 | `roles/secretmanager.secretAccessor`      | Only if `GCP_SECRETS_ENABLED=true`: reading the cached TLS cert and key from Secret Manager, to restore them into the `polaris-tls` Kubernetes secret                                                      |
+| `roles/iam.serviceAccountAdmin`           | Only if `GCP_WORKLOAD_IDENTITY=true` and `GCP_IMAGE_REGISTRY` is an Artifact Registry, for a stack with Kyverno: creating the service account that Kyverno reads the registry as, and letting its Kubernetes service accounts act as it (`roles/iam.workloadIdentityUser`, see [Image signing](#image-signing-signingsh)) |
+| `roles/artifactregistry.admin`            | Only if `GCP_WORKLOAD_IDENTITY=true` and `GCP_IMAGE_REGISTRY` is an Artifact Registry, for a stack with Kyverno: letting that service account read the repository (`roles/artifactregistry.reader` on it, so `artifactregistry.repositories.setIamPolicy`) |
 
 `roles/iam.serviceAccountUser` is granted on the service account, not the project, for a narrower scope:
 
@@ -123,6 +125,25 @@ gcloud storage hmac create $GCP_SERVICE_ACCOUNT --project=$GCP_PROJECT_ID
 If the role is granted and the creation is still refused, an organisation policy may forbid HMAC keys, eg `constraints/storage.restrictAuthTypes`: that
 needs an organisation admin to change.  Without the key a stack with Git still deploys, but Gitea cannot use its bucket and crash-loops, and the log shipper of Polaris
 is refused by the bucket: leave `GCP_POLARIS_LOG_BUCKET` blank to skip it.
+
+## Image signing (`signing.sh`)
+
+The user running `afon-cli.sh gcp-signing create` (and `delete`, `show`), who becomes **the deployer**, the only account that can sign with the
+key, and does so with `docker-image --sign`.  The `gcloud` account that is logged in, which is also the Application Default Credentials that cosign signs
+with (`gcp-login` sets both).  On the projects of `GCP_IMAGE_REGISTRY` and `GCP_COSIGN_KEY`:
+
+| Role                                   | Needed for                                                                                                                  |
+|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `roles/serviceusage.serviceUsageAdmin` | Enabling `cloudkms.googleapis.com` and `artifactregistry.googleapis.com`, if they are not yet: none is needed if an admin has |
+| `roles/cloudkms.admin`                 | Creating the key ring and the key, and giving the deployer its role on the key (`cloudkms.cryptoKeys.setIamPolicy`); destroying its versions, only `gcp-signing delete` |
+| `roles/artifactregistry.admin`         | Creating the repository, setting its cleanup policy and letting the deployer write to it (`artifactregistry.repositories.setIamPolicy`); deleting it, only `gcp-signing delete` |
+
+`gcp-signing create` gives the deployer, on the key alone, `roles/cloudkms.signerVerifier` (sign, verify and read the public key), which is
+what `docker-image --sign` and `signing-public-key` use, and `roles/artifactregistry.writer` on the repository, to copy the images to it and
+read them for the checks.  `roles/cloudkms.admin` cannot sign, nor can the basic roles, so **no other account can sign** unless it is given
+`roles/cloudkms.signerVerifier` on the key, its key ring or the project: `gcp-signing show` lists who holds it on the key.  Anyone who can set the
+IAM policy of the key, or of what it is in, can give it to themselves, as with any key.  Run `gcp-signing create` as another deployer to give it
+the role.  What the stack creates for Kyverno is in the [stack deployer's roles](#stack-deployer).
 
 ## GitHub identity for the smoke tests
 

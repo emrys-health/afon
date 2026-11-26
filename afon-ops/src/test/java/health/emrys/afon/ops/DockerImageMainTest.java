@@ -38,6 +38,16 @@ class DockerImageMainTest {
     }
 
     @Test
+    void recognisesAnArtifactRegistry() {
+        assertThat(DockerImageMain.artifactRegistry("europe-west2-docker.pkg.dev/my-project/afon/emrys"))
+            .contains("europe-west2-docker.pkg.dev");
+        assertThat(DockerImageMain.artifactRegistry("europe-west2-docker.pkg.dev")).isPresent();
+        assertThat(DockerImageMain.artifactRegistry("123456789012.dkr.ecr.eu-west-2.amazonaws.com/emrys")).isEmpty();
+        assertThat(DockerImageMain.artifactRegistry("")).isEmpty();
+        assertThat(DockerImageMain.loginCommand("europe-west2-docker.pkg.dev/my-project/afon")).isEmpty();
+    }
+
+    @Test
     void rejectsWrongArgsAndUnknownImages() {
         assertThatThrownBy(() -> DockerImageMain.lines(new String[]{}))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Usage: docker-image <name|--export|--pin");
