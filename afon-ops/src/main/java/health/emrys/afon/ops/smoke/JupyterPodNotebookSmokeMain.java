@@ -183,6 +183,11 @@ public class JupyterPodNotebookSmokeMain {
             if (Files.isRegularFile(fromRoot)) {
                 return fromRoot;
             }
+            // bit of hack. The CLI runs from a deeper folder, so go up one more directory
+            Path cliPath = Path.of("..", File.separator, "..", File.separator, relativePath);
+            if (Files.isRegularFile(cliPath)) {
+                return cliPath;
+            }
             throw new IllegalArgumentException(format("No notebook at %s, nor %s" ,
                                                       notebook.toAbsolutePath(),
                                                       fromRoot));
