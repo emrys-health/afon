@@ -210,5 +210,6 @@ public class JupyterPodNotebookSmokeMain {
         if (!errors.isEmpty()) {
             throw new IllegalStateException(String.join("\n", errors));
         }
+        logger.info("Test passed");
     }
 }
