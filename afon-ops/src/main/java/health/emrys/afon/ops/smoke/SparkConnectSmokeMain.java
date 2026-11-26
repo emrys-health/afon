@@ -7,14 +7,16 @@ import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
+import org.apache.spark.api.java.function.MapFunction;
+import org.apache.spark.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static health.emrys.afon.config.AfonCatalog.catalogFor;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ENDPOINT;
@@ -43,6 +45,13 @@ public class SparkConnectSmokeMain {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkConnectSmokeMain.class);
 
+    public static class SillyToStringMapper implements MapFunction<Row, String>, Serializable {
+        @Override
+        public String call(Row value) throws Exception {
+            return value.toString();
+        }
+    }
+
     private final AfonPropertyProvider properties;
     private final AfonUserProvider     users;
     private final AfonCatalog          catalog;
@@ -57,72 +66,101 @@ public class SparkConnectSmokeMain {
         catalog = catalogFor(cloud, new AfonCatalogs(properties));
     }
 
-    private SparkSession readTable(SparkConnectClient client) {
+    private SparkSession readTable(SparkConnectClient client, List<String> errors) {
         String       warehouse = "test_warehouse";
         SparkSession spark     = client.sparkSession(warehouse, catalog.toString());
         String       tableFQN  = format("%s.%s.%s", warehouse, POLARIS_NAMESPACE_EXTERNAL, POLARIS_TABLE_NAME);
         logger.info("Reading table {}", tableFQN);
         Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", tableFQN));
+        errors.addAll(checkJvmUDFsOff(dataset));
         // the table is not shown, as its rows hold details that the test does not need: it checks that the query returns them
         Object[] rows = (Object[]) dataset.collect();
-        checkQueryReturnsRows(rows, tableFQN);
-        checkUsersHaveBeenRecorded(rows, tableFQN);
+        errors.addAll(checkQueryReturnsRows(rows, tableFQN));
+        errors.addAll(checkUsersHaveBeenRecorded(rows, tableFQN));
         return spark;
     }
 
-    private static void checkQueryReturnsRows(Object[] rows, String tableFQN) {
-        if (rows.length == 0) {
-            throw new IllegalStateException(format("The query of %s returned no rows", tableFQN));
+    private List<String> checkJvmUDFsOff(Dataset<Row> dataset) {
+        List<String> errors = new ArrayList<>();
+        try {
+            dataset.map(new SillyToStringMapper(), Encoders.STRING()).show();
+            errors.add("Was allowed to run JVM UDF!");
+        } catch (Exception ex) {
+            logger.info("As exected, UDF fail: {}", ex.getMessage());
         }
-        logger.info("{} has {} rows", tableFQN, rows.length);
+        return errors;
     }
 
-    private static void checkUsersHaveBeenRecorded(Object[] rows, String tableFQN) {
+    private static List<String> checkQueryReturnsRows(Object[] rows, String tableFQN) {
+        List<String> errors = new ArrayList<>();
+        if (rows.length == 0) {
+            errors.add(format("The query of %s returned no rows", tableFQN));
+        }
+        logger.info("{} has {} rows", tableFQN, rows.length);
+        return errors;
+    }
+
+    private static List<String> checkUsersHaveBeenRecorded(Object[] rows, String tableFQN) {
+        List<String> errors = new ArrayList<>();
         boolean recorded = Arrays.stream(rows)
                                  .map(r -> (Row) r)
                                  .anyMatch(r -> r.getAs(LOG_COLUMN_NAME).toString().contains(CONFIGURED_USERS_KEY));
         if (!recorded) {
-            throw new IllegalStateException(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN));
+            errors.add(format("No %s in %s", CONFIGURED_USERS_KEY, tableFQN));
         }
         logger.info("{} records the configured users", tableFQN);
+        return errors;
     }
 
-    private void callSparkConnectorInCluster() throws Exception {
-        int exitCode = 0;
-        try {
-            try (KubeClient client = new KubeClient(properties)) {
-                try (PortForwarder session = new PortForwarder(
-                    client,
-                    KUBERNETES_NAMESPACE,
-                    SmokeConfig.SPARK_CONNECTOR_POD,
-                    15002,
-                    15002)) {
-                    SparkSession spark = readTable(new SparkConnectClient(properties, users));
-                    logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
-                    spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
-
-                    try {
-                        SparkConnectClient withInvalidToken = new SparkConnectClient(properties, users.getConfiguredUser(properties), "bogus");
-                        readTable(withInvalidToken);
-                        exitCode = 1;
-                    } catch (Exception e) {
-                        logger.info("As expected, bogus token failed", e);
-                    }
-                }
+    private List<String> callSparkConnectorInCluster() throws Exception {
+        List<String> errors = new ArrayList<>();
+        try (KubeClient client = new KubeClient(properties)) {
+            try (PortForwarder session = new PortForwarder(
+                client,
+                KUBERNETES_NAMESPACE,
+                SmokeConfig.SPARK_CONNECTOR_POD,
+                15002,
+                15002)) {
+                errors.addAll(checkHappyPath());
+                errors.addAll(checkTokenIsMandatory());
             }
-        } catch (IOException e) {
-            logger.error("Error while closing Spark Session. Please check your configuration.", e);
-            exitCode = 1;
         }
-        System.exit(exitCode);
+        return errors;
+    }
+
+    private List<String> checkTokenIsMandatory() {
+        List<String> errors = new ArrayList<>();
+        try {
+            String             badToken         = "bogus";
+            SparkConnectClient withInvalidToken = new SparkConnectClient(properties, users.getConfiguredUser(properties), badToken);
+            readTable(withInvalidToken, errors);
+            errors.add("Not supposed to be able to talk to connect with token " + badToken);
+        } catch (Exception e) {
+            logger.info("As expected, bogus token failed", e);
+        }
+        return errors;
+    }
+
+    private List<String> checkHappyPath() throws IOException {
+        List<String> errors = new ArrayList<>();
+        SparkSession spark  = readTable(new SparkConnectClient(properties, users), errors);
+        logger.info("Test successful. About to close Spark session. Please wait for threads to die...");
+        spark.close(); // need to close to avoid threads hanging and blocking JVM shutdown
+        return errors;
     }
 
     public static void main(String[] args) {
         try {
-            new SparkConnectSmokeMain(smokeTestProperties(), ProjectStackUserProvider.forActiveConfig()).callSparkConnectorInCluster();
+            SparkConnectSmokeMain app    = new SparkConnectSmokeMain(smokeTestProperties(), ProjectStackUserProvider.forActiveConfig());
+            List<String>          errors = app.callSparkConnectorInCluster();
+            if (!errors.isEmpty()) {
+                String explanation = String.join("\n", errors);
+                logger.error(explanation);
+                throw new RuntimeException(explanation);
+            }
             logger.info("Test past");
         } catch (Exception e) {
-            logger.error("Error reading Spark Connector", e);
+            logger.error("Error talking to cluster", e);
             throw new RuntimeException(e);
         }
     }
