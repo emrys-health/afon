@@ -366,8 +366,8 @@ as `smoke-notebook` does: with the pod's Python and Spark Connect client, its ne
 with the token in its header, a Python UDF on the executors, whose Python must be that of the pod, and Trino over HTTPS, from where a user runs them.
 
 It asks JupyterHub to spawn the pod of the configured user (`USER_ID`), as the `network` test does. A pod spawned so has no `OIDC_TOKEN`, which the
-hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`. The token and the
-notebook are sent on the standard input of an exec through the Kubernetes API (`KubeClient`), so the token is in no command line, and the notebook runs in a temporary directory of the pod,
+hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`, with the name of the cloud's catalog as `CATALOG`. The token, the
+catalog and the notebook are sent on the standard input of an exec through the Kubernetes API (`KubeClient`), so the token is in no command line, and the notebook runs in a temporary directory of the pod,
 removed afterwards, with `jupyter nbconvert --execute`. Every cell is run, even after one fails, and the test fails if any cell raised an error. The
 executed notebook, with its outputs, is written to `smoke/notebooks/AwsSmokeTest.ipynb` in the JVM's temporary directory (`java.io.tmpdir`).
 

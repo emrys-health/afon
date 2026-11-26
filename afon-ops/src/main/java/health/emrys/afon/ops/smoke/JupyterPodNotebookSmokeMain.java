@@ -2,10 +2,14 @@ package health.emrys.afon.ops.smoke;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
+import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.Credentials;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.smoke.config.SmokeConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +26,6 @@ import java.util.List;
 
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.KUBERNETES_NAMESPACE;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.isProjectStack;
-import static health.emrys.afon.ops.smoke.config.SmokeConfig.smokeTestProperties;
 import static health.emrys.afon.ops.smoke.config.SmokeConfig.sparkConnectToken;
 import static java.lang.String.format;
 
@@ -32,7 +35,8 @@ import static java.lang.String.format;
  *
  * <p>The pod is the configured user's ({@code USER_ID}), which JupyterHub is asked to spawn, as the network test does.  A pod
  * spawned so has no {@code OIDC_TOKEN}, which the hub only injects at a user's sign-in, so the user's token is got from Keycloak
- * here and given to the notebook as {@code OIDC_TOKEN}.  The token and the notebook are sent to the pod on the standard input
+ * here and given to the notebook as {@code OIDC_TOKEN}, with the name of the cloud's catalog as {@code CATALOG}.  The token,
+ * the catalog and the notebook are sent to the pod on the standard input
  * of an exec through the Kubernetes API, with {@link KubeClient}, so the token is in no command line, and the notebook is run in
  * a temporary directory of the pod, removed afterwards, with {@code jupyter nbconvert --execute}.
  *
@@ -63,8 +67,8 @@ public class JupyterPodNotebookSmokeMain {
     static final Duration NOTEBOOK_TIMEOUT     = Duration.ofMinutes(20);
 
     /**
-     * Reads the token, then the size of the notebook, then the notebook, from its standard input, runs the notebook with the token
-     * as OIDC_TOKEN, and writes the executed notebook to its standard output.  nbconvert's own logging goes to the standard error.
+     * Reads the token, then the catalog, then the size of the notebook, then the notebook, from its standard input, runs the notebook
+     * with the token as OIDC_TOKEN and the catalog as CATALOG, and writes the executed notebook to its standard output.  nbconvert's own logging goes to the standard error.
      * The notebook is read by its size, with head, rather than up to the end of the input, so that nothing hangs on an end that the
      * exec does not pass on.
      */
@@ -74,8 +78,9 @@ public class JupyterPodNotebookSmokeMain {
         "dir=$(mktemp -d)",
         "trap 'rm -rf \"$dir\"' EXIT",
         "IFS= read -r OIDC_TOKEN",
+        "IFS= read -r CATALOG",
         "IFS= read -r size",
-        "export OIDC_TOKEN",
+        "export OIDC_TOKEN CATALOG",
         "head -c \"$size\" > \"$dir/notebook.ipynb\"",
         "cd \"$dir\"",
         "jupyter nbconvert --to notebook --execute --allow-errors --ExecutePreprocessor.timeout=" + CELL_TIMEOUT_SECONDS
@@ -85,20 +90,25 @@ public class JupyterPodNotebookSmokeMain {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final AfonPropertyProvider properties;
+    private final AfonCatalog afonCatalog;
 
-    JupyterPodNotebookSmokeMain(AfonPropertyProvider properties) {
+    JupyterPodNotebookSmokeMain(AfonPropertyProvider properties, AfonCloud cloud) {
         this.properties = properties;
+        afonCatalog     = AfonCatalog.catalogFor(cloud, new AfonCatalogs(properties));
     }
 
     /**
-     * @return what the script reads from its standard input: the token, the size of the notebook, and the notebook
+     * @return what the script reads from its standard input: the token, the catalog, the size of the notebook, and the notebook
      */
-    static byte[] input(String token, byte[] notebook) throws IOException {
+    static byte[] input(String token, String catalog, byte[] notebook) throws IOException {
         if (token == null || token.isBlank() || token.contains("\n")) {
             throw new IllegalArgumentException("No usable OIDC token for the notebook");
         }
+        if (catalog == null || catalog.isBlank() || catalog.contains("\n")) {
+            throw new IllegalArgumentException("No usable catalog for the notebook: " + catalog);
+        }
         ByteArrayOutputStream input = new ByteArrayOutputStream();
-        input.write((token + "\n" + notebook.length + "\n").getBytes(StandardCharsets.UTF_8));
+        input.write((token + "\n" + catalog + "\n" + notebook.length + "\n").getBytes(StandardCharsets.UTF_8));
         input.write(notebook);
         return input.toByteArray();
     }
@@ -123,13 +133,15 @@ public class JupyterPodNotebookSmokeMain {
     /**
      * @return the executed notebook
      */
-    static String runInPod(KubeClient client, String pod, Path notebook, String token) throws Exception {
-        logger.info("Running {} in pod {}", notebook, pod);
-        ExecResult result = client.exec(KUBERNETES_NAMESPACE, pod, NOTEBOOK_CONTAINER, NOTEBOOK_TIMEOUT,
-                                        input(token, Files.readAllBytes(notebook)), "sh", "-c", SCRIPT);
+    static String runInPod(KubeClient client, String pod, Path notebook, String token, String catalog) throws Exception {
+        logger.info("Running {} in pod {}, with CATALOG={}", notebook, pod, catalog);
+        ExecResult result = client.exec(
+            KUBERNETES_NAMESPACE, pod, NOTEBOOK_CONTAINER, NOTEBOOK_TIMEOUT,
+            input(token, catalog, Files.readAllBytes(notebook)), "sh", "-c", SCRIPT);
         if (!result.isSuccess()) {
-            throw new IllegalStateException(format("Could not run %s in pod %s (exit %d): %s", notebook, pod, result.exitCode(),
-                                                   Credentials.redact(result.stderr())));
+            throw new IllegalStateException(format(
+                "Could not run %s in pod %s (exit %d): %s", notebook, pod, result.exitCode(),
+                Credentials.redact(result.stderr())));
         }
         return result.stdout();
     }
@@ -148,26 +160,32 @@ public class JupyterPodNotebookSmokeMain {
         String executedNotebook;
         try (KubeClient client = new KubeClient(properties)) {
             pod              = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
-            executedNotebook = runInPod(client, pod, notebook, sparkConnectToken());
+            executedNotebook = runInPod(client, pod, notebook, sparkConnectToken(), afonCatalog.name());
         }
-        Path   saved            = Path.of(System.getProperty("java.io.tmpdir"), "smoke", "notebooks", notebook.getFileName().toString());
+        Path saved = Path.of(System.getProperty("java.io.tmpdir"), "smoke", "notebooks", notebook.getFileName().toString());
         Files.createDirectories(saved.getParent());
         Files.writeString(saved, executedNotebook);
         List<String> errors = parse(executedNotebook);
         if (errors.isEmpty()) {
             logger.info("{} ran in pod {} with no error; the executed notebook is {}", notebook.getFileName(), pod, saved);
+        } else {
+            logger.error(
+                "{} of the cells of {} failed in pod {}, see the executed notebook {}:\n{}", errors.size(), notebook.getFileName(), pod,
+                saved, String.join("\n", errors));
         }
-        logger.error(
-            "{} of the cells of {} failed in pod {}, see the executed notebook {}:\n{}", errors.size(), notebook.getFileName(), pod,
-            saved, String.join("\n", errors));
         return errors;
     }
 
     public static void main(String[] args) {
-        Path notebook = Path.of(args.length > 0 ? args[0] : DEFAULT_NOTEBOOK);
-        List<String> errors = new  ArrayList<>();
+        Path         notebook = Path.of(args.length > 0 ? args[0] : DEFAULT_NOTEBOOK);
+        List<String> errors   = new ArrayList<>();
         try {
-            JupyterPodNotebookSmokeMain app = new JupyterPodNotebookSmokeMain(smokeTestProperties());
+            SmokeConfig smokeConfig = new SmokeConfig();
+            AfonCloud   cloud       = smokeConfig.cloud();
+            JupyterPodNotebookSmokeMain app = new JupyterPodNotebookSmokeMain(
+                smokeConfig.getProperties(),
+                cloud
+            );
             errors.addAll(app.run(notebook));
         } catch (Exception e) {
             String msg = format("Could not run %s in a Jupyter pod", notebook);
