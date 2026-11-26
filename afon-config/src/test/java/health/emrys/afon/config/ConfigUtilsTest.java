@@ -175,4 +175,40 @@ public class ConfigUtilsTest {
         assertThatThrownBy(() -> requireSingleKubeConfig(list))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only a single kubeconfig is supported");
     }
+
+    private static void assumeNothingNamesTheCluster() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getenv("KUBECONFIG") == null && System.getenv(AFON_STACK_ENV) == null && System.getenv(AFON_CDKTF_ENV) == null,
+                                                      "the environment names a cluster or a cdktf dir");
+    }
+
+    @Test
+    public void theOpsToolsActOnTheStackDeployedLastWhenNoneIsGiven(@org.junit.jupiter.api.io.TempDir java.nio.file.Path cdktf) throws Exception {
+        assumeNothingNamesTheCluster();
+        java.nio.file.Path kube = java.nio.file.Files.createDirectories(cdktf.resolve("kube"));
+        java.nio.file.Path older = java.nio.file.Files.writeString(kube.resolve("azure-full.config"), "a");
+        java.nio.file.Path deployed = java.nio.file.Files.writeString(kube.resolve("aws-full.config"), "b");
+        java.nio.file.Files.createSymbolicLink(kube.resolve("current.config"), deployed);
+        System.setProperty(AFON_CDKTF_PROPERTY, cdktf.toString());
+        try {
+            assertThat(opsKubeConfigPath()).isEqualTo(deployed.toRealPath().toString()).isNotEqualTo(older.toString());
+            // a stack that is given wins over the one deployed last
+            System.setProperty(AFON_STACK_PROPERTY, "azure-full");
+            assertThat(opsKubeConfigPath()).isEqualTo(cdktf + "/kube/azure-full.config");
+        } finally {
+            System.clearProperty(AFON_STACK_PROPERTY);
+            System.clearProperty(AFON_CDKTF_PROPERTY);
+        }
+    }
+
+    @Test
+    public void theOpsToolsAreToldWhatToSetWhenNoStackWasDeployedAndNoneIsGiven(@org.junit.jupiter.api.io.TempDir java.nio.file.Path cdktf) {
+        assumeNothingNamesTheCluster();
+        System.setProperty(AFON_CDKTF_PROPERTY, cdktf.toString());
+        try {
+            assertThatThrownBy(ConfigUtils::opsKubeConfigPath).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No cluster to act on").hasMessageContaining("KUBECONFIG").hasMessageContaining("--stack");
+        } finally {
+            System.clearProperty(AFON_CDKTF_PROPERTY);
+        }
+    }
 }

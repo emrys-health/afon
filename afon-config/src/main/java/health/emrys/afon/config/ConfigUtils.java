@@ -189,9 +189,10 @@ public class ConfigUtils {
      * Returns the kubeconfig that the ops tools (smoke tests, notebooks) act through: the file of {@code KUBECONFIG} if
      * it is set, which must be a single path, as the stacks write one kubeconfig each and the tools do not merge several,
      * as kubectl does, else that of the stack given by env {@link #AFON_STACK_ENV} or system property {@link #AFON_STACK_PROPERTY},
-     * ie {@link #kubeConfigPath(StackId)}.  The default {@code ~/.kube/config} is never used, as it may name any cluster.
+     * ie {@link #kubeConfigPath(StackId)}, else that of the stack deployed last, which {@link #currentKubeConfigPath()} links to, saying so on the standard error, once.
+     * The default {@code ~/.kube/config} is never used, as it may name any cluster.
      *
-     * @throws IllegalStateException    if neither is set
+     * @throws IllegalStateException    if none is set, and no stack has been deployed
      * @throws IllegalArgumentException if {@code KUBECONFIG} is a list of paths
      */
     public static @NonNull String opsKubeConfigPath() {
@@ -201,11 +202,36 @@ public class ConfigUtils {
         }
         String stack = envOrProperty(getenv(AFON_STACK_ENV), getProperty(AFON_STACK_PROPERTY, ""));
         if (stack == null || stack.isBlank()) {
-            throw new IllegalStateException(format(
-                "No cluster to act on: set KUBECONFIG, or %s to the id of the stack, eg aws-tre, whose kubeconfig is %s/kube/<stack-id>.config",
-                AFON_STACK_ENV, afonCkdtf()));
+            return lastDeployedKubeConfig();
         }
         return kubeConfigPath(StackId.parse(stack.trim()));
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean SAID_LAST_STACK = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * @return the kubeconfig that {@link #currentKubeConfigPath()} links to, that of the stack deployed last, which is said once on the standard error, so that it is
+     * never a surprise which cluster is acted on
+     * @throws IllegalStateException if there is none
+     */
+    private static @NonNull String lastDeployedKubeConfig() {
+        java.nio.file.Path current = java.nio.file.Path.of(currentKubeConfigPath());
+        if (!java.nio.file.Files.isRegularFile(current)) {
+            throw new IllegalStateException(format(
+                "No cluster to act on: set KUBECONFIG, or %s (or give --stack to afon-cli.sh) to the id of the stack, eg aws-full, whose kubeconfig is %s/kube/<stack-id>.config",
+                AFON_STACK_ENV, afonCkdtf()));
+        }
+        java.nio.file.Path kubeConfig;
+        try {
+            kubeConfig = current.toRealPath();
+        } catch (java.io.IOException e) {
+            kubeConfig = current;
+        }
+        if (SAID_LAST_STACK.compareAndSet(false, true)) {
+            System.err.printf("No KUBECONFIG, --stack or %s: acting on the cluster of the stack deployed last, %s%n", AFON_STACK_ENV,
+                              kubeConfig.getFileName().toString().replaceFirst("\\.config$", ""));
+        }
+        return kubeConfig.toString();
     }
 
     /**

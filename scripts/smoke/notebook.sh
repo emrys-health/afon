@@ -14,7 +14,7 @@
 #   --notebooks
 #             the CSV file of the notebooks (default: scripts/smoke/notebooks.csv)
 #   --list    lists the notebooks and exits
-#   --local   in a project's TRE, runs the notebooks from this machine, not in the pod of its smoke member
+#   --local   runs the notebooks from this machine, not in a notebook pod, which they are by default
 #
 # The notebooks are read from the notebooks file, whose first line is the header 'name|file|description', and
 # each other line a notebook: its name, its file, in scripts/smoke/notebooks if not an absolute path, and its description.  Blank lines and lines
@@ -23,13 +23,14 @@
 # Each executed notebook, with its outputs, is written to $AFON_HOME/smoke/notebooks/<notebook file name>, leaving the
 # original clean.
 #
-# In a project's TRE (the config has SMOKE_MEMBER) the notebooks are those of scripts/smoke/project-notebooks.csv, unless --notebooks gives another file, and, unless
-# --local, nothing below runs: the afon command 'smoke-pod-notebook' signs the smoke member in to the TRE's JupyterHub and runs the notebooks in the member's notebook pod, as a
-# member's are, with the executed notebooks written to $AFON_HOME/smoke/notebooks.  With --local, or elsewhere, they are run from this machine:
+# By default the notebooks are run in a notebook pod, as a user's are, by the afon command 'user-pod-notebook-smoke', and nothing below runs: in project mode (the config
+# has SMOKE_MEMBER) the pod of its smoke member, who is signed in to the TRE's JupyterHub, and the notebooks are those of scripts/smoke/project-notebooks.csv, unless --notebooks
+# gives another file; in non-project mode, the pod of USER_ID, which the hub is asked to start, with USER_ID's token from Keycloak given to the notebooks.  The executed notebooks are written to
+# $AFON_HOME/smoke/notebooks.  With --local they are run from this machine, as below:
 #
 # Sets up and checks the python env with the afon command 'python-setup', checks Keycloak is serving requests with
 # 'check-oidc <cloud>', then
-# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user', or, in a project's TRE, that of the smoke member with '--token smoke-member',
+# gets USER_ID's OIDC access token from Keycloak with 'check-oidc <cloud> --token user', or, in project mode, that of the smoke member with '--token smoke-member',
 # port-forwards the Spark Connect driver of the cluster of the stack (KUBECONFIG, else that of '<cloud>-update-kube-config tre'), then runs the notebook with
 # 'jupyter-execute'.  The commands are run as 'smoke-notebook <cloud> <notebook>'.  Also reads
 # <CLOUD>_POLARIS_DOMAIN_NAME and <CLOUD>_OIDC_DOMAIN_NAME (else OIDC_DOMAIN_NAME) from
@@ -111,7 +112,7 @@ prop() {
 }
 
 
-# A project's TRE, which the config says by naming its smoke member, SMOKE_MEMBER: its notebooks are those of its own file, unless --notebooks gave
+# Project mode, which the config says by naming its smoke member, SMOKE_MEMBER: its notebooks are those of its own file, unless --notebooks gave
 # another, and run with that member's token, as only the tokens of the project are admitted there
 SMOKE_MEMBER=$(prop SMOKE_MEMBER)
 if [ -n "$SMOKE_MEMBER" ] && [ -z "$NOTEBOOKS_GIVEN" ]; then
@@ -195,13 +196,35 @@ OIDC_HOST="${OIDC_HOST:-$(prop OIDC_DOMAIN_NAME)}"
 require "${CLOUD_PREFIX}_POLARIS_DOMAIN_NAME" "$POLARIS_HOST"
 require "${CLOUD_PREFIX}_OIDC_DOMAIN_NAME or OIDC_DOMAIN_NAME" "$OIDC_HOST"
 
-# In a project's TRE the notebooks are run, by default, in the notebook pod of its smoke member, signed in to the JupyterHub as a member is: they are run where a
-# member's are, with the token that the hub gives the pod, the cluster's own addresses and the pod's network policy.  The afon command does it all.  With --local they
-# are run from this machine as below, with the smoke member's token from Keycloak and port-forwards to Spark Connect and Trino, which tests the reads but not the pod.
-if [ -n "$SMOKE_MEMBER" ] && [ -z "$LOCAL" ]; then
+# The kubeconfig of the stack, if KUBECONFIG is not set already, eg by the regression suite: that of the full stack cluster of the
+# cloud in the env, with the afon command '<cloud>-update-kube-config tre', which prints it.  The default ~/.kube/config is neither written nor read.
+if [ -z "${KUBECONFIG:-}" ]; then
+  KUBE_CONFIG_OUTPUT=$(afon "$CLOUD-update-kube-config" tre 2>&1) || {
+    printf '%s\n' "$KUBE_CONFIG_OUTPUT" | tail -20 >&2
+    echo "Could not get the kubeconfig of the $CLOUD stack: is it deployed?  Or set KUBECONFIG to its kubeconfig" >&2
+    exit 1
+  }
+  KUBECONFIG=$(printf '%s\n' "$KUBE_CONFIG_OUTPUT" | sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' | tail -1)
+  unset KUBE_CONFIG_OUTPUT
+  if [ -z "$KUBECONFIG" ] || [ ! -s "$KUBECONFIG" ]; then
+    echo "No kubeconfig for the $CLOUD stack: set KUBECONFIG to its kubeconfig" >&2
+    exit 1
+  fi
+  export KUBECONFIG
+  echo "Using the kubeconfig $KUBECONFIG"
+fi
+# The notebooks are run in a notebook pod, as a user's are, unless --local: where a user's are, with the token that the hub gives the pod or, for USER_ID, for whom the hub is
+# asked to start a pod, that of Keycloak, the cluster's own addresses and the pod's network policy.  The afon command does it all.  With --local they are run from this machine as
+# below, which tests the reads, and in a project with the smoke member's token from Keycloak, but not the pod.
+if [ -z "$LOCAL" ]; then
+  # what the notebooks are told, as they are run from this machine below
+  export POLARIS_DOMAIN_NAME="$POLARIS_HOST"
+  export OIDC_DOMAIN_NAME="$OIDC_HOST"
+  export AFON_CATALOG="${AFON_CATALOG:-$(echo "$CLOUD" | tr '[:upper:]' '[:lower:]')}"
+  export AFON_FORBIDDEN_CATALOG="${AFON_FORBIDDEN_CATALOG:-${AFON_CATALOG%%_*}_forbidden}"
   RESULTS_DIR="$AFON_HOME/smoke/notebooks"
   mkdir -p "$RESULTS_DIR"
-  afon smoke-pod-notebook "$RESULTS_DIR" "${NOTEBOOKS[@]}"
+  afon user-pod-notebook-smoke "$RESULTS_DIR" "${NOTEBOOKS[@]}"
   exit $?
 fi
 
@@ -217,7 +240,7 @@ if ! afon check-oidc "$CLOUD" >/dev/null; then
 fi
 echo "OIDC provider at $OIDC_HOST is ready"
 
-# the token of USER_ID, who is the admin, or, in a project's TRE, which admits only the tokens of its project, that of its smoke member,
+# the token of USER_ID, who is the admin, or, in project mode, where the TRE admits only the tokens of its project, that of its smoke member,
 # signed in as a member is, with the project and the second factor in it
 TOKEN_KIND=user
 [ -z "$SMOKE_MEMBER" ] || TOKEN_KIND=smoke-member
@@ -241,23 +264,6 @@ export OIDC_DOMAIN_NAME="$OIDC_HOST"
 export AFON_CATALOG="${AFON_CATALOG:-$(echo "$CLOUD" | tr '[:upper:]' '[:lower:]')}"
 export AFON_FORBIDDEN_CATALOG="${AFON_FORBIDDEN_CATALOG:-${AFON_CATALOG%%_*}_forbidden}"
 
-# The kubeconfig of the stack, if KUBECONFIG is not set already, eg by the regression suite: that of the full stack cluster of the
-# cloud in the env, with the afon command '<cloud>-update-kube-config tre', which prints it.  The default ~/.kube/config is neither written nor read.
-if [ -z "${KUBECONFIG:-}" ]; then
-  KUBE_CONFIG_OUTPUT=$(afon "$CLOUD-update-kube-config" tre 2>&1) || {
-    printf '%s\n' "$KUBE_CONFIG_OUTPUT" | tail -20 >&2
-    echo "Could not get the kubeconfig of the $CLOUD stack: is it deployed?  Or set KUBECONFIG to its kubeconfig" >&2
-    exit 1
-  }
-  KUBECONFIG=$(printf '%s\n' "$KUBE_CONFIG_OUTPUT" | sed -n 's/^kubeconfig of .*: export KUBECONFIG=//p' | tail -1)
-  unset KUBE_CONFIG_OUTPUT
-  if [ -z "$KUBECONFIG" ] || [ ! -s "$KUBECONFIG" ]; then
-    echo "No kubeconfig for the $CLOUD stack: set KUBECONFIG to its kubeconfig" >&2
-    exit 1
-  fi
-  export KUBECONFIG
-  echo "Using the kubeconfig $KUBECONFIG"
-fi
 # Forwards the driver's port to a free local port, which kubectl picks and reports, so that runs at the same time, eg for
 # different clouds, do not compete for one.
 PORT_FORWARD_LOG=$(mktemp)
@@ -279,7 +285,7 @@ if [ -z "$LOCAL_PORT" ]; then
 fi
 export SPARK_REMOTE="sc://localhost:$LOCAL_PORT"
 
-# In a project's TRE, the notebooks that read through Trino reach its coordinator as a pod does, by its HTTPS port, which this forwards to a free local port, trusting
+# In project mode, the notebooks that read through Trino reach its coordinator as a pod does, by its HTTPS port, which this forwards to a free local port, trusting
 # its self-signed certificate, which names localhost: AFON_TRINO_HOST, AFON_TRINO_PORT and TRINO_CA_CERT tell the notebook
 if [ -n "$SMOKE_MEMBER" ] && printf '%s\n' "${NOTEBOOKS[@]}" | grep -qi trino; then
   TRINO_POD=$(kubectl get pods -o name | grep 'pod/trino-coordinator' | head -1)

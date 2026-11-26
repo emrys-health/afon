@@ -5,7 +5,7 @@
 set -euo pipefail
 
 usage(){
-  echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>]"
+  echo "Usage: $0 [--home <dir>] [--cdktf <dir>] [--cloud|-c <cloud>] [--stack|-s <stack-id>]"
   echo "          [--config-env <env>] [--cdktf-env <env>] [--env|-e <env>]"
   echo "          [--logging|-l <level>] [--logging-console|-lc <level>] [--logging-file|-lf <file-name>] [--debug] [--lenient]"
   echo "          <command> [args...]"
@@ -13,6 +13,8 @@ usage(){
   echo "  --home / AFON_HOME:                       the afon home dir.  Defaults to '$HOME/.afon'."
   echo "  --cdktf / AFON_CDKTF:                     the afon cdktf dir.  Defaults to 'AFON_HOME/cdktf'."
   echo "  --cloud / AFON_CLOUD:                     the cloud to target.  One of aws|azure|gcp.  Defaults to 'ALL'."
+  echo "  --stack / AFON_STACK:                     the id of the stack whose cluster the commands that use Kubernetes act on, eg aws-full, with its kubeconfig in"
+  echo "                                            'AFON_CDKTF/kube/<stack-id>.config'.  KUBECONFIG, if set, names the cluster instead.  With neither, the stack deployed last."
   echo "  --config-env / AFON_CONFIG_ENV:           the config env name.  Switches AFON_HOME/config to 'config-<env>' immediately, before running any command."
   echo "  --cdktf-env / AFON_CDKTF_ENV:             the cdktf env name.  Switches AFON_CDKTF to 'AFON_CDKTF-<env>' immediately, before running any command."
   echo "  --env / AFON_ENV:                         sets both --cdktf-env and --config-env.  The --env flag overrides both of them;"
@@ -46,6 +48,7 @@ fi
 AFON_HOME="${AFON_HOME:-}"
 AFON_CDKTF="${AFON_CDKTF:-}"
 AFON_CLOUD="${AFON_CLOUD:-}"
+AFON_STACK="${AFON_STACK:-}"
 AFON_LOGGING="${AFON_LOGGING:-}"
 AFON_LOGGING_CONSOLE="${AFON_LOGGING_CONSOLE:-}"
 AFON_LOGGING_FILE="${AFON_LOGGING_FILE:-}"
@@ -70,6 +73,8 @@ while [[ $# -gt 0 ]]; do
       AFON_CDKTF="$2"; shift 2 ;;
     --cloud|-c)
       AFON_CLOUD="$2"; shift 2 ;;
+    --stack|-s)
+      AFON_STACK="$2"; shift 2 ;;
     --config-env)
       AFON_CONFIG_ENV="$2"; CONFIG_ENV_FLAG=true; shift 2 ;;
     --cdktf-env)
@@ -167,6 +172,8 @@ fi
 # AFON_CONFIG_SWITCHED/AFON_CDKTF_SWITCHED are internal: they tell afon-cli-scripts.sh the
 # switch above already ran, so it doesn't redundantly repeat it for a script command.
 # AFON_LENIENT is likewise passed on to the script commands.
+# AFON_STACK is exported for the same reason, and so that a --stack flag wins over the AFON_STACK that was in the env, if any, as it is read from the env.
+[ -z "$AFON_STACK" ] || export AFON_STACK
 export AFON_CONFIG_ENV AFON_CDKTF_ENV AFON_CONFIG_SWITCHED AFON_CDKTF_SWITCHED AFON_LENIENT
 
 AFON_JVM_ENVS=

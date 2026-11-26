@@ -33,7 +33,7 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ## Requirements
 
-- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and its kubeconfig, `$AFON_CDKTF/kube/<stack-id>.config`, given by `KUBECONFIG` (or by `AFON_STACK=<stack-id>`). `~/.kube/config` is not used. `afon-cli.sh <cloud>-update-kube-config tre` writes it and prints the `export`. `smoke-notebook` runs that command itself if `KUBECONFIG` is not set.
+- A deployed full stack, `aws-full`, `azure-full` or `gcp-full`, and its kubeconfig, `$AFON_CDKTF/kube/<stack-id>.config`, given by `KUBECONFIG` (or by the id of the stack, `--stack <stack-id>` of `afon-cli.sh`, eg `--stack aws-full`, or `AFON_STACK=<stack-id>`), and, if none is given, that of the stack deployed last, `$AFON_CDKTF/kube/current.config`. `~/.kube/config` is not used. `afon-cli.sh <cloud>-update-kube-config tre` writes it and prints the `export`. `smoke-notebook` runs that command itself if `KUBECONFIG` is not set.
 - In `$AFON_HOME/config` (default `~/.afon/config`): `<CLOUD>_POLARIS_DOMAIN_NAME`, eg `AZURE_POLARIS_DOMAIN_NAME`,
   `<CLOUD>_OIDC_DOMAIN_NAME` or else `OIDC_DOMAIN_NAME`, and `USER_ID`, naming one of the users in [users.csv](configuration.md), whose password is read from there.
   The test runs as the `USER_ID` user, which you can check with `./afon.sh -a config-user`
@@ -57,20 +57,31 @@ exist before checking privileges, so reading a table in an empty catalog would n
 - `AFON_CATALOG` containing the table `AFON_TABLE` (default `admin.deployments`). The setup of a stack no longer writes it: it is written by the
   `spark-polaris` smoke test (see [The Spark write test](#the-spark-write-test)), so run that first, eg
   `afon-cli.sh smoke-test <cloud> --tests spark-polaris`, or `afon-cli.sh spark-polaris-smoke`. Without it, check 1 fails, as the table does not exist.
-- `curl`, `python3` and [uv](https://docs.astral.sh/uv/): the notebook runs in the common Python environment
+- `curl`, `python3` and [uv](https://docs.astral.sh/uv/), for `--local` only: the notebook then runs in the common Python environment
   `scripts/python/.venv`, which is created and synced on first use (it includes `pyspark-client`).
   `afon-cli.sh smoke-notebook` sets it up and checks it first, with `afon-cli.sh python-setup`, which can also be run on its own: it
   fails early, saying so, if `uv` is not installed, or the env has no `python`, `jupyter` or the ipykernel `afon`.
 
-## Running from your machine
+## Running the notebooks
 
 ```shell
-afon-cli.sh smoke-notebook [--env <env>] [<cloud>]
-afon-cli.sh smoke-notebook [--env <env>] [<cloud>] oidc
+afon-cli.sh smoke-notebook [--env <env>] [--local] [<cloud>]
+afon-cli.sh smoke-notebook [--env <env>] [--local] [<cloud>] oidc
 afon-cli.sh smoke-notebook --list
 ```
 
 which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `oidc`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
+
+By default the notebooks run in a notebook pod, as a user's do, so that they use the pod's own python and Spark Connect client, its network policy and its
+certificate of Trino. The afon command `user-pod-notebook-smoke` does it, and writes the executed notebooks to `$AFON_HOME/smoke/notebooks`:
+
+- In non-project mode, the pod is that of `USER_ID`: JupyterHub is asked, through its API, to start it. It then has no token of a sign-in, as the hub puts one in
+  a pod only when the user signs in, so the token that Keycloak gives the user's client is given to the notebooks as `OIDC_TOKEN`, on the standard input of the command that
+  runs them, so that it is in no command line. They are also told `POLARIS_DOMAIN_NAME`, `OIDC_DOMAIN_NAME`, `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`, as they are from your machine.
+- In project mode, the pod is that of the smoke member, signed in to the hub, see [Projects](projects.md#a-first-tre-project).
+
+`--local` runs the notebooks from your machine instead, with the common python environment described under Requirements, and, in a project, with the smoke member's token from
+Keycloak and port-forwards to the TRE's Spark Connect and Trino. It is quicker and needs no pod, but it does not test the pod.
 
 `--env` selects the afon env, so that the domain names, and the config used by every afon command it runs, are those of `$AFON_HOME/config-<env>`; it defaults to `AFON_ENV`, else the current config.
 
@@ -191,7 +202,7 @@ spark-connect|spark-connect-smoke|
 ```
 
 `<cloud>` in a test's args is replaced by the `<cloud>` of the stack tested, so that the one file serves every cloud: the last test of the
-suite, `notebooks|smoke-notebook|<cloud>`, runs the notebooks of [Running from your machine](#running-from-your-machine) against that cloud, after the other tests,
+suite, `notebooks|smoke-notebook|<cloud>`, runs the notebooks of [Running the notebooks](#running-the-notebooks) against that cloud, after the other tests,
 and so after `spark-polaris`, which writes the table that the notebook `spark-connect-oidc-test` reads.
 
 The suite runs every afon command, the tests' as well as those setting up, tearing down or reaching the stacks, with
@@ -303,7 +314,7 @@ The Spark is the session of the test's own process, signed in as the configured 
 running the test, through a port-forward to its pod, or through its public domain name if `POLARIS_ACCESS=https`. The test writes the table that
 `trino` and `spark-connect` read, so the suite runs it before them, after `keycloak` and `db`, which it needs. It fails if Polaris refuses the write.
 
-It is skipped, and passes, for a project's TRE (the config has `OIDC_PROJECT_CLAIM`): its Polaris admits only the tokens of the project, with its
+It is skipped, and passes, in project mode (the config has `OIDC_PROJECT_CLAIM`): the TRE's Polaris admits only the tokens of the project, with its
 audience, its `acr` and its project claim, which that user cannot present. Making the smoke tests work against it is separate work.
 
 In a Data Provider's project stack (a project stack id, no `OIDC_PROJECT_CLAIM`, and the admin client of its Polaris) it is the same test, with the same code, writing where
@@ -317,7 +328,7 @@ afon-cli.sh manage-project-stack run lon spark-polaris-smoke
 
 Releasing `smoke_test` (`afon-cli.sh manage-project-stack run lon manage-data release cvd smoke_test`) gives the projects that `lon` has let in a table with
 rows to read, from a notebook of the TRE (`scripts/smoke/notebooks/project-spark-reads-data-providers.ipynb` with Spark, `project-trino-reads-data-providers.ipynb` with Trino), and
-leaves `smoke_test_unreleased` in `staging`, which they must be refused. In a project's TRE, `smoke-notebook` runs those two notebooks in the pod of the smoke member, which it signs in to the hub (or, with `--local`, from your machine), and a member can run them in their own.
+leaves `smoke_test_unreleased` in `staging`, which they must be refused. In project mode, `smoke-notebook` runs those two notebooks in the pod of the smoke member, which it signs in to the hub (or, with `--local`, from your machine), and a member can run them in their own.
 See [Projects](projects.md#a-first-tre-project).
 
 Writing the tables is a test, never part of an operation: nothing that deploys or
@@ -373,7 +384,7 @@ executed notebook, with its outputs, is written to `smoke/notebooks/AwsSmokeTest
 
 The notebook is AWS's: its catalog `test_aws` is the `aws` warehouse of the Polaris it names, and it reads the table `admin.deployments` that
 `spark-polaris` writes, so the suite runs it after that test. Deselect it when testing another cloud. Another notebook is run with
-`./afon.sh -a jupyter-pod-notebook-smoke -- <notebook>`. Like `spark-polaris`, it is skipped, and passes, for a project's TRE, whose Polaris admits
+`./afon.sh -a jupyter-pod-notebook-smoke -- <notebook>`. Like `spark-polaris`, it is skipped, and passes, in project mode, as the TRE's Polaris admits
 only the tokens of its members.
 
 ## Other smoke tests

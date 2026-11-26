@@ -821,7 +821,7 @@ kubectl get pods
 
 `afon-cli.sh <cloud>-update-kube-config <stack-id|role>` writes it again, eg after the cluster was recreated, and prints
 the `export`.  `$AFON_CDKTF/kube/current.config` is a link to the kubeconfig of the stack deployed last, so that
-`export KUBECONFIG=$AFON_CDKTF/kube/current.config` reaches it; nothing depends on it, and it is removed with that stack.
+`export KUBECONFIG=$AFON_CDKTF/kube/current.config` reaches it, and it is removed with that stack. It is also the cluster that the commands that use Kubernetes from your machine (the smoke tests, `afon-cli.sh spark-polaris-smoke`) act on when neither `KUBECONFIG` nor `--stack` (`AFON_STACK`) is given, which they say on the standard error.
 The ops tools act on the cluster of `KUBECONFIG`, else of the stack given by `AFON_STACK`, eg `AFON_STACK=aws-full`.
 
 #### Concurrent runs
