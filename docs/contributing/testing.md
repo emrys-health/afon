@@ -99,7 +99,7 @@ See [smoke tests](../smoke_tests.md) for what is tested, the requirements and tr
 
 ### Running
 
-The notebooks of `scripts/smoke/notebooks.csv`, or those named after the cloud, eg `oidc`, against the cluster of the current `kubectl` context:
+The notebooks of `scripts/smoke/notebooks.csv`, or those named after the cloud, eg `stack-spark`, against the cluster of the current `kubectl` context:
 
 ```shell
 afon-cli.sh smoke-notebook <cloud>

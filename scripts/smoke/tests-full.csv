@@ -12,5 +12,4 @@ network|network-smoke|
 spark-connect|spark-connect-smoke|
 spark-gcs-read|spark-connect-gcs-read-smoke|
 spark-s3-read|spark-connect-s3-read-smoke|
-#jupyter-pod-aws|jupyter-pod-notebook-smoke|demo/notebooks/AwsSmokeTest.ipynb
-#notebooks|smoke-notebook|<cloud>
+notebooks|smoke-notebook|<cloud>

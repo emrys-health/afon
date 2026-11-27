@@ -12,7 +12,7 @@ The shared Spark Connect server registers no catalogs and holds no Polaris crede
 the catalogs it uses, authenticated with the user's OIDC token, and Polaris authorises that user through their own
 principal role (see [architecture](architecture.md#spark-integration)).
 
-The notebook [spark-connect-oidc-test.ipynb](../scripts/smoke/notebooks/spark-connect-oidc-test.ipynb) checks that, each check
+The notebook [stack-spark-connects.ipynb](../scripts/smoke/notebooks/stack-spark-connects.ipynb) checks that, each check
 being an assertion, so that the run fails on any regression:
 
 | Check                                                                                                                                                                   | Expected                                   |
@@ -30,6 +30,10 @@ Spark does not know would be read as a namespace in its default catalog, with a 
 
 Check 4 lists the catalog's namespaces rather than reading a table: Polaris answers 404 for a table that does not
 exist before checking privileges, so reading a table in an empty catalog would not test the authorisation.
+
+The notebook [spark-connect-guard.ipynb](../scripts/smoke/notebooks/spark-connect-guard.ipynb) checks, with no catalog or table, so for any user with a token, that Spark Connect lets in only a client
+with the user's token (`UNAUTHENTICATED` with none or an invalid one) and refuses what would reach other sessions (`ADD JAR`, `reflect`, global temporary views, the server's disk, the
+tables of `spark_catalog`), and that a Python UDF on the executors cannot contact the Spark driver's UI (port 4040). It is run as `spark-guard`, in non-project mode by `USER_ID`, and in project mode by the smoke member.
 
 ## Requirements
 
@@ -66,11 +70,13 @@ exist before checking privileges, so reading a table in an empty catalog would n
 
 ```shell
 afon-cli.sh smoke-notebook [--env <env>] [--local] [<cloud>]
-afon-cli.sh smoke-notebook [--env <env>] [--local] [<cloud>] oidc
+afon-cli.sh smoke-notebook [--env <env>] [--local] [<cloud>] stack-spark
 afon-cli.sh smoke-notebook --list
 ```
 
-which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `oidc`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
+which runs all the notebooks listed in `scripts/smoke/notebooks.csv`, or only those named, separated by spaces or commas, eg `stack-spark`. All are run even if some fail, and the command fails if any does. The names are those listed in [scripts/smoke/notebooks.csv](../scripts/smoke/notebooks.csv), the file of the notebooks, `name|file|description`, with the files in `scripts/smoke/notebooks`.  The notebooks are read from that file by default; `--notebooks <file>` reads those of another CSV file instead.
+
+The `stack-*` notebooks are those of a stack that is not a project's (non-project mode), `stack-spark` and `stack-trino`; the `project-*` ones are those of a project's TRE, see `scripts/smoke/notebooks-project.csv`; `spark-guard` is run in both modes. The suite `tests-full.csv` runs all of them in one test, `notebooks`, with `smoke-notebook <cloud>`. `stack-trino` needs the pod's certificate of Trino, so it is run in a pod, not with `--local`.
 
 By default the notebooks run in a notebook pod, as a user's do, so that they use the pod's own python and Spark Connect client, its network policy and its
 certificate of Trino. The afon command `user-pod-notebook-smoke` does it, and writes the executed notebooks to `$AFON_HOME/smoke/notebooks`:
@@ -85,7 +91,7 @@ Keycloak and port-forwards to the TRE's Spark Connect and Trino. It is quicker a
 
 `--env` selects the afon env, so that the domain names, and the config used by every afon command it runs, are those of `$AFON_HOME/config-<env>`; it defaults to `AFON_ENV`, else the current config.
 
-The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
+The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] stack-spark`.  It runs its afon commands with `afon.sh` from the source tree, else with the `afon-cli.sh` of the distribution it runs from, or of `AFON_CLI_DIR`.
 
 `cloud` is `aws`, `azure` or `gcp` (default: `aws`), given first, and selects the Polaris domain from `<CLOUD>_POLARIS_DOMAIN_NAME` and the catalogs `<cloud>` and
 `<cloud>_forbidden`, eg `azure` and `azure_forbidden`. The script:
@@ -97,7 +103,7 @@ The command can also be run with `./afon.sh -a smoke-notebook [<cloud>] oidc`.  
 5. runs the notebook with `./afon.sh -a jupyter-execute` (see [scripts/jupyter/execute.sh](../scripts/jupyter/execute.sh));
 6. stops the port-forward, whether the run passed or failed.
 
-The executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/spark-connect-oidc-test.ipynb`, leaving the original
+The executed notebook, with its outputs, is written to `$AFON_HOME/smoke/notebooks/stack-spark-connects.ipynb`, leaving the original
 clean. The script exits non-zero if any check fails. The token is never printed.
 
 To get the same token yourself, eg to run the notebook some other way, use:
@@ -142,7 +148,7 @@ The notebook reads these environment variables, all optional apart from `OIDC_TO
 | `AFON_TABLE`             | `namespaceph.test_table`                  |
 
 `afon-cli.sh smoke-notebook` sets the first four from your configuration, and `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG` from the
-cloud it is given, eg `azure` and `azure_forbidden` for `afon-cli.sh smoke-notebook azure oidc`, unless they are set already.  The defaults
+cloud it is given, eg `azure` and `azure_forbidden` for `afon-cli.sh smoke-notebook azure stack-spark`, unless they are set already.  The defaults
 in the table, `aws` and `aws_forbidden`, are those of the notebook when run on its own.  The table `AFON_TABLE` is written by the
 setup of the stack to the catalog of its own cloud, so it is not in the `aws` catalog of the Polaris of another cloud.
 
@@ -154,7 +160,7 @@ setup of the stack to the catalog of its own cloud, so it is not in the `aws` ca
 - **Check 1 fails**: the test user is not authorised for `AFON_CATALOG`, or the table does not exist.  With
   `TABLE_OR_VIEW_NOT_FOUND` for ``test_catalog`.`namespaceph`.`test_table` `` the notebook is reading another catalog than
   the one the stack's setup wrote the table to, which is that of its own cloud: run it through
-  `afon-cli.sh smoke-notebook <cloud> oidc`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
+  `afon-cli.sh smoke-notebook <cloud> stack-spark`, or set `AFON_CATALOG` and `AFON_FORBIDDEN_CATALOG`.
 - **Spark fails with `UnknownHostException: <polaris domain>: Temporary failure in name resolution`**: the network policies
   only let the Spark driver resolve the names in `whitelist.yaml`, so list the Polaris and Jupyter domain names and the
   storage account of the cloud in its section there (see [Setup Azure full stack](stacks.md#setup-azure-full-stack)).
@@ -215,7 +221,7 @@ spark-connect|spark-connect-smoke|
 
 `<cloud>` in a test's args is replaced by the `<cloud>` of the stack tested, so that the one file serves every cloud: the last test of the
 suite, `notebooks|smoke-notebook|<cloud>`, runs the notebooks of [Running the notebooks](#running-the-notebooks) against that cloud, after the other tests,
-and so after `spark-polaris`, which writes the table that the notebook `spark-connect-oidc-test` reads.
+and so after `spark-polaris`, which writes the table that the notebook `stack-spark-connects` reads.
 
 The suite runs every afon command, the tests' as well as those setting up, tearing down or reaching the stacks, with
 `afon.sh`, as `./afon.sh -a <command> -- <args>`, or with `afon-cli.sh`, as `afon-cli.sh <command> <args>`, given
@@ -409,18 +415,18 @@ It also checks that the session cannot run a JVM UDF and that a bogus token is r
 #### The notebook in a Jupyter pod
 
 The `jupyter-pod-aws` test (`jupyter-pod-notebook-smoke`, [JupyterPodNotebookSmokeMain](../afon-ops/src/main/java/health/emrys/afon/ops/smoke/JupyterPodNotebookSmokeMain.java))
-runs [demo/notebooks/AwsSmokeTest.ipynb](../demo/notebooks/AwsSmokeTest.ipynb) in a user's own Jupyter pod, as the user would, rather than from your machine
-as `smoke-notebook` does: with the pod's Python and Spark Connect client, its network policy and its certificate of Trino. So it checks Spark Connect,
-with the token in its header, a Python UDF on the executors, whose Python must be that of the pod, and Trino over HTTPS, from where a user runs them.
+runs [scripts/smoke/notebooks/stack-trino-connects.ipynb](../scripts/smoke/notebooks/stack-trino-connects.ipynb) in a user's own Jupyter pod, as the user would, rather than from your machine
+as `smoke-notebook` does: with the pod's Python and Spark Connect client, its network policy and its certificate of Trino. So it checks Trino over HTTPS, with the token, from where a user runs it. The Spark
+checks, including that a Python UDF on the executors cannot contact the Spark driver, are those of `stack-spark-connects`.
 
 It asks JupyterHub to spawn the pod of the configured user (`USER_ID`), as the `network` test does. A pod spawned so has no `OIDC_TOKEN`, which the
-hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`, with the name of the cloud's catalog as `CATALOG`. The token, the
+hub only injects at a user's sign-in, so the test gets the user's token from Keycloak and gives it to the notebook as `OIDC_TOKEN`, with the name of the cloud's catalog as `AFON_CATALOG`, as `smoke-notebook` does. The token, the
 catalog and the notebook are sent on the standard input of an exec through the Kubernetes API (`KubeClient`), so the token is in no command line, and the notebook runs in a temporary directory of the pod,
 removed afterwards, with `jupyter nbconvert --execute`. Every cell is run, even after one fails, and the test fails if any cell raised an error. The
-executed notebook, with its outputs, is written to `smoke/notebooks/AwsSmokeTest.ipynb` in the JVM's temporary directory (`java.io.tmpdir`).
+executed notebook, with its outputs, is written to `smoke/notebooks/stack-trino-connects.ipynb` in the JVM's temporary directory (`java.io.tmpdir`).
 
-The notebook is AWS's: its catalog `test_aws` is the `aws` warehouse of the Polaris it names, and it reads the table `admin.deployments` that
-`spark-polaris` writes, so the suite runs it after that test. Deselect it when testing another cloud. Another notebook is run with
+The notebook takes the catalog of the cloud under test (`AFON_CATALOG`), and reads the table `admin.deployments` of that catalog, which
+`spark-polaris` writes, so the suite runs it after that test. Another notebook is run with
 `./afon.sh -a jupyter-pod-notebook-smoke -- <notebook>`. Like `spark-polaris`, it is skipped, and passes, in project mode, as the TRE's Polaris admits
 only the tokens of its members.
 

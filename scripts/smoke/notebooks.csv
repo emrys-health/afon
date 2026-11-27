@@ -1,2 +1,4 @@
 name|file|description
-oidc|spark-connect-oidc-test.ipynb|Spark Connect with the user's OIDC token: the catalogs the user is, and is not, authorised for
+stack-spark|stack-spark-connects.ipynb|Spark Connect with the user's OIDC token: the catalogs the user is, and is not, authorised for
+stack-trino|stack-trino-connects.ipynb|Trino over HTTPS with the user's OIDC token (in a pod only: it needs the pod's Trino CA)
+spark-guard|spark-connect-guard.ipynb|Spark Connect lets in only a client with the user's token and refuses what would reach other sessions; a Python UDF cannot contact the Spark driver

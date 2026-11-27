@@ -694,8 +694,8 @@ says where to look.
 one that a project's TRE accepts.
 
 - **From the CLI, in the pod of the smoke member** ([#411](https://github.com/emrys-health/afon/issues/411)). `smoke-notebook`,
-  run in the project stack's home, runs `project-spark-reads-data-providers.ipynb` and
-  `project-trino-reads-data-providers.ipynb`, the notebooks of `scripts/smoke/project-notebooks.csv`, as a member's are: it
+  run in the project stack's home, runs `project-spark-reads-data-providers.ipynb`,
+  `project-trino-reads-data-providers.ipynb` and `spark-connect-guard.ipynb`, the notebooks of `scripts/smoke/notebooks-project.csv`, as a member's are: it
   signs the first of the `smokeMembers` (see [Members](#members)) in to the TRE's JupyterHub, as a browser does, after
   `manage-identity smoke-credentials`, which has the hub start their pod with their token, and runs the notebooks in that
   pod, so that the token, the cluster's own addresses and the network policy of the pod are a member's.

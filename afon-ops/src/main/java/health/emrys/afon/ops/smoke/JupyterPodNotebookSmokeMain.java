@@ -55,7 +55,7 @@ public class JupyterPodNotebookSmokeMain {
 
     private static final Logger logger = LoggerFactory.getLogger(JupyterPodNotebookSmokeMain.class);
 
-    static final String DEFAULT_NOTEBOOK = "demo/notebooks/AwsSmokeTest.ipynb";
+    static final String DEFAULT_NOTEBOOK = "scripts/smoke/notebooks/stack-trino-connects.ipynb";
 
     /**
      * The container of a user's pod that runs the notebook server, as KubeSpawner names it.
@@ -82,7 +82,8 @@ public class JupyterPodNotebookSmokeMain {
         "IFS= read -r OIDC_TOKEN",
         "IFS= read -r CATALOG",
         "IFS= read -r size",
-        "export OIDC_TOKEN CATALOG",
+        "AFON_CATALOG=$CATALOG",
+        "export OIDC_TOKEN AFON_CATALOG",
         "head -c \"$size\" > \"$dir/notebook.ipynb\"",
         "cd \"$dir\"",
         "jupyter nbconvert --to notebook --execute --allow-errors --ExecutePreprocessor.timeout=" + CELL_TIMEOUT_SECONDS

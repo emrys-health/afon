@@ -24,7 +24,7 @@
 # original clean.
 #
 # By default the notebooks are run in a notebook pod, as a user's are, by the afon command 'user-pod-notebook-smoke', and nothing below runs: in project mode (the config
-# has SMOKE_MEMBER) the pod of its smoke member, who is signed in to the TRE's JupyterHub, and the notebooks are those of scripts/smoke/project-notebooks.csv, unless --notebooks
+# has SMOKE_MEMBER) the pod of its smoke member, who is signed in to the TRE's JupyterHub, and the notebooks are those of scripts/smoke/notebooks-project.csv, unless --notebooks
 # gives another file; in non-project mode, the pod of USER_ID, which the hub is asked to start, with USER_ID's token from Keycloak given to the notebooks.  The executed notebooks are written to
 # $AFON_HOME/smoke/notebooks.  With --local they are run from this machine, as below:
 #
@@ -116,7 +116,7 @@ prop() {
 # another, and run with that member's token, as only the tokens of the project are admitted there
 SMOKE_MEMBER=$(prop SMOKE_MEMBER)
 if [ -n "$SMOKE_MEMBER" ] && [ -z "$NOTEBOOKS_GIVEN" ]; then
-  NOTEBOOKS_FILE="$AFON_ROOT/scripts/smoke/project-notebooks.csv"
+  NOTEBOOKS_FILE="$AFON_ROOT/scripts/smoke/notebooks-project.csv"
 fi
 if [ -n "$LIST" ]; then
   list_notebooks; exit 0

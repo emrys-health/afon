@@ -1,3 +1,4 @@
 name|file|description
 project-spark|project-spark-reads-data-providers.ipynb|A project's Spark reads the catalogs of its Data Providers with the smoke member's token, and is refused what is not released
 project-trino|project-trino-reads-data-providers.ipynb|A project's Trino reads the catalogs of its Data Providers with the smoke member's token, and is refused what is not released
+spark-guard|spark-connect-guard.ipynb|Spark Connect lets in only a client with the smoke member's token and refuses what would reach other sessions; a Python UDF cannot contact the Spark driver
