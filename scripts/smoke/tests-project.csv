@@ -1,0 +1,20 @@
+name|command|args
+keycloak|key-cloak-smoke|
+db|db-smoke|
+trino|trino-query-smoke|
+tetragon|tetragon-loki-smoke|
+loki|promtail-loki-smoke|
+failed-login-loki|failed-login-loki-smoke|
+guacamole-db|guacamole-db-smoke|
+network|network-smoke|
+spark-connect|spark-connect-smoke|
+spark-gcs-read|spark-connect-gcs-read-smoke|
+spark-s3-read|spark-connect-s3-read-smoke|
+#notebooks|smoke-notebook|<cloud>
+# The suite of project mode, ie of a project stack's TRE, whose config names its smoke member (SMOKE_MEMBER): the tests that a member can run, as the smoke member, see
+# SmokeUser, and the checks of the TRE and its identity that need no user.  It assumes what the member reads is there: the smoke member's credentials (manage-identity
+# smoke-credentials), a grant on each Data Provider and its released and staging tables (spark-polaris-smoke and manage-data release on each Data Provider).
+#
+# tetragon and loki use the pod of the smoke member, signed in to the hub, which starts it, see UserPod.
+#
+# Not in it: spark-polaris, which skips a project's TRE, and git, which needs the user's Git credentials, which a member's are not known.

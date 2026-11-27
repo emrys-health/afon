@@ -1,6 +1,8 @@
 package health.emrys.afon.ops.kube.tools;
 
 import health.emrys.afon.ops.kube.ExecResult;
+import health.emrys.afon.ops.kube.tools.UserPod.Hub;
+import health.emrys.afon.ops.kube.tools.UserPod.Pod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,8 +16,8 @@ import java.util.Map;
 
 /**
  * Runs notebooks in the notebook pod of a user, as the user does, so that the notebooks have the pod's own python, the cluster's own addresses, the network policy of the pod
- * and its certificate of Trino, which they do not have when they run from a machine.  What the runner does is the same for every user: it has the {@link Hub} make the pod, copies
- * each notebook into it, runs it there, brings back the executed notebook and says what failed.  How the pod is made, and whose token it has, is the {@link Hub}'s:
+ * and its certificate of Trino, which they do not have when they run from a machine.  What the runner does is the same for every user: it has the {@link UserPod.Hub} make the pod, copies
+ * each notebook into it, runs it there, brings back the executed notebook and says what failed.  How the pod is made, and whose token it has, is the {@link UserPod.Hub}'s:
  * <ul>
  *   <li>in project mode, the smoke member: the hub signs them in, as a browser does, which starts their pod with their own token, the one that the hub gives a
  *       member, with the project and the second factor in it;</li>
@@ -27,38 +29,6 @@ import java.util.Map;
 public final class PodNotebookRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(PodNotebookRunner.class);
-
-    /** The JupyterHub, as it makes the pod of the user that the notebooks run as: a member who is signed in, or an admin whose pod it is asked to start. */
-    public interface Hub {
-        /** Stops the user's server, if it has one, so that the next one has the token that it is then given.  A hub that gives the notebooks their token has no need to. */
-        void stopServer() throws Exception;
-
-        /** Signs the user in, which has the hub start their server.  A hub that is asked to start the pod instead has nothing to do here. */
-        void signIn() throws Exception;
-
-        /** @return the name of the user's pod, once there is one that the sign-in made, or that the hub was asked for, running */
-        String awaitPod(Instant since) throws Exception;
-
-        /**
-         * @return whether the pod has the user's token from the start, as the hub puts it in a pod at the user's sign-in, which a pod that the hub is asked to start has not:
-         * the runner then checks it is there, as the proof that the pod is the sign-in's; if not, the token is given to the notebooks, in their environment
-         */
-        default boolean podHasTokenOfSignIn() {
-            return true;
-        }
-    }
-
-    /** What is done in the pod. */
-    public interface Pod {
-        ExecResult exec(String... command) throws Exception;
-
-        /** As {@link #exec(String...)}, with the bytes as the standard input of the command, which are never logged, so may hold a credential. */
-        ExecResult exec(byte[] stdin, String... command) throws Exception;
-
-        void copyTo(Path local, String remote) throws Exception;
-
-        void copyFrom(String remote, Path local) throws Exception;
-    }
 
     /** What came of a notebook: whether it passed, and what it printed if it did not. */
     public record Result(String notebook, boolean passed, String output) {

@@ -2,29 +2,20 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.cdk.configs.SparkWorkloads;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonCloudProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
+import health.emrys.afon.ops.kube.tools.UserPod;
 import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
 import health.emrys.afon.ops.kube.tools.PodNotebookRunner;
-import health.emrys.afon.ops.project.SmokeMemberCredentials;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
-import health.emrys.afon.project.FileProjectStackProvider;
-import health.emrys.afon.project.ProjectStackEnv;
-import health.emrys.afon.security.keycloak.KeyCloakMemberLogin;
 
-import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static health.emrys.afon.config.AfonProperty.PROJECT_ID;
-import static health.emrys.afon.config.AfonProperty.SMOKE_MEMBER;
 
 /**
  * Runs notebooks in the notebook pod of a user, as the user does: with the pod's own python, its Spark Connect client, its network policy and its certificate of Trino, see
@@ -86,15 +77,12 @@ public class UserPodNotebookSmokeMain {
 
         try (KubeClient client = new KubeClient(properties)) {
             JupyterHubSpawner spawner = new JupyterHubSpawner(client);
-            PodNotebookRunner.Hub hub;
-            if (project) {
-                hub = memberHub(properties, cloud, spawner);
-            } else {
+            if (!project) {
                 environment.put("OIDC_TOKEN", adminToken);
                 environment.put("SPARK_REMOTE", sparkRemoteWithoutToken());
-                hub = adminHub(properties, spawner);
             }
-            PodNotebookRunner run = new PodNotebookRunner(hub, pod -> new PodNotebookRunner.Pod() {
+            UserPod.Hub hub = UserPod.of(properties, cloud, spawner);
+            PodNotebookRunner run = new PodNotebookRunner(hub, pod -> new UserPod.Pod() {
                 @Override
                 public ExecResult exec(String... command) throws Exception {
                     return client.exec("default", pod, null, Duration.ofMinutes(20), command);
@@ -123,73 +111,5 @@ public class UserPodNotebookSmokeMain {
             }
             System.out.printf("All notebooks (%d) passed%n", outcomes.size());
         }
-    }
-
-    /** The hub in project mode, that of the TRE, and the smoke member that is signed in to it, who gets a new pod with their token. */
-    private static PodNotebookRunner.Hub memberHub(AfonPropertyProvider properties, AfonCloud cloud, JupyterHubSpawner spawner) throws IOException {
-        String projectStack = properties.getValue(PROJECT_ID, "");
-        String member = properties.getValue(SMOKE_MEMBER, "");
-        if (projectStack.isBlank() || member.isBlank()) {
-            throw new IOException("There is no smoke member: PROJECT_ID and SMOKE_MEMBER are set in the config of a project stack that lists smokeMembers, once configured");
-        }
-        Path secrets = FileProjectStackProvider.secretsDir(ProjectStackEnv.defaultAfonHome(), projectStack);
-        SmokeMemberCredentials credentials = SmokeMemberCredentials.read(secrets, member).orElseThrow(() -> new IOException(
-            "No credentials for " + member + " in " + secrets.resolve(SmokeMemberCredentials.FILE) + ": give them with manage-identity smoke-credentials"));
-        String jupyterDomain = properties.getCloudValue(cloud, AfonCloudProperty.JUPYTER_DOMAIN_NAME, "");
-        if (jupyterDomain.isBlank()) {
-            throw new IOException(cloud.name() + "_JUPYTER_DOMAIN_NAME is not set, so there is no JupyterHub to sign in to");
-        }
-        URI realm = URI.create(properties.getOidcIssuerUrl(cloud));
-        return new PodNotebookRunner.Hub() {
-            @Override
-            public void stopServer() throws Exception {
-                spawner.stopServer(member, Duration.ofMinutes(3));
-            }
-
-            @Override
-            public void signIn() throws Exception {
-                KeyCloakMemberLogin.HubLanding landing = new KeyCloakMemberLogin(realm).signInToHub(URI.create("https://" + jupyterDomain + "/"), member,
-                                                                                                      credentials.password(), credentials.totpSecret());
-                System.out.printf("Signed %s in to https://%s/, which ended at %s (HTTP %d)%n", member, jupyterDomain, landing.at().getPath(), landing.status());
-                if (landing.status() >= 400) {
-                    throw new IOException("The hub refused " + member + " (HTTP " + landing.status() + " at " + landing.at().getPath() + "): " + landing.text()
-                                          + ".  The hub admits the members that were listed when the TRE was deployed, so a smoke member added since is refused until the TRE"
-                                          + " is deployed again: configure, then up <project-stack> --from tre");
-                }
-            }
-
-            @Override
-            public String awaitPod(Instant since) throws Exception {
-                return spawner.awaitPod(member, since, Duration.ofMinutes(6));
-            }
-        };
-    }
-
-    /**
-     * The hub in non-project mode, which is asked, through its API, to start the pod of {@code USER_ID}, or to say that it is running: there is no sign-in, so the
-     * pod has no token of one, and the notebooks are given one.
-     */
-    private static PodNotebookRunner.Hub adminHub(AfonPropertyProvider properties, JupyterHubSpawner spawner) {
-        return new PodNotebookRunner.Hub() {
-            @Override
-            public void stopServer() {
-                // the pod is not stopped: the notebooks are given their token, so that of an earlier pod does not matter
-            }
-
-            @Override
-            public void signIn() {
-                // not signed in
-            }
-
-            @Override
-            public String awaitPod(Instant since) throws Exception {
-                return spawner.spawnWithJupyterToken(properties);
-            }
-
-            @Override
-            public boolean podHasTokenOfSignIn() {
-                return false;
-            }
-        };
     }
 }

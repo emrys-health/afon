@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.ExecResult;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.kube.tools.UserPod;
 import health.emrys.afon.ops.kube.tools.LokiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +54,7 @@ public class TetragonLokiSmokeMain {
 
     private void checkTetragon() throws Exception {
         try (KubeClient client = new KubeClient(properties)) {
-            String jupyterPod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
+            String jupyterPod = UserPod.podOf(client, properties);
             logger.info("Started a Jupyter pod called: {}", jupyterPod);
             // the pod's clock, rather than ours, so the command necessarily runs after it
             OffsetDateTime start  = startTimeOf(client, jupyterPod);

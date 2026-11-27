@@ -183,6 +183,18 @@ cloud, so the same file serves all of them:
 afon-cli.sh smoke-test azure
 ```
 
+In project mode, ie when the config names a smoke member (`SMOKE_MEMBER`), the default suite is [scripts/smoke/tests-project.csv](../scripts/smoke/tests-project.csv), the tests
+that apply to a project's TRE: those that run as its smoke member (the Trino and Spark Connect tests, the two storage read tests and the notebooks, run in the
+member's pod) and the checks of the TRE and its identity that need no user (`keycloak`, `db`, `failed-login-loki`, `guacamole-db` and `network`), and `tetragon` and `loki`, which
+use the pod of the smoke member, signed in to the hub, which starts a new one for each. `spark-polaris` is not in it, as it skips a project's TRE, nor is `git`, which needs
+the user's Git credentials, which a member's are not known. It assumes the smoke member's credentials, a grant on each Data Provider and its released and staging tables. Run it in the project stack's home:
+
+```shell
+afon-cli.sh manage-project-stack run cvd-2026 smoke-test aws
+```
+
+`--suite` gives another file in either mode.
+
 It can also be run with `./afon.sh -a smoke-test azure`.
 
 **NOTE:** the `network` test, which checks that Polaris cannot be reached from outside of the cluster, passes on every cloud if the stack's
@@ -368,6 +380,31 @@ tests: 2 passed, 0 failed
 stack aws-full torn down in 07:10
 regression suite completed in 27:03
 ```
+
+#### The Trino query test
+
+The `trino` test (`trino-query-smoke`) queries Trino with a user's token, as the user, over HTTPS through a port-forward to the coordinator, then checks that Trino refuses
+a bad token, no token and the user's token with another user's name, and that Trino's logs in Loki name the user as the principal that ran the query. The user, and what
+is queried, depend on the mode, see `SmokeUser`:
+
+- In non-project mode the user is `USER_ID`, with the token of their client from Keycloak, who is known by their username. The query is the count of the table that
+  `spark-polaris` writes in the cloud's catalog, and Polaris's logs are checked for the user too.
+- In project mode the user is the smoke member, signed in as a member is, so that the token has the project and the second factor in it. They are known by the
+  `polaris_principal` of the token, `afon:<sub>`. The query is the count of the table that each Data Provider has released (`<catalog>.released.smoke_test`, the Trino
+  catalog being the id of the Data Provider's catalog in lower case), and the member is refused the table that the Data Provider left in `staging`
+  (`<catalog>.staging.smoke_test_unreleased`), which must exist, or the failure proves nothing and the test says so. Polaris's logs are not checked, as the Polaris that
+  answers is the Data Provider's, in its own cluster. It needs the smoke member's credentials, a grant from each Data Provider, and each Data Provider's tables, see
+  [Projects](projects.md#a-first-tre-project).
+
+#### The Spark Connect test
+
+The `spark-connect` test (`spark-connect-smoke`) opens a Spark session on the cluster's Spark Connect, through a port-forward, with a user's token, and reads a table.
+It also checks that the session cannot run a JVM UDF and that a bogus token is refused. What it reads depends on the mode:
+
+- In non-project mode the user is `USER_ID`, and the table is the one that `spark-polaris` writes in the cloud's catalog, whose rows must record the configured users.
+- In project mode the user is the smoke member, see `SmokeUser`, with their own token, and no client or Polaris of the stack's is involved. For each Data Provider's catalog,
+  named in Spark `test_<id>` as the notebooks name it, the member reads the table that the Data Provider has released, which must have rows, and is refused the one that it left
+  in `staging`, which must exist, or the test says that nothing was refused. The same preconditions as for the Trino test apply.
 
 #### The notebook in a Jupyter pod
 

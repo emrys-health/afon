@@ -28,4 +28,13 @@ public class SparkWarehouseConfigFactory {
         return new KeyCloakSparkWarehouseConfig(properties, user);
     }
 
+    /**
+     * Creates a config that reads only the catalogs of Data Providers, with the caller's own token, see
+     * {@link SparkWarehouseConfig#sparkConfigsWithToken(health.emrys.afon.config.AfonCatalog, String, String)}: a member of a project has no client of the stack's, nor
+     * a Polaris of the stack's to call, as what answers is each Data Provider's.
+     */
+    public SparkWarehouseConfig createDataProviderConfig(AfonPropertyProvider properties) {
+        return new SparkWarehouseConfig("", "", "", "", new health.emrys.afon.config.AfonCatalogs(properties));
+    }
+
 }

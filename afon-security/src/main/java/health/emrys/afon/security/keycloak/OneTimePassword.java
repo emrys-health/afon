@@ -59,6 +59,23 @@ public final class OneTimePassword {
     }
 
     /**
+     * Waits for the next step and gives the code of the one after it, for when the codes of the current and the next step have been taken, by this or by another process that
+     * signs in as the same member: KeyCloak takes a code once, and refuses one of a step that is not after the last that it took, so the first it can take is of the step
+     * that follows the next, which it takes only once its own clock has reached the next.
+     *
+     * @return the code of the secret for the step after the one that comes, once that has begun
+     */
+    public synchronized String afterTheNextStep(String secret) throws InterruptedException {
+        long now = clock.millis();
+        long boundary = (now / 1000 / STEP_SECONDS + 1) * STEP_SECONDS * 1000;
+        // a second past the boundary, for the clocks that are not quite the same
+        sleeper.sleep(boundary - now + 1000);
+        long step = clock.millis() / 1000 / STEP_SECONDS + 1;
+        given.add(secret + ":" + step);
+        return code(secret, step);
+    }
+
+    /**
      * @return the code of the secret for the current step, or the one before or after it, that this has not given before: the current step's first, and
      * after waiting for the next one when all three were given
      */

@@ -2,7 +2,7 @@ package health.emrys.afon.ops.smoke;
 
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.ops.kube.KubeClient;
-import health.emrys.afon.ops.kube.tools.JupyterHubSpawner;
+import health.emrys.afon.ops.kube.tools.UserPod;
 import health.emrys.afon.ops.kube.tools.LokiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +40,7 @@ public class PromtailLokiSmokeMain {
 
     private void checkLoki() throws Exception {
         try (KubeClient client = new KubeClient(properties)) {
-            String jupyterPod = new JupyterHubSpawner(client).spawnWithJupyterToken(properties);
+            String jupyterPod = UserPod.podOf(client, properties);
             logger.info("Started a Jupyter pod called: {}", jupyterPod);
             // Loki only looks back an hour by default, and a pod that has been running a while may not have logged since
             OffsetDateTime start = startTimeOf(client, jupyterPod);
@@ -48,7 +48,9 @@ public class PromtailLokiSmokeMain {
 
             try (LokiClient loki = new LokiClient(client, properties)) {
                 withRetries(3, () -> checkPodIsWatched(loki, jupyterPod, start));
-                checkPodLogs(loki, jupyterPod, start);
+                // a pod that has just started, as a member's does, has been watched for seconds, and Promtail ships its first lines in a while: the logs are read again, as the
+                // events of the Tetragon test are
+                withRetries(10, () -> checkPodLogs(loki, jupyterPod, start));
             }
         }
     }
@@ -61,11 +63,12 @@ public class PromtailLokiSmokeMain {
         return pods;
     }
 
-    private static void checkPodLogs(LokiClient loki, String jupyterPod, OffsetDateTime start) throws Exception {
+    private static List<String> checkPodLogs(LokiClient loki, String jupyterPod, OffsetDateTime start) throws Exception {
         List<String> lines = loki.queryRange(format("{namespace=\"default\", pod=\"%s\"}", jupyterPod), start, 20);
         if (lines.isEmpty()) {
             throw new RuntimeException(format("There are no logs for pod %s", jupyterPod));
         }
         logger.info("lines = {}", String.join("\n", lines));
+        return lines;
     }
 }

@@ -3,16 +3,14 @@ package health.emrys.afon.ops.smoke;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import health.emrys.afon.config.AfonCloud;
-import health.emrys.afon.config.AfonProperty;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonPropertyProvider;
-import health.emrys.afon.config.AfonUser;
-import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.ops.kube.tools.LokiClient;
-import health.emrys.afon.project.ProjectStackUserProvider;
+import health.emrys.afon.polaris.config.PolarisProjectGrants;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
-import health.emrys.afon.security.keycloak.KeyCloakProvider;
+import health.emrys.afon.ops.smoke.config.SmokeUser;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import org.slf4j.Logger;
@@ -50,32 +48,14 @@ public class TrinoQuerySmokeMain {
 
     private final AfonCloud            cloud;
     private final AfonPropertyProvider properties;
-    private final AfonUserProvider     userProvider;
 
     public TrinoQuerySmokeMain(AfonCloud cloud, AfonPropertyProvider properties) {
-        this.cloud        = cloud;
-        this.properties   = properties;
-        this.userProvider = ProjectStackUserProvider.forActiveConfig();
+        this.cloud      = cloud;
+        this.properties = properties;
     }
 
     public TrinoQuerySmokeMain() {
         this(new SmokeConfig().cloud(), new SmokeConfig().getProperties());
-    }
-
-    public String query(String url, AfonUser user, String query) throws SQLException, IOException {
-        String token = getTokenFor(user);
-        return query(url, query, user, token);
-    }
-
-    protected String getTokenFor(AfonUser user) throws IOException {
-        // The user's confidential client, of the same name and secret, as it takes no username/password
-        String token = new KeyCloakProvider(properties.getOidcDomainName(cloud))
-            .clientToken(user.username(), user.password());
-        return token;
-    }
-
-    public String query(String url, String query, AfonUser user, String token) throws SQLException, IOException {
-        return query(url, query, trinoAccessPropertiesFor(user.username(), token));
     }
 
     public String query(String url, String query, Properties properties) throws SQLException {
@@ -103,20 +83,48 @@ public class TrinoQuerySmokeMain {
     }
 
     /**
-     * The users that can get a token, ie those that have a Keycloak confidential client: only the {@code USER_ID} user has one,
-     * the others are users with no client of their own (see {@code ConfigureUsersMain#configureOidcUsers}).
+     * @return the user that the test acts as, which has the token that Trino is called with: in project mode the smoke member, who is a member, else {@code USER_ID}.  A
+     * subclass may say another.
      */
-    private List<AfonUser> clientUsers() {
-        String         userId = clientUserName();
-        List<AfonUser> users  = userProvider.getUsers().stream().filter(u -> u.username().equals(userId)).toList();
-        if (users.isEmpty()) {
-            throw new RuntimeException("Cannot run Trino tests. USER_ID " + userId + " is not a user in users.csv.");
-        }
-        return users;
+    protected SmokeUser smokeUser() throws IOException, InterruptedException {
+        return SmokeUser.of(properties);
     }
 
-    protected String clientUserName() {
-        return properties.getValue(AfonProperty.USER_ID);
+    /**
+     * What the test queries, and what it must be refused, which depend on the mode.
+     *
+     * @param path       what follows the host and port in the JDBC URL: the catalog and the schema that are the defaults, if any
+     * @param succeeding the queries that the user may run, the first of which is the one that Trino's log is checked for
+     * @param refused    the queries that the user may not run
+     */
+    record Target(String path, List<String> succeeding, List<String> refused) {
+    }
+
+    /**
+     * @param member               whether the user is a member of a project, as in project mode
+     * @param dataProviderCatalogs the catalogs of the Data Providers that the project reads, whose names in Trino are their ids, in lower case
+     * @return outside a project, the count of the table that {@code spark-polaris} writes in the cloud's catalog.  In a project, for each Data Provider's catalog, the count of the
+     * table that the Data Provider has released, which the member may read, and of the one that it has left in staging, which they may not
+     */
+    static Target targetFor(boolean member, AfonCloud cloud, List<AfonCatalog> dataProviderCatalogs) {
+        if (!member) {
+            return new Target(cloud + "/" + POLARIS_NAMESPACE_EXTERNAL, List.of(QUERY), List.of());
+        }
+        if (dataProviderCatalogs.isEmpty()) {
+            throw new IllegalStateException("The project reads no Data Provider's catalog, so there is nothing for a member to query: list dataProviders in its project.yaml");
+        }
+        List<String> succeeding = new ArrayList<>();
+        List<String> refused = new ArrayList<>();
+        for (AfonCatalog catalog : dataProviderCatalogs) {
+            String name = catalog.id().toLowerCase(java.util.Locale.ROOT);
+            succeeding.add(format("SELECT COUNT(*) FROM %s.%s.%s", name, PolarisProjectGrants.RELEASED, SparkPolarisSmokeMain.DATA_PROVIDER_TABLE));
+            refused.add(format("SELECT COUNT(*) FROM %s.%s.%s", name, PolarisProjectGrants.STAGING, SparkPolarisSmokeMain.DATA_PROVIDER_UNRELEASED_TABLE));
+        }
+        return new Target("", succeeding, refused);
+    }
+
+    private Target target(SmokeUser user) {
+        return targetFor(user.isMember(), cloud, user.isMember() ? SmokeConfig.dataProviderCatalogs() : List.of());
     }
 
     public static void main(String[] args) throws Exception {
@@ -140,12 +148,13 @@ public class TrinoQuerySmokeMain {
      */
     private List<String> findUsersInPolarisLogsWithBackoff(OffsetDateTime start,
                                                            LokiClient loki,
-                                                           String polarisPodName
+                                                           String polarisPodName,
+                                                           SmokeUser user
     ) throws IOException, InterruptedException {
         List<String> errors     = new ArrayList<>();
         int          numRetries = 3;
         for (int i = 1; i <= numRetries; i++) {
-            List<String> xs = findUsersInPolarisLogs(start, loki, polarisPodName);
+            List<String> xs = findUsersInPolarisLogs(start, loki, polarisPodName, user);
             if (xs.isEmpty()) {
                 return List.of();
             } else {
@@ -164,7 +173,8 @@ public class TrinoQuerySmokeMain {
 
     private List<String> findUsersInPolarisLogs(OffsetDateTime start,
                                                 LokiClient loki,
-                                                String polarisPodName
+                                                String polarisPodName,
+                                                SmokeUser user
     ) throws IOException {
         List<String> errors = new ArrayList<>();
         String       query  = format("{namespace=\"default\", pod=\"%s\"}", polarisPodName);
@@ -176,17 +186,15 @@ public class TrinoQuerySmokeMain {
                 start));
         } else {
             logger.info("Polaris logs:\n{}", String.join("\n", logs));
-            for (AfonUser user : clientUsers()) {
-                boolean found = false;
-                for (String log : logs) {
-                    if (log.contains("Resolving principal for credentials: PolarisCredential{principalName="
-                                     + user.username())) {
-                        found = true;
-                        break;
-                    }
+            boolean found = false;
+            for (String log : logs) {
+                if (log.contains("Resolving principal for credentials: PolarisCredential{principalName=" + user.principal())) {
+                    found = true;
+                    break;
                 }
-                if (!found)
-                    errors.add("No Polaris log for user " + user.username());
+            }
+            if (!found) {
+                errors.add("No Polaris log for user " + user.principal());
             }
         }
         return errors;
@@ -197,16 +205,23 @@ public class TrinoQuerySmokeMain {
 
     protected List<String> checkCallingTrinoForAllUsers() throws Exception {
         List<String> errors = new ArrayList<>();
+        SmokeUser    user   = smokeUser();
+        Target       target = target(user);
         try (KubeClient client = new KubeClient(properties)) {
             OffsetDateTime start    = OffsetDateTime.now();
             // Helm installs Trino without waiting for it, as it starts only once configure-users has created the realm
             V1Pod          trinoPod = client.waitForOnlyPodBeginningWithToBeReady("trino-coordinator", COORDINATOR_READY_TIMEOUT);
-            errors.addAll(hitTrinoWithAllUsers(client, trinoPod));
+            errors.addAll(hitTrinoWithAllUsers(client, trinoPod, user, target));
 
-            V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
             try (LokiClient loki = new LokiClient(client, properties)) {
-                errors.addAll(findUsersInPolarisLogsWithBackoff(start, loki, KubeClient.nameOfPod(polarisPod)));
-                errors.addAll(findQueriesInTrinoLogsWithBackoff(start, loki, nameOfPod(trinoPod)));
+                if (user.isMember()) {
+                    // what answers a member's query is the Data Provider's Polaris, in its own cluster, whose logs are not in this one's Loki
+                    logger.info("Not checking Polaris's logs: a project's Trino calls the Polaris of its Data Providers, which is not in this cluster");
+                } else {
+                    V1Pod polarisPod = client.getOnlyPodBegginingWith("polaris-deployment");
+                    errors.addAll(findUsersInPolarisLogsWithBackoff(start, loki, KubeClient.nameOfPod(polarisPod), user));
+                }
+                errors.addAll(findQueriesInTrinoLogsWithBackoff(start, loki, nameOfPod(trinoPod), user, target.succeeding().get(0)));
             }
         }
         return errors;
@@ -217,12 +232,14 @@ public class TrinoQuerySmokeMain {
      */
     private List<String> findQueriesInTrinoLogsWithBackoff(OffsetDateTime start,
                                                            LokiClient loki,
-                                                           String trinoPodName
+                                                           String trinoPodName,
+                                                           SmokeUser user,
+                                                           String sql
     ) throws Exception {
         try {
             return withRetries(
                 3, () -> {
-                    List<String> errors = findQueriesInTrinoLogs(start, loki, trinoPodName);
+                    List<String> errors = findQueriesInTrinoLogs(start, loki, trinoPodName, user, sql);
                     if (!errors.isEmpty()) {
                         throw new IllegalStateException(String.join("\n", errors));
                     }
@@ -234,12 +251,14 @@ public class TrinoQuerySmokeMain {
     }
 
     /**
-     * @return an error for each user that has no line in Trino's logs that has both the SQL it ran and it as the
+     * @return an error if the user has no line in Trino's logs that has both the SQL it ran and it as the
      * principal that ran it
      */
     private List<String> findQueriesInTrinoLogs(OffsetDateTime start,
                                                 LokiClient loki,
-                                                String trinoPodName
+                                                String trinoPodName,
+                                                SmokeUser user,
+                                                String sql
     ) throws IOException {
         List<String> errors = new ArrayList<>();
         String       query  = format("{namespace=\"%s\", pod=\"%s\"} |= \"%s\"", TRINO_NAMESPACE, trinoPodName, QUERY_LOGGER);
@@ -250,15 +269,13 @@ public class TrinoQuerySmokeMain {
         }
         List<String> principals = new ArrayList<>();
         for (String log : logs) {
-            String principal = principalThatRan(log, QUERY);
+            String principal = principalThatRan(log, sql);
             if (principal != null) {
                 principals.add(principal);
             }
         }
-        for (AfonUser user : clientUsers()) {
-            if (!principals.contains(user.username())) {
-                errors.add(format("No Trino log of principal %s running '%s'", user.username(), QUERY));
-            }
+        if (!principals.contains(user.principal())) {
+            errors.add(format("No Trino log of principal %s running '%s'", user.principal(), sql));
         }
         return errors;
     }
@@ -281,7 +298,7 @@ public class TrinoQuerySmokeMain {
         return principal.isTextual() ? principal.asText() : null;
     }
 
-    private List<String> hitTrinoWithAllUsers(KubeClient client, V1Pod pod) throws ApiException, SQLException, IOException {
+    private List<String> hitTrinoWithAllUsers(KubeClient client, V1Pod pod, SmokeUser user, Target target) throws ApiException, SQLException, IOException {
         List<String> errors = new ArrayList<>();
         Path trustStore = Files.createTempFile("trino-ca", ".pem");
         try (PortForwarder forward = new PortForwarder(
@@ -291,7 +308,7 @@ public class TrinoQuerySmokeMain {
             0,
             HTTPS_PORT)) {
             Files.write(trustStore, client.secretValue(TRINO_NAMESPACE, TLS_SECRET_NAME, TLS_CA_KEY));
-            errors.addAll(tryQueriesForAllUsers(httpsUrl(forward.localPort(), trustStore), QUERY));
+            errors.addAll(tryQueriesForAllUsers(httpsUrl(forward.localPort(), trustStore, target), user, target));
         } finally {
             Files.deleteIfExists(trustStore);
         }
@@ -303,39 +320,58 @@ public class TrinoQuerySmokeMain {
      * which names {@code localhost}, the host of the port-forward.
      *
      * @param trustStore the certificate, as PEM
+     * @param target     whose path is the default catalog and schema, if the queries have any
      */
-    String httpsUrl(int localPort, Path trustStore) {
+    String httpsUrl(int localPort, Path trustStore, Target target) {
         return format(
-            "jdbc:trino://localhost:%d/%s/%s?SSL=true&SSLVerification=FULL&SSLTrustStorePath=%s",
+            "jdbc:trino://localhost:%d/%s?SSL=true&SSLVerification=FULL&SSLTrustStorePath=%s",
             localPort,
-            cloud.toString(),
-            POLARIS_NAMESPACE_EXTERNAL,
+            target.path(),
             trustStore.toAbsolutePath());
     }
 
-    private List<String> tryQueriesForAllUsers(String url, String query) throws SQLException, IOException {
-        List<String>   errors              = new ArrayList<>();
-        List<AfonUser> users               = clientUsers();
-        boolean        isBadPasswordTested = false;
-        for (AfonUser user : users) {
-            logger.info("Checking Trino access for {}", user.username());
-            String token  = getTokenFor(user);
-            String result = query(url, query, user, token);
-            logger.info("Trino returned {} for {}", result, user.username());
-            // Each after a query of the user succeeded, so while the Iceberg client caches the user's Polaris session
-            if (!isBadPasswordTested) {
-                errors.addAll(tryQueryRefused(
-                    url, query, user.username(), "a bad token",
-                    trinoAccessPropertiesFor(user.username(), "bad-token")));
-                errors.addAll(tryQueryRefused(url, query, user.username(), "no token", noTokenProperties(user.username())));
-                String other = IMPERSONATED_PREFIX + user.username();
-                errors.addAll(tryQueryRefused(
-                    url, query, other, "the token of " + user.username(),
-                    trinoAccessPropertiesFor(other, token)));
-                isBadPasswordTested = true;
-            }
+    /**
+     * The user runs the queries that they may, as the principal that Trino knows them by, which is the user that Trino runs the query as, and the refusals are tried after that: of a
+     * bad token, of no token, of another user's name with their token, and of the queries that they may not run.
+     */
+    private List<String> tryQueriesForAllUsers(String url, SmokeUser user, Target target) throws SQLException {
+        List<String> errors    = new ArrayList<>();
+        String       principal = user.principal();
+        String       token     = user.token();
+        logger.info("Checking Trino access for {}", principal);
+        for (String query : target.succeeding()) {
+            String result = query(url, query, trinoAccessPropertiesFor(principal, token));
+            logger.info("Trino returned {} for {}, for {}", result, principal, query);
+        }
+        // Each after a query of the user succeeded, so while the Iceberg client caches the user's Polaris session
+        String query = target.succeeding().get(0);
+        errors.addAll(tryQueryRefused(url, query, principal, "a bad token", trinoAccessPropertiesFor(principal, "bad-token")));
+        errors.addAll(tryQueryRefused(url, query, principal, "no token", noTokenProperties(principal)));
+        String other = IMPERSONATED_PREFIX + principal;
+        errors.addAll(tryQueryRefused(url, query, other, "the token of " + principal, trinoAccessPropertiesFor(other, token)));
+        for (String refused : target.refused()) {
+            errors.addAll(tryQueryNotAllowed(url, refused, principal, token));
         }
         return errors;
+    }
+
+    /**
+     * @return an error if the user could run a query that they may not, which they are refused by the Data Provider's Polaris, so a failure that says that the table is not there
+     * is an error too: nothing was refused, as there was nothing to refuse
+     */
+    private List<String> tryQueryNotAllowed(String url, String query, String principal, String token) {
+        try {
+            query(url, query, trinoAccessPropertiesFor(principal, token));
+            return List.of(format("Could execute SQL %s as user %s, who may not", query, principal));
+        } catch (SQLException ex) {
+            String message = String.valueOf(ex.getMessage()).toLowerCase(java.util.Locale.ROOT);
+            if (message.contains("does not exist") || message.contains("not found")) {
+                return List.of(format("SQL %s failed because the table is not there, so nothing proves that %s is refused it: has the Data Provider written it? %s", query, principal,
+                                      ex.getMessage()));
+            }
+            logger.info("Tried SQL {} as {} and was correctly refused: {}", query, principal, ex.getMessage());
+            return List.of();
+        }
     }
 
     /**

@@ -34,7 +34,7 @@ class PodNotebookRunnerTest {
     @TempDir
     Path dir;
 
-    private final PodNotebookRunner.Hub hub = new PodNotebookRunner.Hub() {
+    private final UserPod.Hub hub = new UserPod.Hub() {
         @Override
         public void stopServer() {
             calls.add("stop");
@@ -57,7 +57,7 @@ class PodNotebookRunnerTest {
         }
     };
 
-    private final PodNotebookRunner.Pod pod = new PodNotebookRunner.Pod() {
+    private final UserPod.Pod pod = new UserPod.Pod() {
         @Override
         public ExecResult exec(String... command) {
             String text = String.join(" ", command);

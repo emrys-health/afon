@@ -5,6 +5,8 @@ import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.kube.KubeClient;
 import health.emrys.afon.ops.kube.tools.PortForwarder;
 import health.emrys.afon.ops.smoke.config.SmokeConfig;
+import health.emrys.afon.ops.smoke.config.SmokeUser;
+import health.emrys.afon.polaris.config.PolarisProjectGrants;
 import health.emrys.afon.polaris.config.PolarisCredentials;
 import health.emrys.afon.spark.connect.SparkConnectClient;
 import org.apache.spark.api.java.function.MapFunction;
@@ -54,16 +56,24 @@ public class SparkConnectSmokeMain {
 
     private final AfonPropertyProvider properties;
     private final AfonUserProvider     users;
+    /** The catalog of the stack's own Polaris that the table is read from, or {@code null} in project mode, where a member reads the Data Providers'. */
     private final AfonCatalog          catalog;
+    private final boolean              member;
 
     public SparkConnectSmokeMain(AfonPropertyProvider properties, AfonUserProvider users) {
         AfonCloud cloud = new SmokeConfig(properties).cloud();
         // as seen by the cloud, whose Polaris and KeyCloak the smoke test calls
         this.properties = properties.forCloud(cloud);
         this.users      = users;
-        String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
-        this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
-        catalog = catalogFor(cloud, new AfonCatalogs(properties));
+        this.member     = SmokeConfig.isProjectStack(properties);
+        if (member) {
+            // a member reads the catalogs of the Data Providers, whose Polaris answers, so there is no Polaris of the stack's to call
+            this.catalog = null;
+        } else {
+            String polarisEndpoint = new PolarisCredentials(cloud, properties).getPolarisEndpoint();
+            this.properties.setValue(POLARIS_ENDPOINT, polarisEndpoint);
+            this.catalog = catalogFor(cloud, new AfonCatalogs(properties));
+        }
     }
 
     private SparkSession readTable(SparkConnectClient client, List<String> errors) {
@@ -121,9 +131,99 @@ public class SparkConnectSmokeMain {
                 SmokeConfig.SPARK_CONNECTOR_POD,
                 15002,
                 15002)) {
-                errors.addAll(checkHappyPath());
-                errors.addAll(checkTokenIsMandatory());
+                if (member) {
+                    errors.addAll(checkMemberReads(SmokeUser.of(properties), SmokeConfig.dataProviderCatalogs()));
+                } else {
+                    errors.addAll(checkHappyPath());
+                    errors.addAll(checkTokenIsMandatory());
+                }
             }
+        }
+        return errors;
+    }
+
+    /** The name of the catalog of a Data Provider in the Spark session, which is the id of the catalog, as the notebooks name it. */
+    static String sparkCatalogOf(AfonCatalog dataProvider) {
+        return "test_" + dataProvider.id();
+    }
+
+    /**
+     * @return whether the failure says that the table is not there, which Polaris answers before it checks privileges, so a read of a table that is not there proves nothing of
+     * whether the user may read it
+     */
+    static boolean saysTableIsMissing(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            String message = String.valueOf(cause.getMessage()).toLowerCase(java.util.Locale.ROOT);
+            if (message.contains("table_or_view_not_found") || message.contains("nosuchtable") || message.contains("does not exist") || message.contains("not found")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What a member can and cannot do, read from each Data Provider's catalog, with their own token, in project mode: read the table that it has released, which has rows,
+     * through a session that cannot run a JVM UDF, and not read the table that it has left in staging; and, with a bogus token, read none.
+     */
+    private List<String> checkMemberReads(SmokeUser user, List<AfonCatalog> dataProviders) {
+        List<String> errors = new ArrayList<>();
+        if (dataProviders.isEmpty()) {
+            errors.add("The project reads no Data Provider's catalog, so there is nothing for a member to read: list dataProviders in its project.yaml");
+            return errors;
+        }
+        for (AfonCatalog dataProvider : dataProviders) {
+            String       sparkCatalog = sparkCatalogOf(dataProvider);
+            SparkSession spark        = SparkConnectClient.forDataProviders(properties, user.token()).sparkSession(dataProvider, sparkCatalog);
+            try {
+                String released = format("%s.%s.%s", sparkCatalog, PolarisProjectGrants.RELEASED, SparkPolarisSmokeMain.DATA_PROVIDER_TABLE);
+                logger.info("Reading {} as {}", released, user.principal());
+                Dataset<Row> dataset = spark.sql(format("SELECT * FROM %s", released));
+                errors.addAll(checkJvmUDFsOff(dataset));
+                errors.addAll(checkQueryReturnsRows((Object[]) dataset.collect(), released));
+                errors.addAll(checkNotAllowed(spark, format("%s.%s.%s", sparkCatalog, PolarisProjectGrants.STAGING, SparkPolarisSmokeMain.DATA_PROVIDER_UNRELEASED_TABLE), user));
+            } catch (Exception e) {
+                errors.add(format("%s could not read the released table of %s: %s", user.principal(), dataProvider.id(), e.getMessage()));
+            } finally {
+                closeQuietly(spark);
+            }
+        }
+        errors.addAll(checkMemberTokenIsMandatory(dataProviders.get(0)));
+        return errors;
+    }
+
+    /** Closes the session, which is needed to avoid threads hanging and blocking the JVM's shutdown. */
+    private static void closeQuietly(SparkSession spark) {
+        try {
+            spark.close();
+        } catch (Exception e) {
+            logger.warn("Could not close the Spark session: {}", e.getMessage());
+        }
+    }
+
+    /** @return an error if the member could read the table, which they may not, or if it is not there, as then nothing was refused */
+    private List<String> checkNotAllowed(SparkSession spark, String table, SmokeUser user) {
+        try {
+            spark.sql(format("SELECT * FROM %s", table)).collect();
+            return List.of(format("%s could read %s, which has not been released", user.principal(), table));
+        } catch (Exception e) {
+            if (saysTableIsMissing(e)) {
+                return List.of(format("Reading %s failed because the table is not there, so nothing proves that %s is refused it: has the Data Provider written it? %s", table,
+                                      user.principal(), e.getMessage()));
+            }
+            logger.info("As expected, {} was refused {}: {}", user.principal(), table, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<String> checkMemberTokenIsMandatory(AfonCatalog dataProvider) {
+        List<String> errors = new ArrayList<>();
+        String badToken = "bogus";
+        try {
+            SparkSession spark = SparkConnectClient.forDataProviders(properties, badToken).sparkSession(dataProvider, sparkCatalogOf(dataProvider));
+            spark.sql(format("SELECT * FROM %s.%s.%s", sparkCatalogOf(dataProvider), PolarisProjectGrants.RELEASED, SparkPolarisSmokeMain.DATA_PROVIDER_TABLE)).collect();
+            errors.add("Not supposed to be able to talk to connect with token " + badToken);
+        } catch (Exception e) {
+            logger.info("As expected, bogus token failed", e);
         }
         return errors;
     }

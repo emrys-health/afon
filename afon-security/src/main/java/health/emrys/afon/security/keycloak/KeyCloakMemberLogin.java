@@ -193,7 +193,8 @@ public final class KeyCloakMemberLogin {
         private final java.util.function.Consumer<String> enrolled;
         private String sent;
         private boolean announced;
-        private boolean retriedTheCode;
+        /** How many times the one-time password has been sent again, after the realm refused it. */
+        private int codeRetries;
 
         Walk(String username, String password, String totpSecret, java.util.function.Consumer<String> enrolled) {
             this.username = username;
@@ -222,9 +223,10 @@ public final class KeyCloakMemberLogin {
             // or not it has one
             if (sent != null && page.contains("name=\"" + sent + "\"")) {
                 // a code is good once, for the realm, whoever sent it: another sign-in of the member in the same 30 seconds, from another process, may have used the one that
-                // this has sent, and a code of the next time step is accepted too.  So the code is sent once more, which, with the wrong secret, is one more failure
-                if ("otp".equals(sent) && !retriedTheCode) {
-                    retriedTheCode = true;
+                // this has sent, and a code of the next time step is accepted too.  So the code is sent again, of another step; and if others have taken those of the steps that
+                // the realm takes, once more after the next step has begun.  With the wrong secret, that is two more failures
+                if ("otp".equals(sent) && codeRetries < 2) {
+                    codeRetries++;
                 } else {
                     throw new MemberLoginException("The realm refused the login: " + refusalIn(page));
                 }
@@ -234,7 +236,7 @@ public final class KeyCloakMemberLogin {
             if (!action.find()) {
                 throw new MemberLoginException("The login stopped at a page with no form: " + textOf(page));
             }
-            Map<String, String> fields = fieldsFor(page, username, password, secret);
+            Map<String, String> fields = fieldsFor(page, username, password, secret, codeRetries == 2);
             sent = fields.keySet().iterator().next();
             URI target = current.resolve(action.group(1).replace("&amp;", "&"));
             return KeyCloakMemberLogin.this.send(cookies, target, HttpRequest.newBuilder(target).header("Content-Type", "application/x-www-form-urlencoded")
@@ -243,7 +245,7 @@ public final class KeyCloakMemberLogin {
     }
 
     /** What the page asks for: the password, or the one-time password, or else nothing that this can give. */
-    private Map<String, String> fieldsFor(String page, String username, String password, String[] secret) throws InterruptedException, MemberLoginException {
+    private Map<String, String> fieldsFor(String page, String username, String password, String[] secret, boolean afterTheNextStep) throws InterruptedException, MemberLoginException {
         Map<String, String> fields = new LinkedHashMap<>();
         if (page.contains("name=\"username\"")) {
             fields.put("username", username);
@@ -264,7 +266,7 @@ public final class KeyCloakMemberLogin {
             if (secret[0] == null) {
                 throw new MemberLoginException("The realm asks " + username + " for a one-time password, and no authenticator secret was given");
             }
-            fields.put("otp", passwords.next(secret[0]));
+            fields.put("otp", afterTheNextStep ? passwords.afterTheNextStep(secret[0]) : passwords.next(secret[0]));
         } else {
             throw new MemberLoginException("The login stopped: " + textOf(page.substring(Math.max(0, page.indexOf("kc-error-message")))));
         }

@@ -37,13 +37,14 @@ class KeyCloakMemberLoginTest {
     /** What the server saw of the login. */
     private final Map<String, String> authRequest = new LinkedHashMap<>();
     private boolean enrolling;
-    private volatile boolean firstCodeUsedByAnother;
+    /** How many of the first codes that the realm refuses as used, by this member, from other processes. */
+    private volatile int codesUsedByOthers;
     private boolean redirectsWithAnError;
     private boolean sawTheCookie;
 
     @BeforeEach
     void keycloak() throws IOException {
-        firstCodeUsedByAnother = false;
+        codesUsedByOthers = 0;
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         String base = "http://127.0.0.1:" + server.getAddress().getPort();
         realm = URI.create(base + "/realms/polaris");
@@ -70,9 +71,9 @@ class KeyCloakMemberLoginTest {
             for (long step = now - 1; step <= now + 1; step++) {
                 right |= OneTimePassword.code(TOTP_SECRET, step).equals(fields.get("otp"));
             }
-            if (firstCodeUsedByAnother) {
+            if (codesUsedByOthers > 0) {
                 // as the realm refuses a code that has been used, by this member, from another process
-                firstCodeUsedByAnother = false;
+                codesUsedByOthers--;
                 right = false;
             }
             if (redirectsWithAnError) {
@@ -177,8 +178,9 @@ class KeyCloakMemberLoginTest {
 
     @Test
     void saysSoWhenTheOneTimePasswordIsWrong() {
-        assertThatThrownBy(() -> login("right-password", "another-authenticators-secret")).isInstanceOf(KeyCloakMemberLogin.MemberLoginException.class)
-            .hasMessageContaining("Invalid authenticator code");
+        // the wrong secret is refused three times, the last after waiting for the next step, which the test does not wait for
+        assertThatThrownBy(() -> loginThatWaitsWith(new java.util.ArrayList<>()).login(CLIENT, SECRET, REDIRECT, "ada", "right-password", "another-authenticators-secret"))
+            .isInstanceOf(KeyCloakMemberLogin.MemberLoginException.class).hasMessageContaining("Invalid authenticator code");
     }
 
     @Test
@@ -232,10 +234,36 @@ class KeyCloakMemberLoginTest {
 
     @Test
     void sendsTheCodeOnceMoreWithAnotherTimeStepWhenTheRealmRefusesTheFirstAsUsed() throws Exception {
-        firstCodeUsedByAnother = true;
+        codesUsedByOthers = 1;
 
         KeyCloakMemberLogin.Token token = login("right-password", TOTP_SECRET);
 
         assertThat(token.accessToken()).startsWith("eyJ");
+    }
+
+    private KeyCloakMemberLogin loginThatWaitsWith(java.util.List<Long> waits) {
+        OneTimePassword passwords = new OneTimePassword(java.time.Clock.systemUTC(), waits::add);
+        return new KeyCloakMemberLogin(realm, java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.NEVER).build(), passwords);
+    }
+
+    @Test
+    void sendsTheCodeAfterTheNextStepWhenTheRealmRefusedTheCodesOfTheCurrentAndTheNextAsUsed() throws Exception {
+        codesUsedByOthers = 2;
+        java.util.List<Long> waits = new java.util.ArrayList<>();
+
+        KeyCloakMemberLogin.Token token = loginThatWaitsWith(waits).login(CLIENT, SECRET, REDIRECT, "ada", "right-password", TOTP_SECRET);
+
+        assertThat(token.accessToken()).startsWith("eyJ");
+        // the first two were of the steps that are there, and the third waited for the next
+        assertThat(waits).hasSize(1);
+    }
+
+    @Test
+    void givesUpWhenTheRealmRefusesTheCodeThreeTimes() {
+        codesUsedByOthers = 3;
+        java.util.List<Long> waits = new java.util.ArrayList<>();
+
+        assertThatThrownBy(() -> loginThatWaitsWith(waits).login(CLIENT, SECRET, REDIRECT, "ada", "right-password", TOTP_SECRET))
+            .isInstanceOf(KeyCloakMemberLogin.MemberLoginException.class).hasMessageContaining("Invalid authenticator code");
     }
 }

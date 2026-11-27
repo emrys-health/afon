@@ -26,7 +26,8 @@
 #             'manage-stack delete <stack>', whether the tests passed or failed, or a setup failed.  Never done if
 #             the script is interrupted, eg with Ctrl-C, which may stop a setup part way: the commands deleting the
 #             stacks are printed instead.
-#   --suite   the CSV file of the tests (default: scripts/smoke/tests-full.csv)
+#   --suite   the CSV file of the tests (default: scripts/smoke/tests-full.csv, or, in project mode, ie when the config names a smoke member, SMOKE_MEMBER, that of a project's
+#             TRE, scripts/smoke/tests-project.csv)
 #   --tests   the comma-separated names of the tests to run (default: all), as listed by --list
 #   --logging-console
 #             the logging console level of every afon command, one of OFF|DEBUG|INFO|WARN|ERROR (default: that of
@@ -613,6 +614,7 @@ LOGGING_FILE=
 PROGRESS=60
 SELECTED=
 SUITE_FILE="$DEFAULT_SUITE_FILE"
+SUITE_GIVEN=
 CLOUD=aws
 CLOUD_GIVEN=
 
@@ -627,7 +629,7 @@ while [[ $# -gt 0 ]]; do
     --teardown)
       TEARDOWN=true; shift ;;
     --suite|-s)
-      require_value "$1" "${2:-}"; SUITE_FILE="$2"; shift 2 ;;
+      require_value "$1" "${2:-}"; SUITE_FILE="$2"; SUITE_GIVEN=true; shift 2 ;;
     --tests|-t)
       require_value "$1" "${2:-}"; SELECTED="$2"; shift 2 ;;
     --logging-console|-lc)
@@ -676,6 +678,15 @@ fi
 if [ -z "$CLI" ] && [ ! -x "$AFON_ROOT/afon.sh" ]; then
   error "No afon.sh at $AFON_ROOT, if running from the cli distribution: use --cli"
   exit 1
+fi
+
+# In project mode, the config of a project's TRE names its smoke member: its suite is the tests that apply there, unless --suite gives another
+if [ -z "$SUITE_GIVEN" ]; then
+  PROJECT_CONFIG_DIR="${AFON_HOME:-$HOME/.afon}/config${ENV:+-$ENV}"
+  # grep on the files, not on a pipe from cat: grep -q ends at the first match, which kills cat, and pipefail then fails the pipeline
+  if grep -Eqh '^SMOKE_MEMBER=.+' "$PROJECT_CONFIG_DIR"/*.properties 2>/dev/null; then
+    SUITE_FILE="$AFON_ROOT/scripts/smoke/tests-project.csv"
+  fi
 fi
 
 load_tests "$SUITE_FILE"

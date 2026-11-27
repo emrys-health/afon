@@ -97,4 +97,22 @@ class OneTimePasswordTest {
 
         assertThat(passwords.next("second-secret")).isEqualTo(OneTimePassword.code("second-secret", 1_000_000_000L / 30));
     }
+
+    @Test
+    void afterTheNextStepWaitsForItToBeginAndGivesTheCodeOfTheOneThatFollowsIt() throws Exception {
+        // 10 seconds into a step
+        MovingClock clock = new MovingClock(1_000_000_000L - (1_000_000_000L % 30) + 10);
+        List<Long> waits = new ArrayList<>();
+        OneTimePassword passwords = new OneTimePassword(clock, millis -> {
+            waits.add(millis);
+            clock.millis.addAndGet(millis);
+        });
+        long step = clock.millis.get() / 1000 / 30;
+
+        String code = passwords.afterTheNextStep(RFC_SECRET);
+
+        // 20 seconds to the next step, and a second past it
+        assertThat(waits).containsExactly(21_000L);
+        assertThat(code).isEqualTo(OneTimePassword.code(RFC_SECRET, step + 2));
+    }
 }

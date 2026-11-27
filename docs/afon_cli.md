@@ -138,5 +138,5 @@ distribution, being independent of the source tree, has no `afon.sh`.
 ```shell
 afon-cli.sh smoke-test --env <env> [aws|azure]
 ```
-It runs the tests of `scripts/smoke/tests-full.csv` by default, or those of another suite file given with `--suite`, against the
+It runs the tests of `scripts/smoke/tests-full.csv` by default, or, in project mode, those of `scripts/smoke/tests-project.csv`, or those of another suite file given with `--suite`, against the
 full stack of the cloud given, `aws` by default.

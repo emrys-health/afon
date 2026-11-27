@@ -1,6 +1,7 @@
 package health.emrys.afon.spark.connect;
 
 import com.google.common.annotations.VisibleForTesting;
+import health.emrys.afon.config.AfonCatalog;
 import health.emrys.afon.config.AfonUserProvider;
 import health.emrys.afon.config.AfonProperty;
 import health.emrys.afon.config.AfonPropertyProvider;
@@ -69,6 +70,21 @@ public class SparkConnectClient {
         this.token            = token;
     }
 
+    private SparkConnectClient(String connectionString, SparkWarehouseConfig sparkConfig, String token) {
+        this.connectionString = connectionString;
+        this.sparkConfig      = sparkConfig;
+        this.token            = token;
+    }
+
+    /**
+     * A client that reads the catalogs of Data Providers, as a member of a project does, with the member's own {@code token} alone: it needs no user of {@code users.csv}, nor a
+     * Polaris of the stack's, as what answers is each Data Provider's, see {@link #sparkSession(AfonCatalog, String)}.
+     */
+    public static SparkConnectClient forDataProviders(AfonPropertyProvider properties, String token) {
+        return new SparkConnectClient(properties.getValue(SPARK_CONNECT_URL, DEFAULT_SPARK_CONNECT_URL),
+                                      SparkWarehouseConfigFactory.getFactory().createDataProviderConfig(properties), token);
+    }
+
     /**
      * @return the connection string, with the token in the header that the server takes it from: a parameter of the connection
      * string that is not one of Spark Connect's own is sent as a header with every call
@@ -97,6 +113,16 @@ public class SparkConnectClient {
      */
     public SparkSession sparkSession(String warehouse, String catalogName) {
         return buildSparkSession(sparkConfig.sparkConfigsWithToken(warehouse, catalogName, token));
+    }
+
+    /**
+     * Creates a {@link SparkSession} that reads the catalog of a Data Provider, with the client's token.
+     *
+     * @param dataProvider a catalog served by a Data Provider
+     * @param sparkCatalog the name of the catalog in Spark, which tables are read by, eg {@code SELECT * FROM <sparkCatalog>.<namespace>.<table>}
+     */
+    public SparkSession sparkSession(AfonCatalog dataProvider, String sparkCatalog) {
+        return buildSparkSession(sparkConfig.sparkConfigsWithToken(dataProvider, sparkCatalog, token));
     }
 
     private SparkSession buildSparkSession(Map<String, String> config) {

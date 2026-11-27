@@ -1,11 +1,12 @@
 package health.emrys.afon.ops.smoke.config;
 
 import health.emrys.afon.cdk.configs.WhitelistConfig;
+import health.emrys.afon.config.AfonCatalog;
+import health.emrys.afon.config.AfonCatalogs;
 import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
+import health.emrys.afon.config.ConfigUtils;
 import health.emrys.afon.config.FilePropertyProvider;
-import health.emrys.afon.project.ProjectStackUserProvider;
-import health.emrys.afon.spark.connect.SparkConnectClient;
 
 import java.io.IOException;
 import java.util.List;
@@ -156,12 +157,20 @@ public class SmokeConfig {
 
 
     /**
-     * @return the OIDC token of the configured user, from the KeyCloak of the cloud under test, without which the Spark Connect server
-     * refuses a session
+     * @return the catalogs that the project's Data Providers serve, which a TRE reads and the smoke tests query as a member.  They are read from the config of every cloud, whichever cloud
+     * the run is of: a Data Provider may be on another cloud than the TRE, eg one on Azure read by a TRE on AWS, and a run of the TRE's cloud, as the commands of a project are, loads only
+     * that cloud's catalogs, so that these would be hidden from it
      */
-    public static String sparkConnectToken() throws IOException {
-        AfonPropertyProvider properties = smokeTestProperties();
-        AfonPropertyProvider ofCloud    = properties.forCloud(new SmokeConfig(properties).cloud());
-        return SparkConnectClient.userToken(ofCloud, ProjectStackUserProvider.forActiveConfig().getConfiguredUser(ofCloud));
+    public static List<AfonCatalog> dataProviderCatalogs() {
+        AfonPropertyProvider everyCloud = new FilePropertyProvider(ConfigUtils.configDir(), List.of("afon", "secret", "catalogs"), true);
+        return new AfonCatalogs(everyCloud).bySource(AfonCatalogs.Source.DATA_PROVIDER);
+    }
+
+    /**
+     * @return the OIDC token of the user of the smoke tests, from the KeyCloak of the cloud under test, without which the Spark Connect server refuses a session: that of
+     * {@code USER_ID}, or, in project mode, of the smoke member, see {@link SmokeUser}
+     */
+    public static String sparkConnectToken() throws IOException, InterruptedException {
+        return SmokeUser.of(smokeTestProperties()).token();
     }
 }

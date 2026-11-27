@@ -4,8 +4,7 @@ import health.emrys.afon.config.AfonCloud;
 import health.emrys.afon.config.AfonPropertyProvider;
 import health.emrys.afon.config.AfonUser;
 import health.emrys.afon.config.AfonUserProvider;
-import health.emrys.afon.ops.project.SmokeMemberCredentials;
-import health.emrys.afon.project.FileProjectStackProvider;
+import health.emrys.afon.ops.smoke.config.SmokeUser;
 import health.emrys.afon.project.ProjectStackEnv;
 import health.emrys.afon.project.ProjectStackUserProvider;
 import health.emrys.afon.ops.config.OpsPropertyProvider;
@@ -16,16 +15,11 @@ import health.emrys.afon.security.keycloak.KeyCloakProvider;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
-import static health.emrys.afon.config.AfonProperty.OIDC_AUDIENCE;
-import static health.emrys.afon.config.AfonProperty.PROJECT_ID;
-import static health.emrys.afon.config.AfonProperty.SMOKE_MEMBER;
 import static health.emrys.afon.config.AfonProperty.POLARIS_ID;
 import static health.emrys.afon.config.AfonProperty.POLARIS_SECRET;
 
@@ -105,23 +99,8 @@ public class CheckOidcMain {
      * password and the one-time password of the authenticator that {@code smoke-credentials} gave them, which the project stack's secrets dir keeps.
      */
     public void smokeMemberToken(AfonCloud cloud) throws IOException, InterruptedException {
-        String projectStack = properties.getValue(PROJECT_ID, "");
-        String member = properties.getValue(SMOKE_MEMBER, "");
-        if (projectStack.isBlank() || member.isBlank()) {
-            throw new IOException("There is no smoke member: PROJECT_ID and SMOKE_MEMBER are set in the config of a project stack that lists smokeMembers, once configured");
-        }
-        Path secrets = FileProjectStackProvider.secretsDir(afonHome, projectStack);
-        SmokeMemberCredentials credentials = SmokeMemberCredentials.read(secrets, member).orElseThrow(() -> new IOException(
-            "No credentials for " + member + " in " + secrets.resolve(SmokeMemberCredentials.FILE) + ": give them with manage-identity smoke-credentials"));
-        String clientSecret = Files.readString(secrets.resolve("tre.secret"), StandardCharsets.UTF_8).strip();
-        String jupyterDomain = properties.getCloudValue(cloud, health.emrys.afon.config.AfonCloudProperty.JUPYTER_DOMAIN_NAME, "");
-        if (jupyterDomain.isBlank()) {
-            throw new IOException(cloud.name() + "_JUPYTER_DOMAIN_NAME is not set, so there is no callback of the TRE's JupyterHub to sign in with");
-        }
-        KeyCloakMemberLogin.Token token = memberLogin.apply(URI.create(properties.getOidcIssuerUrl(cloud)))
-            .login(properties.getValue(OIDC_AUDIENCE), clientSecret, "https://" + jupyterDomain + KeyCloakProvider.JUPYTERHUB_CALLBACK, member, credentials.password(),
-                   credentials.totpSecret());
-        out.printf("Access token for smoke member '%s' on cloud '%s': %s%n", member, cloud, token.accessToken());
+        SmokeUser member = SmokeUser.ofMember(properties, cloud, afonHome, memberLogin);
+        out.printf("Access token for smoke member '%s' on cloud '%s': %s%n", member.username(), cloud, member.token());
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {

@@ -100,4 +100,16 @@ class KeyCloakSparkWarehouseConfigTest {
         AfonCatalog own = catalogsWithADataProvider().all().get(0);
         assertThatThrownBy(() -> config.sparkConfigsWithToken(own, "azure", "a_token")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aConfigForDataProvidersNeedsNoClientNorPolarisOfTheStack() throws IOException {
+        AfonCatalog dataProvider = catalogsWithADataProvider().bySource(AfonCatalogs.Source.DATA_PROVIDER).get(0);
+        SparkWarehouseConfig forDataProviders = SparkWarehouseConfigFactory.getFactory().createDataProviderConfig(
+            new FilePropertyProvider(dir.toString(), List.of("catalogs")));
+
+        Map<String, String> configs = forDataProviders.sparkConfigsWithToken(dataProvider, "test_lon_cvd", "a_token");
+
+        assertThat(configs).containsEntry("spark.sql.catalog.test_lon_cvd.uri", "https://azure-polaris.lon.example/api/catalog")
+                           .containsEntry("spark.sql.catalog.test_lon_cvd.warehouse", "cvd").containsEntry("spark.sql.catalog.test_lon_cvd.token", "a_token");
+    }
 }
