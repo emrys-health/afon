@@ -32,6 +32,10 @@ Each configured domain name (`<CLOUD>_POLARIS_DOMAIN_NAME`, `<CLOUD>_JUPYTER_DOM
 `OIDC_DOMAIN_NAME`) gets its own DNS zone in the cloud that serves it, **named after the domain name**.  The domain name need not be a 
 registered domain: it can be a subdomain of one, so that a single registered domain per env is enough.  
 
+A stack that has Jupyter also serves `auth.<Jupyter domain>`, eg `auth.aws-jupyter.<env>.click`, the host where Pomerium, the gateway in front of JupyterHub
+and Guacamole, signs users in through KeyCloak.  It needs **no zone, delegation or property of its own**: its record is made in the zone of the Jupyter domain, and
+it needs a certificate of its own, which `<cloud>-issue-cert` issues with the others (`aws-issue-cert jupyter-auth` issues only this one).
+
 With the registered domains `<env>.click`, one per env, and the `<cloud>-<tool>.<domain>` convention, which follows the stack ids:
 
 | Property                    | Env                         |
@@ -107,7 +111,9 @@ afon-cli.sh aws-issue-cert
 ```
 Alternatively, in the [AWS Certificate Manager](https://eu-west-2.console.aws.amazon.com/acm/certificates/list?region=eu-west-2) console `Request` a certificate for the domain, and press the `Create Record in Route 53` button to prove you own it.  Note that it might take a few minutes to propagate. A domain that already has an issued certificate is skipped, so it is safe to repeat; add `--force` to request a new one.
 
-When a stack is deployed, it looks up the hosted zone named after each domain name, and the latest `ISSUED` ACM certificate for exactly that domain name (a wildcard certificate is not matched). The deploy fails when planning, before anything is created, if either is missing.
+When a stack is deployed, it looks up the hosted zone named after each domain name, and the latest `ISSUED` ACM certificate for exactly that domain name (a wildcard certificate is not matched). The deploy fails when planning, before anything is created, if either is missing.  `auth.<Jupyter domain>` is one of those domain names, looked up in the zone of the Jupyter domain.  As Terraform reads them
+when destroying too, a stack deployed before the gateway was Pomerium cannot be deployed again, **nor deleted**, until `aws-issue-cert` has issued the certificate of `auth.<Jupyter domain>`: the plan fails with
+`reading ACM Certificates: empty result`.  For a project's TRE, run `afon-cli.sh manage-project-stack run <project> aws-issue-cert --stack aws-full`.  Azure and GCP do not look the certificates up, so only a deploy needs them there.
 
 **NOTE**: unlike Azure and GCP, AWS does not store the certificate in a secrets manager.  The hosted zones must be in Route 53, whichever registrar the domains are registered with.
 

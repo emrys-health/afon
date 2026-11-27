@@ -22,6 +22,10 @@ We assume the stack is deployed (using the deployment [stacks](stacks.md) docume
 
 ### Logging in (multi-factor authentication)
 
+Jupyter and Guacamole sit behind Pomerium, which signs users in through KeyCloak, at `auth.<Jupyter domain>`, and checks on every request that the user is a member of the
+TRE.  Opening `https://<Jupyter domain>/` without a session redirects to `auth.<Jupyter domain>`, then to KeyCloak, then back.  `/hub/admin` is refused to everyone.  To sign out,
+open `https://<Jupyter domain>/.pomerium/sign_out`, which JupyterHub's own sign-out goes to.
+
 Logging in to Jupyter or Guacamole goes through KeyCloak, which requires a second factor: a
 time-based one-time code from an authenticator app (FreeOTP, Google Authenticator, Microsoft
 Authenticator, ...).

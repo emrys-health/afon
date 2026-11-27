@@ -544,6 +544,10 @@ Left where they are:
   the file).  A warning names each when the stack is synthesised, as it is not verified;
 - the images that the Helm charts pull and the file does not list (`docker-image --charts` reports them), such as the charts' own.
 
+An image that a release adds to `docker-images.yaml`, eg `pomerium`, must be copied and signed before the deploy that uses it, else its pod stays in `ImagePullBackOff` with `not found` (`MANIFEST_UNKNOWN`
+on GCP, `NAME_UNKNOWN` on AWS) in the events of `kubectl describe pod`: run `docker-image --sign --cloud <cloud> <image>`.  On AWS run `aws-signing create` first, which makes the ECR repository of each
+new image, and `--sign` cannot.
+
 The registry is the property of the cloud of the stack, so a stack never uses the registry of another cloud.  Without it, nothing changes.
 
 **Run `docker-image --sign` before deploying with a registry**, as the stack pulls images that must already be in it: a pod whose image is not

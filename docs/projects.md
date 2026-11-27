@@ -523,8 +523,9 @@ in place of the env's client, which the env keeps in the same file, and which an
 `afon.properties` would not override, as `secret.properties` is read after it. `up` gives the identity the same secret
 when it makes the client. `configure` stops if the `secrets/tre.secret` file is missing. The file is not replaced if it
 exists, as the identity and the config were given that secret: `--force` makes another, and `configure` and
-`manage-identity create` are run again (also rerun `manage-identity create` when migrating an existing project's TRE to
-the Pomerium gate so its client gets the `auth.<Jupyter domain>` callbacks). See [Client secrets](#client-secrets) for what it is for.
+`manage-identity create` are run again.  To migrate an existing project's TRE to the Pomerium gate: rerun `manage-identity create`, so that its client gets the
+`auth.<Jupyter domain>` callbacks, and, on AWS, issue the certificate of `auth.<Jupyter domain>` before its next `up` **or `down`**, as both fail when the plan looks it up:
+`afon-cli.sh manage-project-stack run <project> aws-issue-cert --stack aws-full`. See [Client secrets](#client-secrets) for what it is for.
 
 ### Automatic delegation
 
