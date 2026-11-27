@@ -428,6 +428,13 @@
 
     <profiles>
         <profile>
+            <id>nt</id>
+            <!-- No tests: skips all tests -->
+            <properties>
+                <maven.test.skip>true</maven.test.skip>
+            </properties>
+        </profile>
+        <profile>
             <!-- Unit tests only: activating any profile switches off the activeByDefault acceptance profile -->
             <id>unit</id>
         </profile>

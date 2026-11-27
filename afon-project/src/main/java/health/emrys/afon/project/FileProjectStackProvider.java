@@ -148,6 +148,28 @@ public class FileProjectStackProvider implements ProjectStackProvider {
     }
 
     /**
+     * @return the {@code projectStack} section of the text, as the file has it, however much of the rest is incomplete, eg with what is in {@code <angle brackets>}: its {@code cloud}
+     * and {@code env}, which a command that acts before the file is complete needs, such as the reservation of the egress IP that the file asks for; empty if there is none
+     * @throws ProjectStackException if the text is not YAML
+     */
+    public static Map<String, Object> projectStackSection(String yaml) {
+        Object root;
+        try {
+            LoaderOptions options = new LoaderOptions();
+            options.setAllowDuplicateKeys(false);
+            root = new Yaml(new SafeConstructor(options)).load(new StringReader(yaml));
+        } catch (RuntimeException e) {
+            throw new ProjectStackException(FILE, List.of("not valid YAML: " + e.getMessage()));
+        }
+        if (root instanceof Map<?, ?> top && top.get("projectStack") instanceof Map<?, ?> section) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            section.forEach((key, value) -> copy.put(String.valueOf(key), value));
+            return copy;
+        }
+        return Map.of();
+    }
+
+    /**
      * @return the file this provider reads
      */
     public Path file() {
@@ -462,7 +484,7 @@ public class FileProjectStackProvider implements ProjectStackProvider {
         private String egressIp(Map<String, Object> projectStack) {
             String egressIp = optional(projectStack, "projectStack.egressIp", null);
             if (egressIp != null && !IPV4.matcher(egressIp).matches()) {
-                problems.add(String.format("projectStack.egressIp '%s' is not an IPv4 address, eg the one that azure-egress-ip create prints", egressIp));
+                problems.add(String.format("projectStack.egressIp '%s' is not an IPv4 address, eg the one that manage-project-stack egress-ip create <project-stack> prints", egressIp));
                 return null;
             }
             return egressIp;

@@ -2,13 +2,18 @@
 source $AFON_ROOT/scripts/config/afon-source.sh aws
 
 DEFAULT_IP_NAME="afon-egress-ip"
+# For a project stack, run with 'manage-project-stack run <project-stack> ...', the address of its own, named after it, as one address serves the outbound traffic of
+# one cluster, so that project stacks that run next to each other each need their own
+if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+  DEFAULT_IP_NAME="afon-egress-ip-$AFON_PROJECT_STACK"
+fi
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} <create|show> [<name>]"
+  echo "Usage: ${BASH_SOURCE[0]} <create|show|delete> [<name>]"
   echo "Creates, or shows, the Elastic IP in AWS_REGION that the outbound traffic of the cluster egresses from, through its NAT"
   echo "gateway, when AWS_EGRESS_IP is set to its address, see docs/cluster.md#egress-ip-aws.  It is a VPC Elastic IP, found by its"
-  echo "Name tag, which the stack looks up rather than manages, so it is not released with the stack, and not by this script."
-  echo "<name> is that of the Elastic IP (default: $DEFAULT_IP_NAME)."
+  echo "Name tag, which the stack looks up rather than manages, so it is not released with the stack: only delete releases it, and never while it is associated, ie while a stack uses it."
+  echo "<name> is that of the Elastic IP (default: afon-egress-ip, or, run for a project stack, afon-egress-ip-<project-stack>: $DEFAULT_IP_NAME)."
 }
 
 ACTION="${1:-}"
@@ -46,7 +51,11 @@ show_address() {
   if [ -n "$IP_ASSOCIATION" ]; then
     echo "- WARNING: it is already associated, so it may be in use by another stack: one Elastic IP can serve one NAT gateway"
   fi
-  if [ "${AWS_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
+  if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+    # a project stack carries its own address, not the env's
+    echo "- Set it as egressIp in the projectStack section of the file of the project stack $AFON_PROJECT_STACK, ~/.afon/projects/$AFON_PROJECT_STACK/project.yaml:"
+    echo "egressIp: $IP_ADDRESS"
+  elif [ "${AWS_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
     echo "- AWS_EGRESS_IP is already set to it"
   else
     echo "- Set it in afon-aws.properties:"
@@ -72,6 +81,23 @@ case "$ACTION" in
     else
       echo "- Elastic IP $IP_NAME does not exist in $AWS_REGION"
     fi
+    ;;
+
+  delete)
+    if ! ip_exists; then
+      echo "- Elastic IP $IP_NAME does not exist in $AWS_REGION, nothing to release"
+      exit 0
+    fi
+    IP_ADDRESS="$(ip_field PublicIp)"
+    IP_ALLOCATION_ID="$(ip_field AllocationId)"
+    IP_ASSOCIATION="$(ip_field AssociationId)"
+    if [ -n "$IP_ASSOCIATION" ]; then
+      echo "- Elastic IP $IP_NAME ($IP_ADDRESS) is associated ($IP_ASSOCIATION), so a stack uses it: delete that stack first, nothing is released"
+      exit 1
+    fi
+    echo "- Releasing Elastic IP $IP_NAME ($IP_ADDRESS, $IP_ALLOCATION_ID) in $AWS_REGION"
+    aws ec2 release-address --region $AWS_REGION --allocation-id "$IP_ALLOCATION_ID" || exit 1
+    echo "- Released $IP_ADDRESS: anything that allowed it, eg a database or a Data Provider, no longer has this address to allow"
     ;;
 
   *)

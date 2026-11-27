@@ -2,13 +2,18 @@
 source $AFON_ROOT/scripts/config/afon-source.sh azure
 
 DEFAULT_IP_NAME="afon-egress-ip"
+# For a project stack, run with 'manage-project-stack run <project-stack> ...', the address of its own, named after it, as one address serves the outbound traffic of
+# one cluster, so that project stacks that run next to each other each need their own
+if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+  DEFAULT_IP_NAME="afon-egress-ip-$AFON_PROJECT_STACK"
+fi
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} <create|show> [<name>]"
+  echo "Usage: ${BASH_SOURCE[0]} <create|show|delete> [<name>]"
   echo "Creates, or shows, the public IP in AZURE_RESOURCE_GROUP that the outbound traffic of the cluster egresses from, when"
   echo "AZURE_EGRESS_IP is set to its address, see docs/cluster.md#egress-ip-azure.  It is a Standard SKU, static public IP,"
-  echo "in AZURE_REGION, which the stack looks up rather than manages, so it is not deleted with the stack, and not by this script."
-  echo "<name> is that of the public IP (default: $DEFAULT_IP_NAME)."
+  echo "in AZURE_REGION, which the stack looks up rather than manages, so it is not deleted with the stack: only delete deletes it, and never while it is attached, ie while a stack uses it."
+  echo "<name> is that of the public IP (default: afon-egress-ip, or, run for a project stack, afon-egress-ip-<project-stack>: $DEFAULT_IP_NAME)."
 }
 
 ACTION="${1:-}"
@@ -35,7 +40,11 @@ show_address() {
   if [ "$IP_SKU" != "Standard" ] || [ "$IP_ALLOCATION" != "Static" ]; then
     echo "- WARNING: the cluster's load balancer can only use a Standard SKU, static public IP as its outbound IP"
   fi
-  if [ "${AZURE_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
+  if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+    # a project stack carries its own address, not the env's
+    echo "- Set it as egressIp in the projectStack section of the file of the project stack $AFON_PROJECT_STACK, ~/.afon/projects/$AFON_PROJECT_STACK/project.yaml:"
+    echo "egressIp: $IP_ADDRESS"
+  elif [ "${AZURE_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
     echo "- AZURE_EGRESS_IP is already set to it"
   else
     echo "- Set it in afon-azure.properties:"
@@ -61,6 +70,23 @@ case "$ACTION" in
     else
       echo "- Public IP $IP_NAME does not exist in $AZURE_RESOURCE_GROUP"
     fi
+    ;;
+
+  delete)
+    if ! ip_exists; then
+      echo "- Public IP $IP_NAME does not exist in $AZURE_RESOURCE_GROUP, nothing to delete"
+      exit 0
+    fi
+    IP_ADDRESS="$(az network public-ip show --name $IP_NAME --resource-group $AZURE_RESOURCE_GROUP --query ipAddress -o tsv)"
+    # attached to a load balancer's frontend, or a NAT gateway: a stack uses it
+    IP_ATTACHED="$(az network public-ip show --name $IP_NAME --resource-group $AZURE_RESOURCE_GROUP --query "ipConfiguration.id || natGateway.id" -o tsv)"
+    if [ -n "$IP_ATTACHED" ]; then
+      echo "- Public IP $IP_NAME ($IP_ADDRESS) is attached to $IP_ATTACHED, so a stack uses it: delete that stack first, nothing is deleted"
+      exit 1
+    fi
+    echo "- Deleting public IP $IP_NAME ($IP_ADDRESS) in $AZURE_RESOURCE_GROUP"
+    az network public-ip delete --name $IP_NAME --resource-group $AZURE_RESOURCE_GROUP || exit 1
+    echo "- Deleted $IP_ADDRESS: anything that allowed it, eg a database or a Data Provider, no longer has this address to allow"
     ;;
 
   *)

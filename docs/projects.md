@@ -96,14 +96,19 @@ that is the egress IP, which you reserve in the next step.
 an address that must not change when it is rebuilt, so that the database allows it once:
 
 ```shell
-afon-cli.sh aws-egress-ip create afon-egress-ip-idp
-afon-cli.sh aws-egress-ip show afon-egress-ip-idp
+afon-cli.sh manage-project-stack egress-ip create idp
+afon-cli.sh manage-project-stack egress-ip show idp
 ```
 
-The script ends with a line about `AWS_EGRESS_IP` in `afon-aws.properties`: ignore it, as the project stack carries its
-own address. In `~/.afon/projects/idp/project.yaml`, replace the egress IP with the address that `show` prints, and set
-`dns.delegation` to `route53`: the template has `none`, with which `up` makes the zone of the project stack's domain but
-does not delegate it, so the domain does not resolve and Keycloak cannot get its certificate. The result is:
+The command runs the `aws-egress-ip` of the project stack's cloud, which is the cloud in its file, and names the address
+after the project stack, `afon-egress-ip-idp`, so that project stacks that run next to each other each have one. It
+reads nothing of the file but its cloud and the env it is made from, which the file may not have completed yet,
+and runs in a home of its own with that env's config, for its region, account and so on, without switching the active
+env: if the file still has `<env>`, give it with `--made-from <env>`. It is the step after `init`, as a project stack
+cannot be configured until its file has the address. In `~/.afon/projects/idp/project.yaml`, replace the egress IP with
+the address that `show` prints, as `egressIp`, and set `dns.delegation` to `route53`: the template has `none`, with
+which `up` makes the zone of the project stack's domain but does not delegate it, so the domain does not resolve and
+Keycloak cannot get its certificate. The result is:
 
 ```yaml
 projectStack:
@@ -120,6 +125,12 @@ dns:
 AWS has no node pool property, so the nodes of the identity's cluster, as those of the TREs', are those of the env.
 `delegation: route53` has `up` write the `NS` records of the project stack's domains into the Route 53 hosted zone of
 `emrys2.click`: see [Automatic delegation](#automatic-delegation). It must be set, in every project stack's file.
+
+An address that is not wanted, such as one reserved to try this, is released with
+`afon-cli.sh manage-project-stack egress-ip delete idp`. It says what it releases, and leaves an
+address that a stack uses, as AWS, Azure and GCP do not release one that is in use: delete that stack first. Anything
+that allowed the address, such as a database or a Data
+Provider, no longer has it to allow.
 
 **3. Check it, see its stages, and configure it:**
 
@@ -172,8 +183,8 @@ project stack, and complete the `<fields>` of `~/.afon/projects/lon/project.yaml
 catalogs, and set `dns.delegation` to `route53`, as the template has `none`:
 
 ```shell
-afon-cli.sh azure-egress-ip create afon-egress-ip-lon
-afon-cli.sh azure-egress-ip show afon-egress-ip-lon
+afon-cli.sh manage-project-stack egress-ip create lon
+afon-cli.sh manage-project-stack egress-ip show lon
 ```
 
 ```yaml
@@ -215,15 +226,16 @@ runs Polaris only; AWS has none.
 stack's, so a Data Provider takes none of the env's: its project stack's cloud lists `cvd`, for `lon`, and the other
 clouds list none.
 
-**Who can reach its Polaris.** A Data Provider does not list the TREs that read it: they name it, in their own
+**Who can reach its Polaris.** A Data Provider does not list the TREs that read it: the TREs name it, in their own
 `dataProviders.named`. So `configure lon` looks through the project stacks of the Afon home for the TREs that name a
 catalog of `lon`, and adds the egress IP of each, the one its file names or else the env's `<CLOUD>_EGRESS_IP`, to
 `<CLOUD>_POLARIS_ALLOWED_CIDRS` in the config of `lon`, after what the env already allows there. The deploy, and
 `kube-polaris-whitelist`, then restrict the Polaris ingress to those addresses and the cluster's own, and, when
 `kube-polaris-whitelist` is told to (`--caller`), the machine it is run from. With no TRE naming `lon`, the property is
 left as the env has it, and a Polaris with none is open, guarded by its token checks alone, as any other is. `configure`
-refuses if a TRE that names it leaves from no known address, as it would be locked out with nothing to say so. A TRE that
-is added or moved is admitted by configuring and deploying the Data Provider again. The storage account of the catalogs
+refuses if a TRE that names it has no egress IP, neither `projectStack.egressIp` in its file nor the env's
+`<CLOUD>_EGRESS_IP`, as it could not be admitted and would be locked out. A TRE that is added or moved is admitted by
+configuring and deploying the Data Provider again. The storage account of the catalogs
 has no network restriction yet: it is open to any network, and protected by its credentials.
 
 Its Polaris is at the Polaris domain of the env with the project stack's id as a label after the first, eg the env's
@@ -258,8 +270,8 @@ this Polaris with it, so it shows that the audience and `acr` that the Data Prov
 
 ```shell
 afon-cli.sh manage-project-stack init nw azure --role data --made-from emrys2
-afon-cli.sh azure-egress-ip create afon-egress-ip-nw
-afon-cli.sh azure-egress-ip show afon-egress-ip-nw
+afon-cli.sh manage-project-stack egress-ip create nw
+afon-cli.sh manage-project-stack egress-ip show nw
 # complete ~/.afon/projects/nw/project.yaml as for lon, with that address, then:
 afon-cli.sh manage-project-stack validate nw
 afon-cli.sh manage-project-stack plan nw
@@ -420,8 +432,8 @@ one cluster, so project stacks that run next to each other each need their own. 
 to let the TRE read its data:
 
 ```shell
-afon-cli.sh aws-egress-ip create afon-egress-ip-cvd-2026
-afon-cli.sh aws-egress-ip show afon-egress-ip-cvd-2026
+afon-cli.sh manage-project-stack egress-ip create cvd-2026
+afon-cli.sh manage-project-stack egress-ip show cvd-2026
 ```
 
 Then complete the `<fields>` of the file, with the address as `egressIp`, and set `dns.delegation` to `route53`, as the
@@ -830,8 +842,8 @@ egress IP, and whatever else is the project stack's own, such as its Data Provid
 **Its own egress IP.** As for `cvd-2026`, reserve an address of its own, and name it in its file:
 
 ```shell
-afon-cli.sh aws-egress-ip create afon-egress-ip-diab-2026
-afon-cli.sh aws-egress-ip show afon-egress-ip-diab-2026
+afon-cli.sh manage-project-stack egress-ip create diab-2026
+afon-cli.sh manage-project-stack egress-ip show diab-2026
 ```
 
 `up` then allows it on the database, in the `create` stage, as it did for the identity. `validate` and `configure` warn
@@ -930,8 +942,8 @@ Provider again and setting its whitelist, see [Adding a TRE later](#adding-a-tre
 
 ```shell
 afon-cli.sh manage-project-stack init idp aws --role identity --made-from emrys2
-afon-cli.sh aws-egress-ip create afon-egress-ip-idp
-afon-cli.sh aws-egress-ip show afon-egress-ip-idp
+afon-cli.sh manage-project-stack egress-ip create idp
+afon-cli.sh manage-project-stack egress-ip show idp
 # complete ~/.afon/projects/idp/project.yaml: egressIp from `show`, and dns.delegation: route53
 afon-cli.sh manage-project-stack validate idp
 afon-cli.sh manage-project-stack plan idp
@@ -945,14 +957,14 @@ now, and configure and bring them up in step 5:
 
 ```shell
 afon-cli.sh manage-project-stack init lon azure --role data --made-from emrys2
-afon-cli.sh azure-egress-ip create afon-egress-ip-lon
-afon-cli.sh azure-egress-ip show afon-egress-ip-lon
+afon-cli.sh manage-project-stack egress-ip create lon
+afon-cli.sh manage-project-stack egress-ip show lon
 # complete ~/.afon/projects/lon/project.yaml: egressIp, catalogs [cvd],
 # audience provider-lon, dns.delegation: route53
 
 afon-cli.sh manage-project-stack init nw azure --role data --made-from emrys2
-afon-cli.sh azure-egress-ip create afon-egress-ip-nw
-afon-cli.sh azure-egress-ip show afon-egress-ip-nw
+afon-cli.sh manage-project-stack egress-ip create nw
+afon-cli.sh manage-project-stack egress-ip show nw
 # complete ~/.afon/projects/nw/project.yaml the same way, with catalogs [diab] and audience provider-nw
 ```
 
@@ -962,14 +974,14 @@ afon-cli.sh azure-egress-ip show afon-egress-ip-nw
 
 ```shell
 afon-cli.sh manage-project-stack init cvd-2026 aws --made-from emrys2
-afon-cli.sh aws-egress-ip create afon-egress-ip-cvd-2026
-afon-cli.sh aws-egress-ip show afon-egress-ip-cvd-2026
+afon-cli.sh manage-project-stack egress-ip create cvd-2026
+afon-cli.sh manage-project-stack egress-ip show cvd-2026
 # complete ~/.afon/projects/cvd-2026/project.yaml: egressIp, dataProviders (lon, catalog cvd),
 # members alice and bob, auditBucket cvd-2026-audit, dns.delegation: route53
 
 afon-cli.sh manage-project-stack init diab-2026 aws --made-from emrys2
-afon-cli.sh aws-egress-ip create afon-egress-ip-diab-2026
-afon-cli.sh aws-egress-ip show afon-egress-ip-diab-2026
+afon-cli.sh manage-project-stack egress-ip create diab-2026
+afon-cli.sh manage-project-stack egress-ip show diab-2026
 # complete ~/.afon/projects/diab-2026/project.yaml: egressIp, dataProviders (nw, catalog diab),
 # members alice and rob, auditBucket diab-2026-audit, dns.delegation: route53
 ```

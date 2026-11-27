@@ -633,7 +633,8 @@ class ManageProjectStackMainTest {
         assertThat(ran).containsExactly(inProjectStack("db-whitelist", lower(cloud), "--dry-run"));
         assertThat(out.toString()).contains("/cli/afon-cli.sh --home " + projectHome(), "db-whitelist " + lower(cloud) + " --dry-run");
         // the project stack has a cloud, so the commands that need one are not given it
-        assertThat(envs).containsExactly(Map.of("AFON_CLOUD", lower(cloud)));
+        // and its id, so that what it makes of its own, eg its egress IP, is named after it
+        assertThat(envs).containsExactly(Map.of("AFON_CLOUD", lower(cloud), "AFON_PROJECT_STACK", PROJECT_STACK));
     }
 
     @ParameterizedTest
@@ -1177,5 +1178,78 @@ class ManageProjectStackMainTest {
         out.reset();
         assertThat(command.run(new String[]{"validate", PROJECT_STACK})).isEqualTo(1);
         assertThat(err.toString()).contains("dataProviders.named[0].projectStack names lon, which has no file");
+    }
+
+    // the egress IP, which the file asks for before it can be configured: the step after init
+
+    private void writeIncompleteFile(AfonCloud cloud, String env) throws Exception {
+        Files.createDirectories(home.resolve("projects/" + PROJECT_STACK));
+        Files.writeString(home.resolve("projects/" + PROJECT_STACK + "/project.yaml"),
+                          "projectStack:\n  id: " + PROJECT_STACK + "\n  cloud: " + lower(cloud) + "\n  env: " + env + "\n  egressIp: <egress-ip>\n");
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void reservesTheEgressIpWithTheCommandOfTheCloudNamedAfterTheProjectStackWithNothingOfTheFileButItsCloudAndEnv(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        writeIncompleteFile(cloud, "dev");
+        Path envConfig = Files.createDirectories(home.resolve("config-dev"));
+
+        assertThat(command.run(new String[]{"egress-ip", "create", PROJECT_STACK})).isZero();
+
+        Path envHome = home.resolve("projects/" + PROJECT_STACK + "/env-home");
+        assertThat(ran).containsExactly(List.of("--home", envHome.toString(), lower(cloud) + "-egress-ip", "create", "afon-egress-ip-" + PROJECT_STACK));
+        assertThat(envs).containsExactly(Map.of("AFON_CLOUD", lower(cloud), "AFON_PROJECT_STACK", PROJECT_STACK));
+        // the home has the config of the env, and not the active one, which is never switched
+        assertThat(Files.readSymbolicLink(envHome.resolve("config"))).isEqualTo(envConfig.toAbsolutePath());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void showsTheEgressIpOfTheEnvThatIsGivenInsteadOfTheOneTheFilePlaceholds(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        writeIncompleteFile(cloud, "<env>");
+        Path envConfig = Files.createDirectories(home.resolve("config-emrys2"));
+
+        assertThat(command.run(new String[]{"egress-ip", "show", PROJECT_STACK, "--made-from", "emrys2"})).isZero();
+
+        assertThat(ran).hasSize(1);
+        assertThat(ran.get(0)).contains(lower(cloud) + "-egress-ip", "show");
+        assertThat(Files.readSymbolicLink(home.resolve("projects/" + PROJECT_STACK + "/env-home/config"))).isEqualTo(envConfig.toAbsolutePath());
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void saysToGiveTheEnvWhenTheFileStillHasItsPlaceholderAndNoneIsGiven(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        writeIncompleteFile(cloud, "<env>");
+
+        assertThat(command.run(new String[]{"egress-ip", "create", PROJECT_STACK})).isEqualTo(1);
+
+        assertThat(err.toString()).contains("still <env>", "--made-from");
+        assertThat(ran).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void refusesAnActionThatIsNotCreateShowOrDeleteAndAProjectStackWithNoFile(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        assertThat(command.run(new String[]{"egress-ip", "release", PROJECT_STACK})).isEqualTo(2);
+        assertThat(command.run(new String[]{"egress-ip", "create", "no-such-project"})).isEqualTo(1);
+        assertThat(err.toString()).contains("No project stack file").contains("manage-project-stack init no-such-project");
+        assertThat(ran).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(AfonCloud.class)
+    void releasesTheEgressIpWithTheCommandOfTheCloudNamedAfterTheProjectStack(AfonCloud cloud) throws Exception {
+        setUp(cloud);
+        writeIncompleteFile(cloud, "dev");
+        Files.createDirectories(home.resolve("config-dev"));
+
+        assertThat(command.run(new String[]{"egress-ip", "delete", PROJECT_STACK})).isZero();
+
+        Path envHome = home.resolve("projects/" + PROJECT_STACK + "/env-home");
+        assertThat(ran).containsExactly(List.of("--home", envHome.toString(), lower(cloud) + "-egress-ip", "delete", "afon-egress-ip-" + PROJECT_STACK));
     }
 }

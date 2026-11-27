@@ -69,6 +69,38 @@ public final class ProjectStackHome {
         return home;
     }
 
+    /** The name of the dir, in the project stack's dir, of the home for the commands that run before it is configured. */
+    public static final String ENV_HOME_DIR = "env-home";
+
+    /**
+     * Makes a home for the commands that act before the project stack is configured, eg to reserve the egress IP that its file asks for, which has no config of its own yet:
+     * {@code <afon-home>/projects/<project-stack>/env-home}, whose {@code config} is that of the env that it is made from, and whose other entries are those of the Afon home, as
+     * {@link #prepare} makes them.  It is separate from the home that {@link #prepare} makes, so that what that has is never replaced by it.
+     *
+     * @param envConfig the config of the env, which has the properties of the cloud that the command needs, eg its region
+     * @return the home
+     * @throws UncheckedIOException if the links cannot be made
+     */
+    public static Path prepareForEnv(Path afonHome, String projectStack, Path envConfig) {
+        Path home = FileProjectStackProvider.projectDir(afonHome, projectStack).resolve(ENV_HOME_DIR);
+        try {
+            deleteLinks(home);
+            Files.createDirectories(home.resolve("cdktf"));
+            Files.createSymbolicLink(home.resolve("config"), envConfig.toAbsolutePath());
+            try (Stream<Path> entries = Files.list(afonHome)) {
+                for (Path entry : (Iterable<Path>) entries::iterator) {
+                    String name = entry.getFileName().toString();
+                    if (!NOT_SHARED.contains(name) && !name.startsWith(ProjectStackEnv.CONFIG_PREFIX) && !name.startsWith(ProjectStackEnv.CDKTF_PREFIX)) {
+                        Files.createSymbolicLink(home.resolve(name), entry.toAbsolutePath());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot make the home of project stack " + projectStack + " in " + home, e);
+        }
+        return home;
+    }
+
     /**
      * Removes the links of a home that was made before, never what they point to, and nothing that is not a link.
      */

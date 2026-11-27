@@ -42,11 +42,18 @@ cd afon
 ./afon.sh -a build -bp acceptance
 ```
 
-To build all components without running acceptance tests:
+To build all components running only unit tests:
 ```shell
 cd afon
 ./afon.sh -a build -bp unit
 ```
+
+To build all components without running any tests:
+```shell
+cd afon
+./afon.sh -a build -bp nt
+```
+
 
 See [afon_script](afon_script.md) for more details on options and [acceptance tests](acceptance_tests.md).
 

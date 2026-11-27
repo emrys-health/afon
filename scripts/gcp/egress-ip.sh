@@ -2,13 +2,18 @@
 source $AFON_ROOT/scripts/config/afon-source.sh gcp
 
 DEFAULT_IP_NAME="afon-egress-ip"
+# For a project stack, run with 'manage-project-stack run <project-stack> ...', the address of its own, named after it, as one address serves the outbound traffic of
+# one cluster, so that project stacks that run next to each other each need their own
+if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+  DEFAULT_IP_NAME="afon-egress-ip-$AFON_PROJECT_STACK"
+fi
 
 usage(){
-  echo "Usage: ${BASH_SOURCE[0]} <create|show> [<name>]"
+  echo "Usage: ${BASH_SOURCE[0]} <create|show|delete> [<name>]"
   echo "Creates, or shows, the static IP in GCP_PROJECT_ID that the outbound traffic of the cluster egresses from, through its Cloud"
   echo "NAT, when GCP_EGRESS_IP is set to its address, see docs/cluster.md#egress-ip-gcp.  It is a regional, external static IP, in"
-  echo "GCP_REGION, which the stack looks up rather than manages, so it is not deleted with the stack, and not by this script."
-  echo "<name> is that of the static IP (default: $DEFAULT_IP_NAME)."
+  echo "GCP_REGION, which the stack looks up rather than manages, so it is not deleted with the stack: only delete deletes it, and never while it is in use, ie while a stack uses it."
+  echo "<name> is that of the static IP (default: afon-egress-ip, or, run for a project stack, afon-egress-ip-<project-stack>: $DEFAULT_IP_NAME)."
 }
 
 ACTION="${1:-}"
@@ -40,7 +45,11 @@ show_address() {
   if [ "$IP_TYPE" != "EXTERNAL" ]; then
     echo "- WARNING: the Cloud NAT can only use a regional, external static IP"
   fi
-  if [ "${GCP_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
+  if [ -n "${AFON_PROJECT_STACK:-}" ]; then
+    # a project stack carries its own address, not the env's
+    echo "- Set it as egressIp in the projectStack section of the file of the project stack $AFON_PROJECT_STACK, ~/.afon/projects/$AFON_PROJECT_STACK/project.yaml:"
+    echo "egressIp: $IP_ADDRESS"
+  elif [ "${GCP_EGRESS_IP:-}" = "$IP_ADDRESS" ]; then
     echo "- GCP_EGRESS_IP is already set to it"
   else
     echo "- Set it in afon-gcp.properties:"
@@ -65,6 +74,22 @@ case "$ACTION" in
     else
       echo "- Static IP $IP_NAME does not exist in $GCP_PROJECT_ID, $GCP_REGION"
     fi
+    ;;
+
+  delete)
+    if ! ip_exists; then
+      echo "- Static IP $IP_NAME does not exist in $GCP_PROJECT_ID, $GCP_REGION, nothing to delete"
+      exit 0
+    fi
+    IP_ADDRESS="$(ip_field address)"
+    IP_STATUS="$(ip_field status)"
+    if [ "$IP_STATUS" != "RESERVED" ]; then
+      echo "- Static IP $IP_NAME ($IP_ADDRESS) is $IP_STATUS, not RESERVED, so a stack uses it: delete that stack first, nothing is deleted"
+      exit 1
+    fi
+    echo "- Deleting static IP $IP_NAME ($IP_ADDRESS) in $GCP_PROJECT_ID, $GCP_REGION"
+    gcloud compute addresses delete $IP_NAME --region $GCP_REGION --project $GCP_PROJECT_ID --quiet || exit 1
+    echo "- Deleted $IP_ADDRESS: anything that allowed it, eg a database or a Data Provider, no longer has this address to allow"
     ;;
 
   *)

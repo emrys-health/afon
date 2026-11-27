@@ -60,6 +60,8 @@ import java.util.function.Supplier;
  *       stage, {@code --from <stage>:<step>} (for {@code up} and {@code down}, and a stage of a stack) from that step of the stack's own, as
  *       {@code manage-stack setup <stack> <step>} does, so that a deploy that succeeded is not done again, and {@code --dry-run} lists the commands
  *       without running them;</li>
+ *   <li>{@code egress-ip create|show|delete} reserves, shows, or releases, the egress IP of the project stack, in the cloud of its file, named after it, which its file asks
+ *       for before it can be configured: the next step after {@code init}; it releases none that a stack uses;</li>
  *   <li>{@code run} runs a command of Afon in the home of the project stack, as {@code afon-cli.sh --home <its home> <command>}, so that it uses
  *       the project stack's config, address and cluster, whatever env is active; what follows the project stack is the command, as it is;</li>
  *   <li>{@code <project-stack>} is the id of the project stack, whose file the deployer writes in its own dir,
@@ -84,11 +86,15 @@ public class ManageProjectStackMain {
     private static final String USAGE = String.join(System.lineSeparator(),
         "Usage: manage-project-stack <action> <project-stack> [" + ENV + " <env>] [" + FROM + " <stage>[:<step>]] [" + UNTIL + " <stage>] [" + DRY_RUN + "], where:",
         "       manage-project-stack find <name>",
+        "       manage-project-stack egress-ip <create|show|delete> <project-stack> [" + ENV + " <env>]",
         "       manage-project-stack init <project-stack> <cloud> [" + ROLE + " identity|tre|data] [" + ENV + " <env>] [" + FORCE + "]",
         "  <action> is one of:",
         "    init      writes the project stack file from the template of its role, for the deployer to complete: what is in <angle brackets>",
         "              is what only the deployer knows, so it is not valid until it is replaced.  Never overwrites a file, unless given",
         "              " + FORCE + ", which keeps the old one beside it as project.yaml.<time>.bak",
+        "    egress-ip create reserves the egress IP of the project stack in its cloud, named afon-egress-ip-<project-stack>, and show prints its address, to be put in the",
+        "              file as egressIp: it is what the file asks for before it is valid and can be configured, so it is the step after init.  delete releases it,",
+        "              unless a stack uses it, which it says and leaves it: delete that stack first",
         "    validate  checks the project stack file, listing every problem in it",
         "    names     lists the names of the project stack's resources: its clusters, and what is unique in the whole cloud, which are made of a",
         "              token of the cloud, account and project stack, eg afonstorage<token>.  manage-project-stack find <name> says which project stack owns a name",
@@ -167,6 +173,9 @@ public class ManageProjectStackMain {
         if (args[0].equals("run")) {
             // what follows the project stack is the command to run, whatever it has: its options are not this one's
             return runInProject(args);
+        }
+        if (args[0].equals("egress-ip")) {
+            return egressIp(args);
         }
         List<String> positional = new ArrayList<>();
         String env = null;
@@ -430,8 +439,9 @@ public class ManageProjectStackMain {
             err.println(e.getMessage());
             return 1;
         }
-        out.printf("Wrote %s from the template of the %s role: complete what is in <angle brackets>, then%n", provider.file(), projectRole.get().value());
-        out.printf("  afon-cli.sh manage-project-stack validate %s%n  afon-cli.sh manage-project-stack configure %s%n", positional.get(0), positional.get(0));
+        out.printf("Wrote %s from the template of the %s role: complete what is in <angle brackets>, starting with the egress IP, which%n", provider.file(), projectRole.get().value());
+        out.printf("  afon-cli.sh manage-project-stack egress-ip create %s%n  afon-cli.sh manage-project-stack egress-ip show %s%n", positional.get(0), positional.get(0));
+        out.printf("reserves and shows, to put in the file as egressIp, then%n  afon-cli.sh manage-project-stack validate %s%n  afon-cli.sh manage-project-stack configure %s%n", positional.get(0), positional.get(0));
         return 0;
     }
 
@@ -729,9 +739,91 @@ public class ManageProjectStackMain {
         try {
             // the cloud of the project stack, which the launcher takes from AFON_CLOUD, as it takes --cloud, which the launcher of this command has taken
             // from the command's args, so that the commands that need a cloud, eg cdktf-store, need not be given it
-            int status = executor.run(argv, java.util.Map.of("AFON_CLOUD", projectStack.cloud().toString().toLowerCase(Locale.ROOT)));
+            // and its id, AFON_PROJECT_STACK, from which the commands that make something of its own, eg its egress IP, name it, whether or not it has been configured yet
+            int status = executor.run(argv, java.util.Map.of("AFON_CLOUD", projectStack.cloud().toString().toLowerCase(Locale.ROOT), "AFON_PROJECT_STACK", args[1]));
             if (status != 0) {
                 err.printf("%s failed with exit status %d%n", command.get(0), status);
+            }
+            return status;
+        } catch (IOException e) {
+            err.printf("Cannot run %s: %s%n", argv.get(0), e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Reserves, or shows, the egress IP of the project stack, with the command of its cloud, {@code <cloud>-egress-ip}, as its name is that of the project stack, so that no two
+     * project stacks share an address.  The file asks for it, so it is the step after {@code init}: the file is not valid, and the project stack cannot be configured, until it has the
+     * address, so nothing is read of the file but its cloud and the env it is made from, and the command runs in a home of its own, with the config of that env, see
+     * {@link ProjectStackHome#prepareForEnv}.
+     */
+    private int egressIp(String[] args) {
+        List<String> positional = new ArrayList<>();
+        String env = null;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].equals(ENV) && i + 1 < args.length) {
+                env = args[++i];
+            } else if (args[i].startsWith("--")) {
+                return usage("Unknown option, or no value for " + args[i]);
+            } else {
+                positional.add(args[i]);
+            }
+        }
+        if (positional.size() != 2 || !List.of("create", "show", "delete").contains(positional.get(0))) {
+            return usage("egress-ip takes create, show or delete and a <project-stack>");
+        }
+        String action = positional.get(0);
+        String id = positional.get(1);
+        FileProjectStackProvider provider;
+        try {
+            provider = FileProjectStackProvider.forProjectStack(afonHome, id);
+        } catch (IllegalArgumentException e) {
+            return usage(e.getMessage());
+        }
+        if (!provider.exists()) {
+            err.printf("No project stack file %s: write it with manage-project-stack init %s <cloud>%n", provider.file(), id);
+            return 1;
+        }
+        java.util.Map<String, Object> section;
+        try {
+            section = FileProjectStackProvider.projectStackSection(Files.readString(provider.file(), StandardCharsets.UTF_8));
+        } catch (ProjectStackException | IOException e) {
+            err.println(e.getMessage());
+            return 1;
+        }
+        AfonCloud cloud;
+        try {
+            cloud = AfonCloud.valueOf(String.valueOf(section.get("cloud")).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            err.printf("%s has no cloud, aws, azure or gcp, in its projectStack section: it is that of the project stack, which init writes%n", provider.file());
+            return 1;
+        }
+        String fileEnv = section.get("env") == null ? null : String.valueOf(section.get("env")).trim();
+        if (env == null && fileEnv != null && !fileEnv.isEmpty() && fileEnv.startsWith("<")) {
+            err.printf("The env of %s is still %s: give the env whose config has the properties of the cloud, such as its region, with %s <env>, or set it in the file%n", provider.file(),
+                       fileEnv, ENV);
+            return 1;
+        }
+        String chosen = env != null ? env : fileEnv != null && !fileEnv.isEmpty() ? fileEnv : null;
+        Path envConfig = chosen == null ? afonHome.resolve("config") : afonHome.resolve(ProjectStackEnv.CONFIG_PREFIX + chosen);
+        if (!Files.isDirectory(envConfig)) {
+            err.printf("No config %s: %s%n", envConfig, chosen == null ? "there is no active config" : "the env " + chosen + " has none");
+            return 1;
+        }
+        Path home;
+        try {
+            home = ProjectStackHome.prepareForEnv(afonHome, id, envConfig);
+        } catch (UncheckedIOException e) {
+            err.println(e.getMessage());
+            return 1;
+        }
+        String lower = cloud.toString().toLowerCase(Locale.ROOT);
+        List<String> argv = List.of(Path.of(cliDir.get(), "afon-cli.sh").toString(), "--home", home.toString(), lower + "-egress-ip", action, "afon-egress-ip-" + id);
+        out.println(String.join(" ", argv));
+        try {
+            int status = executor.run(argv, java.util.Map.of("AFON_CLOUD", lower, "AFON_PROJECT_STACK", id));
+            if (status != 0) {
+                err.printf("%s-egress-ip failed with exit status %d%n", lower, status);
             }
             return status;
         } catch (IOException e) {

@@ -1,16 +1,19 @@
 # Acceptance tests
 
-The acceptance tests in `afon-acceptance` verify that cross-cloud access works correctly — including that access to "forbidden" buckets is properly denied.
+The acceptance tests in `afon-acceptance` verify cross-cloud behaviour works correctly — without requiring a deployed
+cluster. 
+By running the apps locally in docker containers, they only require access to the cloud storage resources.
 
-By default **all the specs are run**. The profiles of [afon-acceptance/pom.xml](../afon-acceptance/pom.xml) select them by their tags and
-packages, in two ways:
+By default, **the access, users and signing specs are run**. 
+The profiles of [afon-acceptance/pom.xml](../afon-acceptance/pom.xml) select them by their tags and packages, in two
+ways:
 
 | Profile | Specs | Tag | By default |
 |---|---|---|---|
 | `access` | the access, forbidden and external table specs of every cloud | `Access`, `Forbidden`, `External` | on |
+| `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
 | `users` | the onboarding of users in KeyCloak and Polaris (it uses an AWS catalog, but could use another cloud's) | `Users` | on |
 | `signing` | the signing of images and their verification at admission, in a kind cluster, see [below](#image-signing-test) | `Signing` | on |
-| `aws`, `azure`, `gcp` | the access, forbidden and external table specs of that cloud | `Aws`, `Azure`, `Gcp` | off |
 | `project` | the projects: the clients, groups and tokens of the central identity, in a KeyCloak container, and what a project asks of a cloud (the store of its state, and its names accepted by the cloud), which use the real tools of the cloud: `aws`, `az` or `gcloud`, logged in | `Project` | off, for now |
 | `identity` | of those, the projects in the central identity, in a KeyCloak container and a Mailpit one, and what a Data Provider grants a project, in a Polaris container that trusts that KeyCloak, which need only docker, run for AWS alone as KeyCloak does not know the cloud | `ProjectIdentity` | off, for now |
 | `cloud` | of those, what a project asks of a cloud, which uses the tools of the cloud (`aws`, `az`, `gcloud`), logged in | `ProjectCloud` | off, for now |
@@ -20,25 +23,24 @@ packages, in two ways:
 
 ```shell
 ./afon.sh -a build -bp acceptance                         # all the acceptance tests
-./afon.sh -a build -bp acceptance,-signing              # all but the signing test
-./afon.sh -a build -bp acceptance,-access,-users        # only the signing test
 ./afon.sh -a build -bp acceptance,access                  # only the access specs, of all the clouds
 ./afon.sh -a build -bp acceptance -c <cloud>              # only the access specs of the cloud <cloud> (the profile aws, azure or gcp)
-./afon.sh -a build -bp acceptance,signing -c gcp          # the signing test and the specs of GCP
+./afon.sh -a build -bp acceptance,-signing                # all but the signing test
+./afon.sh -a build -bp acceptance,signing                 # only the signing test
+./afon.sh -a build -bp acceptance,signing -c gcp          # only the signing test and the specs of GCP
 ./afon.sh -a build -bp acceptance,project                 # only the project specs, those of every cloud included
 ```
-With Maven alone, `mvn test -pl afon-acceptance -am
--Pacceptance,access,signing`. `-c <cloud>` adds the profile of the cloud to those of `-bp`.
 
 ## In the container, before a commit
 
-The specs that need only docker can be run in the `afon-base` image, as the `acceptance-tests-container` workflow runs them on GitHub, with
-`scripts/docker/afon/afon-docker.sh`. It runs a command in the image with the host network and the docker socket, which the specs need as they
-assume that `localhost` is the Docker host, the repository as `/work`, your `~/.m2`, your `~/.afon` as `/tmp/afon`, and, with `--cloud`, what your
-login to the cloud left (`~/.aws` and the AWS variables, `~/.azure`, `~/.config/gcloud`):
+The specs that need only docker can be run in the `afon-base` image, as the `acceptance-tests-container` workflow runs
+them on GitHub, with `scripts/docker/afon/afon-docker.sh`. It runs a command in the image with the host network and the
+docker socket, which the specs need as they assume that `localhost` is the Docker host, the repository as `/work`, your
+`~/.m2`, your `~/.afon` as `/tmp/afon`, and, with `--cloud`, what your login to the cloud left
+(`~/.aws` and the AWS variables, `~/.azure`, `~/.config/gcloud`):
 
 ```shell
-# the Keycloak specs of the projects: the modules are installed first, then the specs are run, with their log in ~/.afon/logs
+# the identity specs of the projects: the modules are installed first, then the specs are run, with their log in ~/.afon/logs
 scripts/docker/afon/afon-docker.sh -- 'mvn -B -ntp -q -pl afon-acceptance -am -DskipTests install \
   && mvn -B -ntp -pl afon-acceptance test -Pidentity -Dafon.home=/tmp/afon -Dafon.logging.console=OFF'
 scripts/docker/afon/afon-docker.sh --cloud aws          # a shell in the container, logged in as you are, to run what you want
@@ -46,8 +48,9 @@ scripts/docker/afon/afon-docker.sh --image emryshealth/afon-base:1.0-SNAPSHOT --
 ```
 
 The image is `emryshealth/afon-base:<version of the pom>` unless `--image` gives another, such as one built here with
-`scripts/docker/afon/build.sh base`. The signing spec drives the docker client, which the image does not have, so put it in first, as the
-workflow's step does. The script can also be sourced, for its function `afon_docker '<script>' [<docker run option>...]`, which the workflow uses.
+`scripts/docker/afon/build.sh base`. The signing spec drives the docker client, which the image does not have, so put it
+in first, as the workflow's step does. The script can also be sourced, for its function
+`afon_docker '<script>' [<docker run option>...]`, which the workflow uses.
 
 ## Access specs
 
@@ -64,56 +67,88 @@ The `AbstractAccessSpec` demonstrates the full lifecycle:
 
 Test specs include:
 
-- [AwsAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsAccessSpec.scala) — write and read Iceberg tables via AWS Polaris to s3
-- [AwsAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsAccessForbiddenSpec.scala) — verify that access to forbidden buckets is denied for AWS
-- [AzureAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureAccessSpec.scala) — write and read via AWS Polaris to Azure
-- [AzureAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureAccessForbiddenSpec.scala) — verify that access to forbidden buckets is denied for Azure
-- [GcpAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessSpec.scala) — write and read via AWS Polaris to GCP
-- [GcpAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessForbiddenSpec.scala) — verify that access to forbidden buckets is denied for GCP
-- [AwsGlueExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsGlueExternalTableSpec.scala) — cross-cloud: federated AWS Glue catalog access
-- [AzureExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
-- [GcpExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpExternalTableSpec.scala) — cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
+- [AwsAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsAccessSpec.scala) — write and
+  read Iceberg tables via AWS Polaris to s3
+-
+  [AwsAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsAccessForbiddenSpec.scala)
+  — verify that access to forbidden buckets is denied for AWS
+- [AzureAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureAccessSpec.scala) — write
+  and read via AWS Polaris to Azure
+-
+  [AzureAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureAccessForbiddenSpec.scala)
+  — verify that access to forbidden buckets is denied for Azure
+- [GcpAccessSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessSpec.scala) — write and
+  read via AWS Polaris to GCP
+-
+  [GcpAccessForbiddenSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpAccessForbiddenSpec.scala)
+  — verify that access to forbidden buckets is denied for GCP
+-
+  [AwsGlueExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/aws/AwsGlueExternalTableSpec.scala)
+  — cross-cloud: federated AWS Glue catalog access
+-
+  [AzureExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/azure/AzureExternalTableSpec.scala)
+  — cross-cloud: Spark talks to AWS Polaris which federates to Azure Polaris
+- [GcpExternalTableSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/gcp/GcpExternalTableSpec.scala) —
+  cross-cloud: Spark talks to AWS Polaris which federates to GCP Polaris
 
 ## Users spec
 
-[UsersSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/users/UsersSpec.scala) checks the onboarding of users, and that a
-user only gets the catalogs they are authorised for. It starts KeyCloak and Polaris in Docker, onboards users in both with
-`ConfigureUsersMain`, as `configure-users` does, and has a user try `CREATE NAMESPACE` on a catalog through the shared Spark session. A
-user denied access gets Polaris' `ForbiddenException` (403, a role but not the privilege) or `NotAuthorizedException` (401, no role on the
-catalog). It exercises the authorisation of Polaris only, not the storage, so the catalogs are ad hoc ones on the bucket of the AWS
+[UsersSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/users/UsersSpec.scala) checks the onboarding
+of users, and that a
+user only gets the catalogs they are authorised for. It starts KeyCloak and Polaris in Docker, onboards users in both
+with
+`ConfigureUsersMain`, as `configure-users` does, and has a user try `CREATE NAMESPACE` on a catalog through the shared
+Spark session. A
+user denied access gets Polaris' `ForbiddenException` (403, a role but not the privilege) or `NotAuthorizedException`
+(401, no role on the
+catalog). It exercises the authorisation of Polaris only, not the storage, so the catalogs are ad hoc ones on the bucket
+of the AWS
 forbidden catalog, which the spec does not read; it could as well use another cloud's.
 
 - **Users should not see catalogs they should not** — a user whose authorisation is withheld cannot create a namespace.
-- **Users should not see catalogs authorised only for other users** — with one user authorised for one catalog and another for all, the
+- **Users should not see catalogs authorised only for other users** — with one user authorised for one catalog and
+  another for all, the
   first can use their catalog and not the other (ticket 225: all the users used to share one principal role).
-- **Granting catalog privileges** — a principal that has not been permissioned is denied; once configured it is allowed; and configuring it
-  for a second catalog does not revoke its access to the first (ticket 117).
+- **Granting catalog privileges** — a principal that has not been permissioned is denied; once configured it is allowed;
+  and configuring it for a second catalog does not revoke its access to the first (ticket 117).
 - **Configuring the users should be idempotent** — configuring the users again for an existing catalog gives no errors.
 
-It is the `users` profile, on by default, so it is left out with `-bp acceptance,-users` and run alone with `-bp acceptance,users`. It needs
-Docker, and the AWS config of the catalogs, but runs no cloud storage.
+It is the `users` profile, on by default, so it is left out with `-bp acceptance,-users` and run alone with
+`-bp acceptance,users`. It needs Docker, and the AWS config of the catalogs, but runs no cloud storage.
 
 ## Image signing spec
 
-[ImageSigningSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/signing/ImageSigningSpec.scala) checks the signing of
-Docker images and their verification at admission, in a throwaway [kind](https://kind.sigs.k8s.io) cluster, so it needs no cloud. It:
+[ImageSigningSpec](../afon-acceptance/src/test/scala/health/emrys/afon/acceptance/signing/ImageSigningSpec.scala) checks
+the signing of
+Docker images and their verification at admission, in a throwaway [kind](https://kind.sigs.k8s.io) cluster, so it needs
+no cloud. It:
 
-1. creates a kind cluster (with its own kubeconfig, not yours), a local registry joined to its network, and installs Kyverno from the chart
+1. creates a kind cluster (with its own kubeconfig, not yours), a local registry joined to its network, and installs
+   Kyverno from the chart
    the stacks vendor;
-2. pushes one image to the registry three times, and signs the copies with the signer of `docker-image --sign`, one with a key, one with
+2. pushes one image to the registry three times, and signs the copies with the signer of `docker-image --sign`, one with
+   a key, one with
    another key, and leaves the third unsigned;
-3. applies the two Kyverno policies of the `Kyverno` component for the first key, to a namespace labelled `audit` and another labelled
-   `enforce`, and checks that the enforced one rejects the unsigned image and the one signed with the other key, and admits the signed one,
+3. applies the two Kyverno policies of the `Kyverno` component for the first key, to a namespace labelled `audit` and
+   another labelled
+`enforce`, and checks that the enforced one rejects the unsigned image and the one signed with the other key, and admits
+   the signed one,
    and rejects a pod whose init container is not signed, while the audited one admits all of them;
-4. relabels the audited namespace `enforce`, the rollout from Audit to Deny, and checks that it now rejects the unsigned image; then removes
+4. relabels the audited namespace `enforce`, the rollout from Audit to Deny, and checks that it now rejects the unsigned
+   image; then removes
    the label of the enforced namespace, the break-glass, and checks that it admits it again;
-5. limits the egress of the Kyverno admission controller to DNS and the API server with a `NetworkPolicy`, and checks that it then cannot
-   verify an image, and, once the registry is allowed too and nothing else (no KMS, no transparency log), that it verifies and admits it.
+5. limits the egress of the Kyverno admission controller to DNS and the API server with a `NetworkPolicy`, and checks
+   that it then cannot
+verify an image, and, once the registry is allowed too and nothing else (no KMS, no transparency log), that it verifies
+   and admits it.
 
-The public key the policies verify with is the one `docker-image --public-key` exports, read back the way the Kyverno component reads it.
+The public key the policies verify with is the one `docker-image --public-key` exports, read back the way the Kyverno
+component reads it.
 
-Admission is checked with server-side dry runs of `kubectl run`, which run the admission webhooks and create nothing. It needs `docker`,
-`kind`, `kubectl`, `helm` and `cosign` installed, and fails, saying which are missing, if not (leave the spec out with `-bp acceptance,-signing`). It pulls the Kyverno images, so it
+Admission is checked with server-side dry runs of `kubectl run`, which run the admission webhooks and create nothing. It
+needs `docker`,
+`kind`, `kubectl`, `helm` and `cosign` installed, and fails, saying which are missing, if not
+(leave the spec out with `-bp acceptance,-signing`). It pulls the Kyverno images, so it
 takes a few minutes. It is part of the default acceptance tests, left out with `-bp acceptance,-signing`, and
 alone with the profile `signing` (`./afon.sh -a build -bp acceptance,signing`).
 
@@ -129,8 +164,10 @@ only one run executes at a time.
 
 ### In the container, on GitHub
 
-The [acceptance-tests-container](../.github/workflows/acceptance-tests-container.yml) workflow runs specs in the `afon-base` image on a
-**GitHub-hosted runner**, which has the tools of the clouds, the docker client and the rest. It is run by hand (`workflow_dispatch`), and leaves
+The [acceptance-tests-container](../.github/workflows/acceptance-tests-container.yml) workflow runs specs in the
+`afon-base` image on a
+**GitHub-hosted runner**, which has the tools of the clouds, the docker client and the rest. It is run by hand
+(`workflow_dispatch`), and leaves
 [acceptance-tests](../.github/workflows/acceptance-tests.yml) as it is. Its inputs:
 
 | Input | Meaning |
@@ -141,22 +178,31 @@ The [acceptance-tests-container](../.github/workflows/acceptance-tests-container
 | `specs` | `project`, `signing` or `project and signing` (the default) |
 | `image`, `image_tag` | the `afon-base` image, and its tag (the project version of the ref by default) |
 
-The job logs in to the cloud by OIDC, with the GitHub environment `smoke-tests-<cloud>` that the smoke tests use, so that it has no stored credentials
-and needs no setup of its own, see [GitHub workflows](github_workflows.md#smoke-tests-workflows). It then pulls the config from the vault
-(`config-vault pull`) and masks its secrets, as the log is public. The specs run in a container of the image started with `docker run --network host`
-and the runner's docker socket, as `afon-docker.sh` does (see [above](#in-the-container-before-a-commit)), because they assume that `localhost` is the Docker host.
-The specs selected are those of the Maven profiles: `-Pidentity` for `project` (the Keycloak specs, which need docker only) and `-Psigning`, both for
-`project and signing`. The log of the specs goes to `afon.log` in the logs dir of the afon home, not to the console, and at the end it is pushed to
-the cloud's logs store under the tag `<run id>-<attempt>` (`logs-store`), the reports are uploaded as an artifact, and the config is removed
+The job logs in to the cloud by OIDC, with the GitHub environment `smoke-tests-<cloud>` that the smoke tests use, so that
+it has no stored credentials
+and needs no setup of its own, see [GitHub workflows](github_workflows.md#smoke-tests-workflows). It then pulls the
+config from the vault
+(`config-vault pull`) and masks its secrets, as the log is public. The specs run in a container of the image started with
+`docker run --network host`
+and the runner's docker socket, as `afon-docker.sh` does (see [above](#in-the-container-before-a-commit)), because they
+assume that `localhost` is the Docker host.
+The specs selected are those of the Maven profiles: `-Pidentity` for `project`
+(the Keycloak specs, which need docker only) and `-Psigning`, both for
+`project and signing`. The log of the specs goes to `afon.log` in the logs dir of the afon home, not to the console, and
+at the end it is pushed to
+the cloud's logs store under the tag `<run id>-<attempt>` (`logs-store`), the reports are uploaded as an artifact, and
+the config is removed
 from the runner.
 
-Runs of the same cloud do not overlap (concurrency group `acceptance-tests-container-<cloud>`), as they share its config and stores. The
+Runs of the same cloud do not overlap (concurrency group `acceptance-tests-container-<cloud>`), as they share its config
+and stores. The
 specs that use the clouds' tools (`-Pcloud`) are not run by it yet.
 
 ### Runner requirements
 
 The runner must have a Docker daemon reachable by the runner user, since the specs start KeyCloak,
-Polaris and Trino via Testcontainers, and `kind`, `kubectl`, `helm` and `cosign` for the image signing spec, which otherwise fails. Java 17 is provisioned by `actions/setup-java`. The runner
+Polaris and Trino via Testcontainers, and `kind`, `kubectl`, `helm` and `cosign` for the image signing spec, which
+otherwise fails. Java 17 is provisioned by `actions/setup-java`. The runner
 itself is installed and registered by [scripts/github/runner.sh](../scripts/github/runner.sh), either
 by hand or through the `github` role of the ansible playbook below.
 
@@ -257,7 +303,8 @@ which does not check the creation of the environment, which only happens on the 
 
 Without an env, `push` publishes whatever the `config` dir currently points to as **repository** secrets, so
 there is room for only one config.  To hold several [config envs](configuration.md#config-env), publish each
-`config-<env>` dir to the [GitHub environment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment)
+`config-<env>` dir to the
+[GitHub environment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment)
 of the same name, which is created if needed (this needs admin access to the repo):
 
 ```shell
@@ -276,7 +323,8 @@ falls back to the repository secret.  Left blank, as on `push` triggers, the job
 #### Retrieving the config
 
 GitHub secrets are write-only, so the config cannot be read back from them.  To keep a copy of a config env and retrieve
-it onto a machine, use [config-vault](configuration.md#command-config-vault), which stores all the config files, the empty ones
+it onto a machine, use [config-vault](configuration.md#command-config-vault), which stores all the config files, the
+empty ones
 included, in the secret store of a cloud under a tag, and restores them by it:
 
 ```shell
