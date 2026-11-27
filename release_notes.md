@@ -2,6 +2,7 @@
 
 
 ## 1.0-beta-10
+
 **Milestone:** [1.0-beta-10](https://github.com/emrys-health/afon/milestone/11)
 **Due:** 2026-11-27
 
@@ -29,6 +30,37 @@
   - Run `azure-create` again on a deployed env to apply it.  A client that only speaks TLS 1.0 or 1.1 can no longer connect.
 - **The `pyspark-notebook` image is renamed `afon-desktop` in `docker-images.yaml` ([#407](https://github.com/emrys-health/afon/issues/407)):**
   - If you have a `docker-images.yaml` in `$AFON_HOME/config`, which replaces the shipped one, rename its entry `pyspark-notebook` to `afon-desktop`, or the deploy cannot find the desktop image of JupyterHub.
+
+### Closed Issues (28)
+
+- **devops, api** — [#426](https://github.com/emrys-health/afon/issues/426) Make manage-stack the command for all the actions on a stack in non-project mode
+- **configuration, smoke test** — [#424](https://github.com/emrys-health/afon/issues/424) Run smoke tests as the project member, not as `USER_ID`
+- **security, configuration** — [#421](https://github.com/emrys-health/afon/issues/421) Make the Kyverno image registry configurable
+- **devops, testing** — [#419](https://github.com/emrys-health/afon/issues/419) Acceptance test improvements
+- **devops** — [#418](https://github.com/emrys-health/afon/issues/418) Check database configuration before deleting or deploying stacks
+- **devops, smoke test** — [#416](https://github.com/emrys-health/afon/issues/416) Run the smoke notebooks in a notebook pod, as a user does, in project and non-project mode
+- **security, smoke test** — [#411](https://github.com/emrys-health/afon/issues/411) Add project TRE smoke members who can sign-in non-interactively
+- **enhancement** — [#407](https://github.com/emrys-health/afon/issues/407) Rename docker image for desktop tools to afon-desktop
+- **devops, smoke test** — [#406](https://github.com/emrys-health/afon/issues/406) Move the Spark write/read check from the stack setup to the smoke tests
+- **usability** — [#402](https://github.com/emrys-health/afon/issues/402) VSCode as a potential IDE in the cluster
+- **configuration, api** — [#401](https://github.com/emrys-health/afon/issues/401) Multi-project support in Afon
+- **logging, devops, smoke test** — [#400](https://github.com/emrys-health/afon/issues/400) Store the logs of the cluster's pods in the logs store when a stack fails
+- **devops, smoke test** — [#399](https://github.com/emrys-health/afon/issues/399) Smoke tests fail intermittently because the cluster cannot resolve a domain just deployed
+- **security, devops** — [#398](https://github.com/emrys-health/afon/issues/398) Resolve Docker images against the cloud's image registry when defined
+- **devops** — [#396](https://github.com/emrys-health/afon/issues/396) Clean up Maven release files after release.sh
+- **security, smoke test** — [#395](https://github.com/emrys-health/afon/issues/395) Retry "pod can reach domain" checks in the network smoke test
+- **enhancement, security** — [#391](https://github.com/emrys-health/afon/issues/391) Azure storage account requires TLS 1.2
+- **bug** — [#390](https://github.com/emrys-health/afon/issues/390) Security advisories do not work / dead link
+- [#389](https://github.com/emrys-health/afon/pull/389) fix: include transitive groups in query
+- **bug** — [#388](https://github.com/emrys-health/afon/issues/388) bug: `rbac.sh` ignores roles inherited through Entra group membership
+- **security** — [#387](https://github.com/emrys-health/afon/issues/387) Delete the entire KeyCloak database and run set up again
+- **security** — [#386](https://github.com/emrys-health/afon/issues/386) Trino needs a client not a user to allow query
+- **security, configuration** — [#336](https://github.com/emrys-health/afon/issues/336) GCP: Cloud KMS key and registry for Docker image signing
+- **security, configuration** — [#335](https://github.com/emrys-health/afon/issues/335) Azure: Key Vault key and registry for Docker image signing
+- **security, configuration** — [#334](https://github.com/emrys-health/afon/issues/334) AWS: KMS key and registry for Docker image signing
+- **logging, security** — [#333](https://github.com/emrys-health/afon/issues/333) SmokeTest: try connecting to *_JUPYTER_DOMAIN_NAME with an incorrect password and check logs
+- **usability** — [#328](https://github.com/emrys-health/afon/issues/328) Connect Jupyter to Trino and demonstrate it works
+- **security, configuration** — [#289](https://github.com/emrys-health/afon/issues/289) Register the Jupyter browser client only for the stacks that contain Jupyter
 
 ## 1.0-beta-9
 
