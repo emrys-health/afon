@@ -238,6 +238,7 @@ To validate a stack's config without deploying it, eg that the config dir has al
 you can synthesise just the cdktf plan of a stack, which needs no cloud login:
 ```shell
 afon-cli.sh validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+afon-cli.sh manage-stack validate <stack>  # the same, as an action on a stack
 ```
 This fails fast, eg with `Property X not found`, if the config is incomplete.
 It overwrites the plan in `$AFON_CDKTF/stacks/<stack-id>` (ie `cdk.tf.json` and `assets`), but not the state file
@@ -855,6 +856,7 @@ To validate a stack's config without deploying it, eg that the config dir has al
 you can synthesise just the cdktf plan of a stack, which needs no cloud login:
 ```shell
 afon-cli.sh validate-stack <stack>  # eg azure-polaris or aws-full, run without <stack> to list the stacks
+afon-cli.sh manage-stack validate <stack>  # the same, as an action on a stack
 ```
 This fails fast, eg with `Property X not found`, if the config is incomplete.
 It overwrites the plan in `$AFON_CDKTF/stacks/<stack-id>` (ie `cdk.tf.json` and `assets`), but not the state file

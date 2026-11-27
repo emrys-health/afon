@@ -14,6 +14,11 @@ public final class CommandHelp {
 
     public static final String RESOURCE_DIR = "help";
     public static final String GENERATED_DOCS_DIR = "docs";
+    /**
+     * The dir of the docs of the actions of a command, {@code actions/<command>/<action>.md}, which are not commands, so are not in {@link #RESOURCE_DIR}, where every doc is
+     * that of a command.
+     */
+    public static final String ACTIONS_DIR = "actions";
 
     private CommandHelp() {
     }
@@ -24,6 +29,15 @@ public final class CommandHelp {
      */
     public static Optional<String> find(String command) {
         return read(resource(command));
+    }
+
+    /**
+     * @param command the command name in kebab-case, eg {@code manage-stack}
+     * @param action  the action, eg {@code compare}
+     * @return the docs of the action of the command, if it has any
+     */
+    public static Optional<String> findAction(String command, String action) {
+        return read(ACTIONS_DIR + "/" + command + "/" + action + ".md");
     }
 
     /**

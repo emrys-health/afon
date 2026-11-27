@@ -1,4 +1,4 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.ops.stack;
 
 import health.emrys.afon.cdk.StackDefinitions;
 import health.emrys.afon.config.AfonCloud;

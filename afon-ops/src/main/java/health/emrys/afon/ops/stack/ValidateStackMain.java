@@ -1,4 +1,4 @@
-package health.emrys.afon.ops;
+package health.emrys.afon.ops.stack;
 
 import health.emrys.afon.cdk.CloudStackValidator;
 import health.emrys.afon.cdk.StackDefinition;

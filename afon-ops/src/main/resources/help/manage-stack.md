@@ -5,6 +5,9 @@ a named, ordered list of actions and scenarios.
 
 Usage:
   afon-cli.sh manage-stack <action> <stack-id> [<step>] [--replace]
+  afon-cli.sh manage-stack validate [<stack-id> [--runs <n>] | --export-stacks]
+  afon-cli.sh manage-stack snapshot <dir> [<stack-id>...]
+  afon-cli.sh manage-stack compare <before-dir> <after-dir>
   afon-cli.sh manage-stack run <stack-id> [<scenario> [<step>]]
   afon-cli.sh manage-stack run [<flow> [<item>:<step>]] [--replace] [--dry-run]
   afon-cli.sh manage-stack run --export-flows
@@ -25,6 +28,12 @@ Usage:
 --replace lets deploy and setup delete the other stacks conflicting with the stack, else they fail, naming them,
   before deleting any.  Stacks run side by side unless they conflict.
 
+validate validates the config of a stack by synthesising its plan, without deploying it: it is the command validate-stack, with the args that follow
+  validate (see 'afon-cli.sh manage-stack validate -h'), and without a stack it lists the stacks.
+snapshot copies the plans of the stacks that were synthesised, eg by validate, to a dir, to compare them with those of another time, eg before and after a refactoring
+  (see 'afon-cli.sh manage-stack snapshot -h').
+compare compares the plans of the stacks in two dirs, each a snapshot of the plans that were synthesised or the stacks dir, and exits with 1 if they differ
+  (see 'afon-cli.sh manage-stack compare -h').
 run <stack-id> runs a scenario on a stack that is set up, eg 'run aws-snowflake reading-azure'; without a scenario
   it lists those of the stack.
 run <flow> runs a flow, stopping at the first failure, which reports the <item>:<step> to resume from; without

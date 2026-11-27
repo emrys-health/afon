@@ -14,6 +14,8 @@
   - New optional `OIDC_REDIRECT_STRATEGY` (`afon.properties`): `replace` (the default) overwrites the redirect URIs of the client, as before; `merge` adds those of the Jupyter to them, so that clouds sharing a KeyCloak realm, eg in a test env, can all log in.  Leave it as `replace` in production.  `afon-cli.sh purge-redirect-uris <cloud> [--dry-run]` removes the ones that `merge` leaves behind for a cloud that is no longer deployed.
 - **The Spark write of the table is no longer a setup step ([#406](https://github.com/emrys-health/afon/issues/406)):**
   - The table `admin.deployments` is now written by the smoke test `spark-polaris`: run it, eg `afon-cli.sh smoke-test <cloud> --tests spark-polaris`, before what reads the table (the smoke tests `trino` and `spark-connect`, and the notebook `spark-connect-oidc-test.ipynb`, which fail without it).  The smoke notebooks are renamed in kebab-case.
+- **`snapshot-stacks` and `compare-stacks` are replaced by `manage-stack` actions ([#426](https://github.com/emrys-health/afon/issues/426)):**
+  - Use `afon-cli.sh manage-stack snapshot <dir> [<stack-id>...]` and `afon-cli.sh manage-stack compare <before-dir> <after-dir>` instead.
 - **`signing-report` takes the cloud as an argument ([#335](https://github.com/emrys-health/afon/issues/335)):**
   - Add it to the commands you run: `afon-cli.sh signing-report <aws|azure|gcp> [<namespace>|all]`.
 - **`docker-image --sign` needs `oras` binary ([#335](https://github.com/emrys-health/afon/issues/335)):**

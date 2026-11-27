@@ -15,6 +15,8 @@ import health.emrys.afon.ops.flow.FlowStep;
 import health.emrys.afon.ops.flow.StackFlow;
 import health.emrys.afon.ops.flow.StackFlows;
 import health.emrys.afon.ops.help.CommandHelp;
+import health.emrys.afon.ops.stack.ValidateStackMain;
+import health.emrys.afon.ops.synth.PlanSnapshots;
 import health.emrys.afon.ops.plan.StackPlanFactory;
 import health.emrys.afon.ops.steps.StackAction;
 import health.emrys.afon.ops.steps.StepActions;
@@ -37,6 +39,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  * <pre>
  * manage-stack &lt;action&gt; &lt;stack-id&gt; [&lt;step&gt;] [--replace]
  * manage-stack run &lt;stack-id&gt; [&lt;scenario&gt; [&lt;step&gt;]]
+ * manage-stack validate [&lt;stack-id&gt; [--runs &lt;n&gt;] | --export-stacks]
+ * manage-stack snapshot &lt;dir&gt; [&lt;stack-id&gt;...]
+ * manage-stack compare &lt;before-dir&gt; &lt;after-dir&gt;
  * manage-stack run [&lt;flow&gt; [&lt;item&gt;:&lt;step&gt;]] [--replace] [--dry-run]
  * </pre>
  * <ul>
@@ -47,6 +52,12 @@ import static org.slf4j.LoggerFactory.getLogger;
  *   <li>{@code --replace}, if given, lets {@code deploy} and {@code setup} delete the other stacks conflicting with the
  *       stack, else they fail, naming them, before deleting any.</li>
  * </ul>
+ * {@code validate} validates the config of a stack by synthesising its plan, without deploying it: it is {@link ValidateStackMain}, the command {@code validate-stack}, with the
+ * args that follow {@code validate}, so that it is there among the actions on a stack, as {@code validate} is among those of a project stack.
+ * {@code snapshot} copies the plans of the stacks that were synthesised, eg by {@code validate}, to a dir, to compare them with those of another time, eg before and
+ * after a refactoring, and {@code compare} compares the plans of the stacks in two such dirs, or in the stacks dir, listing the resources that were added and removed, which tofu
+ * creates and destroys, then the values that changed, and exiting with 1 if they differ: see {@link PlanSnapshots}.
+ * <p>
  * {@code run} runs a scenario on a stack that is set up, as provided by its components, eg Snowflake reading a catalog, and without
  * a scenario lists those of the stack.  It also runs a {@link StackFlow}, a composed run: a named, ordered list of actions
  * and scenarios, stopping at the first failure, which reports the {@code <item>:<step>} to resume from.  The first arg
@@ -159,6 +170,10 @@ public class ManageStackMain {
             "    %s: %s%n", stackId, actions.stream().map(StackAction::toString).collect(Collectors.joining(", "))));
         System.out.println("    or <cloud>-<role>, the stack of the cloud with the role catalog, identity or tre, eg aws-tre");
         System.out.println("  <step>, if given, is the step from which to resume");
+        System.out.println("Usage: manage-stack validate [<stack-id> [--runs <n>] | --export-stacks], which validates the config of a stack by synthesising its plan,");
+        System.out.println("  and lists the stacks if none is given");
+        System.out.println("Usage: manage-stack snapshot <dir> [<stack-id>...], which copies the plans of the stacks that were synthesised to a dir, to compare them with those of another time");
+        System.out.println("Usage: manage-stack compare <before-dir> <after-dir>, which compares the plans of the stacks in two snapshots of them, and exits with 1 if they differ");
         System.out.println("Usage: manage-stack run <stack-id> [<scenario> [<step>]], which runs a scenario on a stack that is set up,");
         System.out.println("  or lists the scenarios of the stack, if none is given");
         printStackScenarios(new OpsPropertyProvider());
@@ -198,7 +213,34 @@ public class ManageStackMain {
         return CommandHelp.findGeneratedDoc(filename);
     }
 
+    /**
+     * The action that validates a stack, which is the command {@code validate-stack}.
+     */
+    static final String VALIDATE = "validate";
+
+    /**
+     * The action that compares the plans of the stacks in two dirs.
+     */
+    static final String COMPARE = "compare";
+
+    /**
+     * The action that copies the plans of the stacks that were synthesised to a dir.
+     */
+    static final String SNAPSHOT = "snapshot";
+
     public static void main(String[] allArgs) {
+        if (allArgs.length > 0 && VALIDATE.equals(allArgs[0])) {
+            validate(Arrays.copyOfRange(allArgs, 1, allArgs.length));
+            return;
+        }
+        if (allArgs.length > 0 && SNAPSHOT.equals(allArgs[0])) {
+            snapshot(Arrays.copyOfRange(allArgs, 1, allArgs.length));
+            return;
+        }
+        if (allArgs.length > 0 && COMPARE.equals(allArgs[0])) {
+            compare(Arrays.copyOfRange(allArgs, 1, allArgs.length));
+            return;
+        }
         if (allArgs.length == 2 && StackAction.of(allArgs[0]) == StackAction.RUN && EXPORT_FLOWS.equals(allArgs[1])) {
             // before loading the flows, as it is how to replace a file that is not valid
             exportFlows();
@@ -232,6 +274,90 @@ public class ManageStackMain {
             return;
         }
         manager.stack(args, replace);
+    }
+
+    /**
+     * Validates a stack as {@code validate-stack} does, with the args that follow {@code validate}: before loading the flows, as it is how to replace a file of stacks that is
+     * not valid, as for {@code validate-stack} itself.  Its help is that of {@code validate-stack}.
+     */
+    private static void validate(String[] args) {
+        if (Arrays.stream(args).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+            System.out.println(CommandHelp.find("validate-stack").orElse("Usage: manage-stack validate [<stack-id> [--runs <n>] | --export-stacks]"));
+            return;
+        }
+        ValidateStackMain.main(args);
+    }
+
+    /**
+     * @return the id of the stack named by the arg, as an id or as {@code <cloud>-<role>}, see {@link StackDefinitions#resolve}, or the arg as it is if it is neither, eg the name
+     * of a dir of the stacks dir that is not a stack of the stacks file
+     */
+    static String named(String arg) {
+        StackId stackId = parseStackId(arg);
+        return stackId == null ? arg : stackId.toString();
+    }
+
+    /**
+     * Copies to {@code <dir>/<stack-id>/cdk.tf.json} the plan of each stack, or of those given, that was synthesised, eg by {@code validate}, in {@link ConfigUtils#stacksDir()}: it
+     * copies nothing but those files.  It needs no source tree or git, so it runs the same on a deployed machine.
+     */
+    private static void snapshot(String[] args) {
+        if (Arrays.stream(args).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+            System.out.println(CommandHelp.findAction("manage-stack", "snapshot").orElse("Usage: manage-stack snapshot <dir> [<stack-id>...]"));
+            return;
+        }
+        if (args.length < 1) {
+            System.out.println("Usage: manage-stack snapshot <dir> [<stack-id|role>...]");
+            System.exit(1);
+            return;
+        }
+        Path stacksDir = Path.of(ConfigUtils.stacksDir());
+        List<String> stacks;
+        try {
+            stacks = PlanSnapshots.snapshot(stacksDir, Path.of(args[0]), Arrays.stream(args).skip(1).map(ManageStackMain::named).toList());
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage() + ", synthesise it first, eg with manage-stack validate");
+            System.exit(1);
+            return;
+        } catch (java.io.IOException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
+        if (stacks.isEmpty()) {
+            System.err.println("No stack synthesised in " + stacksDir + ", synthesise it first, eg with manage-stack validate");
+            System.exit(1);
+            return;
+        }
+        System.out.printf("Snapshot of %d stacks from %s written to %s: %s%n", stacks.size(), stacksDir, args[0], String.join(", ", stacks));
+    }
+
+    /**
+     * Compares the plans of the stacks in two dirs, each a snapshot, or the stacks dir: it lists the resources that were added and removed, which tofu creates and destroys (a
+     * renamed one is both), then the values that changed, with the long ones reduced to their hash, and exits with 1 if the plans differ.
+     */
+    private static void compare(String[] args) {
+        if (Arrays.stream(args).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+            System.out.println(CommandHelp.findAction("manage-stack", "compare").orElse("Usage: manage-stack compare <before-dir> <after-dir>"));
+            return;
+        }
+        if (args.length != 2) {
+            System.out.println("Usage: manage-stack compare <before-dir> <after-dir>");
+            System.exit(1);
+            return;
+        }
+        PlanSnapshots.Comparison comparison;
+        try {
+            comparison = PlanSnapshots.compare(Path.of(args[0]), Path.of(args[1]));
+        } catch (IllegalArgumentException | java.io.IOException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
+        comparison.lines().forEach(System.out::println);
+        if (comparison.differs()) {
+            System.exit(1);
+        }
     }
 
     private static void exportFlows() {
