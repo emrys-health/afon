@@ -16,6 +16,8 @@
   - The table `admin.deployments` is now written by the smoke test `spark-polaris`: run it, eg `afon-cli.sh smoke-test <cloud> --tests spark-polaris`, before what reads the table (the smoke tests `trino` and `spark-connect`, and the notebook `stack-spark-connects.ipynb`, which fail without it).  The smoke notebooks are renamed in kebab-case.
 - **`snapshot-stacks` and `compare-stacks` are replaced by `manage-stack` actions ([#426](https://github.com/emrys-health/afon/issues/426)):**
   - Use `afon-cli.sh manage-stack snapshot <dir> [<stack-id>...]` and `afon-cli.sh manage-stack compare <before-dir> <after-dir>` instead.
+- **The Spark Connect URL must carry the user's token ([#414](https://github.com/emrys-health/afon/issues/414)):**
+  - The server refuses (`UNAUTHENTICATED`) a client that does not send its OIDC token in the `x-afon-token` header: add `;x-afon-token=<token>` to the connection string, eg `sc://spark-connector-0-driver-svc:15002/;x-afon-token=<OIDC_TOKEN>`, in every notebook and script that connects to it.  The pod of a user who signs in to JupyterHub has it already in `SPARK_REMOTE`, which PySpark uses when the session is built with no `remote(...)`.  Deploy again to apply it.  See docs/architecture.md#spark-integration, which also lists what the server now refuses: JVM code of its clients, files on its local disks and tables in `spark_catalog`.
 - **`signing-report` takes the cloud as an argument ([#335](https://github.com/emrys-health/afon/issues/335)):**
   - Add it to the commands you run: `afon-cli.sh signing-report <aws|azure|gcp> [<namespace>|all]`.
 - **`docker-image --sign` needs `oras` binary ([#335](https://github.com/emrys-health/afon/issues/335)):**
