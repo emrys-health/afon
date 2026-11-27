@@ -569,8 +569,8 @@ class ProjectStackEnvTest {
         OnCloud setup = on(cloud);
         Files.writeString(setup.envConfig().resolve("secret.properties"),
                           "KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=s3cret\nPOMERIUM_SHARED_SECRET=env-shared\nPOMERIUM_COOKIE_SECRET=env-cookie\n");
-        ProjectFixtures.writeSecrets(home);
-        Path config = ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+        ProjectStackFixtures.writeSecrets(home);
+        Path config = ProjectStackEnv.configure(setup.projectStack(), setup.envConfig(), home, setup.projectFile());
 
         AfonPropertyProvider first = new FilePropertyProvider(config.toString());
         String shared = first.getValue(AfonProperty.POMERIUM_SHARED_SECRET);
@@ -580,7 +580,7 @@ class ProjectStackEnvTest {
         assertThat(java.util.Base64.getDecoder().decode(shared)).hasSize(32);
         assertThat(java.util.Base64.getDecoder().decode(cookie)).hasSize(32);
 
-        ProjectEnv.configure(setup.project(), setup.envConfig(), home, setup.projectFile());
+        ProjectStackEnv.configure(setup.projectStack(), setup.envConfig(), home, setup.projectFile());
         AfonPropertyProvider second = new FilePropertyProvider(config.toString());
         assertThat(second.getValue(AfonProperty.POMERIUM_SHARED_SECRET)).isEqualTo(shared);
         assertThat(second.getValue(AfonProperty.POMERIUM_COOKIE_SECRET)).isEqualTo(cookie);
