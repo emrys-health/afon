@@ -8,67 +8,81 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * A first deploy of an AWS stack is refused if the cloud already has a VPC with the name of the stack's VPC, as a second VPC
- * of the same name breaks the by-name cleanup of the stack.
+ * A first deploy is refused if the cloud already has resources of the stack, and a delete is refused, keeping the state and the
+ * stack dir, if the cloud still has them after the destroy, whatever the state says.
  */
 class PlanGuardsTest {
-
-    private static final String PLAN = """
-        {"provider": {"aws": [{"region": "eu-west-2"}]},
-         "resource": {"aws_vpc": {"aws_eksVpc_7BAF8DF4": {"tags": {"Name": "cdktf-eks-vpc-full-emrys2-cluster"}}}}}
-        """;
 
     @TempDir
     Path dir;
 
     private List<String> found = List.of();
-    private String queried;
+    private int lookups;
 
-    private final PlanGuards guards = new PlanGuards() {
+    private final PlanGuards guards = new PlanGuards(new CloudLeftovers() {
         @Override
-        protected List<String> vpcIdsNamed(String name, String region) {
-            queried = name + " in " + region;
+        public List<String> in(Path stackDir) {
+            lookups++;
             return found;
         }
-    };
-
-    private Path stackDir() throws IOException {
-        Files.writeString(dir.resolve("cdk.tf.json"), PLAN);
-        return dir;
-    }
+    });
 
     private Path state(String resources) throws IOException {
         return Files.writeString(dir.resolve("terraform.tfstate"), "{\"resources\": [" + resources + "]}");
     }
 
-    @Test
-    void refusesFirstDeployWhenAVpcOfTheNameExists() throws Exception {
-        found = List.of("vpc-1", "vpc-2");
+    private static final String MANAGED = "{\"mode\": \"managed\", \"type\": \"aws_vpc\", \"instances\": [{}]}";
 
-        assertThatThrownBy(() -> guards.checkNoOrphanAwsVpc(stackDir(), dir.resolve("none.tfstate")))
+    @Test
+    void refusesFirstDeployWhenTheCloudHasResourcesOfTheStack() {
+        found = List.of("EKS cluster full: full", "VPC named v: vpc-1");
+
+        assertThatThrownBy(() -> guards.checkNoneLeftBeforeDeploy(dir, dir.resolve("none.tfstate")))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("cdktf-eks-vpc-full-emrys2-cluster")
-            .hasMessageContaining("vpc-1")
-            .hasMessageContaining("vpc-2");
-        assertThat(queried).isEqualTo("cdktf-eks-vpc-full-emrys2-cluster in eu-west-2");
+            .hasMessageContaining("2 resource(s)")
+            .hasMessageContaining("EKS cluster full: full")
+            .hasMessageContaining("VPC named v: vpc-1");
     }
 
     @Test
-    void allowsFirstDeployWhenNoVpcOfTheNameExists() {
-        assertThatCode(() -> guards.checkNoOrphanAwsVpc(stackDir(), dir.resolve("none.tfstate"))).doesNotThrowAnyException();
+    void refusesDeployWhenTheStateIsEmptyAndTheCloudHasResources() throws Exception {
+        found = List.of("AKS cluster full-emrys-cluster in resource group rg: id");
+
+        assertThatThrownBy(() -> guards.checkNoneLeftBeforeDeploy(dir, state("")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("full-emrys-cluster");
     }
 
     @Test
-    void allowsRedeployWhenTheStateHasTheVpc() throws Exception {
-        found = List.of("vpc-1");
+    void allowsFirstDeployWhenTheCloudHasNone() {
+        assertThatCode(() -> guards.checkNoneLeftBeforeDeploy(dir, dir.resolve("none.tfstate"))).doesNotThrowAnyException();
+    }
 
-        assertThatCode(() -> guards.checkNoOrphanAwsVpc(stackDir(), state("{\"type\": \"aws_vpc\", \"instances\": [{}]}")))
-            .doesNotThrowAnyException();
-        assertThat(queried).isNull();
+    @Test
+    void allowsRedeployWhenTheStateHasResourcesWithoutLookingInTheCloud() throws Exception {
+        found = List.of("VPC named v: vpc-1");
+
+        assertThatCode(() -> guards.checkNoneLeftBeforeDeploy(dir, state(MANAGED))).doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThat(lookups).isZero();
+    }
+
+    @Test
+    void refusesDeleteWhenTheStateIsEmptyButTheClusterIsStillInTheCloud() throws Exception {
+        found = List.of("AKS cluster full-emrys-cluster in resource group rg: id");
+
+        assertThatThrownBy(() -> guards.checkNoneLeftAfterDestroy(dir, state("")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("still has 1 resource(s)")
+            .hasMessageContaining("full-emrys-cluster")
+            .hasMessageContaining("is deleted");
+    }
+
+    @Test
+    void allowsDeleteWhenTheCloudHasNone() throws Exception {
+        assertThatCode(() -> guards.checkNoneLeftAfterDestroy(dir, state(""))).doesNotThrowAnyException();
     }
 }

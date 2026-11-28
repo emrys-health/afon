@@ -80,10 +80,14 @@ public class DocumentingStepActions extends StepActions {
 
     public DocumentingStepActions(OutputStream out) {
         this.out = new PrintWriter(out);
-        // documenting must not call the cloud: the guard looks up the VPCs of the stack in AWS
+        // documenting must not call the cloud: the guards look up the resources of the stack in it
         this.planGuards = new PlanGuards() {
             @Override
-            public void checkNoOrphanAwsVpc(Path stackDir, Path tfState) {
+            public void checkNoneLeftBeforeDeploy(Path stackDir, Path tfState) {
+            }
+
+            @Override
+            public void checkNoneLeftAfterDestroy(Path stackDir, Path tfState) {
             }
         };
     }
@@ -285,6 +289,8 @@ public class DocumentingStepActions extends StepActions {
         out.println("""
                    After `tofu destroy`, check that the tofu state lists no resource that is still deployed, other than those that outlive
                    the stack: if it does, the state and the stack dir are not deleted, and the delete fails, naming them.
+                   Then check, with the cloud CLI, that the cloud has none of the stack's cluster, network and identity, whatever the state says:
+                   if it has, the delete fails in the same way.
                    """);
         out.flush();
     }

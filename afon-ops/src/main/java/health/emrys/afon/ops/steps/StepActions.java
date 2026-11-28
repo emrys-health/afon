@@ -258,6 +258,7 @@ public class StepActions {
         try {
             tofuDestroy(stackDir, maxAttempts, outputStream);
             checkNothingLeft(stackDir, tfState);
+            planGuards.checkNoneLeftAfterDestroy(stackDir, tfState);
             deletePath(stackDir);
             deletePath(tfState);
         } catch (ManagedProcessException e) {
@@ -481,9 +482,7 @@ public class StepActions {
             logAzureDeployer();
         }
         Path stackDir = stackDir(stackId);
-        if (stackId.cloud() == AfonCloud.AWS) {
-            planGuards.checkNoOrphanAwsVpc(stackDir, Path.of(tfStatePath(stackId)));
-        }
+        planGuards.checkNoneLeftBeforeDeploy(stackDir, Path.of(tfStatePath(stackId)));
         tofuApply(stackDir, clusterBootstrapTargets(stackDir), maxAttempts, outputStream);
     }
 

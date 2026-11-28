@@ -981,8 +981,27 @@ The check is there because `tofu destroy` can finish successfully without having
 it reports `0 destroyed`. Deleting the state then leaves the stack running in the cloud with nothing to destroy it, which costs money, and deploying
 the stack again fails with `already exists` (an EKS cluster, a VPC, an IAM role). The state is checked, not what tofu says.
 
-It cannot help if the state had already lost the resources before the delete, eg after a `tofu state rm` or by deleting the state file by hand: then use
-the cleanup script above, or delete the leftovers in the cloud.
+The state check cannot help if the state had already lost the resources before the delete, eg after a delete that was interrupted and run again on a
+cluster left in the `Failed` state by an upgrade, a `tofu state rm`, or deleting the state file by hand. So the delete **also looks in the cloud**.
+
+#### The delete and the deploy look in the cloud for what is left
+
+After the state check, the delete looks, with the CLI of the cloud (`az`, `aws` or `gcloud`), for the resources of the stack that are still there, by the
+names in the plan in its stack dir (`cdk.tf.json`):
+
+| Cloud | What it looks for |
+|-------|-------------------|
+| Azure | the AKS cluster, the virtual network and the managed identity, in the resource group of the plan |
+| AWS   | the EKS cluster, the NAT gateway and the VPC, by name, in the region of the plan |
+| GCP   | the GKE cluster and the VPC network, in the project of the plan |
+
+If any is found, the delete fails, naming them, and **keeps the state and the stack dir**. Delete them in the cloud, or run the delete again if they are
+still being deleted. It only reports: it does not delete them. The volume that outlives the stack is not looked for, so it never counts as left.
+
+The deploy does the same before the first apply of a stack that has nothing in its tofu state (none, or an empty one), so that leftovers fail it early,
+naming them, instead of with `already exists` part way through the apply. A stack with resources in its state is not checked: tofu knows them.
+
+Nothing is reported if it cannot be told: the plan is missing, a name in it is computed by tofu, or the CLI is not installed or not logged in.
 
 ### AWS
 
